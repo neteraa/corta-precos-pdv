@@ -4,3 +4,6 @@ dist
 *.log
 base_raw.txt
 data/
+
+# Local Netlify folder
+.netlify

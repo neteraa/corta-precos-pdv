@@ -19,10 +19,18 @@ nohup python3 -m http.server 8011 --bind 0.0.0.0 > /tmp/server.log 2>&1 &
 nohup npm run dev > /tmp/vite.log 2>&1 &
 ```
 
-## Access URLs
+## 🚀 PRODUCTION URL (PERMANENT — always online, no laptop needed)
+**https://corta-precos-pdv.netlify.app**
+- Hosted on Netlify free tier (agn.girardi@gmail.com)
+- Admin: https://app.netlify.com/projects/corta-precos-pdv
+- Site ID: abd4863b-ef7b-4d7c-b3f2-85547f519485
+- Data persists in Netlify Blobs (keys: cp_products, cp_sales, cp_customers, cp_promos, cp_fiado)
+- To redeploy: `cd /workspace/project && ./node_modules/.bin/netlify deploy --prod --dir=dist --functions=netlify/functions`
+
+## Development / Local Access
 - Container internal: http://localhost:8011
 - User browser (host): http://localhost:36537  (maps to container port 8011)
-- Container IP: http://172.17.0.10:8011
+- PM2 manages local server + cloudflared tunnel (auto-restart)
 
 ## Project structure
 ```

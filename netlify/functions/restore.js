@@ -1,0 +1,31 @@
+import { getStore } from '@netlify/blobs'
+
+const KEYS = ['cp_products', 'cp_sales', 'cp_customers', 'cp_promos', 'cp_fiado']
+
+export default async (_req, _context) => {
+  try {
+    const store = getStore('corta-precos')
+    const data = {}
+
+    await Promise.all(
+      KEYS.map(async (key) => {
+        const val = await store.get(key)
+        if (val) data[key] = val
+      })
+    )
+
+    return new Response(JSON.stringify({ ok: true, data }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    })
+  } catch (err) {
+    return new Response(JSON.stringify({ ok: false, data: {}, error: err.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+}
+
+export const config = { path: '/api/restore' }
