@@ -1,0 +1,30 @@
+{
+  "name": "Corta Preços — PDV",
+  "short_name": "Corta Preços",
+  "description": "Sistema PDV Corta Preços — frente de caixa, promoções e estoque",
+  "start_url": "/pdv",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#ea580c",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Abrir Caixa",   "url": "/pdv",       "description": "Frente de caixa" },
+    { "name": "Dashboard",     "url": "/dashboard", "description": "Visão geral" },
+    { "name": "Tela do Cliente","url": "/display",  "description": "Display do cliente" }
+  ],
+  "categories": ["business", "productivity"]
+}

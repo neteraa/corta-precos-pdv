@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <title>Corta Preços – PDV</title>
+
+    <!-- PWA: instala como app no Windows/Android/iOS -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#ea580c" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Corta Preços PDV" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+  </head>
+  <body class="bg-gray-50">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', async () => {
+          try {
+            const reg = await navigator.serviceWorker.register('/sw.js')
+
+            // When a new SW takes control of this tab, reload to pick up
+            // the fresh JS bundle — safe because network-first already
+            // served the latest HTML when the page opened.
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              // Small guard: only auto-reload if user hasn't been on the page
+              // for more than 4 s (i.e. this is startup activation, not mid-use)
+              if (performance.now() < 4000) {
+                window.location.reload()
+              }
+            })
+
+            // Periodically check for updates while the app is open
+            // (browser also checks on every navigation, but PWA can stay
+            //  open all day without navigating)
+            setInterval(() => reg.update(), 60 * 60 * 1000)  // every hour
+          } catch {}
+        })
+      }
+    </script>
+  </body>
+</html>
