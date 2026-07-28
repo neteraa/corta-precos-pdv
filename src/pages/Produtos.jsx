@@ -137,11 +137,15 @@ export default function Produtos() {
   }, [skuInput, editing, photoData, photoSource, photos, photoRemoved])
 
   // ── Picker: search by name ────────────────────────────────
+  const [pickerError,   setPickerError]   = useState(null)
+
   const runPickerSearch = useCallback(async (q) => {
-    if (!q || q.trim().length < 3) { setPickerResults([]); return }
+    if (!q || q.trim().length < 3) { setPickerResults([]); setPickerError(null); return }
     setPickerLoading(true)
-    const results = await searchProductPhotos(q, 8)
+    setPickerError(null)
+    const { results, error } = await searchProductPhotos(q, 8)
     setPickerResults(results)
+    setPickerError(error || null)
     setPickerLoading(false)
   }, [])
 
@@ -161,10 +165,19 @@ export default function Produtos() {
     }
   }, [])
 
-  // When picker opens, auto-search with the product name already in the form
+  // When picker opens, auto-search with product name (cleaned: lowercase, no sizes/codes)
   const openPicker = useCallback(() => {
     setShowPicker(true)
-    const q = editing?.name || ''
+    setPickerError(null)
+    setPickerResults([])
+    const raw = editing?.name || ''
+    const cleaned = raw
+      .toLowerCase()
+      .replace(/\d+[xX]\d+\w*/g, '')   // remove "24X350G", "36X133"
+      .replace(/\d+\s*g\b|\d+\s*kg\b|\d+\s*ml\b|\d+\s*lt?\b/gi, '') // "350g", "1kg"
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+    const q = cleaned || raw.toLowerCase()
     if (q.length >= 3) setPickerQuery(q)
   }, [editing])
 
@@ -507,21 +520,29 @@ export default function Produtos() {
                       {pickerLoading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blue-400 animate-spin" />}
                     </div>
                     {pickerResults.length > 0 ? (
-                      <div className="grid grid-cols-4 gap-1 p-2 max-h-44 overflow-y-auto">
+                      <div className="grid grid-cols-4 gap-1 p-2 max-h-48 overflow-y-auto">
                         {pickerResults.map((item, i) => (
                           <button key={i} type="button" onClick={() => pickPhoto(item)}
                             className="aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-400 transition-all relative group">
-                            <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
+                            <img src={item.url} alt={item.name} className="w-full h-full object-cover bg-gray-100" />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end">
                               <p className="text-white text-[8px] font-bold p-1 leading-tight opacity-0 group-hover:opacity-100 truncate w-full">{item.name}</p>
                             </div>
                           </button>
                         ))}
                       </div>
+                    ) : pickerError ? (
+                      <div className="p-4 text-center space-y-1">
+                        <p className="text-xs font-bold text-amber-600">⚠ Serviço temporariamente indisponível</p>
+                        <p className="text-[10px] text-gray-400">Open Food Facts está fora do ar. Tente em alguns minutos ou use câmera/arquivo.</p>
+                      </div>
                     ) : pickerQuery.length >= 3 && !pickerLoading ? (
-                      <p className="text-xs text-gray-400 text-center p-4">Nenhuma imagem encontrada. Tente outro nome.</p>
-                    ) : (
-                      <p className="text-xs text-gray-400 text-center p-4">Digite o nome do produto para buscar imagens</p>
+                      <div className="p-4 text-center space-y-1">
+                        <p className="text-xs text-gray-500 font-semibold">Nenhuma imagem encontrada</p>
+                        <p className="text-[10px] text-gray-400">Tente com menos palavras, ex: <em>"biscoito vitarella"</em></p>
+                      </div>
+                    ) : !pickerLoading && (
+                      <p className="text-xs text-gray-400 text-center p-4">Digite ou edite o nome para buscar imagens</p>
                     )}
                   </div>
                 )}

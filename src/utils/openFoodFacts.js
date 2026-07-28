@@ -57,24 +57,29 @@ export async function fetchProductPhoto(barcode) {
   return urlToDataUrl(url)
 }
 
-/* ── busca imagens por nome (ex: "biscoito vitarella") ───── */
+/* ── busca imagens por nome (ex: "biscoito vitarella") ───────
+   Retorna { results: [{name, url}], error?: string }
+────────────────────────────────────────────────────────────── */
 export async function searchProductPhotos(query, limit = 8) {
-  if (!query || query.trim().length < 3) return []
+  if (!query || query.trim().length < 3) return { results: [] }
   try {
     const q = encodeURIComponent(query.trim())
     const res = await fetch(
       `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${q}&search_simple=1&action=process&json=1&page_size=${limit}&fields=product_name,image_front_small_url,image_front_url`,
-      { signal: AbortSignal.timeout(8000) }
+      { signal: AbortSignal.timeout(10000) }
     )
-    if (!res.ok) return []
+    if (!res.ok) return { results: [], error: `OFF ${res.status}` }
     const data = await res.json()
-    return (data.products || [])
+    const results = (data.products || [])
       .filter(p => p.image_front_small_url || p.image_front_url)
       .map(p => ({
         name: p.product_name || '',
         url:  p.image_front_small_url || p.image_front_url,
       }))
-  } catch { return [] }
+    return { results }
+  } catch (e) {
+    return { results: [], error: e.message }
+  }
 }
 
 /* ── baixa uma URL de imagem → data URL comprimida ─────── */
