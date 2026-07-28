@@ -151,76 +151,77 @@ export function StoreProvider({ children }) {
   const persist = useCallback((key, val) => {
     const str = JSON.stringify(val)
     try { localStorage.setItem(key, str) } catch {}
-    // async save to server — no await, never blocks UI
     fetch('/api/persist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, value: str }),
-    }).catch(() => {}) // silent if server unreachable
+    }).catch(() => {})
   }, [])
 
-  // ── Boot: restore from server on first mount ─────────────────
-  // Server disk is source of truth. If localStorage was cleared or
-  // another device opens the URL, server data is restored instantly.
-  useEffect(() => {
+  // ── Last-sync timestamp (shown in UI) ────────────────────────
+  const [lastSync, setLastSync] = useState(null)
+  const [syncing,  setSyncing]  = useState(false)
+
+  // ── Core restore function — called on mount and on interval ──
+  const applyServerData = useCallback((data) => {
+    if (!data) return
     const syncToServer = (key, value) =>
       fetch('/api/persist', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value }),
       }).catch(() => {})
 
+    if (data.cp_products) {
+      const parsed = JSON.parse(data.cp_products)
+      setProducts(mergeWithSeed(parsed))
+      try { localStorage.setItem('cp_products', data.cp_products) } catch {}
+    }
+    if (data.cp_sales) {
+      setSales(JSON.parse(data.cp_sales))
+      try { localStorage.setItem('cp_sales', data.cp_sales) } catch {}
+    }
+    if (data.cp_customers) {
+      setCustomers(JSON.parse(data.cp_customers))
+      try { localStorage.setItem('cp_customers', data.cp_customers) } catch {}
+    }
+    if (data.cp_promos) {
+      try { localStorage.setItem('cp_promos', data.cp_promos) } catch {}
+      const stored = JSON.parse(data.cp_promos)
+      const seedById = Object.fromEntries(SEED_PROMOS.map(p => [p.id, p]))
+      const merged = stored.map(p => seedById[p.id] ?? p)
+      const storedIds = new Set(stored.map(p => p.id))
+      setPromos([...merged, ...SEED_PROMOS.filter(p => !storedIds.has(p.id))])
+    }
+    if (data.cp_fiado)    { try { localStorage.setItem('cp_fiado', data.cp_fiado) } catch {} }
+    if (data.cp_cash)     { setCashMovements(JSON.parse(data.cp_cash));   try { localStorage.setItem('cp_cash',      data.cp_cash)      } catch {} }
+    if (data.cp_goal)     { setSalesGoalState(JSON.parse(data.cp_goal));  try { localStorage.setItem('cp_goal',      data.cp_goal)      } catch {} }
+    if (data.cp_operators){ setOperators(JSON.parse(data.cp_operators)); try { localStorage.setItem('cp_operators', data.cp_operators) } catch {} }
+
+    // Push local keys not yet on server
+    if (!data.cp_customers) setCustomers(c  => { syncToServer('cp_customers', JSON.stringify(c));  return c })
+    if (!data.cp_promos)    setPromos(pr    => { syncToServer('cp_promos',    JSON.stringify(pr)); return pr })
+    if (!data.cp_products)  setProducts(p   => { syncToServer('cp_products',  JSON.stringify(p));  return p })
+    if (!data.cp_sales)     setSales(s      => { syncToServer('cp_sales',     JSON.stringify(s));  return s })
+
+    setLastSync(new Date())
+  }, []) // eslint-disable-line
+
+  // ── Manual sync (exposed to UI) ──────────────────────────────
+  const syncNow = useCallback(() => {
+    setSyncing(true)
     fetch('/api/restore')
       .then(r => r.json())
-      .then(({ ok, data }) => {
-        if (!ok || !data) return
+      .then(({ ok, data }) => { if (ok) applyServerData(data) })
+      .catch(() => {})
+      .finally(() => setSyncing(false))
+  }, [applyServerData])
 
-        // ── Restore keys that exist on server ───────────────────
-        if (data.cp_products) {
-          const parsed = JSON.parse(data.cp_products)
-          setProducts(mergeWithSeed(parsed))
-          try { localStorage.setItem('cp_products', data.cp_products) } catch {}
-        }
-        if (data.cp_sales) {
-          setSales(JSON.parse(data.cp_sales))
-          try { localStorage.setItem('cp_sales', data.cp_sales) } catch {}
-        }
-        if (data.cp_customers) {
-          setCustomers(JSON.parse(data.cp_customers))
-          try { localStorage.setItem('cp_customers', data.cp_customers) } catch {}
-        }
-        if (data.cp_promos) {
-          try { localStorage.setItem('cp_promos', data.cp_promos) } catch {}
-          const stored = JSON.parse(data.cp_promos)
-          const seedById = Object.fromEntries(SEED_PROMOS.map(p => [p.id, p]))
-          const merged = stored.map(p => seedById[p.id] ?? p)
-          const storedIds = new Set(stored.map(p => p.id))
-          setPromos([...merged, ...SEED_PROMOS.filter(p => !storedIds.has(p.id))])
-        }
-        if (data.cp_fiado) {
-          try { localStorage.setItem('cp_fiado', data.cp_fiado) } catch {}
-        }
-        if (data.cp_cash) {
-          setCashMovements(JSON.parse(data.cp_cash))
-          try { localStorage.setItem('cp_cash', data.cp_cash) } catch {}
-        }
-        if (data.cp_goal) {
-          setSalesGoalState(JSON.parse(data.cp_goal))
-          try { localStorage.setItem('cp_goal', data.cp_goal) } catch {}
-        }
-        if (data.cp_operators) {
-          setOperators(JSON.parse(data.cp_operators))
-          try { localStorage.setItem('cp_operators', data.cp_operators) } catch {}
-        }
-
-        // ── Push any keys missing from server ────────────────────
-        // This fills gaps (e.g. customers, promos not yet synced)
-        if (!data.cp_customers) setCustomers(c  => { syncToServer('cp_customers', JSON.stringify(c));  return c })
-        if (!data.cp_promos)    setPromos(pr    => { syncToServer('cp_promos',    JSON.stringify(pr)); return pr })
-        if (!data.cp_products)  setProducts(p   => { syncToServer('cp_products',  JSON.stringify(p));  return p })
-        if (!data.cp_sales)     setSales(s      => { syncToServer('cp_sales',     JSON.stringify(s));  return s })
-      })
-      .catch(() => {}) // silently fall back to localStorage data already loaded
-  }, []) // eslint-disable-line
+  // ── Boot + auto-poll every 30 s ──────────────────────────────
+  useEffect(() => {
+    syncNow()
+    const id = setInterval(syncNow, 30_000)
+    return () => clearInterval(id)
+  }, [syncNow])
 
   // ── Cross-tab sync: reload state when another tab writes ─────
   useEffect(() => {
@@ -396,6 +397,7 @@ export function StoreProvider({ children }) {
       addCashMovement, setSalesGoal,
       upsertOperator, deleteOperator,
       resetAll,
+      syncNow, lastSync, syncing,
     }}>
       {children}
     </Ctx.Provider>

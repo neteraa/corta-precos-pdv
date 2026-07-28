@@ -1,13 +1,46 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
   Warehouse, Users, Settings, Menu, Phone, Instagram,
   QrCode, Tag, Star, Download, Monitor, Camera, Scissors, HandCoins, LogOut,
-  BarChart2, Printer, CalendarClock, Megaphone
+  BarChart2, Printer, CalendarClock, Megaphone, RefreshCw
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import { logout } from '../utils/auth.js'
+import { useStore } from '../store.jsx'
+
+function SyncBar() {
+  const { syncNow, lastSync, syncing } = useStore()
+  const [ago, setAgo] = useState('')
+
+  useEffect(() => {
+    const update = () => {
+      if (!lastSync) { setAgo(''); return }
+      const s = Math.floor((Date.now() - lastSync) / 1000)
+      if (s < 5)  setAgo('agora mesmo')
+      else if (s < 60)  setAgo(`há ${s}s`)
+      else setAgo(`há ${Math.floor(s / 60)}min`)
+    }
+    update()
+    const t = setInterval(update, 5000)
+    return () => clearInterval(t)
+  }, [lastSync])
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${syncing ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'}`} />
+      <span className="text-[10px] text-gray-500 flex-1 truncate">
+        {syncing ? 'Sincronizando...' : ago ? `Sync ${ago}` : 'Conectando...'}
+      </span>
+      <button onClick={syncNow} disabled={syncing}
+        className="text-gray-600 hover:text-green-400 transition-colors disabled:opacity-30">
+        <RefreshCw className={`w-3 h-3 ${syncing ? 'animate-spin' : ''}`} />
+      </button>
+    </div>
+  )
+}
 
 /* ── nav sections ─────────────────────────────────────────── */
 const CAIXA = [
@@ -170,6 +203,8 @@ export default function Layout() {
               <span className="text-black text-[11px] font-black">Instalar App (PWA)</span>
             </button>
           )}
+
+          <SyncBar />
 
           <button onClick={handleLogout}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all group">
