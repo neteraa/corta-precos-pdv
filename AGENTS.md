@@ -75,3 +75,30 @@ After importing CSV, data persists across page reloads.
 - F4: toggle HID barcode scanner mode (keyboard input capture)
 - F10: open finalize sale modal
 - ESC: close modal / disable scanner
+
+## Features added (session 2025-07)
+**10 improvements all deployed live:**
+1. **Fechamento de Caixa** — already existed, now with Sangria/Suprimento form + net cash balance
+2. **Meta de Vendas** — progress bar on Dashboard, set with "Meta" button
+3. **Estoque Mínimo** — `minStock` field per product; "🛒 Repor" tab in Estoque shows below-min products
+4. **Etiquetas de Preço** — `/etiquetas` page; select products → generate PDF (40x20/50x25/60x30/100x50mm) via jsPDF
+5. **Controle de Validade** — `/validade` page; `expiryDate` field per product; alerts: expired/critical/warning/ok
+6. **Múltiplos Operadores** — in Configurações → Operadores; stored in `cp_operators` (name/role/pin)
+7. **Balança por Peso** — PDV detects `unit=KG/G` and opens weight modal for decimal qty input
+8. **Recibo por WhatsApp** — button in post-sale modal sends formatted receipt text via wa.me
+9. **Relatório Gerencial** — `/relatorio` page; period filter, profit, margin, ticket avg, top 10, CSV export
+10. **Sangria/Suprimento** — in Fechamento de Caixa modal; recorded in `cp_cash` key
+
+## New store keys (localStorage + Netlify Blobs)
+- `cp_cash` — cash movements array `[{id, type, amount, reason, date}]`
+- `cp_goal` — sales goal `{daily: number}`
+- `cp_operators` — operators array `[{id, name, role, pin}]`
+
+## Product model extended
+Products now support: `minStock` (number), `expiryDate` (ISO date string), `unit` (UN/KG/G/LT/CX)
+
+## Production deployment
+- URL: https://corta-precos-pdv.netlify.app
+- Site ID: abd4863b-ef7b-4d7c-b3f2-85547f519485
+- Deploy via: `npx netlify-cli deploy --prod --dir=dist --site=abd4863b-ef7b-4d7c-b3f2-85547f519485`
+- Login: admin / 1234 (changeable in Configurações → Acesso ao Sistema)
