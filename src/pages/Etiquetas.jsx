@@ -60,6 +60,18 @@ const fpt = (hMm, pct) => Math.max(4.5, hMm * 2.8346 * pct)
 
 const PAD = 2.5 // mm horizontal padding inside label
 
+/* ── Strip diacritics so jsPDF helvetica renders correctly ──
+   Browser previews fine (UTF-8 font), PDF needs ASCII-safe text */
+const pdfSafe = s =>
+  (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+
+/* ── hex #rrggbb → [r,g,b] ─────────────────────────────── */
+const hex2rgb = hex => [
+  parseInt(hex.slice(1, 3), 16),
+  parseInt(hex.slice(3, 5), 16),
+  parseInt(hex.slice(5, 7), 16),
+]
+
 /* ══════════════════════════════════════════════════════════
    PDF DRAWING — all coords in mm (jsPDF unit:'mm')
    setFontSize() always takes pt regardless of unit
@@ -67,22 +79,18 @@ const PAD = 2.5 // mm horizontal padding inside label
 function pdfLabel(doc, p, x, y, w, h, tmplId) {
   const t = TMPL.find(t => t.id === tmplId) || TMPL[0]
   const { int, dec } = splitPrice(p.price)
-  const name = (p.name || '').toUpperCase()
-  const hs = h * 0.26  // header strip height
 
-  const hexToRgb = hex => {
-    const r = parseInt(hex.slice(1, 3), 16)
-    const g = parseInt(hex.slice(3, 5), 16)
-    const b = parseInt(hex.slice(5, 7), 16)
-    return [r, g, b]
-  }
+  // FIX 1: strip accents — jsPDF built-in helvetica is ASCII-only
+  const name = pdfSafe(p.name)
 
-  const [br, bg, bb] = hexToRgb(t.body)
-  const [sr, sg, sb] = hexToRgb(t.strip)
-  const [nr, ng, nb] = hexToRgb(t.nameTxt)
-  const [pr, pg, pb] = hexToRgb(t.priceTxt)
-  const [str, stg, stb] = hexToRgb(t.stripTxt)
-  const [bdr, bdg, bdb] = hexToRgb(t.bodyBorder)
+  const hs = h * 0.27  // header strip height
+
+  const [br, bg, bb]   = hex2rgb(t.body)
+  const [sr, sg, sb]   = hex2rgb(t.strip)
+  const [nr, ng, nb]   = hex2rgb(t.nameTxt)
+  const [pr, pg, pb]   = hex2rgb(t.priceTxt)
+  const [str, stg, stb] = hex2rgb(t.stripTxt)
+  const [bdr, bdg, bdb] = hex2rgb(t.bodyBorder)
 
   // ── body background
   doc.setFillColor(br, bg, bb)
@@ -97,63 +105,69 @@ function pdfLabel(doc, p, x, y, w, h, tmplId) {
   doc.setLineWidth(0.35)
   doc.rect(x, y, w, h, 'S')
 
-  // ── store name in strip
+  // FIX 2: draw only ONE text in strip — oferta shows "* SUPER OFERTA *" instead of store name
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(fpt(h, 0.115))
+  const stripLabel = tmplId === 'oferta' ? '* SUPER OFERTA *' : pdfSafe(STORE)
+  doc.setFontSize(fpt(h, tmplId === 'oferta' ? 0.10 : 0.115))
   doc.setTextColor(str, stg, stb)
-  doc.text(STORE, x + w / 2, y + hs * 0.73, { align: 'center' })
+  doc.text(stripLabel, x + w / 2, y + hs * 0.73, { align: 'center' })
 
-  // ── oferta badge
-  if (tmplId === 'oferta') {
-    doc.setFontSize(fpt(h, 0.10))
-    doc.setTextColor(str, stg, stb)
-    doc.text('★ SUPER OFERTA ★', x + w / 2, y + hs * 0.73, { align: 'center' })
-  }
+  // FIX 3: auto-shrink font until name fits in nameLinesMax lines
+  const maxNameW    = w - PAD * 2
+  const nameLinesMax = h <= 25 ? 1 : 2
+  let   nameFs      = fpt(h, h <= 25 ? 0.150 : 0.122)
 
-  // ── product name (1-2 lines)
-  const nameFs = fpt(h, h <= 25 ? 0.155 : 0.125)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(nameFs)
-  doc.setTextColor(nr, ng, nb)
-  const maxNameW = w - PAD * 2
-  const nameLines = doc.splitTextToSize(name, maxNameW).slice(0, h <= 30 ? 1 : 2)
-  const nameY = y + hs + h * 0.19
-  doc.text(nameLines, x + PAD, nameY)
+  for (let i = 0; i < 8; i++) {
+    doc.setFontSize(nameFs)
+    if (doc.splitTextToSize(name, maxNameW).length <= nameLinesMax || nameFs <= 4.5) break
+    nameFs = Math.max(4.5, nameFs * 0.82)
+  }
+  const nameLines = doc.splitTextToSize(name, maxNameW).slice(0, nameLinesMax)
 
-  // ── promo pill (if product has promo and label is tall enough)
+  // FIX 4: compute nameY so text never overlaps price block
+  const lineHmm  = (nameFs / 2.8346) * 1.35          // line height in mm
+  const nameBlockH = nameLines.length * lineHmm
+  const nameAreaTop = y + hs + 1.2
+  const priceBlockTop = y + h * (h <= 25 ? 0.54 : 0.60)  // price block starts here
+  const nameCenter = nameAreaTop + (priceBlockTop - nameAreaTop - nameBlockH) / 2
+  const nameY = Math.max(nameAreaTop + lineHmm * 0.82, nameCenter + lineHmm * 0.82)
+
+  doc.setTextColor(nr, ng, nb)
+  doc.text(nameLines, x + PAD, nameY, { lineHeightFactor: 1.35 })
+
+  // ── promo pill
   if (p.promo && h >= 45) {
-    const pillY = y + h * 0.62
+    const promoText = pdfSafe(p.promo)
+    const pillY = y + h * 0.63
     doc.setFillColor(sr, sg, sb)
     doc.roundedRect(x + PAD, pillY - 2.5, w - PAD * 2, 5, 1, 1, 'F')
     doc.setFontSize(fpt(h, 0.08))
     doc.setTextColor(str, stg, stb)
-    doc.text(p.promo.toUpperCase(), x + w / 2, pillY + 0.8, { align: 'center' })
+    doc.text(promoText, x + w / 2, pillY + 0.8, { align: 'center' })
   }
 
   // ── price layout: R$ [INT] ,DEC
-  const bigFs = fpt(h, 0.40)
-  const smFs  = fpt(h, 0.15)
-  const priceBaseline = y + h - h * 0.095
+  const bigFs = fpt(h, 0.38)
+  const smFs  = fpt(h, 0.145)
+  const priceBaseline = y + h - h * 0.09
 
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(pr, pg, pb)
 
-  // R$
   doc.setFontSize(smFs)
-  const rsW = doc.getTextWidth('R$') + 1.0
-  doc.text('R$', x + PAD, priceBaseline - (bigFs / 2.8346) * 0.25)
+  const rsW = doc.getTextWidth('R$') + 0.8
+  doc.text('R$', x + PAD, priceBaseline - (bigFs / 2.8346) * 0.22)
 
-  // integer (big)
   doc.setFontSize(bigFs)
   const intX = x + PAD + rsW
   doc.text(int, intX, priceBaseline)
   const intW = doc.getTextWidth(int)
 
-  // ,dec (raised)
   doc.setFontSize(smFs)
-  doc.text(dec, intX + intW + 0.5, priceBaseline - (bigFs / 2.8346) * 0.25)
+  doc.text(dec, intX + intW + 0.5, priceBaseline - (bigFs / 2.8346) * 0.22)
 
-  // ── unit label (KG / LT etc.)
+  // ── unit (KG / LT etc.)
   const unit = (p.unit || '').toUpperCase()
   if (!['UN', 'UND', ''].includes(unit)) {
     doc.setFontSize(fpt(h, 0.10))
@@ -161,7 +175,7 @@ function pdfLabel(doc, p, x, y, w, h, tmplId) {
     doc.text('/' + unit, x + w - PAD, priceBaseline, { align: 'right' })
   }
 
-  // ── barcode / SKU at very bottom
+  // ── barcode / SKU footer
   if (h >= 35 && (p.sku || p.barcode)) {
     doc.setFontSize(fpt(h, 0.075))
     doc.setTextColor(150, 150, 150)
