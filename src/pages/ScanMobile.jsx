@@ -93,12 +93,15 @@ export default function ScanMobile() {
   const qtyRef = useRef(null)
 
   /* ── New product registration sheet ────────────────────── */
-  const [newProdCode,  setNewProdCode]  = useState(null)  // barcode of unknown product
+  const [newProdCode,  setNewProdCode]  = useState(null)
   const [newProdName,  setNewProdName]  = useState('')
   const [newProdPrice, setNewProdPrice] = useState('')
   const [newProdCost,  setNewProdCost]  = useState('')
   const [newProdCat,   setNewProdCat]   = useState('')
+  const [newProdUnit,  setNewProdUnit]  = useState('UN')
+  const [newProdQty,   setNewProdQty]   = useState('')
   const nameRef = useRef(null)
+  const UNITS_QUICK = ['UN', 'KG', 'LT', 'CX', 'PC', 'DZ']
 
   useEffect(() => {
     if (newProdCode) setTimeout(() => nameRef.current?.focus(), 350)
@@ -125,7 +128,8 @@ export default function ScanMobile() {
   /* ── open new-product form ──────────────────────────────── */
   const openNewProd = useCallback((code) => {
     setNewProdCode(code)
-    setNewProdName(''); setNewProdPrice(''); setNewProdCost(''); setNewProdCat('')
+    setNewProdName(''); setNewProdPrice(''); setNewProdCost('')
+    setNewProdCat(''); setNewProdUnit('UN'); setNewProdQty('')
   }, [])
 
   /* ── save new product ───────────────────────────────────── */
@@ -135,24 +139,24 @@ export default function ScanMobile() {
       id:       `p${Date.now()}_${Math.random().toString(36).slice(2)}`,
       sku:      newProdCode,
       barcode:  newProdCode,
-      name:     newProdName.trim(),
+      name:     newProdName.trim().toUpperCase(),
       price:    parseFloat(newProdPrice) || 0,
       cost:     parseFloat(newProdCost)  || 0,
       category: newProdCat.trim() || 'Outros',
-      stock:    0,
+      unit:     newProdUnit || 'UN',
+      stock:    parseFloat(newProdQty)   || 0,
     }
     upsertProduct(p)
     setNewProdCode(null)
-    // After saving, continue the scan flow for each mode
     if (mode === 'pdv') {
       sendScan(newProdCode)
       setPdvFound(p); setTimeout(() => setPdvFound(null), 2500)
       setPdvFeed(f => [{ code: newProdCode, name: p.name, price: p.price, ts: Date.now() }, ...f].slice(0, 8))
     } else {
-      setQty('1'); setVencimento(''); setLote(''); setCusto('')
+      setQty(newProdQty || '1'); setVencimento(''); setLote(''); setCusto('')
       setSheet(p)
     }
-  }, [newProdCode, newProdName, newProdPrice, newProdCost, newProdCat, mode, upsertProduct, sendScan])
+  }, [newProdCode, newProdName, newProdPrice, newProdCost, newProdCat, newProdUnit, newProdQty, mode, upsertProduct, sendScan])
 
   /* ── scan handler ──────────────────────────────────────── */
   const handleScan = useCallback((code) => {
@@ -191,25 +195,37 @@ export default function ScanMobile() {
 
   /* ── confirm all batch entries ─────────────────────────── */
   const confirmAll = () => {
-    batch.forEach(({ product, qty, custo }) => {
+    batch.forEach(({ product, qty, vencimento, custo }) => {
       const updates = { stock: (product.stock || 0) + qty, receivedAt: new Date().toISOString() }
-      if (custo) updates.cost = custo
+      if (custo)      updates.cost       = parseFloat(custo)
+      if (vencimento) updates.expiryDate = vencimento   // ← BUG FIX: save to product
       upsertProduct({ ...product, ...updates })
     })
     setDone(true)
-    setTimeout(() => { setBatch([]); setDone(false) }, 3000)
+    setTimeout(() => { setBatch([]); setDone(false) }, 8000)
   }
 
   /* ── done screen ───────────────────────────────────────── */
-  if (done) return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: '#052e16', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 32, fontFamily: 'system-ui,sans-serif' }}>
-      <CheckCircle style={{ width: 72, height: 72, color: '#4ade80' }} />
-      <div style={{ color: '#fff', fontWeight: 900, fontSize: 24, textAlign: 'center' }}>Estoque atualizado!</div>
-      <div style={{ color: '#4ade80', fontSize: 14, textAlign: 'center' }}>
-        {batch.length} produto(s) · {batch.reduce((s, e) => s + e.qty, 0)} unidades
+  if (done) {
+    const withVenc = batch.filter(e => e.vencimento).length
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: '#052e16', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 32, fontFamily: 'system-ui,sans-serif' }}>
+        <CheckCircle style={{ width: 72, height: 72, color: '#4ade80' }} />
+        <div style={{ color: '#fff', fontWeight: 900, fontSize: 24, textAlign: 'center' }}>Estoque atualizado!</div>
+        <div style={{ color: '#4ade80', fontSize: 14, textAlign: 'center' }}>
+          {batch.length} produto(s) · {batch.reduce((s, e) => s + e.qty, 0)} unidades
+        </div>
+        {withVenc > 0 && (
+          <div style={{ color: '#fbbf24', fontSize: 13, textAlign: 'center' }}>
+            📅 {withVenc} validade(s) salva(s) → veja em Controle de Validade
+          </div>
+        )}
+        <a href="/validade" style={{ marginTop: 8, padding: '12px 24px', borderRadius: 12, background: '#166534', color: '#4ade80', fontWeight: 800, fontSize: 14, textDecoration: 'none', display: 'inline-block' }}>
+          Ver Controle de Validade →
+        </a>
       </div>
-    </div>
-  )
+    )
+  }
 
   // Camera fills the full viewport (CameraScanner uses fixed inset-0 z-50).
   // Every other panel floats at z > 50 on top of it.
@@ -314,34 +330,51 @@ export default function ScanMobile() {
               />
             </div>
 
-            {/* Preço e Custo lado a lado */}
+            {/* Preço e Custo */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 20px 14px' }}>
               <div>
                 <label style={S.label}>Preço venda (R$) *</label>
-                <input
-                  id="scanNewPrice"
-                  type="number" inputMode="decimal" step="0.01" min="0"
+                <input id="scanNewPrice" type="number" inputMode="decimal" step="0.01" min="0"
                   value={newProdPrice} onChange={e => setNewProdPrice(e.target.value)}
-                  style={S.input} placeholder="0,00"
-                />
+                  style={S.input} placeholder="0,00" />
               </div>
               <div>
                 <label style={S.label}>Custo (R$)</label>
-                <input
-                  type="number" inputMode="decimal" step="0.01" min="0"
+                <input type="number" inputMode="decimal" step="0.01" min="0"
                   value={newProdCost} onChange={e => setNewProdCost(e.target.value)}
-                  style={S.input} placeholder="0,00"
-                />
+                  style={S.input} placeholder="0,00" />
+              </div>
+            </div>
+
+            {/* Unidade (tap chips) + Qtd inicial */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 20px 14px' }}>
+              <div>
+                <label style={S.label}>Unidade</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 4 }}>
+                  {UNITS_QUICK.map(u => (
+                    <button key={u} type="button" onClick={() => setNewProdUnit(u)}
+                      style={{ padding: '8px 11px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                        fontSize: 12, fontWeight: 800,
+                        background: newProdUnit === u ? '#ea580c' : '#3f3f46',
+                        color:      newProdUnit === u ? '#000'    : '#a1a1aa' }}>
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={S.label}>Qtd em estoque</label>
+                <input type="number" inputMode="numeric" min="0" step="1"
+                  value={newProdQty} onChange={e => setNewProdQty(e.target.value)}
+                  style={S.input} placeholder="0" />
               </div>
             </div>
 
             {/* Categoria */}
             <div style={S.field}>
               <label style={S.label}>Categoria</label>
-              <input
-                type="text" value={newProdCat} onChange={e => setNewProdCat(e.target.value)}
-                style={S.input} placeholder="Ex: Mercearia, Bebidas, Carnes…"
-              />
+              <input type="text" value={newProdCat} onChange={e => setNewProdCat(e.target.value)}
+                style={S.input} placeholder="Ex: Mercearia, Bebidas, Carnes…" />
             </div>
 
             <div style={S.row}>

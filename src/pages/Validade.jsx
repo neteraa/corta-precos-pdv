@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle, Clock, Search, Calendar } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Clock, Search, Calendar, QrCode } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
 
 const WARN_DAYS = 30  // alert threshold
@@ -66,9 +66,20 @@ export default function Validade() {
 
   return (
     <div className="space-y-5 animate-pop">
-      <div>
-        <h1 className="text-2xl font-black text-gray-900">Controle de Validade</h1>
-        <p className="text-gray-500 text-sm mt-0.5">Produtos próximos ao vencimento</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-black text-gray-900">Controle de Validade</h1>
+          <p className="text-gray-500 text-sm mt-0.5">
+            {counts.expired > 0 && <span className="text-red-600 font-bold">{counts.expired} vencido(s)! · </span>}
+            {counts.critical > 0 && <span className="text-orange-600 font-bold">{counts.critical} vence em 7 dias · </span>}
+            Produtos próximos ao vencimento
+          </p>
+        </div>
+        <a href="/scan?mode=estoque" target="_blank" rel="noreferrer"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-black font-black text-sm transition-colors">
+          <QrCode className="w-4 h-4" />
+          Escanear no celular
+        </a>
       </div>
 
       {/* Summary pills */}
@@ -108,29 +119,27 @@ export default function Validade() {
           const cfg = STATUS_CFG[p.status] || STATUS_CFG.ok
           const Icon = cfg.icon
           return (
-            <div key={p.id} className={`${cfg.bg} ${cfg.border} border rounded-xl p-3 flex items-center gap-3`}>
-              <Icon className={`w-5 h-5 flex-shrink-0 ${cfg.iconColor}`} />
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-gray-800 text-sm truncate">{p.name}</div>
-                <div className="text-xs text-gray-500">{p.category} · {BRL.format(p.price || 0)} · {p.stock} un.</div>
-              </div>
-              <div className="text-right flex-shrink-0 mr-2">
-                {p.days !== null ? (
-                  <>
+            <div key={p.id} className={`${cfg.bg} ${cfg.border} border rounded-xl p-3`}>
+              <div className="flex items-center gap-2 mb-2">
+                <Icon className={`w-5 h-5 flex-shrink-0 ${cfg.iconColor}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-gray-800 text-sm leading-tight truncate">{p.name}</div>
+                  <div className="text-xs text-gray-500">{p.category} · {BRL.format(p.price || 0)} · {p.stock ?? 0} un.</div>
+                </div>
+                {p.days !== null && (
+                  <div className="flex-shrink-0 text-right">
                     <div className={`text-sm font-black ${cfg.text}`}>
                       {p.days < 0 ? `${Math.abs(p.days)}d atrás` : p.days === 0 ? 'Hoje!' : `${p.days}d`}
                     </div>
                     <div className="text-xs text-gray-400">{new Date(p.expiryDate + 'T00:00:00').toLocaleDateString('pt-BR')}</div>
-                  </>
-                ) : (
-                  <span className="text-xs text-gray-400">sem data</span>
+                  </div>
                 )}
               </div>
               <input
                 type="date"
                 value={p.expiryDate || ''}
                 onChange={e => updateExpiry(p.id, e.target.value)}
-                className="input w-36 py-1 text-sm flex-shrink-0"
+                className="input w-full py-2 text-sm"
               />
             </div>
           )
