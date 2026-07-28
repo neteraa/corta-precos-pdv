@@ -20,6 +20,7 @@ import ScanMobile from './pages/ScanMobile.jsx'
 import Relatorio from './pages/Relatorio.jsx'
 import Etiquetas from './pages/Etiquetas.jsx'
 import Validade from './pages/Validade.jsx'
+import Campanhas from './pages/Campanhas.jsx'
 import { isLoggedIn } from './utils/auth.js'
 
 function RequireAuth({ children }) {
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="/relatorio"     element={<Relatorio />} />
           <Route path="/etiquetas"     element={<Etiquetas />} />
           <Route path="/validade"      element={<Validade />} />
+          <Route path="/campanhas"     element={<Campanhas />} />
         </Route>
       </Routes>
     </StoreProvider>

@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
   Warehouse, Users, Settings, Menu, Phone, Instagram,
   QrCode, Tag, Star, Download, Monitor, Camera, Scissors, HandCoins, LogOut,
-  BarChart2, Printer, CalendarClock
+  BarChart2, Printer, CalendarClock, Megaphone
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import { logout } from '../utils/auth.js'
@@ -26,6 +26,7 @@ const GESTAO = [
 const EXTRAS = [
   { to: '/etiquetas',     icon: Printer,         label: 'Etiquetas' },
   { to: '/validade',      icon: CalendarClock,   label: 'Validade' },
+  { to: '/campanhas',     icon: Megaphone,       label: 'Campanhas / ZAP', badge: 'NOVO' },
   { to: '/fidelidade',    icon: QrCode,          label: 'Fidelidade / ZAP' },
   { to: '/flyer',         icon: Star,            label: 'Flyer Sorteio' },
   { to: '/configuracoes', icon: Settings,        label: 'Configurações' },
