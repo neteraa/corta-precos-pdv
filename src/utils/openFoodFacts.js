@@ -46,8 +46,7 @@ function urlToDataUrl(url) {
       catch { resolve(null) } // canvas taint (shouldn't happen with CORS *)
     }
     img.onerror = () => resolve(null)
-    // Bust cache so img tag doesn't use a cached response without CORS header
-    img.src = url.includes('?') ? url : url + '.jpg'
+    img.src = url
   })
 }
 

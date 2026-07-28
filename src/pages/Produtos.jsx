@@ -161,6 +161,13 @@ export default function Produtos() {
     }
   }, [])
 
+  // When picker opens, auto-search with the product name already in the form
+  const openPicker = useCallback(() => {
+    setShowPicker(true)
+    const q = editing?.name || ''
+    if (q.length >= 3) setPickerQuery(q)
+  }, [editing])
+
   const save = async (e) => {
     e.preventDefault()
     const fd  = new FormData(e.target)
@@ -433,7 +440,7 @@ export default function Produtos() {
                         <Camera className="w-3.5 h-3.5" /> Câmera
                         <input ref={photoInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoSelect} />
                       </label>
-                      <button type="button" onClick={() => setShowPicker(v => !v)}
+                      <button type="button" onClick={openPicker}
                         className="bg-blue-500/90 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-blue-600">
                         <Search className="w-3.5 h-3.5" /> Buscar
                       </button>
@@ -464,7 +471,7 @@ export default function Produtos() {
                         <input ref={photoInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoSelect} />
                       </label>
                       {/* Search */}
-                      <button type="button" onClick={() => setShowPicker(v => !v)}
+                      <button type="button" onClick={openPicker}
                         className={`flex flex-col items-center gap-1.5 py-5 hover:bg-blue-50 transition-colors group ${showPicker ? 'bg-blue-50' : ''}`}>
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${showPicker ? 'bg-blue-100' : 'bg-gray-100 group-hover:bg-blue-100'}`}>
                           <Globe className={`w-5 h-5 ${showPicker ? 'text-blue-500' : 'text-gray-400 group-hover:text-blue-500'}`} />
