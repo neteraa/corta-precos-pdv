@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import PRODUCTS_SEED from './utils/products_seed.json'
+import { getAllPhotos, savePhoto as dbSavePhoto, deletePhoto as dbDeletePhoto } from './utils/photoDb.js'
 
 /* ── formatting helpers ─────────────────────────────────────── */
 export const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -117,6 +118,20 @@ export function StoreProvider({ children }) {
   const [operators, setOperators] = useState(() => {
     try { const s = localStorage.getItem('cp_operators'); return s ? JSON.parse(s) : [] } catch { return [] }
   })
+
+  // ── Product photos (IndexedDB — loaded async on mount) ─────
+  const [photos, setPhotos] = useState({})
+  useEffect(() => { getAllPhotos().then(setPhotos).catch(() => {}) }, [])
+
+  const saveProductPhoto = useCallback(async (id, dataUrl) => {
+    if (dataUrl) {
+      await dbSavePhoto(id, dataUrl)
+      setPhotos(prev => ({ ...prev, [id]: dataUrl }))
+    } else {
+      await dbDeletePhoto(id)
+      setPhotos(prev => { const n = { ...prev }; delete n[id]; return n })
+    }
+  }, [])
 
   const [promos, setPromos] = useState(() => {
     try {
@@ -373,6 +388,7 @@ export function StoreProvider({ children }) {
     <Ctx.Provider value={{
       products, sales, customers, promos,
       cashMovements, salesGoal, operators,
+      photos, saveProductPhoto,
       upsertProduct, deleteProduct, registerSale,
       upsertCustomer, deleteCustomer, importProducts,
       upsertPromo, deletePromo, assignPromoGroup,

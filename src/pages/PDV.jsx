@@ -159,7 +159,7 @@ function useHIDScanner(onScan) {
 }
 
 export default function PDV() {
-  const { products, promos, registerSale } = useStore()
+  const { products, promos, registerSale, photos } = useStore()
   const printer   = usePrinter()
   const broadcast = useBroadcastSend()
 
@@ -567,18 +567,23 @@ export default function PDV() {
                     key={p.id}
                     data-result
                     onClick={() => { addToCart(p); setSelIdx(-1) }}
-                    className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
                       idx === selIdx
                         ? 'bg-orange-50 border-l-4 border-orange-500'
                         : 'hover:bg-brand-50'
                     }`}
                   >
-                    <div className="flex-1 min-w-0 mr-4">
-                      <div className="flex items-center gap-2">
+                    {/* Product thumbnail */}
+                    {photos[p.id]
+                      ? <img src={photos[p.id]} alt="" className="w-11 h-11 rounded-lg object-cover flex-shrink-0" />
+                      : <div className="w-11 h-11 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-300 text-lg">📦</div>
+                    }
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
                         {idx === selIdx && <span className="text-orange-500 font-black text-base leading-none">›</span>}
                         <span className="text-sm font-semibold text-gray-800 truncate">{p.name}</span>
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5 ml-4">
+                      <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs text-gray-400 font-mono">{p.sku}</span>
                         <span className="text-xs text-gray-400">{p.category}</span>
                         {p.promoGroup && (
