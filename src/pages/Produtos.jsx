@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react'
-import { Plus, Pencil, Trash2, Search, X, Upload, Camera, LayoutGrid, List, ImageOff, Sparkles, StopCircle } from 'lucide-react'
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import { Plus, Pencil, Trash2, Search, X, Upload, Camera, LayoutGrid, List, ImageOff,
+         Sparkles, StopCircle, Globe, Loader2 } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
 import { parseGdoorCsv } from '../utils/importCsv.js'
-import { compressImage } from '../utils/photoDb.js'
-import { autoFetchPhotos } from '../utils/openFoodFacts.js'
+import { compressImage, savePhoto as dbSavePhoto } from '../utils/photoDb.js'
+import { autoFetchPhotos, fetchProductPhoto, searchProductPhotos, urlToDataUrl } from '../utils/openFoodFacts.js'
 
 const EMPTY = { sku: '', name: '', category: '', cost: '', price: '', stock: '', unit: 'UN', minStock: '', expiryDate: '' }
 const UNITS = ['UN', 'KG', 'G', 'LT', 'ML', 'CX', 'PC', 'DZ', 'MT']
@@ -70,14 +71,25 @@ export default function Produtos() {
   const [importing, setImporting] = useState(false)
 
   // Photo state for form
-  const [photoPreview, setPhotoPreview] = useState(null) // base64 preview
-  const [photoData,    setPhotoData]    = useState(null) // compressed base64 to save
-  const [photoRemoved, setPhotoRemoved] = useState(false)
+  const [photoPreview,    setPhotoPreview]    = useState(null)
+  const [photoData,       setPhotoData]       = useState(null)
+  const [photoRemoved,    setPhotoRemoved]    = useState(false)
+  const [photoSource,     setPhotoSource]     = useState(null) // 'camera' | 'off' | 'search'
   const photoInputRef = useRef(null)
 
-  // Auto-fetch state
+  // Form barcode (controlled — triggers auto-fetch)
+  const [skuInput,        setSkuInput]        = useState('')
+  const [autoFetchingPh,  setAutoFetchingPh]  = useState(false)
+
+  // Name-search picker
+  const [showPicker,      setShowPicker]      = useState(false)
+  const [pickerQuery,     setPickerQuery]      = useState('')
+  const [pickerResults,   setPickerResults]   = useState([])
+  const [pickerLoading,   setPickerLoading]   = useState(false)
+
+  // Bulk auto-fetch state
   const [fetching,   setFetching]   = useState(false)
-  const [fetchProg,  setFetchProg]  = useState(null) // { done, total, found }
+  const [fetchProg,  setFetchProg]  = useState(null)
   const abortRef = useRef(null)
 
   const filtered = useMemo(() =>
@@ -87,26 +99,67 @@ export default function Produtos() {
 
   const openEdit = (p) => {
     setEditing(p)
-    setPhotoPreview(null)
-    setPhotoData(null)
-    setPhotoRemoved(false)
+    setPhotoPreview(null); setPhotoData(null); setPhotoRemoved(false); setPhotoSource(null)
+    setSkuInput(p.sku || '')
+    setShowPicker(false); setPickerQuery(''); setPickerResults([])
   }
 
   const handlePhotoSelect = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     const compressed = await compressImage(file, 400, 0.82)
-    if (compressed) { setPhotoPreview(compressed); setPhotoData(compressed) }
+    if (compressed) { setPhotoPreview(compressed); setPhotoData(compressed); setPhotoSource('camera') }
     e.target.value = ''
   }
 
   const removePhoto = () => {
-    setPhotoPreview(null)
-    setPhotoData(null)
-    setPhotoRemoved(true)
+    setPhotoPreview(null); setPhotoData(null); setPhotoRemoved(true); setPhotoSource(null)
   }
 
   const currentPhoto = photoPreview || (editing?.id && !photoRemoved ? photos[editing.id] : null)
+
+  // ── Auto-fetch by barcode (debounced 700ms) ───────────────
+  useEffect(() => {
+    if (!editing) return
+    const digits = skuInput.replace(/\D/g, '')
+    if (digits.length < 8) return
+    // Don't re-fetch if already have a photo for this product
+    if (photoData || photoSource) return
+    if (editing.id && photos[editing.id] && !photoRemoved) return
+
+    const timer = setTimeout(async () => {
+      setAutoFetchingPh(true)
+      const dataUrl = await fetchProductPhoto(skuInput)
+      setAutoFetchingPh(false)
+      if (dataUrl) { setPhotoPreview(dataUrl); setPhotoData(dataUrl); setPhotoSource('off') }
+    }, 700)
+    return () => clearTimeout(timer)
+  }, [skuInput, editing, photoData, photoSource, photos, photoRemoved])
+
+  // ── Picker: search by name ────────────────────────────────
+  const runPickerSearch = useCallback(async (q) => {
+    if (!q || q.trim().length < 3) { setPickerResults([]); return }
+    setPickerLoading(true)
+    const results = await searchProductPhotos(q, 8)
+    setPickerResults(results)
+    setPickerLoading(false)
+  }, [])
+
+  // Debounced picker query
+  useEffect(() => {
+    const t = setTimeout(() => runPickerSearch(pickerQuery), 600)
+    return () => clearTimeout(t)
+  }, [pickerQuery, runPickerSearch])
+
+  const pickPhoto = useCallback(async (item) => {
+    setPickerLoading(true)
+    const dataUrl = await urlToDataUrl(item.url)
+    setPickerLoading(false)
+    if (dataUrl) {
+      setPhotoPreview(dataUrl); setPhotoData(dataUrl); setPhotoSource('search')
+      setShowPicker(false)
+    }
+  }, [])
 
   const save = async (e) => {
     e.preventDefault()
@@ -114,7 +167,7 @@ export default function Produtos() {
     const id  = editing.id || `p${Date.now()}`
     upsertProduct({
       id,
-      sku:        fd.get('sku'),
+      sku:        skuInput,
       name:       fd.get('name'),
       category:   fd.get('category'),
       unit:       fd.get('unit'),
@@ -159,19 +212,16 @@ export default function Produtos() {
     setFetching(true)
     setFetchProg({ done: 0, total: missing.length, found: 0 })
 
-    const found = await autoFetchPhotos(
+    await autoFetchPhotos(
       missing,
       (done, total, found) => setFetchProg({ done, total, found }),
       ctrl.signal,
+      // Save each photo immediately as it's found (real-time update)
+      (id, dataUrl) => saveProductPhoto(id, dataUrl),
     )
 
-    // Persist all found photos to IndexedDB
-    for (const [id, dataUrl] of found.entries()) {
-      await saveProductPhoto(id, dataUrl)
-    }
-
     setFetching(false)
-    setFetchProg(prev => ({ ...prev, done: prev.total, finished: true }))
+    setFetchProg(prev => prev ? { ...prev, finished: true } : null)
   }, [products, photos, saveProductPhoto])
 
   const cancelFetch = () => { abortRef.current?.abort(); setFetching(false) }
@@ -362,33 +412,111 @@ export default function Produtos() {
 
             <div className="overflow-y-auto flex-1 px-5 pb-5">
               {/* ── FOTO ── */}
-              <div className="mb-4">
+              <div className="mb-4 space-y-2">
                 {currentPhoto ? (
                   <div className="relative rounded-2xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
                     <img src={currentPhoto} alt="foto do produto" className="w-full h-full object-cover" />
+                    {/* Source badge */}
+                    {photoSource === 'off' && (
+                      <div className="absolute top-2 left-2 bg-green-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Globe className="w-2.5 h-2.5" /> Open Food Facts
+                      </div>
+                    )}
+                    {photoSource === 'search' && (
+                      <div className="absolute top-2 left-2 bg-blue-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Search className="w-2.5 h-2.5" /> Pesquisa
+                      </div>
+                    )}
                     {/* Overlay buttons */}
-                    <div className="absolute inset-0 bg-black/0 hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 hover:opacity-100">
+                    <div className="absolute inset-0 bg-black/0 hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 hover:opacity-100">
                       <label className="bg-white/90 text-gray-800 text-xs font-bold px-3 py-1.5 rounded-full cursor-pointer flex items-center gap-1.5 hover:bg-white">
-                        <Camera className="w-3.5 h-3.5" /> Trocar
+                        <Camera className="w-3.5 h-3.5" /> Câmera
                         <input ref={photoInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoSelect} />
                       </label>
+                      <button type="button" onClick={() => setShowPicker(v => !v)}
+                        className="bg-blue-500/90 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-blue-600">
+                        <Search className="w-3.5 h-3.5" /> Buscar
+                      </button>
                       <button type="button" onClick={removePhoto}
                         className="bg-red-500/90 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-red-600">
                         <X className="w-3.5 h-3.5" /> Remover
                       </button>
                     </div>
                   </div>
+                ) : autoFetchingPh ? (
+                  /* Spinner while auto-fetching by barcode */
+                  <div className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-blue-200 rounded-2xl bg-blue-50/50">
+                    <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                    <div className="text-sm font-bold text-blue-600">Buscando foto pelo código...</div>
+                    <div className="text-xs text-blue-400">Open Food Facts</div>
+                  </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center gap-2 py-6 border-2 border-dashed border-gray-200 rounded-2xl cursor-pointer hover:border-orange-400 hover:bg-orange-50/50 transition-all group">
-                    <div className="w-14 h-14 rounded-full bg-gray-100 group-hover:bg-orange-100 flex items-center justify-center transition-colors">
-                      <Camera className="w-6 h-6 text-gray-400 group-hover:text-orange-500 transition-colors" />
+                  /* Empty state with 3 options */
+                  <div className="border-2 border-dashed border-gray-200 rounded-2xl overflow-hidden">
+                    <div className="grid grid-cols-3 divide-x divide-gray-200">
+                      {/* Camera */}
+                      <label className="flex flex-col items-center gap-1.5 py-5 cursor-pointer hover:bg-orange-50 transition-colors group">
+                        <div className="w-10 h-10 rounded-full bg-gray-100 group-hover:bg-orange-100 flex items-center justify-center transition-colors">
+                          <Camera className="w-5 h-5 text-gray-400 group-hover:text-orange-500" />
+                        </div>
+                        <span className="text-[11px] font-bold text-gray-500 group-hover:text-orange-600">Câmera</span>
+                        <span className="text-[9px] text-gray-400">ou galeria</span>
+                        <input ref={photoInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoSelect} />
+                      </label>
+                      {/* Search */}
+                      <button type="button" onClick={() => setShowPicker(v => !v)}
+                        className={`flex flex-col items-center gap-1.5 py-5 hover:bg-blue-50 transition-colors group ${showPicker ? 'bg-blue-50' : ''}`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${showPicker ? 'bg-blue-100' : 'bg-gray-100 group-hover:bg-blue-100'}`}>
+                          <Globe className={`w-5 h-5 ${showPicker ? 'text-blue-500' : 'text-gray-400 group-hover:text-blue-500'}`} />
+                        </div>
+                        <span className={`text-[11px] font-bold ${showPicker ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'}`}>Buscar online</span>
+                        <span className="text-[9px] text-gray-400">Open Food Facts</span>
+                      </button>
+                      {/* URL paste */}
+                      <label className="flex flex-col items-center gap-1.5 py-5 cursor-pointer hover:bg-gray-50 transition-colors group">
+                        <div className="w-10 h-10 rounded-full bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition-colors">
+                          <Upload className="w-5 h-5 text-gray-400" />
+                        </div>
+                        <span className="text-[11px] font-bold text-gray-500">Arquivo</span>
+                        <span className="text-[9px] text-gray-400">JPG/PNG</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
+                      </label>
                     </div>
-                    <div className="text-center">
-                      <div className="text-sm font-bold text-gray-500 group-hover:text-orange-600 transition-colors">Adicionar foto</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Câmera ou galeria — comprime automático</div>
+                  </div>
+                )}
+
+                {/* ── Picker: name search ── */}
+                {showPicker && (
+                  <div className="border border-blue-200 rounded-xl overflow-hidden bg-white animate-pop">
+                    <div className="relative bg-blue-50 border-b border-blue-100">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blue-400" />
+                      <input
+                        value={pickerQuery}
+                        onChange={e => setPickerQuery(e.target.value)}
+                        autoFocus
+                        placeholder="Buscar por nome do produto... (ex: biscoito vitarella)"
+                        className="w-full pl-9 pr-4 py-2.5 text-sm bg-transparent focus:outline-none text-blue-900 placeholder-blue-300"
+                      />
+                      {pickerLoading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blue-400 animate-spin" />}
                     </div>
-                    <input ref={photoInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoSelect} />
-                  </label>
+                    {pickerResults.length > 0 ? (
+                      <div className="grid grid-cols-4 gap-1 p-2 max-h-44 overflow-y-auto">
+                        {pickerResults.map((item, i) => (
+                          <button key={i} type="button" onClick={() => pickPhoto(item)}
+                            className="aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-400 transition-all relative group">
+                            <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end">
+                              <p className="text-white text-[8px] font-bold p-1 leading-tight opacity-0 group-hover:opacity-100 truncate w-full">{item.name}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : pickerQuery.length >= 3 && !pickerLoading ? (
+                      <p className="text-xs text-gray-400 text-center p-4">Nenhuma imagem encontrada. Tente outro nome.</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 text-center p-4">Digite o nome do produto para buscar imagens</p>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -397,7 +525,8 @@ export default function Produtos() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="label">Código / Barras</label>
-                    <input name="sku" defaultValue={editing.sku} className="input" placeholder="Ex: 7896213006355" />
+                    <input value={skuInput} onChange={e => setSkuInput(e.target.value)}
+                      className="input" placeholder="Ex: 7896213006355" />
                   </div>
                   <div>
                     <label className="label">Unidade</label>

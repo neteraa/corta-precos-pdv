@@ -58,48 +58,60 @@ export async function fetchProductPhoto(barcode) {
   return urlToDataUrl(url)
 }
 
+/* ── busca imagens por nome (ex: "biscoito vitarella") ───── */
+export async function searchProductPhotos(query, limit = 8) {
+  if (!query || query.trim().length < 3) return []
+  try {
+    const q = encodeURIComponent(query.trim())
+    const res = await fetch(
+      `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${q}&search_simple=1&action=process&json=1&page_size=${limit}&fields=product_name,image_front_small_url,image_front_url`,
+      { signal: AbortSignal.timeout(8000) }
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    return (data.products || [])
+      .filter(p => p.image_front_small_url || p.image_front_url)
+      .map(p => ({
+        name: p.product_name || '',
+        url:  p.image_front_small_url || p.image_front_url,
+      }))
+  } catch { return [] }
+}
+
+/* ── baixa uma URL de imagem → data URL comprimida ─────── */
+export { urlToDataUrl }
+
 /* ══════════════════════════════════════════════════════════
    AUTO-FETCH EM LOTE
 
-   products  — array de { id, sku } dos produtos SEM foto
-   onProgress(done, total, found) — callback de progresso
-   signal    — AbortSignal para cancelar
-
-   Retorna Map<productId, dataUrl>
+   products   — array de { id, sku } dos produtos SEM foto
+   onProgress — (done, total, found) callback de progresso
+   signal     — AbortSignal para cancelar
+   onFound    — (id, dataUrl) chamado imediatamente ao achar cada foto
 ══════════════════════════════════════════════════════════ */
-export async function autoFetchPhotos(products, onProgress, signal) {
-  const results = new Map()
-  let done = 0
-  let found = 0
+export async function autoFetchPhotos(products, onProgress, signal, onFound) {
+  let done = 0, found = 0
   const total = products.length
 
-  // Process in chunks of CONCURRENCY
   for (let i = 0; i < products.length; i += CONCURRENCY) {
     if (signal?.aborted) break
 
     const chunk = products.slice(i, i + CONCURRENCY)
     const settled = await Promise.allSettled(
-      chunk.map(async p => {
-        const dataUrl = await fetchProductPhoto(p.sku)
-        return { id: p.id, dataUrl }
-      })
+      chunk.map(async p => ({ id: p.id, dataUrl: await fetchProductPhoto(p.sku) }))
     )
 
-    settled.forEach(r => {
+    for (const r of settled) {
       done++
       if (r.status === 'fulfilled' && r.value.dataUrl) {
-        results.set(r.value.id, r.value.dataUrl)
         found++
+        await onFound?.(r.value.id, r.value.dataUrl) // persist immediately
       }
-    })
+    }
 
     onProgress?.(done, total, found)
 
-    // Small pause between batches to be polite to the API
-    if (i + CONCURRENCY < products.length && !signal?.aborted) {
+    if (i + CONCURRENCY < products.length && !signal?.aborted)
       await new Promise(r => setTimeout(r, 150))
-    }
   }
-
-  return results
 }
