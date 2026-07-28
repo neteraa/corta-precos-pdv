@@ -3,7 +3,7 @@ import { Plus, Pencil, Trash2, Search, X, Upload } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
 import { parseGdoorCsv } from '../utils/importCsv.js'
 
-const EMPTY = { sku: '', name: '', category: '', cost: '', price: '', stock: '', unit: 'UN' }
+const EMPTY = { sku: '', name: '', category: '', cost: '', price: '', stock: '', unit: 'UN', minStock: '', expiryDate: '' }
 const CATEGORIES = ['Alimentos', 'Bebidas', 'Laticínios', 'Limpeza', 'Higiene', 'Outros']
 
 export default function Produtos() {
@@ -26,6 +26,8 @@ export default function Produtos() {
       category: fd.get('category'), unit: fd.get('unit'),
       cost: Number(fd.get('cost')), price: Number(fd.get('price')),
       stock: Number(fd.get('stock')),
+      minStock:   fd.get('minStock')   ? Number(fd.get('minStock'))   : 0,
+      expiryDate: fd.get('expiryDate') || null,
     })
     setEditing(null)
   }
@@ -169,6 +171,20 @@ export default function Produtos() {
                 <div>
                   <label className="label">Estoque</label>
                   <input name="stock" type="number" min="0" required defaultValue={editing.stock} className="input" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Estoque mínimo (alerta de reposição)</label>
+                  <input name="minStock" type="number" min="0" step="1"
+                    defaultValue={editing.minStock || ''} placeholder="Ex: 10"
+                    className="input" />
+                </div>
+                <div>
+                  <label className="label">Data de Validade</label>
+                  <input name="expiryDate" type="date"
+                    defaultValue={editing.expiryDate || ''}
+                    className="input" />
                 </div>
               </div>
               <div className="flex gap-2 pt-2">

@@ -61,9 +61,10 @@ export default function Estoque() {
   const filtered = useMemo(() => {
     let list = [...products]
 
-    if (filter === 'critical') list = list.filter(p => p.stock > 0 && p.stock <= 10)
+    if (filter === 'critical')  list = list.filter(p => p.stock > 0 && p.stock <= 10)
     else if (filter === 'zero')     list = list.filter(p => p.stock === 0)
     else if (filter === 'fifo')     list = list.filter(p => p.stock > 0 && p.stock <= 15)
+    else if (filter === 'shopping') list = list.filter(p => p.minStock > 0 && p.stock <= p.minStock)
 
     if (query.trim()) list = list.filter(p =>
       p.name?.toLowerCase().includes(query.toLowerCase()) ||
@@ -89,17 +90,19 @@ export default function Estoque() {
     setAdjustModal(null)
   }
 
-  const { totalCost, totalSale, zeroCount, criticalCount } = useMemo(() => ({
+  const { totalCost, totalSale, zeroCount, criticalCount, shoppingCount } = useMemo(() => ({
     totalCost:     products.reduce((s, p) => s + p.stock * p.cost, 0),
     totalSale:     products.reduce((s, p) => s + p.stock * p.price, 0),
     zeroCount:     products.filter(p => p.stock === 0).length,
     criticalCount: products.filter(p => p.stock > 0 && p.stock <= 10).length,
+    shoppingCount: products.filter(p => p.minStock > 0 && p.stock <= p.minStock).length,
   }), [products])
 
   const FILTERS = [
     { k: 'all',      l: `Todos (${products.length})` },
     { k: 'critical', l: `⚠️ Crítico (${criticalCount})` },
     { k: 'zero',     l: `🔴 Zerado (${zeroCount})` },
+    { k: 'shopping', l: `🛒 Repor (${shoppingCount})` },
     { k: 'fifo',     l: '📦 FIFO' },
   ]
 
@@ -162,7 +165,7 @@ export default function Estoque() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Status', 'Produto', 'Categoria', 'Custo', 'Venda', 'Estoque', 'Val. Custo', 'Entrada'].map(h => (
+                {['Status', 'Produto', 'Categoria', 'Custo', 'Venda', 'Estoque', 'Mín.', 'Val. Custo', 'Entrada'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -191,6 +194,13 @@ export default function Estoque() {
                         {p.stock}
                       </span>
                       <span className="text-[10px] text-gray-400 ml-0.5">{p.unit}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {p.minStock > 0 ? (
+                        <span className={`text-xs font-bold ${p.stock <= p.minStock ? 'text-red-500' : 'text-gray-400'}`}>
+                          {p.minStock}
+                        </span>
+                      ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600">{BRL.format(p.stock * p.cost)}</td>
                     <td className="px-4 py-3">

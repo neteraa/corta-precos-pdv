@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Database, RotateCcw, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff } from 'lucide-react'
+import { Database, RotateCcw, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, ShieldCheck } from 'lucide-react'
 import { useStore } from '../store.jsx'
 import { parseGdoorCsv } from '../utils/importCsv.js'
 import { usePrinter, savePrinterSettings } from '../hooks/usePrinter.js'
@@ -7,7 +7,7 @@ import PixQR from '../components/PixQR.jsx'
 import { getCredentials, saveCredentials } from '../utils/auth.js'
 
 export default function Configuracoes() {
-  const { products, sales, customers, importProducts, resetAll } = useStore()
+  const { products, sales, customers, importProducts, resetAll, operators, upsertOperator, deleteOperator } = useStore()
   const { settings, setSettings } = usePrinter()
   const [form, setForm] = useState(() => ({
     storeName:  settings.storeName  || 'CORTA PRECOS',
@@ -26,6 +26,9 @@ export default function Configuracoes() {
   })
   const [showPass, setShowPass]   = useState(false)
   const [authMsg,  setAuthMsg]    = useState(null) // {type:'ok'|'err', text}
+
+  // Operators
+  const [opForm,   setOpForm]     = useState({ name: '', role: 'caixa', pin: '' })
 
   const saveAuth = () => {
     setAuthMsg(null)
@@ -271,6 +274,56 @@ export default function Configuracoes() {
         )}
         <button onClick={saveAuth} className="btn-primary mt-4">
           <Save className="w-4 h-4" /> Salvar acesso
+        </button>
+      </Section>
+
+      {/* ── Operadores ──────────────────────────────────────────── */}
+      <Section icon={Users} title="Operadores de Caixa">
+        <p className="text-sm text-gray-500 mb-3">
+          Cadastre os funcionários que usam o PDV. O operador aparece no histórico de vendas.
+        </p>
+        <div className="space-y-2 mb-3">
+          {operators.length === 0 && <p className="text-sm text-gray-400">Nenhum operador cadastrado.</p>}
+          {operators.map(op => (
+            <div key={op.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2.5 border border-gray-200">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className={`w-4 h-4 ${op.role === 'admin' ? 'text-orange-500' : 'text-blue-500'}`} />
+                <div>
+                  <div className="font-semibold text-sm text-gray-800">{op.name}</div>
+                  <div className="text-xs text-gray-400">{op.role === 'admin' ? 'Gerente (acesso total)' : 'Caixa (somente PDV)'} {op.pin ? `· PIN: ${op.pin}` : ''}</div>
+                </div>
+              </div>
+              <button onClick={() => { if (confirm(`Remover ${op.name}?`)) deleteOperator(op.id) }}
+                className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <Field label="Nome do operador">
+            <input value={opForm.name} onChange={e => setOpForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="Ex: João" className="input" />
+          </Field>
+          <Field label="Perfil">
+            <select value={opForm.role} onChange={e => setOpForm(f => ({ ...f, role: e.target.value }))} className="input">
+              <option value="caixa">Caixa</option>
+              <option value="admin">Gerente</option>
+            </select>
+          </Field>
+          <Field label="PIN (opcional)">
+            <input value={opForm.pin} onChange={e => setOpForm(f => ({ ...f, pin: e.target.value }))}
+              placeholder="1234" maxLength={6} className="input" />
+          </Field>
+        </div>
+        <button
+          onClick={() => {
+            if (!opForm.name.trim()) return
+            upsertOperator({ name: opForm.name.trim(), role: opForm.role, pin: opForm.pin })
+            setOpForm({ name: '', role: 'caixa', pin: '' })
+          }}
+          className="btn-primary mt-3">
+          <Plus className="w-4 h-4" /> Adicionar Operador
         </button>
       </Section>
 

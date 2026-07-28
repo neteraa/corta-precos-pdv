@@ -103,6 +103,21 @@ export function StoreProvider({ children }) {
   const [customers, setCustomers] = useState(() => {
     try { const s = localStorage.getItem('cp_customers'); return s ? JSON.parse(s) : SEED_CUSTOMERS } catch { return SEED_CUSTOMERS }
   })
+  // ── Cash movements (sangria / suprimento) ─────────────────
+  const [cashMovements, setCashMovements] = useState(() => {
+    try { const s = localStorage.getItem('cp_cash'); return s ? JSON.parse(s) : [] } catch { return [] }
+  })
+
+  // ── Sales goal (meta diária) ───────────────────────────────
+  const [salesGoal, setSalesGoalState] = useState(() => {
+    try { const s = localStorage.getItem('cp_goal'); return s ? JSON.parse(s) : { daily: 0 } } catch { return { daily: 0 } }
+  })
+
+  // ── Operators ─────────────────────────────────────────────
+  const [operators, setOperators] = useState(() => {
+    try { const s = localStorage.getItem('cp_operators'); return s ? JSON.parse(s) : [] } catch { return [] }
+  })
+
   const [promos, setPromos] = useState(() => {
     try {
       const s = localStorage.getItem('cp_promos')
@@ -168,6 +183,18 @@ export function StoreProvider({ children }) {
         }
         if (data.cp_fiado) {
           try { localStorage.setItem('cp_fiado', data.cp_fiado) } catch {}
+        }
+        if (data.cp_cash) {
+          setCashMovements(JSON.parse(data.cp_cash))
+          try { localStorage.setItem('cp_cash', data.cp_cash) } catch {}
+        }
+        if (data.cp_goal) {
+          setSalesGoalState(JSON.parse(data.cp_goal))
+          try { localStorage.setItem('cp_goal', data.cp_goal) } catch {}
+        }
+        if (data.cp_operators) {
+          setOperators(JSON.parse(data.cp_operators))
+          try { localStorage.setItem('cp_operators', data.cp_operators) } catch {}
         }
 
         // ── Push any keys missing from server ────────────────────
@@ -308,6 +335,35 @@ export function StoreProvider({ children }) {
     })
   }, [persist])
 
+  // ── Cash movements (sangria / suprimento) ─────────────────
+  const addCashMovement = useCallback((mov) => {
+    const entry = { ...mov, id: `cm${Date.now()}`, date: new Date().toISOString() }
+    setCashMovements(prev => {
+      const next = [entry, ...prev]
+      persist('cp_cash', next); return next
+    })
+  }, [persist])
+
+  // ── Sales goal ────────────────────────────────────────────
+  const setSalesGoal = useCallback((goal) => {
+    setSalesGoalState(goal)
+    persist('cp_goal', goal)
+  }, [persist])
+
+  // ── Operators ─────────────────────────────────────────────
+  const upsertOperator = useCallback((op) => {
+    setOperators(prev => {
+      const next = op.id
+        ? prev.map(x => x.id === op.id ? { ...x, ...op } : x)
+        : [...prev, { ...op, id: `op${Date.now()}` }]
+      persist('cp_operators', next); return next
+    })
+  }, [persist])
+
+  const deleteOperator = useCallback((id) => {
+    setOperators(prev => { const next = prev.filter(x => x.id !== id); persist('cp_operators', next); return next })
+  }, [persist])
+
   const resetAll = useCallback(() => {
     setProducts(SEED_PRODUCTS); setSales(SEED_SALES); setCustomers(SEED_CUSTOMERS); setPromos(SEED_PROMOS)
     ;['cp_products','cp_sales','cp_customers','cp_promos'].forEach(k => localStorage.removeItem(k))
@@ -316,10 +372,13 @@ export function StoreProvider({ children }) {
   return (
     <Ctx.Provider value={{
       products, sales, customers, promos,
+      cashMovements, salesGoal, operators,
       upsertProduct, deleteProduct, registerSale,
       upsertCustomer, deleteCustomer, importProducts,
       upsertPromo, deletePromo, assignPromoGroup,
       addFiado, payFiado,
+      addCashMovement, setSalesGoal,
+      upsertOperator, deleteOperator,
       resetAll,
     }}>
       {children}

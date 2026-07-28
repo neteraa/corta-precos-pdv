@@ -4,16 +4,19 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from 'recharts'
-import { TrendingUp, ShoppingCart, Package, AlertTriangle, ArrowRight, Receipt, ClipboardList, X, Printer, Download, MessageCircle } from 'lucide-react'
+import { TrendingUp, ShoppingCart, Package, AlertTriangle, ArrowRight, Receipt, ClipboardList, X, Printer, Download, MessageCircle, Target, ArrowDownCircle, ArrowUpCircle, Plus } from 'lucide-react'
 import { useStore, BRL, fmtDate } from '../store.jsx'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 
 const COLORS = ['#ea580c', '#fb923c', '#f97316', '#c2410c', '#fed7aa', '#9a3412']
 
 export default function Dashboard() {
-  const { products, sales } = useStore()
+  const { products, sales, cashMovements, salesGoal, setSalesGoal, addCashMovement } = useStore()
   const navigate = useNavigate()
   const [showCaixa, setShowCaixa] = useState(false)
+  const [movForm, setMovForm] = useState({ type: 'sangria', amount: '', reason: '' })
+  const [showGoalEdit, setShowGoalEdit] = useState(false)
+  const [goalDraft, setGoalDraft] = useState('')
   const { canInstall, installed, install } = useInstallPWA()
 
   const { chartData, totalRevenue, todayRevenue, totalSales, lowStock } = useMemo(() => {
@@ -94,8 +97,18 @@ export default function Dashboard() {
     }))
     const margem = totalSaleRev > 0 ? ((totalSaleRev - totalCost) / totalSaleRev * 100) : 0
 
-    return { todaySales, totalVendas, faturamento, avgTicket, totalDesconto, byPayment, topToday, margem, date: today }
-  }, [sales, products, showCaixa])
+    // Cash balance: dinheiro received minus sangria plus suprimento (today)
+    const cashIn  = byPayment['Dinheiro'] || 0
+    const todayMovs = cashMovements.filter(m => {
+      const d = new Date(m.date)
+      return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()
+    })
+    const sangriaTotal    = todayMovs.filter(m => m.type === 'sangria').reduce((s, m) => s + m.amount, 0)
+    const suprimentoTotal = todayMovs.filter(m => m.type === 'suprimento').reduce((s, m) => s + m.amount, 0)
+    const cashBalance = cashIn - sangriaTotal + suprimentoTotal
+
+    return { todaySales, totalVendas, faturamento, avgTicket, totalDesconto, byPayment, topToday, margem, date: today, todayMovs, sangriaTotal, suprimentoTotal, cashBalance }
+  }, [sales, products, cashMovements, showCaixa])
 
   const kpis = [
     {
@@ -129,7 +142,31 @@ export default function Dashboard() {
           <h1 className="text-2xl font-black text-gray-900">Dashboard</h1>
           <p className="text-gray-500 text-sm mt-0.5">Visão geral do seu negócio</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {/* Define meta */}
+          {showGoalEdit ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number" min="0" step="100"
+                value={goalDraft}
+                onChange={e => setGoalDraft(e.target.value)}
+                placeholder="Meta diária R$"
+                className="input w-36 py-1.5 text-sm"
+                autoFocus
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { setSalesGoal({ daily: parseFloat(goalDraft) || 0 }); setShowGoalEdit(false) }
+                  if (e.key === 'Escape') setShowGoalEdit(false)
+                }}
+              />
+              <button onClick={() => { setSalesGoal({ daily: parseFloat(goalDraft) || 0 }); setShowGoalEdit(false) }}
+                className="btn-primary py-1.5 px-3 text-sm">OK</button>
+              <button onClick={() => setShowGoalEdit(false)} className="btn-ghost py-1.5 px-3 text-sm">✕</button>
+            </div>
+          ) : (
+            <button onClick={() => { setGoalDraft(salesGoal.daily || ''); setShowGoalEdit(true) }} className="btn-ghost">
+              <Target className="w-4 h-4" /> Meta
+            </button>
+          )}
           <button onClick={() => setShowCaixa(true)} className="btn-ghost">
             <ClipboardList className="w-4 h-4" /> Fechar Caixa
           </button>
@@ -188,6 +225,38 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* ── Meta de Vendas ──────────────────────────────────── */}
+      {salesGoal.daily > 0 && (
+        <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-orange-500" />
+              <span className="font-bold text-gray-800 text-sm">Meta do Dia</span>
+            </div>
+            <div className="text-sm font-black text-gray-900">
+              {BRL.format(todayRevenue)} <span className="text-gray-400 font-normal">/ {BRL.format(salesGoal.daily)}</span>
+            </div>
+          </div>
+          <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-3 rounded-full transition-all duration-500"
+              style={{
+                width: `${Math.min(100, (todayRevenue / salesGoal.daily) * 100)}%`,
+                background: todayRevenue >= salesGoal.daily ? '#22c55e' : '#ea580c',
+              }}
+            />
+          </div>
+          <div className="flex justify-between mt-1">
+            <span className="text-xs text-gray-400">
+              {todayRevenue >= salesGoal.daily ? '🎉 Meta batida!' : `Faltam ${BRL.format(Math.max(0, salesGoal.daily - todayRevenue))}`}
+            </span>
+            <span className="text-xs font-bold" style={{ color: todayRevenue >= salesGoal.daily ? '#22c55e' : '#ea580c' }}>
+              {Math.min(100, ((todayRevenue / salesGoal.daily) * 100)).toFixed(0)}%
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* faturamento 14 dias */}
@@ -372,6 +441,57 @@ export default function Dashboard() {
                   )}
                 </>
               )}
+
+              {/* ── Sangria / Suprimento ─────────────────────── */}
+              <div className="border border-gray-200 rounded-xl p-3 space-y-2">
+                <div className="text-xs font-black text-gray-500 uppercase tracking-widest">Sangria / Suprimento</div>
+                <div className="flex gap-2">
+                  {['sangria', 'suprimento'].map(t => (
+                    <button key={t} onClick={() => setMovForm(f => ({ ...f, type: t }))}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors capitalize ${movForm.type === t ? (t === 'sangria' ? 'bg-red-500 text-white' : 'bg-green-500 text-white') : 'bg-gray-100 text-gray-600'}`}>
+                      {t === 'sangria' ? '↓ Sangria (retirada)' : '↑ Suprimento (entrada)'}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input type="number" min="0" step="0.01" placeholder="Valor R$"
+                    value={movForm.amount}
+                    onChange={e => setMovForm(f => ({ ...f, amount: e.target.value }))}
+                    className="input flex-1 py-1.5 text-sm" />
+                  <input type="text" placeholder="Motivo (opcional)"
+                    value={movForm.reason}
+                    onChange={e => setMovForm(f => ({ ...f, reason: e.target.value }))}
+                    className="input flex-1 py-1.5 text-sm" />
+                  <button
+                    onClick={() => {
+                      const amt = parseFloat(movForm.amount)
+                      if (!amt || amt <= 0) return
+                      addCashMovement({ type: movForm.type, amount: amt, reason: movForm.reason })
+                      setMovForm(f => ({ ...f, amount: '', reason: '' }))
+                    }}
+                    disabled={!movForm.amount || parseFloat(movForm.amount) <= 0}
+                    className="btn-primary py-1.5 px-3 text-sm disabled:opacity-40">
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+                {/* today's movements */}
+                {caixaStats.todayMovs?.length > 0 && (
+                  <div className="space-y-1 pt-1 border-t border-gray-100">
+                    {caixaStats.todayMovs.map(m => (
+                      <div key={m.id} className="flex justify-between text-xs text-gray-600">
+                        <span className={m.type === 'sangria' ? 'text-red-500' : 'text-green-600'}>
+                          {m.type === 'sangria' ? '↓' : '↑'} {m.reason || m.type}
+                        </span>
+                        <span className="font-bold">{m.type === 'sangria' ? '-' : '+'}{BRL.format(m.amount)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between text-sm font-black pt-1 border-t border-gray-200">
+                      <span>💵 Saldo no caixa (dinheiro)</span>
+                      <span className={caixaStats.cashBalance >= 0 ? 'text-green-600' : 'text-red-500'}>{BRL.format(caixaStats.cashBalance)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* action buttons */}
               <div className="flex gap-2">

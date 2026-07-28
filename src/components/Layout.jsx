@@ -3,7 +3,8 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
   Warehouse, Users, Settings, Menu, Phone, Instagram,
-  QrCode, Tag, Star, Download, Monitor, Camera, Scissors, HandCoins, LogOut
+  QrCode, Tag, Star, Download, Monitor, Camera, Scissors, HandCoins, LogOut,
+  BarChart2, Printer, CalendarClock
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import { logout } from '../utils/auth.js'
@@ -19,12 +20,15 @@ const GESTAO = [
   { to: '/vendas',        icon: Receipt,         label: 'Vendas' },
   { to: '/estoque',       icon: Warehouse,       label: 'Estoque' },
   { to: '/clientes',      icon: Users,           label: 'Clientes' },
-  { to: '/fiado',         icon: HandCoins,       label: 'Fiado', badge: 'NEW' },
+  { to: '/fiado',         icon: HandCoins,       label: 'Fiado' },
+  { to: '/relatorio',     icon: BarChart2,        label: 'Relatório' },
 ]
 const EXTRAS = [
-  { to: '/fidelidade',    icon: QrCode,   label: 'Fidelidade / ZAP' },
-  { to: '/flyer',         icon: Star,     label: 'Flyer Sorteio', badge: 'NEW' },
-  { to: '/configuracoes', icon: Settings, label: 'Configurações' },
+  { to: '/etiquetas',     icon: Printer,         label: 'Etiquetas' },
+  { to: '/validade',      icon: CalendarClock,   label: 'Validade' },
+  { to: '/fidelidade',    icon: QrCode,          label: 'Fidelidade / ZAP' },
+  { to: '/flyer',         icon: Star,            label: 'Flyer Sorteio' },
+  { to: '/configuracoes', icon: Settings,        label: 'Configurações' },
 ]
 
 /* ── logo ─────────────────────────────────────────────────── */

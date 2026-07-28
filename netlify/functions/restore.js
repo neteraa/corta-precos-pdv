@@ -1,6 +1,6 @@
 import { getStore } from '@netlify/blobs'
 
-const KEYS = ['cp_products', 'cp_sales', 'cp_customers', 'cp_promos', 'cp_fiado']
+const KEYS = ['cp_products', 'cp_sales', 'cp_customers', 'cp_promos', 'cp_fiado', 'cp_cash', 'cp_goal', 'cp_operators']
 
 export default async (_req, _context) => {
   try {

@@ -17,6 +17,9 @@ import CustomerDisplay from './pages/CustomerDisplay.jsx'
 import Flyer from './pages/Flyer.jsx'
 import Terminal from './pages/Terminal.jsx'
 import ScanMobile from './pages/ScanMobile.jsx'
+import Relatorio from './pages/Relatorio.jsx'
+import Etiquetas from './pages/Etiquetas.jsx'
+import Validade from './pages/Validade.jsx'
 import { isLoggedIn } from './utils/auth.js'
 
 function RequireAuth({ children }) {
@@ -48,9 +51,12 @@ export default function App() {
           <Route path="/estoque"      element={<Estoque />} />
           <Route path="/clientes"     element={<Clientes />} />
           <Route path="/fidelidade"   element={<Fidelidade />} />
-          <Route path="/fiado"        element={<Fiado />} />
-          <Route path="/promocoes"    element={<Promocoes />} />
+          <Route path="/fiado"         element={<Fiado />} />
+          <Route path="/promocoes"     element={<Promocoes />} />
           <Route path="/configuracoes" element={<Configuracoes />} />
+          <Route path="/relatorio"     element={<Relatorio />} />
+          <Route path="/etiquetas"     element={<Etiquetas />} />
+          <Route path="/validade"      element={<Validade />} />
         </Route>
       </Routes>
     </StoreProvider>
