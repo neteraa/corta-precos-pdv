@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useRef } from 'react'
-import { Plus, Pencil, Trash2, Search, X, Upload, Camera, LayoutGrid, List, ImageOff } from 'lucide-react'
+import React, { useState, useMemo, useRef, useCallback } from 'react'
+import { Plus, Pencil, Trash2, Search, X, Upload, Camera, LayoutGrid, List, ImageOff, Sparkles, StopCircle } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
 import { parseGdoorCsv } from '../utils/importCsv.js'
 import { compressImage } from '../utils/photoDb.js'
+import { autoFetchPhotos } from '../utils/openFoodFacts.js'
 
 const EMPTY = { sku: '', name: '', category: '', cost: '', price: '', stock: '', unit: 'UN', minStock: '', expiryDate: '' }
 const UNITS = ['UN', 'KG', 'G', 'LT', 'ML', 'CX', 'PC', 'DZ', 'MT']
@@ -74,6 +75,11 @@ export default function Produtos() {
   const [photoRemoved, setPhotoRemoved] = useState(false)
   const photoInputRef = useRef(null)
 
+  // Auto-fetch state
+  const [fetching,   setFetching]   = useState(false)
+  const [fetchProg,  setFetchProg]  = useState(null) // { done, total, found }
+  const abortRef = useRef(null)
+
   const filtered = useMemo(() =>
     products.filter(p =>
       !query || p.name?.toLowerCase().includes(query.toLowerCase()) || p.sku?.includes(query)
@@ -143,8 +149,36 @@ export default function Produtos() {
     finally { setImporting(false); e.target.value = '' }
   }
 
+  /* ── auto-fetch photos from Open Food Facts ── */
+  const startAutoFetch = useCallback(async () => {
+    const missing = products.filter(p => !photos[p.id] && p.sku?.replace(/\D/g,'').length >= 8)
+    if (missing.length === 0) { alert('Todos os produtos com código já têm foto! 🎉'); return }
+
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+    setFetching(true)
+    setFetchProg({ done: 0, total: missing.length, found: 0 })
+
+    const found = await autoFetchPhotos(
+      missing,
+      (done, total, found) => setFetchProg({ done, total, found }),
+      ctrl.signal,
+    )
+
+    // Persist all found photos to IndexedDB
+    for (const [id, dataUrl] of found.entries()) {
+      await saveProductPhoto(id, dataUrl)
+    }
+
+    setFetching(false)
+    setFetchProg(prev => ({ ...prev, done: prev.total, finished: true }))
+  }, [products, photos, saveProductPhoto])
+
+  const cancelFetch = () => { abortRef.current?.abort(); setFetching(false) }
+
   const margin = (p) => p.price > 0 ? ((p.price - p.cost) / p.price * 100).toFixed(1) : '0.0'
-  const withPhotos = filtered.filter(p => photos[p.id]).length
+  const withPhotos = products.filter(p => photos[p.id]).length
+  const missingPhotos = products.filter(p => !photos[p.id] && p.sku?.replace(/\D/g,'').length >= 8).length
 
   return (
     <div className="space-y-4 animate-pop">
@@ -157,7 +191,7 @@ export default function Produtos() {
             {withPhotos > 0 && <span className="ml-2 text-orange-500 font-semibold">· {withPhotos} com foto</span>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* View toggle */}
           <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
             <button onClick={() => setViewMode('table')}
@@ -169,6 +203,24 @@ export default function Produtos() {
               <LayoutGrid className="w-4 h-4" />
             </button>
           </div>
+
+          {/* Auto-fetch button */}
+          {!fetching
+            ? (
+              <button onClick={startAutoFetch}
+                className="btn-ghost text-sm gap-1.5 border border-purple-200 text-purple-700 hover:bg-purple-50">
+                <Sparkles className="w-4 h-4" />
+                Buscar fotos auto
+                {missingPhotos > 0 && <span className="text-[10px] bg-purple-100 px-1.5 py-0.5 rounded-full">{missingPhotos}</span>}
+              </button>
+            ) : (
+              <button onClick={cancelFetch}
+                className="btn-ghost text-sm gap-1.5 border border-red-200 text-red-600 hover:bg-red-50">
+                <StopCircle className="w-4 h-4" /> Cancelar
+              </button>
+            )
+          }
+
           <label className={`btn-ghost cursor-pointer ${importing ? 'opacity-60 pointer-events-none' : ''}`}>
             <Upload className="w-4 h-4" />
             {importing ? 'Importando…' : 'CSV Gdoor'}
@@ -179,6 +231,42 @@ export default function Produtos() {
           </button>
         </div>
       </div>
+
+      {/* ── Progress bar (auto-fetch) ── */}
+      {fetchProg && (
+        <div className={`card px-4 py-3 border-2 animate-pop ${fetchProg.finished ? 'border-green-300 bg-green-50' : 'border-purple-200 bg-purple-50/50'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              {fetchProg.finished
+                ? <span className="text-green-700 font-black text-sm">✅ Concluído!</span>
+                : <><span className="w-3.5 h-3.5 rounded-full border-2 border-purple-400 border-t-transparent animate-spin inline-block" />
+                   <span className="text-purple-800 font-bold text-sm">Buscando fotos no Open Food Facts…</span></>
+              }
+            </div>
+            <div className="text-xs font-bold text-gray-600">
+              <span className="text-green-700">{fetchProg.found} encontradas</span>
+              <span className="text-gray-400 mx-1">·</span>
+              {fetchProg.done}/{fetchProg.total} verificados
+            </div>
+          </div>
+          {/* progress bar */}
+          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${fetchProg.finished ? 'bg-green-500' : 'bg-purple-500'}`}
+              style={{ width: `${fetchProg.total > 0 ? (fetchProg.done / fetchProg.total) * 100 : 0}%` }}
+            />
+          </div>
+          {fetchProg.finished && (
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-xs text-green-700">
+                {fetchProg.found} fotos adicionadas de {fetchProg.total} produtos verificados
+                {fetchProg.found > 0 && ' · Visíveis no grid e no PDV agora!'}
+              </p>
+              <button onClick={() => setFetchProg(null)} className="text-xs text-gray-400 hover:text-gray-600">Fechar</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative">
