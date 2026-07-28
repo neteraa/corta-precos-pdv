@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
-import { Outlet, NavLink } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
   Warehouse, Users, Settings, Menu, Phone, Instagram,
-  QrCode, Tag, Star, Download, Monitor, Camera, Scissors, HandCoins
+  QrCode, Tag, Star, Download, Monitor, Camera, Scissors, HandCoins, LogOut
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
+import { logout } from '../utils/auth.js'
 
 /* ── nav sections ─────────────────────────────────────────── */
 const CAIXA = [
@@ -107,8 +108,14 @@ function NavSection({ title, items, onClose }) {
 }
 
 export default function Layout() {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]   = useState(false)
   const { canInstall, install } = useInstallPWA()
+  const navigate          = useNavigate()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
@@ -159,9 +166,15 @@ export default function Layout() {
             </button>
           )}
 
+          <button onClick={handleLogout}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all group">
+            <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="text-[11px] font-semibold">Sair do sistema</span>
+          </button>
+
           <div className="pt-1 text-center">
             <div className="text-gray-600 text-[9px] font-bold tracking-widest uppercase">🙏 Deus é bom o tempo todo</div>
-            <div className="text-gray-700 text-[9px] mt-0.5">PDV v1.0 · Corta Preços</div>
+            <div className="text-gray-700 text-[9px] mt-0.5">PDV v3.0 · Corta Preços</div>
           </div>
         </div>
       </aside>

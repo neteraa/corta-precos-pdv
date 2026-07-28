@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
-import { Database, RotateCcw, Download, Upload, Info, Store, QrCode, Save } from 'lucide-react'
+import { Database, RotateCcw, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff } from 'lucide-react'
 import { useStore } from '../store.jsx'
 import { parseGdoorCsv } from '../utils/importCsv.js'
 import { usePrinter, savePrinterSettings } from '../hooks/usePrinter.js'
 import PixQR from '../components/PixQR.jsx'
+import { getCredentials, saveCredentials } from '../utils/auth.js'
 
 export default function Configuracoes() {
   const { products, sales, customers, importProducts, resetAll } = useStore()
@@ -17,6 +18,28 @@ export default function Configuracoes() {
     pixCity:    settings.pixCity    || 'SAO PAULO',
   }))
   const [saved, setSaved] = useState(false)
+
+  // ── Auth / credentials ────────────────────────────────────
+  const [authForm, setAuthForm] = useState(() => {
+    const { username } = getCredentials()
+    return { username, newPass: '', confirmPass: '' }
+  })
+  const [showPass, setShowPass]   = useState(false)
+  const [authMsg,  setAuthMsg]    = useState(null) // {type:'ok'|'err', text}
+
+  const saveAuth = () => {
+    setAuthMsg(null)
+    if (!authForm.username.trim()) return setAuthMsg({ type: 'err', text: 'Usuário não pode ser vazio.' })
+    if (authForm.newPass && authForm.newPass.length < 4)
+      return setAuthMsg({ type: 'err', text: 'Senha precisa de pelo menos 4 caracteres.' })
+    if (authForm.newPass !== authForm.confirmPass)
+      return setAuthMsg({ type: 'err', text: 'As senhas não coincidem.' })
+    const { password: currentPass } = getCredentials()
+    saveCredentials(authForm.username.trim(), authForm.newPass || currentPass)
+    setAuthForm(f => ({ ...f, newPass: '', confirmPass: '' }))
+    setAuthMsg({ type: 'ok', text: '✅ Credenciais atualizadas!' })
+    setTimeout(() => setAuthMsg(null), 3000)
+  }
 
   const saveSettings = () => {
     setSettings(s => ({ ...s, ...form }))
@@ -195,6 +218,60 @@ export default function Configuracoes() {
             </div>
           ))}
         </div>
+      </Section>
+
+      {/* ── Acesso / Login ─────────────────────────────────────── */}
+      <Section icon={KeyRound} title="Acesso ao Sistema">
+        <p className="text-sm text-gray-500 mb-4">
+          Altere o usuário e/ou senha de login. Deixe a senha em branco para manter a atual.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Usuário">
+            <input
+              className="input"
+              value={authForm.username}
+              onChange={e => setAuthForm(f => ({ ...f, username: e.target.value }))}
+              placeholder="admin"
+            />
+          </Field>
+          <div /> {/* spacer */}
+          <Field label="Nova senha">
+            <div className="relative">
+              <input
+                type={showPass ? 'text' : 'password'}
+                className="input pr-10"
+                value={authForm.newPass}
+                onChange={e => setAuthForm(f => ({ ...f, newPass: e.target.value }))}
+                placeholder="mínimo 4 caracteres"
+              />
+              <button type="button" onClick={() => setShowPass(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </Field>
+          <Field label="Confirmar nova senha">
+            <input
+              type={showPass ? 'text' : 'password'}
+              className="input"
+              value={authForm.confirmPass}
+              onChange={e => setAuthForm(f => ({ ...f, confirmPass: e.target.value }))}
+              placeholder="repita a senha"
+            />
+          </Field>
+        </div>
+        {authMsg && (
+          <div className={`mt-3 px-4 py-2.5 rounded-xl text-sm font-medium ${
+            authMsg.type === 'ok'
+              ? 'bg-green-500/10 text-green-700 border border-green-200'
+              : 'bg-red-500/10 text-red-600 border border-red-200'
+          }`}>
+            {authMsg.text}
+          </div>
+        )}
+        <button onClick={saveAuth} className="btn-primary mt-4">
+          <Save className="w-4 h-4" /> Salvar acesso
+        </button>
       </Section>
 
       {/* ── Reset ──────────────────────────────────────────────── */}
