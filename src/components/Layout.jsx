@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import Footer from './Footer.jsx'
 import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
   Warehouse, Users, Settings, Menu, Phone, Instagram,
@@ -230,6 +231,8 @@ export default function Layout() {
             <div className="text-gray-700 text-[9px] mt-0.5">PDV v3.0 · Corta Preços</div>
           </div>
         </div>
+
+        <Footer variant="mkt" />
       </aside>
 
       {/* overlay mobile */}

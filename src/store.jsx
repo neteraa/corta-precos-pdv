@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import PRODUCTS_SEED from './utils/products_seed.json'
 import { getAllPhotos, savePhoto as dbSavePhoto, deletePhoto as dbDeletePhoto } from './utils/photoDb.js'
+import { mktKey, migrateAndGet } from './utils/tenantStorage.js'
 
 /* ── formatting helpers ─────────────────────────────────────── */
 export const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -94,34 +95,34 @@ function mergeWithSeed(stored) {
 export function StoreProvider({ children }) {
   const [products, setProducts] = useState(() => {
     try {
-      const s = localStorage.getItem('cp_products')
+      const s = migrateAndGet('cp_products', mktKey)
       return s ? mergeWithSeed(JSON.parse(s)) : SEED_PRODUCTS
     } catch { return SEED_PRODUCTS }
   })
   const [sales, setSales] = useState(() => {
-    try { const s = localStorage.getItem('cp_sales'); return s ? JSON.parse(s) : SEED_SALES } catch { return SEED_SALES }
+    try { const s = migrateAndGet('cp_sales', mktKey); return s ? JSON.parse(s) : SEED_SALES } catch { return SEED_SALES }
   })
   const [customers, setCustomers] = useState(() => {
-    try { const s = localStorage.getItem('cp_customers'); return s ? JSON.parse(s) : SEED_CUSTOMERS } catch { return SEED_CUSTOMERS }
+    try { const s = migrateAndGet('cp_customers', mktKey); return s ? JSON.parse(s) : SEED_CUSTOMERS } catch { return SEED_CUSTOMERS }
   })
   // ── Cash movements (sangria / suprimento) ─────────────────
   const [cashMovements, setCashMovements] = useState(() => {
-    try { const s = localStorage.getItem('cp_cash'); return s ? JSON.parse(s) : [] } catch { return [] }
+    try { const s = migrateAndGet('cp_cash', mktKey); return s ? JSON.parse(s) : [] } catch { return [] }
   })
 
   // ── Sales goal (meta diária) ───────────────────────────────
   const [salesGoal, setSalesGoalState] = useState(() => {
-    try { const s = localStorage.getItem('cp_goal'); return s ? JSON.parse(s) : { daily: 0 } } catch { return { daily: 0 } }
+    try { const s = migrateAndGet('cp_goal', mktKey); return s ? JSON.parse(s) : { daily: 0 } } catch { return { daily: 0 } }
   })
 
   // ── Operators ─────────────────────────────────────────────
   const [operators, setOperators] = useState(() => {
-    try { const s = localStorage.getItem('cp_operators'); return s ? JSON.parse(s) : [] } catch { return [] }
+    try { const s = migrateAndGet('cp_operators', mktKey); return s ? JSON.parse(s) : [] } catch { return [] }
   })
 
   // ── Supplier Offers ────────────────────────────────────────
   const [supplierOffers, setSupplierOffers] = useState(() => {
-    try { const s = localStorage.getItem('cp_supplier_offers'); return s ? JSON.parse(s) : [] } catch { return [] }
+    try { const s = migrateAndGet('cp_supplier_offers', mktKey); return s ? JSON.parse(s) : [] } catch { return [] }
   })
 
   // ── Product photos (IndexedDB — loaded async on mount) ─────
@@ -140,7 +141,7 @@ export function StoreProvider({ children }) {
 
   const [promos, setPromos] = useState(() => {
     try {
-      const s = localStorage.getItem('cp_promos')
+      const s = migrateAndGet('cp_promos', mktKey)
       if (!s) return SEED_PROMOS
       const stored = JSON.parse(s)
       const seedById = Object.fromEntries(SEED_PROMOS.map(p => [p.id, p]))
@@ -154,22 +155,22 @@ export function StoreProvider({ children }) {
 
   // ── Expiry alert threshold ────────────────────────────────
   const [expiryAlertDays, setExpiryAlertDaysState] = useState(() => {
-    try { return parseInt(localStorage.getItem('cp_expiry_days') || '30', 10) } catch { return 30 }
+    try { return parseInt(migrateAndGet('cp_expiry_days', mktKey) || '30', 10) } catch { return 30 }
   })
   const setExpiryAlertDays = useCallback((days) => {
     const n = Math.max(1, Math.min(365, parseInt(days, 10) || 30))
     setExpiryAlertDaysState(n)
-    try { localStorage.setItem('cp_expiry_days', String(n)) } catch {}
+    try { localStorage.setItem(mktKey('cp_expiry_days'), String(n)) } catch {}
   }, [])
 
-  // ── Persist: localStorage + server disk (fire-and-forget) ──
-  const persist = useCallback((key, val) => {
+  // ── Persist: namespaced localStorage + flat server key (fire-and-forget) ──
+  const persist = useCallback((baseKey, val) => {
     const str = JSON.stringify(val)
-    try { localStorage.setItem(key, str) } catch {}
+    try { localStorage.setItem(mktKey(baseKey), str) } catch {}
     fetch('/api/persist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, value: str }),
+      body: JSON.stringify({ key: baseKey, value: str }),  // server key stays flat (Netlify Blobs compat)
     }).catch(() => {})
   }, [])
 
@@ -189,29 +190,29 @@ export function StoreProvider({ children }) {
     if (data.cp_products) {
       const parsed = JSON.parse(data.cp_products)
       setProducts(mergeWithSeed(parsed))
-      try { localStorage.setItem('cp_products', data.cp_products) } catch {}
+      try { localStorage.setItem(mktKey('cp_products'), data.cp_products) } catch {}
     }
     if (data.cp_sales) {
       setSales(JSON.parse(data.cp_sales))
-      try { localStorage.setItem('cp_sales', data.cp_sales) } catch {}
+      try { localStorage.setItem(mktKey('cp_sales'), data.cp_sales) } catch {}
     }
     if (data.cp_customers) {
       setCustomers(JSON.parse(data.cp_customers))
-      try { localStorage.setItem('cp_customers', data.cp_customers) } catch {}
+      try { localStorage.setItem(mktKey('cp_customers'), data.cp_customers) } catch {}
     }
     if (data.cp_promos) {
-      try { localStorage.setItem('cp_promos', data.cp_promos) } catch {}
+      try { localStorage.setItem(mktKey('cp_promos'), data.cp_promos) } catch {}
       const stored = JSON.parse(data.cp_promos)
       const seedById = Object.fromEntries(SEED_PROMOS.map(p => [p.id, p]))
       const merged = stored.map(p => seedById[p.id] ?? p)
       const storedIds = new Set(stored.map(p => p.id))
       setPromos([...merged, ...SEED_PROMOS.filter(p => !storedIds.has(p.id))])
     }
-    if (data.cp_fiado)    { try { localStorage.setItem('cp_fiado', data.cp_fiado) } catch {} }
-    if (data.cp_cash)     { setCashMovements(JSON.parse(data.cp_cash));   try { localStorage.setItem('cp_cash',      data.cp_cash)      } catch {} }
-    if (data.cp_goal)     { setSalesGoalState(JSON.parse(data.cp_goal));  try { localStorage.setItem('cp_goal',      data.cp_goal)      } catch {} }
-    if (data.cp_operators)      { setOperators(JSON.parse(data.cp_operators));           try { localStorage.setItem('cp_operators',       data.cp_operators)       } catch {} }
-    if (data.cp_supplier_offers){ setSupplierOffers(JSON.parse(data.cp_supplier_offers)); try { localStorage.setItem('cp_supplier_offers', data.cp_supplier_offers) } catch {} }
+    if (data.cp_fiado)    { try { localStorage.setItem(mktKey('cp_fiado'), data.cp_fiado) } catch {} }
+    if (data.cp_cash)     { setCashMovements(JSON.parse(data.cp_cash));   try { localStorage.setItem(mktKey('cp_cash'),      data.cp_cash)      } catch {} }
+    if (data.cp_goal)     { setSalesGoalState(JSON.parse(data.cp_goal));  try { localStorage.setItem(mktKey('cp_goal'),      data.cp_goal)      } catch {} }
+    if (data.cp_operators)      { setOperators(JSON.parse(data.cp_operators));           try { localStorage.setItem(mktKey('cp_operators'),       data.cp_operators)       } catch {} }
+    if (data.cp_supplier_offers){ setSupplierOffers(JSON.parse(data.cp_supplier_offers)); try { localStorage.setItem(mktKey('cp_supplier_offers'), data.cp_supplier_offers) } catch {} }
 
     // Push local keys not yet on server
     if (!data.cp_customers) setCustomers(c  => { syncToServer('cp_customers', JSON.stringify(c));  return c })
@@ -243,10 +244,10 @@ export function StoreProvider({ children }) {
   useEffect(() => {
     const onStorage = (e) => {
       try {
-        if (e.key === 'cp_products' && e.newValue) setProducts(JSON.parse(e.newValue))
-        if (e.key === 'cp_sales'    && e.newValue) setSales(JSON.parse(e.newValue))
-        if (e.key === 'cp_promos'   && e.newValue) setPromos(JSON.parse(e.newValue))
-        if (e.key === 'cp_customers'&& e.newValue) setCustomers(JSON.parse(e.newValue))
+        if (e.key === mktKey('cp_products') && e.newValue) setProducts(JSON.parse(e.newValue))
+        if (e.key === mktKey('cp_sales')    && e.newValue) setSales(JSON.parse(e.newValue))
+        if (e.key === mktKey('cp_promos')   && e.newValue) setPromos(JSON.parse(e.newValue))
+        if (e.key === mktKey('cp_customers')&& e.newValue) setCustomers(JSON.parse(e.newValue))
       } catch {}
     }
     window.addEventListener('storage', onStorage)
@@ -401,7 +402,7 @@ export function StoreProvider({ children }) {
 
   const resetAll = useCallback(() => {
     setProducts(SEED_PRODUCTS); setSales(SEED_SALES); setCustomers(SEED_CUSTOMERS); setPromos(SEED_PROMOS)
-    ;['cp_products','cp_sales','cp_customers','cp_promos'].forEach(k => localStorage.removeItem(k))
+    ;['cp_products','cp_sales','cp_customers','cp_promos'].forEach(k => localStorage.removeItem(mktKey(k)))
   }, [])
 
   return (

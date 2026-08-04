@@ -21,7 +21,8 @@ export default function Login() {
     setTimeout(() => {
       const { username, password } = getCredentials()
       if (user.trim() === username && pass === password) {
-        localStorage.setItem('cp_session', JSON.stringify({ loggedIn: true, user: user.trim() }))
+        // storeId namespaces all mercado localStorage keys — 'default' for single-store; extend per-store later
+        localStorage.setItem('cp_session', JSON.stringify({ loggedIn: true, user: user.trim(), storeId: 'default' }))
         navigate(from, { replace: true })
       } else {
         setErr('Usuário ou senha incorretos.')

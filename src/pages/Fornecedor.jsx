@@ -12,6 +12,8 @@ import {
 } from 'lucide-react'
 import CameraScanner from '../components/CameraScanner.jsx'
 import PRODUCTS_SEED from '../utils/products_seed.json'
+import { fornKey, migrateToNamespace } from '../utils/tenantStorage.js'
+import Footer from '../components/Footer.jsx'
 
 const BRL         = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const LOCAL       = 'cp_fornecedor_v1'
@@ -864,7 +866,7 @@ function OfferCard({ offer, markets, supplierName, orders = [], onDelete, onUpda
 
 /* ── SetupScreen ────────────────────────────────────────────── */
 function SetupScreen({ onDone }) {
-  const saved = (() => { try { return JSON.parse(localStorage.getItem(LOCAL)) || {} } catch { return {} } })()
+  const saved = (() => { try { return JSON.parse(localStorage.getItem(fornKey(LOCAL))) || {} } catch { return {} } })()
   const [name, setName]   = useState(saved.name  || '')
   const [phone, setPhone] = useState(saved.phone || '')
   return (
@@ -1474,7 +1476,7 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, 
 
   // Supplier autocomplete — local list keyed by sourceType
   const savedSuppliers = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem(SUPPLIERS_KEY) || '{}') } catch { return {} }
+    try { return JSON.parse(localStorage.getItem(fornKey(SUPPLIERS_KEY)) || '{}') } catch { return {} }
   }, [sourceName]) // re-read when user types (to refresh after save)
   const currentTypeSuggestions = (savedSuppliers[sourceType] || []).filter(
     s => sourceName.trim() === '' || s.toLowerCase().includes(sourceName.toLowerCase())
@@ -1485,11 +1487,11 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, 
   function saveSupplierIfNew(name) {
     if (!name.trim()) return
     try {
-      const all = JSON.parse(localStorage.getItem(SUPPLIERS_KEY) || '{}')
+      const all = JSON.parse(localStorage.getItem(fornKey(SUPPLIERS_KEY)) || '{}')
       const list = all[sourceType] || []
       if (!list.includes(name.trim())) {
         all[sourceType] = [name.trim(), ...list].slice(0, 20)
-        localStorage.setItem(SUPPLIERS_KEY, JSON.stringify(all))
+        localStorage.setItem(fornKey(SUPPLIERS_KEY), JSON.stringify(all))
       }
     } catch {}
   }
@@ -2391,7 +2393,7 @@ function TabMercados({ markets, setMarkets, orders, recurrences, setRecurrences 
   /* Recurrence helpers */
   function saveRecurrences(next) {
     setRecurrences(next)
-    try { localStorage.setItem(RECURRENCE_KEY, JSON.stringify(next)) } catch {}
+    try { localStorage.setItem(fornKey(RECURRENCE_KEY), JSON.stringify(next)) } catch {}
     persistKey(RECURRENCE_KEY, next)
   }
 
@@ -2419,7 +2421,7 @@ function TabMercados({ markets, setMarkets, orders, recurrences, setRecurrences 
 
   async function saveMarkets(next) {
     setMarkets(next)
-    try { localStorage.setItem(MKTS_KEY, JSON.stringify(next)) } catch {}
+    try { localStorage.setItem(fornKey(MKTS_KEY), JSON.stringify(next)) } catch {}
     await persistKey(MKTS_SERVER_KEY, next)
   }
 
@@ -3078,9 +3080,7 @@ function LoginPage({ onLogin }) {
         </div>
       </div>
 
-      <div style={{ color:'#1e3a50', fontSize:12, marginTop:24, textAlign:'center' }}>
-        ZatendeStock • {new Date().getFullYear()}
-      </div>
+      <Footer variant="forn" />
     </div>
   )
 }
@@ -3195,6 +3195,18 @@ function EditProfileModal({ profile, onSave, onClose }) {
 }
 
 export default function Fornecedor() {
+  /* ── One-time migration: copy flat legacy keys → forn:{tenantId}: namespace.
+     Runs before any useState so returning sessions get their data on first render. ── */
+  ;(() => {
+    try {
+      const sess = JSON.parse(localStorage.getItem(SESSION_KEY))
+      if (!sess?.id) return
+      const fk = (base) => `forn:${sess.id}:${base}`
+      const BASES = [LOCAL, MKTS_KEY, RECURRENCE_KEY, SUPPLIERS_KEY]
+      migrateToNamespace(BASES, fk)
+    } catch {}
+  })()
+
   /* ══ ALL HOOKS FIRST — no conditional hooks (React rules) ══ */
 
   /* ── Session ── */
@@ -3205,7 +3217,7 @@ export default function Fornecedor() {
   /* ── Profile — loaded from localStorage, falls back to tenant default ── */
   const [profile, setProfile] = useState(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(LOCAL))
+      const saved = JSON.parse(localStorage.getItem(fornKey(LOCAL)))
       if (saved?.name) return saved
     } catch {}
     const s = (() => { try { return JSON.parse(localStorage.getItem(SESSION_KEY)) } catch { return null } })()
@@ -3213,12 +3225,12 @@ export default function Fornecedor() {
     return tenant?.profile || { name: 'Distribuidor', phone: '' }
   })
 
-  const [markets,     setMarkets]     = useState(() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })
+  const [markets,     setMarkets]     = useState(() => { try { return JSON.parse(localStorage.getItem(fornKey(MKTS_KEY))) || [] } catch { return [] } })
   const [estoque,     setEstoque]     = useState([])
   const [offers,      setOffers]      = useState([])
   const [orders,      setOrders]      = useState([])
   const [recurrences, setRecurrences] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(RECURRENCE_KEY) || '[]') } catch { return [] }
+    try { return JSON.parse(localStorage.getItem(fornKey(RECURRENCE_KEY)) || '[]') } catch { return [] }
   })
   const [tab,         setTab]         = useState('inicio')
   const [syncing,     setSyncing]     = useState(false)
@@ -3237,7 +3249,7 @@ export default function Fornecedor() {
 
   const saveProfile = (data) => {
     setProfile(data)
-    try { localStorage.setItem(LOCAL, JSON.stringify(data)) } catch {}
+    try { localStorage.setItem(fornKey(LOCAL), JSON.stringify(data)) } catch {}
     persistKey(PROFILE_SERVER_KEY, data)   // sincroniza logo e tema em todos os dispositivos
     setEditingProfile(false)
   }
@@ -3248,11 +3260,14 @@ export default function Fornecedor() {
     setSession(s)
     localStorage.setItem(SESSION_KEY, JSON.stringify(s))
 
+    // Migrate flat legacy keys → forn:{tenantId}: namespace on first login after upgrade
+    migrateToNamespace([LOCAL, MKTS_KEY, RECURRENCE_KEY, SUPPLIERS_KEY], fornKey)
+
     // Set profile from tenant (preserve edits if businessName matches)
-    const saved = (() => { try { return JSON.parse(localStorage.getItem(LOCAL)) } catch { return null } })()
+    const saved = (() => { try { return JSON.parse(localStorage.getItem(fornKey(LOCAL))) } catch { return null } })()
     const prof = (saved?.businessName === tenant.profile.businessName) ? saved : tenant.profile
     setProfile(prof)
-    localStorage.setItem(LOCAL, JSON.stringify(prof))
+    localStorage.setItem(fornKey(LOCAL), JSON.stringify(prof))
 
     // Demo tenants: substituir mercados completamente (limpa lixo de sessões antigas)
     // Real tenants: merge preservando cadastros manuais
@@ -3260,12 +3275,12 @@ export default function Fornecedor() {
       const mkts = tenant.autoSeedDemo
         ? tenant.seedMarkets                        // substitui — demo sempre parte limpo
         : (() => {                                  // merge — real preserva cadastros manuais
-            const saved = (() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })()
+            const saved = (() => { try { return JSON.parse(localStorage.getItem(fornKey(MKTS_KEY))) || [] } catch { return [] } })()
             const ids   = new Set(saved.map(m => m.id))
             return [...saved, ...tenant.seedMarkets.filter(m => !ids.has(m.id))]
           })()
       setMarkets(mkts)
-      localStorage.setItem(MKTS_KEY, JSON.stringify(mkts))
+      localStorage.setItem(fornKey(MKTS_KEY), JSON.stringify(mkts))
       persistKey(MKTS_SERVER_KEY, mkts)
     }
   }
@@ -3282,19 +3297,19 @@ export default function Fornecedor() {
     setOffers(o.filter(of => of.supplierId === LOCAL || !of.supplierId))
     setOrders(ord)
     // markets: merge server data with localStorage seed
-    const localMkts = (() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })()
+    const localMkts = (() => { try { return JSON.parse(localStorage.getItem(fornKey(MKTS_KEY))) || [] } catch { return [] } })()
     if (mkt !== null) {
       const serverIds = new Set(mkt.map(m => m.id))
       const merged = [...mkt, ...localMkts.filter(m => !serverIds.has(m.id))]
       setMarkets(merged)
-      try { localStorage.setItem(MKTS_KEY, JSON.stringify(merged)) } catch {}
+      try { localStorage.setItem(fornKey(MKTS_KEY), JSON.stringify(merged)) } catch {}
     }
     // profile: server wins for logoUrl (so mobile picks up logo uploaded on PC)
     if (srvProfile) {
       setProfile(prev => {
         // merge: prefer server's logoUrl and themeColor if local is missing them
         const merged = { ...prev, ...srvProfile }
-        try { localStorage.setItem(LOCAL, JSON.stringify(merged)) } catch {}
+        try { localStorage.setItem(fornKey(LOCAL), JSON.stringify(merged)) } catch {}
         return merged
       })
     }
@@ -3331,7 +3346,7 @@ export default function Fornecedor() {
     // Demo tenant: substituir mercados completamente (remove telefones errados de sessões antigas)
     const freshMkts = tenant.seedMarkets || []
     setMarkets(freshMkts)
-    localStorage.setItem(MKTS_KEY, JSON.stringify(freshMkts))
+    localStorage.setItem(fornKey(MKTS_KEY), JSON.stringify(freshMkts))
     persistKey(MKTS_SERVER_KEY, freshMkts)
   }, [synced]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

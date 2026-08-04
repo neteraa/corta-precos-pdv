@@ -140,11 +140,37 @@ npm run build && npx netlify-cli deploy --prod --dir=dist --site=abd4863b-ef7b-4
 5. Mercado: Meus Pedidos atualiza em ≤30s mostrando "✅ Confirmado!"
 6. Distribuidor: "Entreguei + 📱 Avisar Mercado" → ZAP de entrega
 
+## TASK-8 — Multi-tenant localStorage (2026-08)
+
+### Architecture
+Two completely isolated namespaces — never mix:
+- `mkt:{storeId}:{key}` → Corta Preço / mercado (B2C)
+- `forn:{tenantId}:{key}` → Mega Tudo Barato / distribuidor (B2B)
+
+Session keys (always flat — they ARE the namespace identifiers):
+- `cp_session` → mercado session `{ loggedIn, user, storeId }` — storeId='default' (single-store, extendable)
+- `cp_session_v1` → forn session `{ id, username }` — id = tenant.id from TENANTS array
+
+### Files changed
+- **NEW** `src/utils/tenantStorage.js` — `mktKey(base)`, `fornKey(base)`, `migrateAndGet()`, `migrateToNamespace()`
+- `src/pages/Login.jsx` — adds `storeId: 'default'` to session on login
+- `src/store.jsx` — all `localStorage.getItem/setItem('cp_xxx')` → `mktKey('cp_xxx')`; `persist()` uses mktKey for localStorage, flat for server (Netlify Blobs compat)
+- `src/pages/Fornecedor.jsx` — all data localStorage calls → `fornKey(KEY)`; migration IIFE at function start + migration in `handleLogin`
+- **NEW** `src/components/Footer.jsx` — `etc!` / Zatende / Dubai / Bay Square (placeholder)
+- `src/components/Layout.jsx` — Footer at bottom of sidebar (variant='mkt')
+- `Fornecedor.jsx` LoginPage — Footer at bottom (variant='forn')
+
+### Migration strategy (zero data loss)
+- Mercado: `migrateAndGet(base, mktKey)` inside each useState lazy initializer — copies flat → `mkt:default:` on first load
+- Forn: IIFE at top of `Fornecedor()` for returning sessions; `migrateToNamespace()` in `handleLogin` for fresh logins
+- Server keys (Netlify Blobs) remain flat — backward compat preserved
+
 ## Known issues / next possible work
 - Produtos page can be slow with 2795 products loaded (no virtual scroll)
 - Validade "Sem data (2795)" — products need expiry dates added via ScanMobile or Receber Mercadoria
 - Photos from OpenFoodFacts API can be unstable (503 errors)
 - No real auth (PIN only) — not production-safe for multi-user
+- Footer `etc!` placeholder — real address/contact data to be filled by team
 
 ## Stack
 - React 18, React Router 6, Recharts, Lucide React
