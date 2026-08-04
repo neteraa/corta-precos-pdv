@@ -10,7 +10,9 @@ import { X, Camera, Loader } from 'lucide-react'
  *   onClose()             — called when user closes the camera panel
  *   compact               — smaller inline mode (default: false = full overlay)
  */
-export default function CameraScanner({ onScan, onClose, compact = false }) {
+export default function CameraScanner({ onScan, onDetected, onClose, compact = false }) {
+  // support both prop names
+  const handleCode = onScan || onDetected
   const [state, setState] = useState('idle')   // idle | starting | scanning | error
   const [errMsg, setErrMsg] = useState('')
   const [lastCode, setLastCode] = useState('')
@@ -32,7 +34,7 @@ export default function CameraScanner({ onScan, onClose, compact = false }) {
         lastRef.current = code
         setTimeout(() => { lastRef.current = null }, 1500)
         setLastCode(code)
-        onScan?.(code)
+        handleCode?.(code)
       },
       () => {}   // per-frame errors are normal — ignore
     )

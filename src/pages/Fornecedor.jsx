@@ -1406,6 +1406,17 @@ function TabPedidos({ orders, setOrders }) {
   async function updateStatus(id, status) {
     const next = orders.map(o => o.id === id ? { ...o, status, updatedAt: new Date().toISOString() } : o)
     setOrders(next); await persistKey(ORDERS_KEY, next)
+
+    // Auto-notify market via WhatsApp
+    const order = orders.find(o => o.id === id)
+    if (!order?.storePhone) return
+    const msgs = {
+      confirmed: `✅ *PEDIDO CONFIRMADO!*\n\nOlá, ${order.storeName || 'Mercado'}!\n\nSeu pedido foi confirmado:\n📦 *${order.productName}*\n   ${order.qtyRequested} ${order.unit} · ${BRL.format(order.totalPrice)}\n\nCombine a entrega pelo chat 🚚`,
+      delivered: `📦 *ENTREGUE!*\n\nOlá, ${order.storeName || 'Mercado'}!\n\n${order.productName} foi entregue com sucesso!\n   ${order.qtyRequested} ${order.unit} · ${BRL.format(order.totalPrice)}\n\nObrigado pela parceria! 🤝`,
+    }
+    if (msgs[status]) {
+      window.open(`https://wa.me/${cleanPhone(order.storePhone)}?text=${encodeURIComponent(msgs[status])}`, '_blank')
+    }
   }
 
   async function deleteOrder(id) {
@@ -1464,14 +1475,14 @@ function TabPedidos({ orders, setOrders }) {
             <div style={{ display:'flex', gap:8 }}>
               {order.status === 'pending' && (
                 <button onClick={() => updateStatus(order.id, 'confirmed')}
-                  style={{ flex:1, background:'linear-gradient(135deg,#10b981,#059669)', color:'#fff', border:'none', borderRadius:12, padding:10, fontWeight:800, fontSize:13, cursor:'pointer' }}>
-                  ✓ Confirmar Pedido
+                  style={{ flex:1, background:'linear-gradient(135deg,#10b981,#059669)', color:'#fff', border:'none', borderRadius:12, padding:10, fontWeight:800, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  <Check size={15} /> Confirmar + 📱 Avisar Mercado
                 </button>
               )}
               {order.status === 'confirmed' && (
                 <button onClick={() => updateStatus(order.id, 'delivered')}
-                  style={{ flex:1, background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'#fff', border:'none', borderRadius:12, padding:10, fontWeight:800, fontSize:13, cursor:'pointer' }}>
-                  🚚 Marcar Entregue
+                  style={{ flex:1, background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'#fff', border:'none', borderRadius:12, padding:10, fontWeight:800, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  🚚 Entreguei + 📱 Avisar Mercado
                 </button>
               )}
               {order.status === 'delivered' && (

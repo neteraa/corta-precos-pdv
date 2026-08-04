@@ -443,6 +443,50 @@ function PedidoModal({ offer, onClose, onConfirm }) {
   )
 }
 
+/* ── Order status config ──────────────────────────────────────── */
+const ORDER_STATUS = {
+  pending:   { label: 'Aguardando',  emoji: '🕐', tw: 'text-amber-400 bg-amber-900/30 border-amber-700/50' },
+  confirmed: { label: 'Confirmado!', emoji: '✅', tw: 'text-emerald-300 bg-emerald-900/40 border-emerald-600/50' },
+  delivering:{ label: 'A Caminho',   emoji: '🚚', tw: 'text-blue-300 bg-blue-900/30 border-blue-700/50' },
+  delivered: { label: 'Entregue!',   emoji: '📦', tw: 'text-emerald-300 bg-emerald-900/40 border-emerald-600/50' },
+  cancelled: { label: 'Cancelado',   emoji: '❌', tw: 'text-red-400 bg-red-900/30 border-red-700/50' },
+}
+
+function OrderCard({ order }) {
+  const st = ORDER_STATUS[order.status] || ORDER_STATUS.pending
+  const isConfirmed = order.status === 'confirmed' || order.status === 'delivered' || order.status === 'delivering'
+  return (
+    <div className={`rounded-2xl border mb-3 overflow-hidden ${isConfirmed ? 'border-emerald-700/60' : 'border-gray-800'}`}>
+      {isConfirmed && (
+        <div className="bg-emerald-500/10 px-4 py-2 flex items-center gap-2">
+          <span className="text-base">{st.emoji}</span>
+          <span className="text-emerald-300 font-black text-sm">{st.label} pelo distribuidor!</span>
+        </div>
+      )}
+      <div className="bg-gray-900 px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-black text-base truncate">{order.productName}</div>
+            <div className="text-gray-500 text-xs mt-0.5">
+              {order.qtyRequested} {order.unit} · {BRL.format(order.totalPrice)}
+              {order.createdAt && <span className="ml-2">· {new Date(order.createdAt).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}</span>}
+            </div>
+          </div>
+          <span className={`text-xs font-bold px-2 py-1 rounded-lg border flex-shrink-0 ${st.tw}`}>
+            {st.emoji} {st.label}
+          </span>
+        </div>
+        {order.note && <div className="text-gray-500 text-xs mt-2 italic">"{order.note}"</div>}
+        {order.status === 'pending' && (
+          <div className="mt-2 text-amber-600 text-xs">
+            ⏱ O distribuidor ainda não confirmou. Você receberá a confirmação via WhatsApp.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ── MAIN ───────────────────────────────────────────────────── */
 export default function Ofertas() {
   const { upsertProduct, products }  = useStore()
@@ -452,18 +496,41 @@ export default function Ofertas() {
   const storeName  = storeSettings.storeName  || 'Mercado'
   const storePhone = storeSettings.phone       || ''
   const [offers,      setOffers]     = useState([])
+  const [myOrders,    setMyOrders]   = useState([])
   const [loading,     setLoading]    = useState(true)
   const [accepting,   setAccepting]  = useState(false)
   const [filter,      setFilter]     = useState('all')
   const [toast,       setToast]      = useState(null)
   const [refreshAt,   setRefreshAt]  = useState(Date.now())
   const [pedidoOffer, setPedidoOffer] = useState(null)
+  const [lastSync,    setLastSync]   = useState(null)
 
-  /* load */
+  /* load offers */
   useEffect(() => {
     setLoading(true)
-    loadOffers().then(o => { setOffers(o); setLoading(false) })
+    loadOffers().then(o => { setOffers(o); setLoading(false); setLastSync(new Date()) })
   }, [refreshAt])
+
+  /* load + poll MY orders every 30s */
+  async function loadMyOrders() {
+    try {
+      const r = await fetch(API_RESTORE)
+      const j = await r.json()
+      const raw = j?.data?.[ORDERS_KEY]
+      const all = raw ? JSON.parse(raw) : []
+      const mine = all.filter(o =>
+        (storePhone && o.storePhone && cleanPhone(o.storePhone) === cleanPhone(storePhone)) ||
+        (storeName  && o.storeName  && o.storeName.toLowerCase() === storeName.toLowerCase())
+      ).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      setMyOrders(mine)
+      setLastSync(new Date())
+    } catch {}
+  }
+  useEffect(() => {
+    loadMyOrders()
+    const iv = setInterval(loadMyOrders, 30000)
+    return () => clearInterval(iv)
+  }, [storeName, storePhone]) // eslint-disable-line
 
   function showToast(msg, type = 'success') {
     setToast({ msg, type })
@@ -552,21 +619,26 @@ export default function Ofertas() {
       window.open(`https://wa.me/${cleanPhone(order.supplierPhone)}?text=${encodeURIComponent(msg)}`, '_blank')
     }
 
+    // Add to local myOrders immediately so UI updates without polling
+    setMyOrders(prev => [order, ...prev.filter(o => o.id !== order.id)])
     setPedidoOffer(null)
+    setFilter('myorders') // Jump to "Meus Pedidos" tab to show the placed order
     showToast(`✅ Pedido enviado! ${order.qtyRequested} ${order.unit} de ${order.productName}`)
   }
 
   /* filtered */
   const filtered = useMemo(() => {
     const sorted = [...offers].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
-    if (filter === 'pending')      return sorted.filter(o => o.status === 'pending')
-    if (filter === 'accepted')     return sorted.filter(o => o.status === 'accepted')
-    if (filter === 'opportunity')  return sorted.filter(o => o.isOpportunity)
+    if (filter === 'pending')     return sorted.filter(o => o.status === 'pending')
+    if (filter === 'accepted')    return sorted.filter(o => o.status === 'accepted')
+    if (filter === 'opportunity') return sorted.filter(o => o.isOpportunity)
+    if (filter === 'myorders')    return [] // handled separately
     return sorted
   }, [offers, filter])
 
-  const pendingCount     = offers.filter(o => o.status === 'pending').length
-  const oppCount         = offers.filter(o => o.isOpportunity && o.status === 'pending').length
+  const pendingCount  = offers.filter(o => o.status === 'pending').length
+  const oppCount      = offers.filter(o => o.isOpportunity && o.status === 'pending').length
+  const confirmedOrders = myOrders.filter(o => o.status === 'confirmed' || o.status === 'delivered').length
 
   return (
     <div className="min-h-screen bg-gray-950 text-white pb-8 relative">
@@ -594,10 +666,18 @@ export default function Ofertas() {
                 : 'Nenhuma oferta pendente'}
             </p>
           </div>
-          <button onClick={() => setRefreshAt(Date.now())}
-            className="p-2.5 bg-gray-800 rounded-xl hover:bg-gray-700 transition-all">
-            <RefreshCw size={16} className="text-gray-400" />
-          </button>
+          <div className="flex items-center gap-2">
+            {confirmedOrders > 0 && (
+              <div className="flex items-center gap-1 bg-emerald-900/50 border border-emerald-700/50 rounded-xl px-2 py-1">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-emerald-300 text-xs font-bold">{confirmedOrders} confirmado{confirmedOrders > 1 ? 's' : ''}!</span>
+              </div>
+            )}
+            <button onClick={() => { setRefreshAt(Date.now()); loadMyOrders() }}
+              className="p-2.5 bg-gray-800 rounded-xl hover:bg-gray-700 transition-all">
+              <RefreshCw size={16} className="text-gray-400" />
+            </button>
+          </div>
         </div>
 
         {/* Alert banners */}
@@ -632,16 +712,21 @@ export default function Ofertas() {
         {[
           { id: 'all',         label: `Todas (${offers.length})` },
           { id: 'pending',     label: `Pendentes (${pendingCount})` },
-          { id: 'accepted',    label: 'Aceitas' },
+          { id: 'myorders',    label: `📋 Meus Pedidos${myOrders.length > 0 ? ` (${myOrders.length})` : ''}`, highlight: confirmedOrders > 0 },
           { id: 'opportunity', label: '🔥 Oportunidade' },
         ].map(f => (
           <button key={f.id} onClick={() => setFilter(f.id)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 relative ${
               filter === f.id
                 ? 'bg-emerald-500 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                : f.highlight
+                  ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700/50'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
             }`}>
             {f.label}
+            {f.highlight && filter !== f.id && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+            )}
           </button>
         ))}
       </div>
@@ -655,7 +740,48 @@ export default function Ofertas() {
           </div>
         )}
 
-        {!loading && filtered.length === 0 && (
+        {/* ── Meus Pedidos view ── */}
+        {filter === 'myorders' && (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-white font-black text-base">Meus Pedidos</div>
+                {lastSync && (
+                  <div className="text-gray-600 text-xs flex items-center gap-1 mt-0.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Atualizado {lastSync.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })} · sincroniza a cada 30s
+                  </div>
+                )}
+              </div>
+              <button onClick={loadMyOrders} className="flex items-center gap-1.5 bg-gray-800 rounded-xl px-3 py-2 text-gray-400 text-xs font-bold hover:bg-gray-700 transition-all">
+                <RefreshCw size={13} /> Atualizar
+              </button>
+            </div>
+            {myOrders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <ClipboardList size={48} className="text-gray-800 mb-4" />
+                <div className="text-gray-500 font-bold text-base">Nenhum pedido ainda</div>
+                <div className="text-gray-700 text-sm mt-1">Quando você fizer um pedido, ele aparece aqui com o status em tempo real</div>
+              </div>
+            ) : (
+              <>
+                {confirmedOrders > 0 && (
+                  <div className="bg-emerald-900/30 border border-emerald-700/50 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
+                    <span className="text-2xl">🎉</span>
+                    <div>
+                      <div className="text-emerald-300 font-black text-sm">{confirmedOrders} pedido{confirmedOrders > 1 ? 's' : ''} confirmado{confirmedOrders > 1 ? 's' : ''}!</div>
+                      <div className="text-emerald-700 text-xs">O distribuidor confirmou seu pedido. Combine a entrega via WhatsApp.</div>
+                    </div>
+                  </div>
+                )}
+                {myOrders.map(order => <OrderCard key={order.id} order={order} />)}
+              </>
+            )}
+          </>
+        )}
+
+        {/* ── Regular offer list ── */}
+        {filter !== 'myorders' && !loading && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Package size={48} className="text-gray-800 mb-4" />
             <div className="text-gray-500 font-bold text-base">Nenhuma oferta encontrada</div>
@@ -667,7 +793,7 @@ export default function Ofertas() {
           </div>
         )}
 
-        {!loading && filtered.map(offer => (
+        {filter !== 'myorders' && !loading && filtered.map(offer => (
           <OfferCard
             key={offer.id}
             offer={offer}
