@@ -3,8 +3,16 @@
 ## What this is
 React + Vite + Tailwind MVP platform for retail management (PDV/automação comercial), Brazilian supermarket.
 Live URL: **https://corta-precos-pdv.netlify.app**
+GitHub Repo: **https://github.com/neteraa/corta-precos-pdv**
 Netlify site ID: `abd4863b-ef7b-4d7c-b3f2-85547f519485`
-Repo: `/workspace/project` · Branch: `master` · Latest commit: `a91f364`
+Branch: `master`
+
+## First thing to do in a NEW session
+```bash
+git clone https://github.com/neteraa/corta-precos-pdv.git /workspace/project
+cd /workspace/project
+npm install
+```
 
 ## Deploy command (always use this)
 ```bash
