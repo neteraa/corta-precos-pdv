@@ -22,7 +22,23 @@ const MKTS_KEY    = LOCAL + '_markets'
 const MKTS_SERVER_KEY = 'cp_distribuidor_markets'  // server-side persistence (cross-device)
 const API_PERSIST = '/api/persist'
 const API_RESTORE = '/api/restore'
-const UNITS       = ['CX', 'UND', 'FD', 'KG', 'LT', 'PC', 'DZ', 'SC']
+const UNITS       = ['UND', 'CX', 'FD', 'KG', 'LT', 'PC', 'DZ', 'SC']
+
+/* 🔒 INTERNAL ONLY — never sent to market-facing offer objects */
+const SOURCE_TYPES = [
+  { id:'leilao',     emoji:'🔨', label:'Leilão',      color:'#f59e0b', bg:'#78350f' },
+  { id:'danificado', emoji:'📦', label:'Danificado',  color:'#f87171', bg:'#7f1d1d' },
+  { id:'contato',    emoji:'👤', label:'Contato',     color:'#4ade80', bg:'#14532d' },
+  { id:'atacadista', emoji:'🏭', label:'Atacadista',  color:'#93c5fd', bg:'#1e3a5f' },
+  { id:'avulso',     emoji:'❓', label:'Avulso',      color:'#94a3b8', bg:'#1e293b' },
+]
+const EXPIRY_SHORTCUTS = [
+  { label:'7d',  days:7  },
+  { label:'15d', days:15 },
+  { label:'30d', days:30 },
+  { label:'60d', days:60 },
+  { label:'90d', days:90 },
+]
 
 const PAYMENT_INFO = {
   pix:      { emoji: '⚡', label: 'PIX',       color: '#10b981' },
@@ -259,15 +275,183 @@ function WaOverlay({ offer, markets, supplierName, supplierPhone, orders = [], o
   )
 }
 
+/* ── QuickProductInput ──────────────────────────────────────── */
+/* Free-text OR scan — no SKU required; suggests from seed DB   */
+function QuickProductInput({ onSelect }) {
+  const [text,    setText]    = useState('')
+  const [results, setResults] = useState([])
+  const [scan,    setScan]    = useState(false)
+
+  const doSearch = (q) => {
+    setText(q)
+    if (!q || q.length < 2) { setResults([]); return }
+    const ql = q.toLowerCase()
+    const skuHit = SKU_MAP[q]
+    const hits = skuHit
+      ? [skuHit]
+      : PRODUCTS_SEED.filter(p => p.name?.toLowerCase().includes(ql) || p.sku?.includes(q)).slice(0, 5)
+    setResults(hits)
+  }
+
+  const confirmFreeText = () => {
+    if (!text.trim()) return
+    onSelect({ name: text.trim(), sku: '', price: null })
+    setText(''); setResults([])
+  }
+
+  const pick = (p) => { onSelect(p); setText(''); setResults([]) }
+
+  const inp = { flex:1, background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, padding:'13px 14px', color:'#e2e8f0', fontSize:16, outline:'none' }
+
+  return (
+    <div style={{ position:'relative' }}>
+      {scan && (
+        <div style={{ position:'fixed', inset:0, zIndex:999, background:'#000' }}>
+          <CameraScanner onDetected={sku => { setScan(false); doSearch(sku) }} onClose={() => setScan(false)} />
+        </div>
+      )}
+      <div style={{ display:'flex', gap:8 }}>
+        <input value={text} onChange={e => doSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && confirmFreeText()}
+          placeholder="Nome do produto ou código de barras..." style={inp} autoFocus />
+        <button onClick={() => setScan(true)} style={{ background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, padding:'0 14px', cursor:'pointer' }}>
+          <Camera size={20} color="#10b981" />
+        </button>
+      </div>
+      {text.trim().length >= 1 && (
+        <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:100, background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, marginTop:4 }}>
+          {/* Always show "use as typed" first */}
+          <button onClick={confirmFreeText}
+            style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'12px 14px', background:'transparent', border:'none', borderBottom:'1px solid #1a3a50', cursor:'pointer', textAlign:'left' }}>
+            <div style={{ width:28, height:28, borderRadius:8, background:'#14532d', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <Check size={14} color="#4ade80" />
+            </div>
+            <div>
+              <div style={{ color:'#4ade80', fontWeight:800, fontSize:13 }}>Usar: "{text.trim()}"</div>
+              <div style={{ color:'#475569', fontSize:11 }}>produto novo / sem cadastro</div>
+            </div>
+          </button>
+          {/* Seed matches */}
+          {results.map(p => (
+            <button key={p.id || p.sku} onClick={() => pick(p)}
+              style={{ display:'flex', alignItems:'center', justifyContent:'space-between', width:'100%', padding:'11px 14px', background:'transparent', border:'none', borderBottom:'1px solid #1a3a50', cursor:'pointer', textAlign:'left' }}>
+              <div>
+                <div style={{ color:'#e2e8f0', fontWeight:700, fontSize:13 }}>{p.name}</div>
+                {p.sku && <div style={{ color:'#475569', fontSize:11, fontFamily:'monospace' }}>{p.sku}</div>}
+              </div>
+              {p.price != null && <span style={{ color:'#10b981', fontWeight:900, fontSize:14, flexShrink:0 }}>{BRL.format(p.price)}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── BlitzModal ──────────────────────────────────────────────── */
+function BlitzModal({ offers, setOffers, markets, profile, onClose }) {
+  const [pct,     setPct]     = useState(20)
+  const [blasting, setBlasting] = useState(false)
+  const [blastMsg, setBlastMsg] = useState(null)
+
+  const active  = offers.filter(o => o.status !== 'delivered' && o.offerPrice > 0)
+  const avgOld  = active.length ? active.reduce((s,o) => s + o.offerPrice, 0) / active.length : 0
+  const avgNew  = avgOld * (1 - pct / 100)
+
+  function buildBlitzMsg() {
+    const lines = [
+      `⚡ *BLITZ FINAL DO DIA — ${profile.name}*`,
+      '',
+      `Preços caíram ${pct}%! Garanta agora:`,
+      '',
+      ...active.map(o => `📦 *${o.productName}* — ${BRL.format(o.offerPrice * (1 - pct / 100))}/un (${o.qty} ${o.unit})`),
+      '',
+      '🏃 Estoque limitado! Primeiro que pedir leva!',
+      '',
+      '👉 *Fazer pedido:*',
+      'https://corta-precos-pdv.netlify.app/ofertas',
+      '',
+      profile.phone ? `📞 ${profile.name} · ${profile.phone}` : `📞 ${profile.name}`,
+    ]
+    return lines.join('\n')
+  }
+
+  async function applyBlitz() {
+    // Update all active offer prices
+    const factor = 1 - pct / 100
+    const nextOffers = offers.map(o =>
+      o.status !== 'delivered' ? { ...o, offerPrice: parseFloat((o.offerPrice * factor).toFixed(2)) } : o
+    )
+    setOffers(nextOffers)
+    await persistKey(OFFERS_KEY, nextOffers)
+    setBlastMsg(buildBlitzMsg())
+    setBlasting(true)
+  }
+
+  const validMkts = (markets || []).filter(m => m.phone)
+
+  if (blasting && blastMsg) {
+    // Reuse BlastScreen logic but with custom combined message
+    return <BlastScreen customMsg={blastMsg} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={onClose} />
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:250, background:'rgba(0,0,0,0.9)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ background:'#0a1929', borderRadius:24, padding:24, width:'100%', maxWidth:400 }}>
+        <div style={{ textAlign:'center', marginBottom:20 }}>
+          <div style={{ fontSize:36, marginBottom:8 }}>⚡</div>
+          <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:20 }}>Blitz Final do Dia</div>
+          <div style={{ color:'#64748b', fontSize:13, marginTop:4 }}>{active.length} ofer{active.length !== 1 ? 'tas' : 'ta'} · {validMkts.length} mercados</div>
+        </div>
+
+        {/* Discount selector */}
+        <div style={{ marginBottom:20 }}>
+          <div style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase', marginBottom:10, textAlign:'center' }}>Quanto baixar?</div>
+          <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
+            {[10, 20, 30, 50].map(p => (
+              <button key={p} onClick={() => setPct(p)} style={{
+                flex:1, padding:'14px 0', borderRadius:14, border:`2px solid ${pct === p ? '#f59e0b' : '#1e4060'}`,
+                background: pct === p ? '#78350f' : '#0d2137', color: pct === p ? '#fbbf24' : '#64748b',
+                fontWeight:900, fontSize:18, cursor:'pointer',
+              }}>{p}%</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Preview */}
+        {active.length > 0 && (
+          <div style={{ background:'#0d2137', borderRadius:14, padding:'12px 14px', marginBottom:20 }}>
+            <div style={{ color:'#64748b', fontSize:11, marginBottom:8 }}>Exemplo de preços:</div>
+            {active.slice(0, 3).map(o => (
+              <div key={o.id} style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                <span style={{ color:'#e2e8f0', fontSize:13, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'60%' }}>{o.productName}</span>
+                <span style={{ color:'#64748b', fontSize:12, textDecoration:'line-through', marginRight:6 }}>{BRL.format(o.offerPrice)}</span>
+                <span style={{ color:'#4ade80', fontSize:13, fontWeight:800 }}>→ {BRL.format(o.offerPrice * (1 - pct / 100))}</span>
+              </div>
+            ))}
+            {active.length > 3 && <div style={{ color:'#334155', fontSize:11, marginTop:4 }}>+{active.length - 3} mais...</div>}
+          </div>
+        )}
+
+        <div style={{ display:'flex', gap:10 }}>
+          <Btn secondary full onClick={onClose}>Cancelar</Btn>
+          <Btn full disabled={active.length === 0} onClick={applyBlitz}>
+            <Zap size={16} /> Aplicar e Disparar
+          </Btn>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── BlastScreen ─────────────────────────────────────────────── */
 /* Full-screen sequential WA dispatcher — one market at a time   */
-function BlastScreen({ offer, markets, supplierName, supplierPhone, onDone }) {
+function BlastScreen({ offer, customMsg, markets, supplierName, supplierPhone, onDone }) {
   const [idx, setIdx] = useState(0)
   const valid  = (markets || []).filter(m => m.phone)
   const done   = idx >= valid.length
   const pct    = valid.length ? Math.round((idx / valid.length) * 100) : 100
   const curr   = valid[idx]
-  const msg    = buildOfferMsg(offer, supplierName, supplierPhone)
+  const msg    = customMsg || buildOfferMsg(offer, supplierName, supplierPhone)
 
   function sendCurrent() {
     if (!curr) return
@@ -519,15 +703,19 @@ function SetupScreen({ onDone }) {
 const DEMO_DATE = (d) => { const dt = new Date(); dt.setDate(dt.getDate() + d); return dt.toISOString().slice(0,10) }
 const DEMO_AGO  = (d) => { const dt = new Date(); dt.setDate(dt.getDate() - d); return dt.toISOString() }
 const DEMO_ESTOQUE = [
-  { id:'demo1', productName:'Coca-Cola 2L',           sku:'7894900011630', qty:120, unit:'UND', cost:5.20,  expiryDate:DEMO_DATE(45),  receivedAt:today(), updatedAt:new Date().toISOString() },
-  { id:'demo2', productName:'Arroz Tio João 5kg',     sku:'7896036500572', qty:80,  unit:'SC',  cost:18.50, expiryDate:DEMO_DATE(365), receivedAt:today(), updatedAt:new Date().toISOString() },
-  { id:'demo3', productName:'Óleo de Soja Soya 900ml',sku:'7896036500573', qty:60,  unit:'UND', cost:6.80,  expiryDate:DEMO_DATE(180), receivedAt:today(), updatedAt:new Date().toISOString() },
-  { id:'demo4', productName:'Biscoito Oreo 90g',      sku:'7622210651557', qty:200, unit:'UND', cost:2.90,  expiryDate:DEMO_DATE(12),  receivedAt:today(), updatedAt:new Date().toISOString() },
-  { id:'demo5', productName:'Leite Integral Itambé 1L',sku:'7896051190016',qty:144, unit:'CX',  cost:4.30,  expiryDate:DEMO_DATE(30),  receivedAt:today(), updatedAt:new Date().toISOString() },
+  // Arrived today — normal
+  { id:'demo1', productName:'Coca-Cola 2L',           sku:'7894900011630', qty:120, unit:'UND', unitCost:5.20,  totalPaid:624,  sourceType:'atacadista', sourceName:'Atacado Central SP', expiryDate:DEMO_DATE(45),  receivedAt:today(), updatedAt:new Date().toISOString() },
+  { id:'demo2', productName:'Arroz Tio João 5kg',     sku:'7896036500572', qty:80,  unit:'SC',  unitCost:18.50, totalPaid:1480, sourceType:'atacadista', sourceName:'Atacado Central SP', expiryDate:DEMO_DATE(365), receivedAt:today(), updatedAt:new Date().toISOString() },
+  // Arrived yesterday — attention
+  { id:'demo3', productName:'Óleo de Soja Soya 900ml',sku:'7896036500573', qty:60,  unit:'UND', unitCost:6.80,  totalPaid:408,  sourceType:'contato',    sourceName:'Pedro da Soya',      expiryDate:DEMO_DATE(180), receivedAt:DEMO_DATE(-1), updatedAt:new Date().toISOString() },
+  // Arrived 2 days ago — URGENT
+  { id:'demo4', productName:'Panetone Bauducco Amassado', sku:'', qty:156, unit:'UND', unitCost:0.80, totalPaid:125, sourceType:'leilao', sourceName:'Leilão CAIXA SP — Lote 44', expiryDate:DEMO_DATE(12), receivedAt:DEMO_DATE(-2), updatedAt:new Date().toISOString() },
+  { id:'demo5', productName:'Leite Integral Itambé 1L',sku:'7896051190016',qty:144, unit:'CX',  unitCost:4.30,  totalPaid:619,  sourceType:'danificado',  sourceName:'Caixa amassada, produto OK', expiryDate:DEMO_DATE(30),  receivedAt:DEMO_DATE(-2), updatedAt:new Date().toISOString() },
 ]
 const DEMO_OFFERS = [
-  { id:'doff1', supplierId:LOCAL, supplierName:'Distribuidora Demo', supplierPhone:'15999990000', productName:'Biscoito Oreo 90g', sku:'7622210651557', qty:200, unit:'UND', offerPrice:3.49, expiryDate:DEMO_DATE(12), isOpportunity:true,  note:'Próximo do vencimento — oportunidade única!', status:'pending', publishedAt:DEMO_AGO(1) },
-  { id:'doff2', supplierId:LOCAL, supplierName:'Distribuidora Demo', supplierPhone:'15999990000', productName:'Coca-Cola 2L',      sku:'7894900011630', qty:120, unit:'UND', offerPrice:6.90, expiryDate:DEMO_DATE(45), isOpportunity:false, note:'Lote novo, entrega imediata',               status:'pending', publishedAt:DEMO_AGO(0) },
+  { id:'doff1', supplierId:LOCAL, supplierName:'Distribuidora Demo', supplierPhone:'15999990000', productName:'Panetone Bauducco Amassado', sku:'', qty:156, unit:'UND', offerPrice:1.50, expiryDate:DEMO_DATE(12), isOpportunity:true,  note:'Embalagem amassada, produto 100% OK — preço de custo!', status:'pending', publishedAt:DEMO_AGO(2) },
+  { id:'doff2', supplierId:LOCAL, supplierName:'Distribuidora Demo', supplierPhone:'15999990000', productName:'Leite Integral Itambé 1L',   sku:'7896051190016', qty:144, unit:'CX',  offerPrice:5.20, expiryDate:DEMO_DATE(30), isOpportunity:true,  note:'Caixa amassada, leite perfeito — entrega imediata', status:'pending', publishedAt:DEMO_AGO(2) },
+  { id:'doff3', supplierId:LOCAL, supplierName:'Distribuidora Demo', supplierPhone:'15999990000', productName:'Coca-Cola 2L',              sku:'7894900011630', qty:120, unit:'UND', offerPrice:6.90, expiryDate:DEMO_DATE(45), isOpportunity:false, note:'Lote novo, direto do atacado',                      status:'pending', publishedAt:DEMO_AGO(0) },
 ]
 const DEMO_MARKETS = [
   { id:'dmkt1', name:'Mercado Qualidade Preço', phone:'15996604075', contact:'André Porfírio', address:'Rua das Rosas 450, Centro, Sorocaba/SP', cnpj:'12.345.678/0001-99', notes:'Paga à vista, prefere entrega 2ª e 5ª feira' },
@@ -543,126 +731,296 @@ const DEMO_ORDERS_HIST = [
 ]
 
 /* ── TabInicio ──────────────────────────────────────────────── */
-function TabInicio({ estoque, offers, orders, profile, setEstoque, setOffers, setMarkets, setOrders }) {
-  const stats = useMemo(() => ({
-    itens:    estoque.filter(e => e.qty > 0).length,
-    qtdTotal: estoque.reduce((s, e) => s + (e.qty || 0), 0),
-    ativas:   offers.filter(o => o.status === 'pending').length,
-    pedidos:  orders.filter(o => o.status === 'pending').length,
-    receita:  orders.reduce((s, o) => s + (o.totalPrice || 0), 0),
-  }), [estoque, offers, orders])
+function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setOffers, setMarkets, setOrders }) {
+  const [showBlitz, setShowBlitz] = useState(false)
+  const todayStr = today()
+
+  /* FIFO aging */
+  const withAge = useMemo(() =>
+    estoque.filter(e => e.qty > 0).map(e => ({
+      ...e,
+      ageInDays: Math.max(0, Math.floor((Date.now() - new Date((e.receivedAt || todayStr) + 'T12:00:00')) / 86400000))
+    })).sort((a, b) => b.ageInDays - a.ageInDays)
+  , [estoque])
+
+  const urgent    = withAge.filter(e => e.ageInDays >= 2)
+  const attention = withAge.filter(e => e.ageInDays === 1)
+  const newToday  = withAge.filter(e => e.ageInDays === 0)
+
+  /* Daily P&L */
+  const spentToday = useMemo(() =>
+    estoque.filter(e => e.receivedAt === todayStr).reduce((s, e) => s + (e.totalPaid || 0), 0)
+  , [estoque, todayStr])
+  const soldToday = useMemo(() =>
+    orders.filter(o => o.createdAt?.slice(0, 10) === todayStr).reduce((s, o) => s + (o.totalPrice || 0), 0)
+  , [orders, todayStr])
+  const profit = soldToday - spentToday
+
+  /* Find matching active offer for a stock item */
+  function findOffer(item) {
+    return offers.find(o => o.status !== 'delivered' &&
+      o.productName.toLowerCase() === item.productName.toLowerCase()
+    )
+  }
+
+  /* Reduce offer price and start blast */
+  const [singleBlast, setSingleBlast] = useState(null)
+  async function quickBlast(item, discountPct) {
+    const offer = findOffer(item)
+    if (!offer) return
+    const newPrice = parseFloat((offer.offerPrice * (1 - discountPct / 100)).toFixed(2))
+    const newOffer = { ...offer, offerPrice: newPrice }
+    const nextOffers = offers.map(o => o.id === offer.id ? newOffer : o)
+    setOffers(nextOffers)
+    await persistKey(OFFERS_KEY, nextOffers)
+    setSingleBlast(newOffer)
+  }
 
   async function carregarDemo() {
-    setEstoque(DEMO_ESTOQUE)
-    setOffers(DEMO_OFFERS)
-    setMarkets(DEMO_MARKETS)
-    setOrders(prev => {
-      const ids = new Set(prev.map(o => o.id))
-      return [...DEMO_ORDERS_HIST.filter(o => !ids.has(o.id)), ...prev]
-    })
+    setEstoque(DEMO_ESTOQUE); setOffers(DEMO_OFFERS); setMarkets(DEMO_MARKETS)
+    setOrders(prev => { const ids = new Set(prev.map(o => o.id)); return [...DEMO_ORDERS_HIST.filter(o => !ids.has(o.id)), ...prev] })
     await persistKey(ESTOQUE_KEY, DEMO_ESTOQUE)
     await persistKey(OFFERS_KEY,  DEMO_OFFERS)
     await persistKey(MKTS_SERVER_KEY, DEMO_MARKETS)
   }
 
+  if (singleBlast) return <BlastScreen offer={singleBlast} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setSingleBlast(null)} />
+
+  const srcCfg = (id) => SOURCE_TYPES.find(s => s.id === id) || SOURCE_TYPES[4]
+  const pendingOrders = orders.filter(o => o.status === 'pending').length
+  const totalRevenue  = orders.reduce((s, o) => s + (o.totalPrice || 0), 0)
+
+  const FifoRow = ({ item }) => {
+    const offer = findOffer(item)
+    const src   = srcCfg(item.sourceType)
+    const exp   = item.expiryDate ? Math.ceil((new Date(item.expiryDate) - new Date()) / 86400000) : null
+    return (
+      <div style={{ background:'#0d2137', borderRadius:14, marginBottom:8, overflow:'hidden', border:'1px solid ' + (item.ageInDays >= 2 ? '#7f1d1d' : '#78350f') }}>
+        <div style={{ padding:'10px 14px', display:'flex', gap:10, alignItems:'center' }}>
+          <div style={{ flexShrink:0, fontSize:16 }}>{src.emoji}</div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.productName}</div>
+            <div style={{ color:'#64748b', fontSize:11, marginTop:1, display:'flex', gap:8 }}>
+              <span>{item.qty} {item.unit}</span>
+              {exp !== null && <span style={{ color: exp <= 7 ? '#f87171' : '#fbbf24' }}>· val: {exp <= 0 ? 'VENCIDO' : `${exp}d`}</span>}
+              {item.unitCost > 0 && <span style={{ color:'#334155' }}>· custo {BRL.format(item.unitCost)}/un 🔒</span>}
+            </div>
+          </div>
+          <div style={{ textAlign:'right', flexShrink:0 }}>
+            {offer && <div style={{ color:'#10b981', fontWeight:900, fontSize:15 }}>{BRL.format(offer.offerPrice)}/un</div>}
+            <div style={{ color: item.ageInDays >= 2 ? '#f87171' : '#fbbf24', fontSize:11, fontWeight:700 }}>
+              {item.ageInDays === 0 ? 'hoje' : `há ${item.ageInDays}d`}
+            </div>
+          </div>
+        </div>
+        {offer && (
+          <div style={{ display:'flex', gap:0, borderTop:'1px solid #1a3a50' }}>
+            {[10, 20, 30].map(pct => (
+              <button key={pct} onClick={() => quickBlast(item, pct)}
+                style={{ flex:1, padding:'9px 0', background:'transparent', border:'none', borderRight:'1px solid #1a3a50', cursor:'pointer', color:'#fbbf24', fontSize:12, fontWeight:700 }}>
+                -{pct}% + ZAP
+              </button>
+            ))}
+            <button onClick={() => setSingleBlast(offer)}
+              style={{ flex:1, padding:'9px 0', background:'#14532d', border:'none', cursor:'pointer', color:'#4ade80', fontSize:12, fontWeight:700 }}>
+              📱 ZAP
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding:'16px 16px 100px' }}>
-      <div style={{ marginBottom:20 }}>
-        <div style={{ color:'#10b981', fontSize:13, fontWeight:700 }}>Bom dia! 👋</div>
-        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:22 }}>{profile.name}</div>
+
+      {showBlitz && <BlitzModal offers={offers} setOffers={setOffers} markets={markets} profile={profile} onClose={() => setShowBlitz(false)} />}
+
+      {/* Header greeting */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+        <div>
+          <div style={{ color:'#10b981', fontSize:13, fontWeight:700 }}>Bom dia! 👋</div>
+          <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:22 }}>{profile.name}</div>
+        </div>
+        {offers.filter(o => o.status !== 'delivered').length > 0 && (
+          <button onClick={() => setShowBlitz(true)}
+            style={{ background:'linear-gradient(135deg,#78350f,#d97706)', border:'none', borderRadius:14, padding:'10px 14px', cursor:'pointer', display:'flex', alignItems:'center', gap:6, color:'#fef3c7', fontWeight:800, fontSize:13 }}>
+            <Zap size={16} /> Blitz
+          </button>
+        )}
       </div>
+
+      {/* ── FIFO Urgency ── */}
+      {urgent.length > 0 && (
+        <div style={{ marginBottom:16 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+            <div style={{ width:8, height:8, borderRadius:4, background:'#ef4444' }} />
+            <span style={{ color:'#f87171', fontSize:12, fontWeight:800, textTransform:'uppercase' }}>🔴 Gire agora — {urgent.length} item{urgent.length !== 1 ? 's' : ''} parado{urgent.length !== 1 ? 's' : ''} ({urgent[0]?.ageInDays}d+)</span>
+          </div>
+          {urgent.map(item => <FifoRow key={item.id} item={item} />)}
+        </div>
+      )}
+
+      {attention.length > 0 && (
+        <div style={{ marginBottom:16 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+            <div style={{ width:8, height:8, borderRadius:4, background:'#f59e0b' }} />
+            <span style={{ color:'#fbbf24', fontSize:12, fontWeight:800, textTransform:'uppercase' }}>⚡ Chegou ontem — {attention.length} item{attention.length !== 1 ? 's' : ''}</span>
+          </div>
+          {attention.map(item => <FifoRow key={item.id} item={item} />)}
+        </div>
+      )}
+
+      {/* ── Balanço do Dia ── */}
+      <div style={{ background:'#0d2137', borderRadius:16, padding:'14px 16px', marginBottom:20, border:'1px solid #1a3a50' }}>
+        <div style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>💰 Balanço de hoje</div>
+        <div style={{ display:'flex', gap:0 }}>
+          <div style={{ flex:1, textAlign:'center' }}>
+            <div style={{ color:'#f87171', fontWeight:900, fontSize:18 }}>{spentToday > 0 ? BRL.format(spentToday) : '—'}</div>
+            <div style={{ color:'#64748b', fontSize:11 }}>gastou</div>
+          </div>
+          <div style={{ width:1, background:'#1a3a50' }} />
+          <div style={{ flex:1, textAlign:'center' }}>
+            <div style={{ color:'#4ade80', fontWeight:900, fontSize:18 }}>{soldToday > 0 ? BRL.format(soldToday) : '—'}</div>
+            <div style={{ color:'#64748b', fontSize:11 }}>vendeu</div>
+          </div>
+          <div style={{ width:1, background:'#1a3a50' }} />
+          <div style={{ flex:1, textAlign:'center' }}>
+            <div style={{ color: profit > 0 ? '#10b981' : profit < 0 ? '#f87171' : '#475569', fontWeight:900, fontSize:18 }}>
+              {profit !== 0 ? BRL.format(Math.abs(profit)) : '—'}
+            </div>
+            <div style={{ color:'#64748b', fontSize:11 }}>{profit > 0 ? 'lucro' : profit < 0 ? 'prejuízo' : 'resultado'}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Stats ── */}
       <div style={{ display:'flex', gap:10, marginBottom:10 }}>
-        <StatCard icon={Boxes}            label="Em Estoque" value={stats.itens}               sub={stats.qtdTotal + ' unidades'} color="#10b981" />
-        <StatCard icon={TrendingUp}       label="Ofertas"    value={stats.ativas}               sub="aguardando aceite"            color="#3b82f6" />
+        <StatCard icon={Boxes}         label="Em Estoque" value={withAge.length}                    sub={withAge.reduce((s,e)=>s+e.qty,0) + ' unidades'} color="#10b981" />
+        <StatCard icon={TrendingUp}    label="Ofertas"    value={offers.filter(o=>o.status==='pending').length} sub="aguardando aceite" color="#3b82f6" />
       </div>
-      <div style={{ display:'flex', gap:10, marginBottom:24 }}>
-        <StatCard icon={ClipboardList}    label="Pedidos"    value={stats.pedidos}              sub="a confirmar"                  color="#f59e0b" />
-        <StatCard icon={CircleDollarSign} label="Receita"    value={BRL.format(stats.receita)} sub="em pedidos"                   color="#8b5cf6" />
+      <div style={{ display:'flex', gap:10, marginBottom:20 }}>
+        <StatCard icon={ClipboardList}    label="Pedidos"  value={pendingOrders}         sub="a confirmar"  color="#f59e0b" />
+        <StatCard icon={CircleDollarSign} label="Total"    value={BRL.format(totalRevenue)} sub="em pedidos" color="#8b5cf6" />
       </div>
-      <div style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10 }}>Estoque</div>
-      {estoque.length === 0 ? (
+
+      {/* ── Chegou hoje ── */}
+      {newToday.length > 0 && (
+        <>
+          <div style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>
+            ✅ Chegou hoje ({newToday.length})
+          </div>
+          {newToday.map(item => {
+            const src = srcCfg(item.sourceType)
+            return (
+              <div key={item.id} style={{ background:'#0d2137', borderRadius:12, padding:'10px 14px', marginBottom:6, border:'1px solid #1a3a50', display:'flex', gap:10, alignItems:'center' }}>
+                <span style={{ fontSize:16, flexShrink:0 }}>{src.emoji}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ color:'#e2e8f0', fontWeight:700, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.productName}</div>
+                  {item.sourceName && <div style={{ color:'#334155', fontSize:11 }}>{item.sourceName}</div>}
+                </div>
+                <div style={{ textAlign:'right', flexShrink:0 }}>
+                  <div style={{ color:'#10b981', fontWeight:900, fontSize:16 }}>{item.qty}</div>
+                  <div style={{ color:'#475569', fontSize:11 }}>{item.unit}</div>
+                </div>
+                {item.totalPaid > 0 && (
+                  <div style={{ textAlign:'right', flexShrink:0 }}>
+                    <div style={{ color:'#334155', fontSize:11 }}>🔒 {BRL.format(item.totalPaid)}</div>
+                    <div style={{ color:'#1e3a50', fontSize:10 }}>total pago</div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </>
+      )}
+
+      {/* ── Empty state ── */}
+      {estoque.length === 0 && (
         <div style={{ background:'#0d2137', borderRadius:16, padding:24, textAlign:'center', border:'1px solid #1a3a50' }}>
           <Boxes size={32} color="#1e4060" style={{ marginBottom:8 }} />
-          <div style={{ color:'#475569', fontSize:14 }}>Nenhum produto em estoque</div>
-          <div style={{ color:'#334155', fontSize:12, marginTop:4, marginBottom:16 }}>Use a aba Receber para dar entrada</div>
+          <div style={{ color:'#475569', fontSize:14, marginBottom:4 }}>Sem estoque ainda</div>
+          <div style={{ color:'#334155', fontSize:12, marginBottom:16 }}>Use Receber pra dar entrada</div>
           <button onClick={carregarDemo} style={{ background:'#0a2a4a', border:'1px solid #1e6091', borderRadius:12, padding:'10px 20px', color:'#93c5fd', fontSize:13, fontWeight:700, cursor:'pointer' }}>
             🎯 Carregar dados de exemplo
           </button>
         </div>
-      ) : estoque.map(item => (
-        <div key={item.id} style={{ background:'#0d2137', borderRadius:14, padding:'12px 16px', marginBottom:8, border:'1px solid #1a3a50', display:'flex', alignItems:'center', gap:12 }}>
-          <div style={{ width:40, height:40, borderRadius:10, background:'#0a2540', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-            <Package size={18} color="#10b981" />
-          </div>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ color:'#e2e8f0', fontWeight:700, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.productName}</div>
-            {item.sku && <div style={{ color:'#334155', fontSize:11, fontFamily:'monospace' }}>{item.sku}</div>}
-          </div>
-          <div style={{ textAlign:'right', flexShrink:0 }}>
-            <div style={{ color: item.qty > 0 ? '#10b981' : '#ef4444', fontWeight:900, fontSize:18 }}>{item.qty}</div>
-            <div style={{ color:'#475569', fontSize:11 }}>{item.unit}</div>
-          </div>
-        </div>
-      ))}
+      )}
     </div>
   )
 }
 
 /* ── TabReceber ─────────────────────────────────────────────── */
 function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }) {
-  const [selected,   setSelected]   = useState(null)
-  const [qty,        setQty]        = useState('')
-  const [unit,       setUnit]       = useState('UND')
-  const [cost,       setCost]       = useState('')
-  const [expiryDate, setExpiryDate] = useState('')
-  const [offerPrice, setOfferPrice] = useState('')
-  const [isOpp,      setIsOpp]      = useState(false)
-  const [offerNote,  setOfferNote]  = useState('')
-  const [saving,     setSaving]     = useState(false)
-  const [blast,      setBlast]      = useState(null) // offer to blast
+  const [selected,    setSelected]   = useState(null)  // { name, sku, price }
+  const [sourceType,  setSourceType] = useState('leilao')
+  const [sourceName,  setSourceName] = useState('')
+  const [qty,         setQty]        = useState('')
+  const [unit,        setUnit]       = useState('UND')
+  const [totalPaid,   setTotalPaid]  = useState('')   // total pago pelo lote
+  const [expiryDate,  setExpiryDate] = useState('')
+  const [offerPrice,  setOfferPrice] = useState('')
+  const [isOpp,       setIsOpp]      = useState(false)
+  const [offerNote,   setOfferNote]  = useState('')
+  const [saving,      setSaving]     = useState(false)
+  const [blast,       setBlast]      = useState(null)
 
   function handleSelect(p) {
-    setSelected(p); setQty(''); setUnit('UND'); setExpiryDate('')
-    setCost(p.price ? String(p.price).replace('.', ',') : '')
-    setOfferPrice(p.price ? String((p.price * 1.3).toFixed(2)).replace('.', ',') : '')
-    setIsOpp(false); setOfferNote('')
+    setSelected(p)
+    // Source stays as chosen; auto-suggest offer price from seed if available
+    if (p.price) setOfferPrice(String((p.price * 1.35).toFixed(2)).replace('.', ','))
+  }
+
+  function applyExpiryShortcut(days) {
+    const dt = new Date(); dt.setDate(dt.getDate() + days)
+    setExpiryDate(dt.toISOString().slice(0, 10))
   }
 
   function reset() {
-    setSelected(null); setQty(''); setCost(''); setExpiryDate('')
-    setOfferPrice(''); setIsOpp(false); setOfferNote('')
+    setSelected(null); setQty(''); setTotalPaid(''); setExpiryDate('')
+    setOfferPrice(''); setIsOpp(false); setOfferNote(''); setSourceName('')
   }
+
+  const qtyNum   = parseFloat(qty) || 0
+  const paid     = parseNum(totalPaid)
+  const unitCost = (paid > 0 && qtyNum > 0) ? paid / qtyNum : 0
+  const sellPrice = parseNum(offerPrice)
+  const margin   = unitCost > 0 && sellPrice > 0 ? Math.round(((sellPrice - unitCost) / unitCost) * 100) : null
+  const canBlast = sellPrice > 0
+  const validMkts = (markets || []).filter(m => m.phone).length
+  const inp = { display:'block', width:'100%', background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, padding:'11px 14px', color:'#e2e8f0', fontSize:15, fontWeight:600, boxSizing:'border-box', outline:'none' }
 
   async function handleSubmit() {
     if (!selected || !qty) return
     setSaving(true)
-    const qtyNum = parseFloat(qty) || 0
 
-    // 1. Add to estoque
-    const item = { id: uid(), productName: selected.name, sku: selected.sku || '', qty: qtyNum, unit, cost: parseNum(cost), expiryDate: expiryDate || null, receivedAt: today(), updatedAt: new Date().toISOString() }
-    const idx  = estoque.findIndex(e => e.sku === selected.sku && e.unit === unit)
+    // 1. Add to estoque — 🔒 internal fields (never in offer object)
+    const item = {
+      id: uid(), productName: selected.name, sku: selected.sku || '',
+      qty: qtyNum, unit, unitCost, totalPaid: paid,
+      sourceType, sourceName: sourceName.trim() || null,
+      expiryDate: expiryDate || null,
+      receivedAt: today(), updatedAt: new Date().toISOString(),
+    }
+    const idx = estoque.findIndex(e => e.productName === selected.name && e.unit === unit)
     const nextEstoque = idx >= 0
       ? estoque.map((e, i) => i === idx ? { ...e, qty: e.qty + qtyNum, expiryDate: expiryDate || e.expiryDate, updatedAt: new Date().toISOString() } : e)
       : [...estoque, item]
     setEstoque(nextEstoque)
     await persistKey(ESTOQUE_KEY, nextEstoque)
 
-    // 2. Create + publish offer if price filled
-    const price = parseNum(offerPrice)
-    if (price > 0) {
+    // 2. Create offer (🔒 cost/source NEVER included)
+    if (sellPrice > 0) {
       const offer = {
         id: uid(), supplierId: LOCAL, supplierName: profile?.name || 'Distribuidora', supplierPhone: profile?.phone || '',
         productName: selected.name, sku: selected.sku || '', qty: qtyNum, unit,
-        offerPrice: price, expiryDate: expiryDate || null, isOpportunity: isOpp,
+        offerPrice: sellPrice, expiryDate: expiryDate || null, isOpportunity: isOpp,
         note: offerNote.trim(), status: 'pending', publishedAt: new Date().toISOString(),
       }
       const nextOffers = [offer, ...(offers || [])]
       setOffers(nextOffers)
       await persistKey(OFFERS_KEY, nextOffers)
-
-      // 3. Trigger blast if markets exist
-      const validMkts = (markets || []).filter(m => m.phone)
-      if (validMkts.length > 0) { setSaving(false); reset(); setBlast(offer); return }
+      if (validMkts > 0) { setSaving(false); reset(); setBlast(offer); return }
     }
 
     setSaving(false); reset()
@@ -673,25 +1031,15 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
     setEstoque(next); await persistKey(ESTOQUE_KEY, next)
   }
 
-  if (blast) {
-    return <BlastScreen offer={blast} markets={markets} supplierName={profile?.name || 'Distribuidora'} supplierPhone={profile?.phone || ''} onDone={() => setBlast(null)} />
-  }
-
-  const price     = parseNum(offerPrice)
-  const canBlast  = price > 0
-  const validMkts = (markets || []).filter(m => m.phone).length
-  const qtyNum    = parseFloat(qty) || 0
-  const inp       = { display:'block', width:'100%', background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, padding:'11px 14px', color:'#e2e8f0', fontSize:15, fontWeight:600, boxSizing:'border-box', outline:'none' }
+  if (blast) return <BlastScreen offer={blast} markets={markets} supplierName={profile?.name || 'Distribuidora'} supplierPhone={profile?.phone || ''} onDone={() => setBlast(null)} />
 
   return (
     <div style={{ padding:'16px 16px 100px' }}>
 
       {/* Header */}
-      <div style={{ marginBottom:18 }}>
-        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:20, marginBottom:2 }}>📦 Receber Produto</div>
-        <div style={{ color:'#475569', fontSize:13 }}>
-          Escaneia ou busca · produto aparece no portal de todos os mercados automaticamente
-        </div>
+      <div style={{ marginBottom:16 }}>
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:20, marginBottom:2 }}>📦 Entrada de Mercadoria</div>
+        <div style={{ color:'#475569', fontSize:13 }}>Chegou o lote? Registra e já dispara pra todos os mercados.</div>
         {validMkts > 0 && (
           <div style={{ display:'inline-flex', alignItems:'center', gap:5, background:'#0d2137', border:'1px solid #14532d', borderRadius:20, padding:'4px 12px', marginTop:8 }}>
             <div style={{ width:6, height:6, borderRadius:3, background:'#10b981' }} />
@@ -700,120 +1048,150 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
         )}
       </div>
 
-      <ProductSearch onSelect={handleSelect} />
+      {/* ── Step 1: Source type ── */}
+      <div style={{ marginBottom:14 }}>
+        <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>De onde veio? (interno)</div>
+        <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4 }}>
+          {SOURCE_TYPES.map(s => (
+            <button key={s.id} onClick={() => setSourceType(s.id)} style={{
+              flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+              padding:'10px 14px', borderRadius:14, border:`2px solid ${sourceType === s.id ? s.color : '#1e3050'}`,
+              background: sourceType === s.id ? s.bg : '#0d2137',
+              cursor:'pointer', minWidth:72,
+            }}>
+              <span style={{ fontSize:20 }}>{s.emoji}</span>
+              <span style={{ color: sourceType === s.id ? s.color : '#475569', fontSize:11, fontWeight:700 }}>{s.label}</span>
+            </button>
+          ))}
+        </div>
+        <input value={sourceName} onChange={e => setSourceName(e.target.value)}
+          placeholder="Quem vendeu? (ex: contato do Pedro, Leilão CAIXA SP — opcional)"
+          style={{ ...inp, marginTop:8, fontSize:13, color:'#64748b' }} />
+      </div>
+
+      {/* ── Step 2: Product ── */}
+      <div style={{ marginBottom:14 }}>
+        <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Produto</div>
+        {!selected
+          ? <QuickProductInput onSelect={handleSelect} />
+          : (
+            <div style={{ background:'linear-gradient(135deg,#0f3d27,#0a2a1c)', borderRadius:14, padding:'12px 14px', display:'flex', gap:10, alignItems:'center', border:'1px solid #10b981' }}>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ color:'#4ade80', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:2 }}>✓ Selecionado</div>
+                <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:16 }}>{selected.name}</div>
+                {selected.sku && <div style={{ color:'#334155', fontSize:11, fontFamily:'monospace' }}>{selected.sku}</div>}
+              </div>
+              <button onClick={() => { setSelected(null); setOfferPrice('') }} style={{ background:'none', border:'none', cursor:'pointer', color:'#475569' }}><X size={18} /></button>
+            </div>
+          )
+        }
+      </div>
 
       {selected && (
-        <div style={{ marginTop:14, borderRadius:20, overflow:'hidden', border:'1px solid #10b981' }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
 
-          {/* Product header */}
-          <div style={{ background:'linear-gradient(135deg,#0f3d27,#0a2a1c)', padding:'14px 16px 12px', display:'flex', gap:12 }}>
-            <div style={{ flex:1 }}>
-              <div style={{ color:'#4ade80', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>✓ Produto</div>
-              <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18, lineHeight:1.2 }}>{selected.name}</div>
-              {selected.sku && <div style={{ color:'#334155', fontSize:11, fontFamily:'monospace', marginTop:3 }}>{selected.sku}</div>}
+          {/* ── Qty + Unit ── */}
+          <div>
+            <div style={{ color:'#94a3b8', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>Quantidade do lote</div>
+            <div style={{ display:'flex', gap:8 }}>
+              <input value={qty} onChange={e => setQty(e.target.value)} type="number" placeholder="Ex: 200" autoFocus
+                style={{ ...inp, flex:2, fontSize:22, fontWeight:900 }} />
+              <select value={unit} onChange={e => setUnit(e.target.value)} style={{ ...inp, flex:1, padding:'11px 8px' }}>
+                {UNITS.map(u => <option key={u}>{u}</option>)}
+              </select>
             </div>
-            <button onClick={reset} style={{ background:'rgba(0,0,0,0.3)', border:'none', borderRadius:10, padding:8, cursor:'pointer', color:'#64748b', alignSelf:'flex-start' }}><X size={17} /></button>
           </div>
 
-          <div style={{ background:'#0d2137', padding:'16px', display:'flex', flexDirection:'column', gap:14 }}>
-
-            {/* Qty + Unit */}
-            <div>
-              <div style={{ color:'#94a3b8', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>Quantidade recebida</div>
-              <div style={{ display:'flex', gap:8 }}>
-                <input value={qty} onChange={e => setQty(e.target.value)} type="number" placeholder="Ex: 200"
-                  autoFocus style={{ ...inp, flex:2, fontSize:20, fontWeight:900, color:'#e2e8f0' }} />
-                <select value={unit} onChange={e => setUnit(e.target.value)}
-                  style={{ ...inp, flex:1, padding:'11px 8px' }}>
-                  {UNITS.map(u => <option key={u}>{u}</option>)}
-                </select>
-              </div>
+          {/* ── Total pago + unit cost ── */}
+          <div>
+            <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>Total pago pelo lote (interno 🔒)</div>
+            <div style={{ position:'relative' }}>
+              <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'#475569', fontSize:13, fontWeight:700 }}>R$</span>
+              <input value={totalPaid} onChange={e => setTotalPaid(e.target.value)} placeholder="0,00 — quanto pagou no total"
+                style={{ ...inp, paddingLeft:30 }} />
             </div>
-
-            {/* Custo + Validade */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-              <div>
-                <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>Custo (R$)</div>
-                <div style={{ position:'relative' }}>
-                  <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:'#475569', fontSize:12 }}>R$</span>
-                  <input value={cost} onChange={e => setCost(e.target.value)} placeholder="0,00" style={{ ...inp, paddingLeft:28 }} />
-                </div>
-              </div>
-              <div>
-                <div style={{ color:'#f97316', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>📅 Validade</div>
-                <input value={expiryDate} onChange={e => setExpiryDate(e.target.value)} type="date"
-                  style={{ ...inp, border:'1px solid #7c2d12', color:'#fed7aa' }} />
-              </div>
-            </div>
-
-            {/* ────────────── OFFER SECTION ────────────── */}
-            <div style={{ background:'#0a1929', borderRadius:14, padding:14, border:`1px solid ${canBlast ? '#2563eb55' : '#1e3050'}` }}>
-              <div style={{ color:'#93c5fd', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
-                <Zap size={12} /> Publicar oferta para os mercados
-              </div>
-
-              <div style={{ marginBottom: canBlast ? 10 : 0 }}>
-                <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>Preço de venda para os mercados</div>
-                <div style={{ position:'relative' }}>
-                  <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:'#3b82f6', fontSize:13, fontWeight:700 }}>R$</span>
-                  <input value={offerPrice} onChange={e => setOfferPrice(e.target.value)}
-                    placeholder={cost ? 'Sugerido: ' + String((parseNum(cost) * 1.3).toFixed(2)).replace('.', ',') : 'quanto quer cobrar?'}
-                    style={{ ...inp, border:`1px solid ${canBlast ? '#2563eb' : '#1e3050'}`, color:'#60a5fa', paddingLeft:28, fontSize:17, fontWeight:900 }} />
-                </div>
-                {canBlast && qty && (
-                  <div style={{ color:'#475569', fontSize:11, marginTop:4 }}>
-                    💰 Valor do lote: <strong style={{ color:'#f1f5f9' }}>{BRL.format(price * qtyNum)}</strong>
-                    {cost && parseNum(cost) > 0 && <span style={{ color:'#10b981', marginLeft:8 }}>· Margem: {Math.round(((price - parseNum(cost)) / parseNum(cost)) * 100)}%</span>}
-                  </div>
-                )}
-              </div>
-
-              {canBlast && (
-                <>
-                  <button onClick={() => setIsOpp(v => !v)}
-                    style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', cursor:'pointer', padding:'6px 0', marginBottom:8 }}>
-                    <div style={{ width:22, height:22, borderRadius:7, background: isOpp ? '#d97706' : '#1a3050', border:`1px solid ${isOpp ? '#f59e0b' : '#334155'}`, display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.2s' }}>
-                      {isOpp && <Check size={13} color="#fff" />}
-                    </div>
-                    <span style={{ color: isOpp ? '#fbbf24' : '#475569', fontSize:13, fontWeight:700 }}>🔥 Queima de estoque</span>
-                  </button>
-                  <input value={offerNote} onChange={e => setOfferNote(e.target.value)}
-                    placeholder="Nota para os mercados (ex: lote novo, entrega imediata...)"
-                    style={{ ...inp, fontSize:13 }} />
-                </>
-              )}
-            </div>
-
-            {/* ── ACTION BUTTON ── */}
-            <button
-              disabled={!qty || qtyNum <= 0 || saving}
-              onClick={handleSubmit}
-              style={{
-                display:'flex', alignItems:'center', justifyContent:'center', gap:10,
-                padding: canBlast ? '18px 20px' : '15px 20px',
-                borderRadius:16, border:'none', fontWeight:900, fontSize: canBlast ? 16 : 15,
-                cursor: (!qty || qtyNum <= 0 || saving) ? 'not-allowed' : 'pointer',
-                opacity: (!qty || qtyNum <= 0 || saving) ? 0.45 : 1,
-                background: canBlast
-                  ? 'linear-gradient(135deg,#1d4ed8,#10b981)'
-                  : 'linear-gradient(135deg,#10b981,#059669)',
-                color:'#fff',
-                boxShadow: canBlast ? '0 6px 24px rgba(16,185,129,0.3)' : 'none',
-                transition:'all 0.2s',
-              }}>
-              {saving ? '⏳ Salvando...'
-                : canBlast
-                  ? <><ArrowDownToLine size={18} /> Dar Entrada + <MessageCircle size={18} /> Disparar para {validMkts} mercado{validMkts !== 1 ? 's' : ''}</>
-                  : <><ArrowDownToLine size={18} /> Dar Entrada — {qtyNum || 0} {unit}</>
-              }
-            </button>
-            {canBlast && (
-              <div style={{ color:'#334155', fontSize:12, textAlign:'center', marginTop:-8 }}>
-                Produto será publicado no portal + WhatsApp enviado para cada mercado
+            {unitCost > 0 && (
+              <div style={{ color:'#64748b', fontSize:12, marginTop:4, display:'flex', gap:10 }}>
+                <span>💸 Custo/un: <strong style={{ color:'#f1f5f9' }}>{BRL.format(unitCost)}</strong></span>
+                {margin !== null && <span style={{ color: margin >= 30 ? '#4ade80' : margin >= 0 ? '#fbbf24' : '#f87171' }}>
+                  Margem: {margin > 0 ? '+' : ''}{margin}%
+                </span>}
               </div>
             )}
-
           </div>
+
+          {/* ── Validade ── */}
+          <div>
+            <div style={{ color:'#f97316', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>📅 Validade</div>
+            {/* Shortcuts */}
+            <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+              {EXPIRY_SHORTCUTS.map(s => (
+                <button key={s.label} onClick={() => applyExpiryShortcut(s.days)} style={{
+                  padding:'6px 12px', borderRadius:20, border:`1px solid ${expiryDate && Math.ceil((new Date(expiryDate) - new Date()) / 86400000) === s.days ? '#f97316' : '#1e3050'}`,
+                  background: expiryDate && Math.ceil((new Date(expiryDate) - new Date()) / 86400000) === s.days ? '#7c2d12' : '#0a1929',
+                  color: expiryDate && Math.ceil((new Date(expiryDate) - new Date()) / 86400000) === s.days ? '#fed7aa' : '#64748b',
+                  fontSize:12, fontWeight:700, cursor:'pointer',
+                }}>{s.label}</button>
+              ))}
+              <input value={expiryDate} onChange={e => setExpiryDate(e.target.value)} type="date"
+                style={{ flex:1, background:'#0a1929', border:'1px solid #7c2d12', borderRadius:10, padding:'6px 10px', color:'#fed7aa', fontSize:12, outline:'none', boxSizing:'border-box' }} />
+            </div>
+          </div>
+
+          {/* ── Preço de venda para mercados ── */}
+          <div style={{ background:'#0a1929', borderRadius:14, padding:14, border:`1px solid ${canBlast ? '#2563eb55' : '#1e3050'}` }}>
+            <div style={{ color:'#93c5fd', fontSize:11, fontWeight:700, textTransform:'uppercase', marginBottom:10, display:'flex', alignItems:'center', gap:5 }}>
+              <Zap size={12} /> Preço p/ mercados {canBlast ? '— mercados NÃO veem origem nem custo' : ''}
+            </div>
+            <div style={{ position:'relative', marginBottom: canBlast ? 10 : 0 }}>
+              <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'#3b82f6', fontSize:14, fontWeight:700 }}>R$</span>
+              <input value={offerPrice} onChange={e => setOfferPrice(e.target.value)}
+                placeholder={unitCost > 0 ? `Sugerido: ${(unitCost * 1.5).toFixed(2).replace('.',',')}` : 'quanto cobrar dos mercados?'}
+                style={{ ...inp, border:`1px solid ${canBlast ? '#2563eb' : '#1e3050'}`, color:'#60a5fa', paddingLeft:30, fontSize:18, fontWeight:900 }} />
+            </div>
+            {canBlast && qtyNum > 0 && (
+              <div style={{ color:'#475569', fontSize:12, marginBottom:10, display:'flex', gap:10, flexWrap:'wrap' }}>
+                <span>💰 Fatura total: <strong style={{ color:'#f1f5f9' }}>{BRL.format(sellPrice * qtyNum)}</strong></span>
+                {unitCost > 0 && <span style={{ color: margin >= 0 ? '#4ade80' : '#f87171' }}>· Margem: {margin > 0 ? '+' : ''}{margin}%</span>}
+                {paid > 0 && <span style={{ color:'#10b981' }}>· Lucro lote: {BRL.format((sellPrice - unitCost) * qtyNum)}</span>}
+              </div>
+            )}
+            {canBlast && (
+              <>
+                <button onClick={() => setIsOpp(v => !v)}
+                  style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', cursor:'pointer', padding:'5px 0', marginBottom:8 }}>
+                  <div style={{ width:22, height:22, borderRadius:7, background: isOpp ? '#d97706' : '#1a3050', border:`1px solid ${isOpp ? '#f59e0b' : '#334155'}`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    {isOpp && <Check size={13} color="#fff" />}
+                  </div>
+                  <span style={{ color: isOpp ? '#fbbf24' : '#475569', fontSize:13, fontWeight:700 }}>🔥 Queima / danificado (destaca no portal)</span>
+                </button>
+                <input value={offerNote} onChange={e => setOfferNote(e.target.value)}
+                  placeholder="Nota para mercados (ex: embalagem amassada, produto OK)"
+                  style={{ ...inp, fontSize:13 }} />
+              </>
+            )}
+          </div>
+
+          {/* ── Action button ── */}
+          <button
+            disabled={!qty || qtyNum <= 0 || saving}
+            onClick={handleSubmit}
+            style={{
+              display:'flex', alignItems:'center', justifyContent:'center', gap:10,
+              padding: canBlast ? '19px 20px' : '15px 20px',
+              borderRadius:16, border:'none', fontWeight:900, fontSize: canBlast ? 16 : 15,
+              cursor: (!qty || qtyNum <= 0 || saving) ? 'not-allowed' : 'pointer',
+              opacity: (!qty || qtyNum <= 0 || saving) ? 0.45 : 1,
+              background: canBlast ? 'linear-gradient(135deg,#1d4ed8,#10b981)' : 'linear-gradient(135deg,#10b981,#059669)',
+              color:'#fff', boxShadow: canBlast ? '0 6px 24px rgba(16,185,129,0.3)' : 'none',
+            }}>
+            {saving ? '⏳ Registrando...'
+              : canBlast
+                ? <><ArrowDownToLine size={18} /> Dar Entrada + <MessageCircle size={18} /> Disparar {validMkts} mercado{validMkts !== 1 ? 's' : ''}</>
+                : <><ArrowDownToLine size={18} /> Só dar entrada — {qtyNum || 0} {unit}</>
+            }
+          </button>
+          {canBlast && <div style={{ color:'#334155', fontSize:12, textAlign:'center', marginTop:-6 }}>Mercados não veem custo, origem ou margem</div>}
         </div>
       )}
       {estoque.length > 0 && (
@@ -1425,7 +1803,7 @@ export default function Fornecedor() {
       </div>
 
       <div style={{ flex:1, overflowY:'auto' }}>
-        {tab === 'inicio'   && <TabInicio  estoque={estoque} offers={offers} orders={orders} profile={profile} setEstoque={setEstoque} setOffers={setOffers} setMarkets={setMarkets} setOrders={setOrders} />}
+        {tab === 'inicio'   && <TabInicio  estoque={estoque} offers={offers} orders={orders} profile={profile} markets={markets} setEstoque={setEstoque} setOffers={setOffers} setMarkets={setMarkets} setOrders={setOrders} />}
         {tab === 'receber'  && <TabReceber estoque={estoque} setEstoque={setEstoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} />}
         {tab === 'ofertas'  && <TabOfertas estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} orders={orders} preSelected={preSelectedForOffer} onClearPreSelected={() => setPreSelectedForOffer(null)} />}
         {tab === 'pedidos'  && <TabPedidos orders={orders} setOrders={setOrders} />}
