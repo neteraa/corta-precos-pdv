@@ -2166,122 +2166,313 @@ function TabOfertas({ estoque, offers, setOffers, markets, profile, orders, preS
 }
 
 /* ── TabPedidos ─────────────────────────────────────────────── */
-function TabPedidos({ orders, setOrders }) {
-  const [filter, setFilter] = useState('all') // all | pending | confirmed | delivered | cancelled
-  const pending = orders.filter(o => o.status === 'pending').length
-  const total   = orders.reduce((s, o) => s + (o.totalPrice || 0), 0)
+function TabPedidos({ orders, setOrders, markets }) {
+  const [filter,    setFilter]    = useState('pending')
+  const [expanded,  setExpanded]  = useState({})
+
   const payInfo = id => PAYMENT_INFO[id] || { emoji: '💰', label: id || 'N/A', color: '#94a3b8' }
-  const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter)
+
+  /* Enrich order with registered market data (by phone match) */
+  const enrichOrder = (order) => {
+    if (!markets?.length) return order
+    const mkt = markets.find(m => m.phone && cleanPhone(m.phone) === cleanPhone(order.storePhone || ''))
+    if (!mkt) return order
+    return {
+      ...order,
+      storeName:    order.storeName  || mkt.name,
+      storeContact: mkt.contact,
+      storeCity:    mkt.city,
+      storeAddress: order.address    || mkt.address,
+      storeLogoUrl: mkt.logoUrl,
+    }
+  }
+
+  const pendingCount   = orders.filter(o => o.status === 'pending').length
+  const confirmedCount = orders.filter(o => o.status === 'confirmed').length
+  const totalRevenue   = orders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + (o.totalPrice || 0), 0)
+
   const FILTERS = [
-    { id:'all',       label:'Todos',      count: orders.length,                                        color:'#64748b' },
-    { id:'pending',   label:'Pendentes',  count: orders.filter(o=>o.status==='pending').length,        color:'#f59e0b' },
-    { id:'confirmed', label:'Confirmados',count: orders.filter(o=>o.status==='confirmed').length,      color:'#3b82f6' },
-    { id:'delivered', label:'Entregues',  count: orders.filter(o=>o.status==='delivered').length,      color:'#10b981' },
+    { id:'pending',   label:'🟡 Aguardando', count: pendingCount,   color:'#f59e0b' },
+    { id:'confirmed', label:'🔵 Confirmados', count: confirmedCount, color:'#3b82f6' },
+    { id:'delivered', label:'✅ Entregues',  count: orders.filter(o=>o.status==='delivered').length, color:'#10b981' },
+    { id:'all',       label:'Todos',         count: orders.length,  color:'#64748b' },
   ].filter(f => f.id === 'all' || f.count > 0)
+
+  const filtered = (filter === 'all' ? orders : orders.filter(o => o.status === filter))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .map(enrichOrder)
+
+  /* time elapsed */
+  const timeAgo = (iso) => {
+    if (!iso) return ''
+    const diff = Math.floor((Date.now() - new Date(iso)) / 60000)
+    if (diff < 1)   return 'agora'
+    if (diff < 60)  return `${diff}min atrás`
+    const h = Math.floor(diff / 60)
+    if (h < 24)     return `${h}h atrás`
+    return `${Math.floor(h / 24)}d atrás`
+  }
+
+  /* avatar color per store name */
+  const avatarColor = (name) => {
+    const colors = ['#f97316','#3b82f6','#10b981','#8b5cf6','#ec4899','#f59e0b','#06b6d4','#ef4444']
+    let h = 0; for (const c of (name || 'M')) h = (h * 31 + c.charCodeAt(0)) & 0xffffffff
+    return colors[Math.abs(h) % colors.length]
+  }
 
   async function updateStatus(id, status) {
     const next = orders.map(o => o.id === id ? { ...o, status, updatedAt: new Date().toISOString() } : o)
-    setOrders(next); await persistKey(ORDERS_KEY, next)
-
-    // Auto-notify market via WhatsApp
+    setOrders(next)
+    await persistKey(ORDERS_KEY, next)
     const order = orders.find(o => o.id === id)
     if (!order?.storePhone) return
     const msgs = {
       confirmed: `✅ *PEDIDO CONFIRMADO!*\n\nOlá, ${order.storeName || 'Mercado'}!\n\nSeu pedido foi confirmado:\n📦 *${order.productName}*\n   ${order.qtyRequested} ${order.unit} · ${BRL.format(order.totalPrice)}\n\nCombine a entrega pelo chat 🚚`,
-      delivered: `📦 *ENTREGUE!*\n\nOlá, ${order.storeName || 'Mercado'}!\n\n${order.productName} foi entregue com sucesso!\n   ${order.qtyRequested} ${order.unit} · ${BRL.format(order.totalPrice)}\n\nObrigado pela parceria! 🤝`,
+      delivered: `📦 *ENTREGUE COM SUCESSO!*\n\nOlá, ${order.storeName || 'Mercado'}!\n\n${order.productName} foi entregue!\n   ${order.qtyRequested} ${order.unit} · ${BRL.format(order.totalPrice)}\n\nObrigado pela parceria! 🤝\n_Mega Tudo Barato_`,
     }
-    if (msgs[status]) {
-      window.open(`https://wa.me/${cleanPhone(order.storePhone)}?text=${encodeURIComponent(msgs[status])}`, '_blank')
-    }
+    if (msgs[status]) window.open(`https://wa.me/${cleanPhone(order.storePhone)}?text=${encodeURIComponent(msgs[status])}`, '_blank')
   }
 
   async function deleteOrder(id) {
     const next = orders.filter(o => o.id !== id)
-    setOrders(next); await persistKey(ORDERS_KEY, next)
+    setOrders(next)
+    await persistKey(ORDERS_KEY, next)
   }
 
-  const sBg  = s => s === 'delivered' ? '#14532d' : s === 'confirmed' ? '#1e3a5f' : '#78350f'
-  const sTxt = s => s === 'delivered' ? '#86efac' : s === 'confirmed' ? '#93c5fd' : '#fcd34d'
-  const sLbl = s => s === 'delivered' ? '✓ Entregue' : s === 'confirmed' ? '✓ Confirmado' : '📦 Pendente'
+  /* status config */
+  const statusCfg = {
+    pending:   { bar:'#f59e0b', bg:'#78350f22', border:'#92400e66', txt:'#fcd34d', label:'Aguardando' },
+    confirmed: { bar:'#3b82f6', bg:'#1e3a5f22', border:'#2563eb66', txt:'#93c5fd', label:'Confirmado' },
+    delivered: { bar:'#10b981', bg:'#14532d22', border:'#059669aa', txt:'#86efac', label:'Entregue'   },
+    cancelled: { bar:'#ef4444', bg:'#7f1d1d22', border:'#ef444466', txt:'#fca5a5', label:'Cancelado'  },
+  }
 
   return (
     <div style={{ padding:'16px 16px 100px' }}>
-      {/* Header + stats */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18 }}>Pedidos Recebidos</div>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          {pending > 0 && <div style={{ background:'#78350f', border:'1px solid #92400e', borderRadius:10, padding:'3px 10px', color:'#fcd34d', fontSize:12, fontWeight:800 }}>{pending} pendente{pending !== 1 ? 's' : ''}</div>}
-          <div style={{ color:'#64748b', fontSize:12 }}>{BRL.format(total)}</div>
-        </div>
+
+      {/* ── Header stats ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:16 }}>
+        {[
+          { label:'Pendentes', value: pendingCount,            color:'#f59e0b', bg:'#78350f' },
+          { label:'Confirmados',value: confirmedCount,         color:'#3b82f6', bg:'#1e3a5f' },
+          { label:'Faturado',  value: BRL.format(totalRevenue),color:'#10b981', bg:'#14532d' },
+        ].map(s => (
+          <div key={s.label} style={{ background: s.bg + '33', border:`1px solid ${s.color}33`, borderRadius:12, padding:'10px 12px', textAlign:'center' }}>
+            <div style={{ color: s.color, fontWeight:900, fontSize:15 }}>{s.value}</div>
+            <div style={{ color:'#475569', fontSize:10, marginTop:2 }}>{s.label}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Status filter pills */}
+      {/* ── Filter pills ── */}
       <div style={{ display:'flex', gap:6, marginBottom:16, overflowX:'auto', paddingBottom:4 }}>
         {FILTERS.map(f => (
           <button key={f.id} onClick={() => setFilter(f.id)} style={{
-            flexShrink:0, padding:'7px 14px', borderRadius:20, border:`1.5px solid ${filter === f.id ? f.color : '#1e4060'}`,
+            flexShrink:0, padding:'7px 14px', borderRadius:20,
+            border: `1.5px solid ${filter === f.id ? f.color : '#1e4060'}`,
             background: filter === f.id ? f.color + '22' : '#0d2137',
             color: filter === f.id ? f.color : '#475569',
             fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap',
           }}>
-            {f.label} {f.count > 0 && <span style={{ background: filter === f.id ? f.color + '44' : '#1a3a50', borderRadius:10, padding:'1px 6px', marginLeft:3, fontSize:11 }}>{f.count}</span>}
+            {f.label}
+            {f.count > 0 && <span style={{ background: filter === f.id ? f.color + '44' : '#1a3a50', borderRadius:10, padding:'1px 6px', marginLeft:4, fontSize:11 }}>{f.count}</span>}
           </button>
         ))}
       </div>
 
-      {filtered.length === 0 && orders.length > 0 ? (
+      {/* ── Empty states ── */}
+      {orders.length === 0 ? (
+        <div style={{ background:'#0d2137', borderRadius:20, padding:40, textAlign:'center', border:'1px solid #1a3a50' }}>
+          <div style={{ fontSize:40, marginBottom:12 }}>📋</div>
+          <div style={{ color:'#475569', fontSize:15, fontWeight:700 }}>Nenhum pedido recebido ainda</div>
+          <div style={{ color:'#334155', fontSize:12, marginTop:6 }}>Quando um mercado fizer pedido via WhatsApp, aparece aqui em tempo real</div>
+        </div>
+      ) : filtered.length === 0 ? (
         <div style={{ background:'#0d2137', borderRadius:14, padding:24, textAlign:'center', border:'1px solid #1a3a50', color:'#475569', fontSize:14 }}>
-          Nenhum pedido com status "{FILTERS.find(f=>f.id===filter)?.label}"
+          Nenhum pedido "{FILTERS.find(f=>f.id===filter)?.label}" no momento
         </div>
-      ) : orders.length === 0 ? (
-        <div style={{ background:'#0d2137', borderRadius:20, padding:32, textAlign:'center', border:'1px solid #1a3a50' }}>
-          <ClipboardList size={32} color="#1e4060" style={{ marginBottom:8 }} />
-          <div style={{ color:'#475569', fontSize:15 }}>Nenhum pedido recebido ainda</div>
-          <div style={{ color:'#334155', fontSize:12, marginTop:4 }}>Quando um mercado fizer pedido, aparece aqui</div>
-        </div>
-      ) : [...filtered].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(order => {
-        const pay = payInfo(order.paymentMethod)
+      ) : filtered.map(order => {
+        const pay   = payInfo(order.paymentMethod)
+        const st    = statusCfg[order.status] || statusCfg.pending
+        const aColor = avatarColor(order.storeName)
+        const initials = (order.storeName || '?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase()
+        const isExpanded = expanded[order.id]
+        const hasDelivery = order.deliveryType === 'entrega'
+        const hasSchedule = order.schedDate || order.schedTime
+
         return (
-          <div key={order.id} style={{ background:'#0d2137', borderRadius:16, padding:'14px 16px', marginBottom:12, border:'1px solid ' + (order.status === 'pending' ? '#78350f' : '#1a3a50') }}>
-            <div style={{ display:'flex', alignItems:'flex-start', gap:10, marginBottom:10 }}>
-              <div style={{ width:40, height:40, borderRadius:10, background:'#0a2540', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <Package size={18} color="#10b981" />
+          <div key={order.id} style={{
+            background:'#0a1929', borderRadius:18, marginBottom:14,
+            border:`1px solid ${st.border}`,
+            overflow:'hidden',
+            boxShadow: order.status === 'pending' ? `0 0 0 1px ${st.bar}33, 0 4px 24px rgba(0,0,0,0.4)` : '0 2px 12px rgba(0,0,0,0.3)',
+          }}>
+
+            {/* ── Colored top bar ── */}
+            <div style={{ height:4, background: st.bar, borderRadius:'18px 18px 0 0' }} />
+
+            {/* ── Market identity header ── */}
+            <div style={{ padding:'14px 16px 0', display:'flex', alignItems:'center', gap:12 }}>
+              {/* Avatar */}
+              <div style={{
+                width:48, height:48, borderRadius:14, flexShrink:0,
+                background: `linear-gradient(135deg, ${aColor}, ${aColor}99)`,
+                display:'flex', alignItems:'center', justifyContent:'center',
+                border:`2px solid ${aColor}44`,
+              }}>
+                {order.storeLogoUrl
+                  ? <img src={order.storeLogoUrl} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:12 }} />
+                  : <span style={{ color:'#fff', fontWeight:900, fontSize:17 }}>{initials}</span>}
               </div>
+
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{order.productName}</div>
-                <div style={{ display:'flex', gap:6, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
-                  <span style={{ color:'#10b981', fontWeight:900, fontSize:15 }}>{BRL.format(order.totalPrice)}</span>
-                  <span style={{ background:'#0a2540', color:'#93c5fd', fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:8 }}>{order.qtyRequested} {order.unit}</span>
-                  <span style={{ fontSize:13 }}>{pay.emoji}</span>
-                  <span style={{ color:pay.color, fontSize:11, fontWeight:700 }}>{pay.label}</span>
+                {/* Store name */}
+                <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:16, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                  {order.storeName || <span style={{ color:'#475569', fontStyle:'italic' }}>Mercado não identificado</span>}
+                </div>
+                {/* Phone + city */}
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:3, flexWrap:'wrap' }}>
+                  {order.storePhone
+                    ? <span style={{ color:'#64748b', fontSize:12 }}>{order.storePhone}</span>
+                    : <span style={{ color:'#334155', fontSize:11, fontStyle:'italic' }}>Sem telefone</span>}
+                  {order.storeCity && <span style={{ color:'#334155', fontSize:11 }}>· {order.storeCity}</span>}
+                  {order.storeContact && <span style={{ color:'#334155', fontSize:11 }}>· {order.storeContact}</span>}
                 </div>
               </div>
-              <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, background:sBg(order.status), color:sTxt(order.status), flexShrink:0, whiteSpace:'nowrap' }}>
-                {sLbl(order.status)}
-              </span>
+
+              {/* Status pill + time */}
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0 }}>
+                <span style={{ fontSize:10, fontWeight:800, padding:'3px 10px', borderRadius:20, background: st.bg, color: st.txt, border:`1px solid ${st.border}`, whiteSpace:'nowrap' }}>
+                  {st.label}
+                </span>
+                <span style={{ color:'#334155', fontSize:10 }}>{timeAgo(order.createdAt)}</span>
+              </div>
             </div>
-            {order.note && <div style={{ background:'#0a1929', borderRadius:10, padding:'8px 12px', marginBottom:10, color:'#64748b', fontSize:12, fontStyle:'italic' }}>"{order.note}"</div>}
-            <div style={{ color:'#334155', fontSize:10, marginBottom:10 }}>{fmtDT(order.createdAt)}</div>
-            <div style={{ display:'flex', gap:8 }}>
+
+            {/* ── WhatsApp quick-action bar ── */}
+            {order.storePhone && (
+              <div style={{ padding:'8px 16px 0', display:'flex', gap:6 }}>
+                <a href={`https://wa.me/${cleanPhone(order.storePhone)}`} target="_blank" rel="noreferrer"
+                  style={{ display:'inline-flex', alignItems:'center', gap:5, background:'#14532d', border:'1px solid #166534', borderRadius:10, padding:'5px 12px', color:'#4ade80', fontSize:12, fontWeight:700, textDecoration:'none' }}>
+                  📱 WhatsApp
+                </a>
+                <a href={`tel:${order.storePhone.replace(/\D/g,'')}`}
+                  style={{ display:'inline-flex', alignItems:'center', gap:5, background:'#0d2137', border:'1px solid #1e4060', borderRadius:10, padding:'5px 12px', color:'#64748b', fontSize:12, fontWeight:700, textDecoration:'none' }}>
+                  📞 Ligar
+                </a>
+              </div>
+            )}
+
+            {/* ── Product + financials ── */}
+            <div style={{ margin:'12px 16px 0', background:'#0d2137', borderRadius:12, padding:'12px 14px', border:'1px solid #1a3a50' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <div style={{ width:34, height:34, borderRadius:10, background:'#0a2540', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <Package size={16} color="#10b981" />
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{order.productName}</div>
+                  {order.sku && <div style={{ color:'#334155', fontSize:10, fontFamily:'monospace', marginTop:1 }}>{order.sku}</div>}
+                </div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginTop:10 }}>
+                <div style={{ textAlign:'center' }}>
+                  <div style={{ color:'#93c5fd', fontWeight:900, fontSize:15 }}>{order.qtyRequested} <span style={{ fontSize:11 }}>{order.unit}</span></div>
+                  <div style={{ color:'#334155', fontSize:9, textTransform:'uppercase' }}>Qtd</div>
+                </div>
+                <div style={{ textAlign:'center' }}>
+                  <div style={{ color:'#64748b', fontWeight:700, fontSize:13 }}>{BRL.format(order.offerPrice || 0)}</div>
+                  <div style={{ color:'#334155', fontSize:9, textTransform:'uppercase' }}>por {order.unit}</div>
+                </div>
+                <div style={{ textAlign:'center' }}>
+                  <div style={{ color:'#10b981', fontWeight:900, fontSize:15 }}>{BRL.format(order.totalPrice || 0)}</div>
+                  <div style={{ color:'#334155', fontSize:9, textTransform:'uppercase' }}>Total</div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Delivery + payment pills ── */}
+            <div style={{ padding:'10px 16px 0', display:'flex', gap:6, flexWrap:'wrap' }}>
+              {/* Payment */}
+              <span style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#0d2137', border:`1px solid ${pay.color}44`, borderRadius:10, padding:'4px 10px', color: pay.color, fontSize:12, fontWeight:700 }}>
+                {pay.emoji} {pay.label}
+              </span>
+              {/* Delivery type */}
+              {order.deliveryType && (
+                <span style={{ display:'inline-flex', alignItems:'center', gap:4, background:'#0d2137', border:'1px solid #1e4060', borderRadius:10, padding:'4px 10px', color: hasDelivery ? '#93c5fd' : '#a78bfa', fontSize:12, fontWeight:700 }}>
+                  {hasDelivery ? '🚚 Entrega' : '📦 Retirada'}
+                </span>
+              )}
+            </div>
+
+            {/* ── Expandable details ── */}
+            <button onClick={() => setExpanded(p => ({...p, [order.id]: !p[order.id]}))}
+              style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px 0', background:'none', border:'none', cursor:'pointer', color:'#334155' }}>
+              <span style={{ fontSize:11, fontWeight:600 }}>
+                {isExpanded ? '▲ Menos detalhes' : '▼ Ver detalhes completos'}
+              </span>
+              <span style={{ fontSize:10, color:'#1e4060' }}>{fmtDT(order.createdAt)}</span>
+            </button>
+
+            {isExpanded && (
+              <div style={{ margin:'8px 16px 0', display:'flex', flexDirection:'column', gap:6 }}>
+                {/* Delivery address */}
+                {hasDelivery && order.storeAddress && (
+                  <div style={{ background:'#060e1a', borderRadius:10, padding:'8px 12px', display:'flex', gap:8, alignItems:'flex-start' }}>
+                    <span style={{ fontSize:14, flexShrink:0 }}>📍</span>
+                    <div>
+                      <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase' }}>Endereço de entrega</div>
+                      <div style={{ color:'#94a3b8', fontSize:12, marginTop:2 }}>{order.storeAddress}</div>
+                    </div>
+                  </div>
+                )}
+                {/* Schedule */}
+                {hasSchedule && (
+                  <div style={{ background:'#060e1a', borderRadius:10, padding:'8px 12px', display:'flex', gap:8, alignItems:'center' }}>
+                    <span style={{ fontSize:14 }}>🕐</span>
+                    <div>
+                      <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase' }}>Agendamento</div>
+                      <div style={{ color:'#94a3b8', fontSize:12, marginTop:1 }}>
+                        {[order.schedDate, order.schedTime].filter(Boolean).join(' às ')}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* Note */}
+                {order.note && (
+                  <div style={{ background:'#060e1a', borderRadius:10, padding:'8px 12px', display:'flex', gap:8, alignItems:'flex-start' }}>
+                    <span style={{ fontSize:14, flexShrink:0 }}>💬</span>
+                    <div>
+                      <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase' }}>Observação</div>
+                      <div style={{ color:'#94a3b8', fontSize:12, marginTop:2, fontStyle:'italic' }}>"{order.note}"</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Action buttons ── */}
+            <div style={{ padding:'12px 16px 14px', display:'flex', gap:8, marginTop:4 }}>
               {order.status === 'pending' && (
                 <button onClick={() => updateStatus(order.id, 'confirmed')}
-                  style={{ flex:1, background:'linear-gradient(135deg,#10b981,#059669)', color:'#fff', border:'none', borderRadius:12, padding:10, fontWeight:800, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                  <Check size={15} /> Confirmar + 📱 Avisar Mercado
+                  style={{ flex:1, background:'linear-gradient(135deg,#10b981,#059669)', color:'#fff', border:'none', borderRadius:12, padding:'11px 0', fontWeight:800, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  <Check size={15} /> Confirmar + 📱 Avisar
                 </button>
               )}
               {order.status === 'confirmed' && (
                 <button onClick={() => updateStatus(order.id, 'delivered')}
-                  style={{ flex:1, background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'#fff', border:'none', borderRadius:12, padding:10, fontWeight:800, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                  🚚 Entreguei + 📱 Avisar Mercado
+                  style={{ flex:1, background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'#fff', border:'none', borderRadius:12, padding:'11px 0', fontWeight:800, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  🚚 Marcar Entregue + 📱 Avisar
                 </button>
               )}
               {order.status === 'delivered' && (
-                <div style={{ flex:1, textAlign:'center', color:'#86efac', fontSize:13, fontWeight:700, padding:10 }}>✓ Entregue</div>
+                <div style={{ flex:1, textAlign:'center', color:'#86efac', fontSize:13, fontWeight:700, padding:11 }}>✓ Entregue com sucesso!</div>
               )}
-              <button onClick={() => deleteOrder(order.id)} style={{ background:'#1a0a0a', color:'#ef4444', border:'none', borderRadius:10, padding:'8px 10px', cursor:'pointer' }}>
+              <button onClick={() => deleteOrder(order.id)}
+                style={{ background:'#1a0a0a', color:'#475569', border:'1px solid #1f2937', borderRadius:10, padding:'0 12px', cursor:'pointer', display:'flex', alignItems:'center' }}>
                 <Trash2 size={14} />
               </button>
             </div>
+
           </div>
         )
       })}
@@ -3535,7 +3726,7 @@ export default function Fornecedor() {
         {tab === 'inicio'    && <TabInicio    estoque={estoque} offers={offers} orders={orders} profile={profile} markets={markets} setEstoque={setEstoque} setOffers={setOffers} setMarkets={setMarkets} setOrders={setOrders} onNavigate={setTab} zapServerUrl={zapServerUrl} zapConnected={zapConnected} recurrences={recurrences} setRecurrences={setRecurrences} />}
         {tab === 'receber'   && <TabReceber   estoque={estoque} setEstoque={setEstoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
         {tab === 'ofertas'   && <TabOfertas   estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} orders={orders} preSelected={preSelectedForOffer} onClearPreSelected={() => setPreSelectedForOffer(null)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
-        {tab === 'pedidos'   && <TabPedidos   orders={orders} setOrders={setOrders} />}
+        {tab === 'pedidos'   && <TabPedidos   orders={orders} setOrders={setOrders} markets={markets} />}
         {tab === 'mercados'  && <TabMercados  markets={markets} setMarkets={setMarkets} orders={orders} recurrences={recurrences} setRecurrences={setRecurrences} />}
         {tab === 'relatorio' && <TabRelatorio estoque={estoque} offers={offers} orders={orders} markets={markets} />}
       </div>
