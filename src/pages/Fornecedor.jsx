@@ -137,7 +137,7 @@ function buildOfferMsg(offer, supplierName, supplierPhone) {
     offer.note ? '💬 ' + offer.note : '',
     '',
     '👉 *Fazer pedido agora:*',
-    'https://corta-precos-pdv.netlify.app/ofertas',
+    'https://zatendestock.netlify.app/ofertas',
     '',
     supplierPhone ? '📞 ' + supplierName + ' · ' + supplierPhone : '📞 ' + supplierName,
   ]
@@ -443,7 +443,7 @@ function BlitzModal({ offers, setOffers, markets, profile, onClose }) {
       '🏃 Estoque limitado! Primeiro que pedir leva!',
       '',
       '👉 *Fazer pedido:*',
-      'https://corta-precos-pdv.netlify.app/ofertas',
+      'https://zatendestock.netlify.app/ofertas',
       '',
       profile.phone ? `📞 ${profile.name} · ${profile.phone}` : `📞 ${profile.name}`,
     ]
@@ -790,7 +790,7 @@ function SetupScreen({ onDone }) {
           <Check size={18} /> Entrar
         </Btn>
       </div>
-      <div style={{ color:'#1e4060', fontSize:12, marginTop:24 }}>Corta Precos PDV · Plataforma Distribuidor v2.0</div>
+      <div style={{ color:'#1e4060', fontSize:12, marginTop:24 }}>ZatendeStock · Plataforma Distribuidora</div>
     </div>
   )
 }
@@ -855,7 +855,7 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
       ...active.map(o => `📦 *${o.productName}* — ${BRL.format(o.offerPrice)}/un  ·  ${o.qty} ${o.unit}${o.expiryDate ? `  ·  val ${fmtDate(o.expiryDate)}` : ''}`),
       '',
       '👉 *Fazer pedido agora:*',
-      'https://corta-precos-pdv.netlify.app/ofertas',
+      'https://zatendestock.netlify.app/ofertas',
       '',
       profile.phone ? `📞 ${profile.name} · ${profile.phone}` : `📞 ${profile.name}`,
     ]
@@ -2025,9 +2025,9 @@ function TabMercados({ markets, setMarkets, orders }) {
       <div style={{ background:'#0a1929', borderRadius:14, padding:'14px 16px', marginTop:8, border:'1px solid #1e4060' }}>
         <div style={{ color:'#10b981', fontSize:11, fontWeight:700, textTransform:'uppercase', marginBottom:4 }}>🔗 Link do Portal (envie para os mercados)</div>
         <div style={{ color:'#60a5fa', fontSize:13, fontFamily:'monospace', wordBreak:'break-all', marginBottom:8 }}>
-          https://corta-precos-pdv.netlify.app/ofertas
+          https://zatendestock.netlify.app/ofertas
         </div>
-        <a href={'https://wa.me/?text=' + encodeURIComponent('Olá! Acesse nossas ofertas exclusivas aqui: https://corta-precos-pdv.netlify.app/ofertas')}
+        <a href={'https://wa.me/?text=' + encodeURIComponent('Olá! Acesse nossas ofertas exclusivas aqui: https://zatendestock.netlify.app/ofertas')}
           target="_blank" rel="noreferrer"
           style={{ display:'inline-flex', alignItems:'center', gap:6, background:'#14532d', color:'#4ade80', borderRadius:10, padding:'8px 14px', textDecoration:'none', fontSize:12, fontWeight:700 }}>
           <MessageCircle size={13} /> Enviar link pelo ZAP
@@ -2355,7 +2355,7 @@ function LoginPage({ onLogin }) {
         <div style={{ width:80, height:80, borderRadius:24, background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px', boxShadow:'0 12px 40px rgba(16,185,129,0.35)' }}>
           <Truck size={38} color="#fff" />
         </div>
-        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:28, letterSpacing:'-0.02em' }}>Corta Preços</div>
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:28, letterSpacing:'-0.02em' }}>ZatendeStock</div>
         <div style={{ color:'#10b981', fontSize:13, fontWeight:700, marginTop:4, textTransform:'uppercase', letterSpacing:'0.1em' }}>Portal do Distribuidor</div>
       </div>
 
@@ -2410,7 +2410,7 @@ function LoginPage({ onLogin }) {
       </div>
 
       <div style={{ color:'#1e3a50', fontSize:12, marginTop:24, textAlign:'center' }}>
-        Corta Preços Soluções Comerciais • {new Date().getFullYear()}
+        ZatendeStock • {new Date().getFullYear()}
       </div>
     </div>
   )

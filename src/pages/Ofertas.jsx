@@ -831,7 +831,7 @@ export default function Ofertas() {
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <div className="text-gray-500 text-xs font-bold mb-1">📲 LINK PARA O FORNECEDOR</div>
             <div className="bg-gray-800 rounded-lg px-3 py-2 text-emerald-400 text-xs font-mono">
-              corta-precos-pdv.netlify.app/fornecedor
+              zatendestock.netlify.app/fornecedor
             </div>
             <div className="text-gray-600 text-[11px] mt-2">
               Envie este link para o fornecedor publicar ofertas diretamente pelo celular
