@@ -2569,6 +2569,11 @@ export default function Fornecedor() {
   }, [])
 
   useEffect(() => { sync() }, [sync])
+  useEffect(() => {
+    const prev = document.title
+    document.title = 'ZatendeStock – Portal do Distribuidor'
+    return () => { document.title = prev }
+  }, [])
 
   /* ── Login gate — after ALL hooks ── */
   if (!session) return <LoginPage onLogin={handleLogin} />
