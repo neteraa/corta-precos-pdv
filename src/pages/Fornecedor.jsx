@@ -8,7 +8,7 @@ import {
   Truck, Package, Users, Plus, Camera, Search, Check, Trash2, X,
   MessageCircle, LayoutDashboard, ClipboardList, ArrowDownToLine,
   ShoppingCart, TrendingUp, Boxes, CircleDollarSign, CheckCircle,
-  RefreshCw, Phone, Send,
+  RefreshCw, Phone, Send, MapPin, Zap, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import CameraScanner from '../components/CameraScanner.jsx'
 import PRODUCTS_SEED from '../utils/products_seed.json'
@@ -66,20 +66,29 @@ async function fetchAll() {
   } catch { return { estoque: [], offers: [], orders: [], markets: null } }
 }
 
-function buildOfferMsg(offer, supplierName) {
+function buildOfferMsg(offer, supplierName, supplierPhone) {
+  const urgente = offer.expiryDate
+    ? (() => { const d = Math.ceil((new Date(offer.expiryDate) - new Date()) / 86400000); return d > 0 && d <= 14 })()
+    : false
   const lines = [
-    '🚚 *NOVA OFERTA - ' + supplierName + '*',
+    offer.isOpportunity
+      ? '🔥 *QUEIMA DE ESTOQUE — ' + supplierName + '*'
+      : '🚚 *CHEGOU MERCADORIA — ' + supplierName + '*',
     '',
     '📦 *' + offer.productName + '*',
-    offer.sku ? '   Cod: ' + offer.sku : '',
-    '   ' + offer.qty + ' ' + offer.unit + '  .  ' + BRL.format(offer.offerPrice) + '/un',
-    offer.expiryDate ? '📅 Vence: ' + fmtDate(offer.expiryDate) : '',
-    offer.isOpportunity ? '🔥 *OPORTUNIDADE - estoque limitado!*' : '',
-    offer.note ? '\ud83d\udcac ' + offer.note : '',
+    offer.sku ? '   Cód: ' + offer.sku : '',
     '',
-    '\u2705 Ver e aceitar: https://corta-precos-pdv.netlify.app/ofertas',
+    '💰 *' + BRL.format(offer.offerPrice) + '/un*',
+    '📦 ' + offer.qty + ' ' + offer.unit + ' disponíveis',
+    offer.expiryDate ? '📅 Validade: ' + fmtDate(offer.expiryDate) + (urgente ? ' ⚠️ URGENTE' : '') : '',
+    offer.note ? '💬 ' + offer.note : '',
+    '',
+    '👉 *Fazer pedido agora:*',
+    'https://corta-precos-pdv.netlify.app/ofertas',
+    '',
+    supplierPhone ? '📞 ' + supplierName + ' · ' + supplierPhone : '📞 ' + supplierName,
   ]
-  return lines.filter(Boolean).join('\n')
+  return lines.filter(l => l !== null && l !== undefined).join('\n')
 }
 
 /* ── Btn ────────────────────────────────────────────────────── */
@@ -167,8 +176,8 @@ function ProductSearch({ onSelect }) {
 }
 
 /* ── WaOverlay ──────────────────────────────────────────────── */
-function WaOverlay({ offer, markets, supplierName, orders = [], onClose }) {
-  const msg = buildOfferMsg(offer, supplierName)
+function WaOverlay({ offer, markets, supplierName, supplierPhone, orders = [], onClose }) {
+  const msg = buildOfferMsg(offer, supplierName, supplierPhone)
 
   function marketStats(m) {
     const mOrders = orders.filter(o =>
@@ -250,6 +259,109 @@ function WaOverlay({ offer, markets, supplierName, orders = [], onClose }) {
   )
 }
 
+/* ── BlastScreen ─────────────────────────────────────────────── */
+/* Full-screen sequential WA dispatcher — one market at a time   */
+function BlastScreen({ offer, markets, supplierName, supplierPhone, onDone }) {
+  const [idx, setIdx] = useState(0)
+  const valid  = (markets || []).filter(m => m.phone)
+  const done   = idx >= valid.length
+  const pct    = valid.length ? Math.round((idx / valid.length) * 100) : 100
+  const curr   = valid[idx]
+  const msg    = buildOfferMsg(offer, supplierName, supplierPhone)
+
+  function sendCurrent() {
+    if (!curr) return
+    window.open(`https://wa.me/${cleanPhone(curr.phone)}?text=${encodeURIComponent(msg)}`, '_blank')
+    setIdx(i => i + 1)
+  }
+
+  const btnBase = { border:'none', borderRadius:16, cursor:'pointer', fontWeight:900, display:'flex', alignItems:'center', justifyContent:'center', gap:10 }
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:300, background:'#050f1a', display:'flex', flexDirection:'column', padding:'env(safe-area-inset-top,24px) 24px 40px' }}>
+
+      {/* Top bar */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24, paddingTop:16 }}>
+        <div>
+          <div style={{ color:'#10b981', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em' }}>
+            {done ? '✅ Concluído' : 'Disparando no WhatsApp'}
+          </div>
+          <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:22 }}>
+            {done ? 'Todos notificados!' : `${idx} / ${valid.length} mercados`}
+          </div>
+        </div>
+        <button onClick={onDone} style={{ background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, padding:'8px 14px', color:'#64748b', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+          {done ? 'Fechar' : 'Pular tudo'}
+        </button>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ background:'#0d2137', borderRadius:99, height:8, marginBottom:20, overflow:'hidden' }}>
+        <div style={{ background: done ? '#10b981' : 'linear-gradient(90deg,#3b82f6,#10b981)', height:'100%', width:`${pct}%`, borderRadius:99, transition:'width 0.4s ease' }} />
+      </div>
+
+      {/* Offer summary */}
+      <div style={{ background:'#0d2137', borderRadius:16, padding:'12px 16px', marginBottom:24, display:'flex', gap:12, alignItems:'center', border:'1px solid #1a3a50' }}>
+        <div style={{ width:40, height:40, borderRadius:12, background:'#0a2540', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          <Package size={18} color="#10b981" />
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{offer.productName}</div>
+          <div style={{ color:'#10b981', fontSize:12, fontWeight:700 }}>{BRL.format(offer.offerPrice)}/un · {offer.qty} {offer.unit}</div>
+        </div>
+        {offer.expiryDate && (
+          <div style={{ background:'#7c2d12', borderRadius:8, padding:'3px 8px', color:'#fed7aa', fontSize:10, fontWeight:700, flexShrink:0 }}>📅 {offer.expiryDate}</div>
+        )}
+      </div>
+
+      {/* Main area */}
+      <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:20 }}>
+        {done ? (
+          <>
+            <div style={{ width:100, height:100, borderRadius:28, background:'linear-gradient(135deg,#14532d,#065f46)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <CheckCircle size={52} color="#4ade80" />
+            </div>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ color:'#4ade80', fontWeight:900, fontSize:22, marginBottom:4 }}>{valid.length} mercado{valid.length !== 1 ? 's' : ''} notificado{valid.length !== 1 ? 's' : ''}!</div>
+              <div style={{ color:'#475569', fontSize:14 }}>A oferta já está visível no portal de todos os mercados.</div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Market avatar */}
+            <div style={{ width:96, height:96, borderRadius:28, background:'linear-gradient(135deg,#0f3460,#1e40af)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:40, fontWeight:900, color:'#93c5fd', boxShadow:'0 0 40px rgba(59,130,246,0.3)' }}>
+              {curr?.name?.charAt(0)?.toUpperCase() || '?'}
+            </div>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:22, marginBottom:4 }}>{curr?.name}</div>
+              {curr?.contact && <div style={{ color:'#64748b', fontSize:13 }}>👤 {curr.contact}</div>}
+              {curr?.phone  && <div style={{ color:'#4ade80', fontSize:13, fontWeight:700, marginTop:2 }}>📞 {curr.phone}</div>}
+              {curr?.address && <div style={{ color:'#475569', fontSize:12, marginTop:4 }}>📍 {curr.address}</div>}
+            </div>
+            {/* Send button */}
+            <button onClick={sendCurrent}
+              style={{ ...btnBase, width:'100%', maxWidth:340, background:'linear-gradient(135deg,#16a34a,#15803d)', padding:'18px 24px', fontSize:17, color:'#fff', boxShadow:'0 8px 32px rgba(16,185,129,0.4)' }}>
+              <MessageCircle size={22} />
+              Abrir WhatsApp — {curr?.name?.split(' ')[0]}
+            </button>
+            <button onClick={() => setIdx(i => i + 1)} style={{ background:'none', border:'none', color:'#334155', cursor:'pointer', fontSize:13, padding:8 }}>
+              Pular este mercado →
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Bottom close */}
+      {done && (
+        <button onClick={onDone}
+          style={{ ...btnBase, width:'100%', background:'linear-gradient(135deg,#10b981,#059669)', padding:'16px', fontSize:16, color:'#fff', marginTop:8 }}>
+          <Check size={20} /> Fechar — voltar ao início
+        </button>
+      )}
+    </div>
+  )
+}
+
 /* ── OfferCard ──────────────────────────────────────────────── */
 function OfferCard({ offer, markets, supplierName, orders = [], onDelete, onUpdatePrice }) {
   const [showWa,    setShowWa]    = useState(false)
@@ -270,7 +382,7 @@ function OfferCard({ offer, markets, supplierName, orders = [], onDelete, onUpda
 
   return (
     <>
-      {showWa && <WaOverlay offer={offer} markets={markets} supplierName={supplierName} orders={orders} onClose={() => setShowWa(false)} />}
+      {showWa && <WaOverlay offer={offer} markets={markets} supplierName={supplierName} supplierPhone={offer.supplierPhone} orders={orders} onClose={() => setShowWa(false)} />}
 
       <div style={{ background:'#0d2137', borderRadius:18, marginBottom:12, border:'1px solid ' + (offer.isOpportunity ? '#d97706' : '#1a3a50'), overflow:'hidden' }}>
 
@@ -497,33 +609,63 @@ function TabInicio({ estoque, offers, orders, profile, setEstoque, setOffers, se
 }
 
 /* ── TabReceber ─────────────────────────────────────────────── */
-function TabReceber({ estoque, setEstoque, onGoToOferta }) {
-  const [selected,    setSelected]    = useState(null)
-  const [qty,         setQty]         = useState('')
-  const [unit,        setUnit]        = useState('CX')
-  const [cost,        setCost]        = useState('')
-  const [expiryDate,  setExpiryDate]  = useState('')
-  const [saving,      setSaving]      = useState(false)
-  const [justAdded,   setJustAdded]   = useState(null) // triggers quick-publish banner
+function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }) {
+  const [selected,   setSelected]   = useState(null)
+  const [qty,        setQty]        = useState('')
+  const [unit,       setUnit]       = useState('UND')
+  const [cost,       setCost]       = useState('')
+  const [expiryDate, setExpiryDate] = useState('')
+  const [offerPrice, setOfferPrice] = useState('')
+  const [isOpp,      setIsOpp]      = useState(false)
+  const [offerNote,  setOfferNote]  = useState('')
+  const [saving,     setSaving]     = useState(false)
+  const [blast,      setBlast]      = useState(null) // offer to blast
 
   function handleSelect(p) {
-    setSelected(p); setQty(''); setCost(p.price ? String(p.price).replace('.', ',') : '')
-    setUnit('CX'); setExpiryDate(''); setJustAdded(null)
+    setSelected(p); setQty(''); setUnit('UND'); setExpiryDate('')
+    setCost(p.price ? String(p.price).replace('.', ',') : '')
+    setOfferPrice(p.price ? String((p.price * 1.3).toFixed(2)).replace('.', ',') : '')
+    setIsOpp(false); setOfferNote('')
   }
 
-  async function handleEntrada() {
+  function reset() {
+    setSelected(null); setQty(''); setCost(''); setExpiryDate('')
+    setOfferPrice(''); setIsOpp(false); setOfferNote('')
+  }
+
+  async function handleSubmit() {
     if (!selected || !qty) return
     setSaving(true)
     const qtyNum = parseFloat(qty) || 0
-    const item   = { id: uid(), productName: selected.name, sku: selected.sku || '', qty: qtyNum, unit, cost: parseNum(cost), expiryDate: expiryDate || null, receivedAt: today(), updatedAt: new Date().toISOString() }
-    const idx    = estoque.findIndex(e => e.sku === selected.sku && e.unit === unit)
-    const next   = idx >= 0
+
+    // 1. Add to estoque
+    const item = { id: uid(), productName: selected.name, sku: selected.sku || '', qty: qtyNum, unit, cost: parseNum(cost), expiryDate: expiryDate || null, receivedAt: today(), updatedAt: new Date().toISOString() }
+    const idx  = estoque.findIndex(e => e.sku === selected.sku && e.unit === unit)
+    const nextEstoque = idx >= 0
       ? estoque.map((e, i) => i === idx ? { ...e, qty: e.qty + qtyNum, expiryDate: expiryDate || e.expiryDate, updatedAt: new Date().toISOString() } : e)
       : [...estoque, item]
-    setEstoque(next)
-    await persistKey(ESTOQUE_KEY, next)
-    setJustAdded(next[idx >= 0 ? idx : next.length - 1])
-    setSelected(null); setQty(''); setSaving(false)
+    setEstoque(nextEstoque)
+    await persistKey(ESTOQUE_KEY, nextEstoque)
+
+    // 2. Create + publish offer if price filled
+    const price = parseNum(offerPrice)
+    if (price > 0) {
+      const offer = {
+        id: uid(), supplierId: LOCAL, supplierName: profile?.name || 'Distribuidora', supplierPhone: profile?.phone || '',
+        productName: selected.name, sku: selected.sku || '', qty: qtyNum, unit,
+        offerPrice: price, expiryDate: expiryDate || null, isOpportunity: isOpp,
+        note: offerNote.trim(), status: 'pending', publishedAt: new Date().toISOString(),
+      }
+      const nextOffers = [offer, ...(offers || [])]
+      setOffers(nextOffers)
+      await persistKey(OFFERS_KEY, nextOffers)
+
+      // 3. Trigger blast if markets exist
+      const validMkts = (markets || []).filter(m => m.phone)
+      if (validMkts.length > 0) { setSaving(false); reset(); setBlast(offer); return }
+    }
+
+    setSaving(false); reset()
   }
 
   async function handleRemove(id) {
@@ -531,81 +673,147 @@ function TabReceber({ estoque, setEstoque, onGoToOferta }) {
     setEstoque(next); await persistKey(ESTOQUE_KEY, next)
   }
 
-  const inputStyle = { display:'block', width:'100%', marginTop:6, background:'#0a1929', border:'1px solid #1e4060', borderRadius:10, padding:12, color:'#e2e8f0', fontSize:15, fontWeight:700, boxSizing:'border-box', outline:'none' }
+  if (blast) {
+    return <BlastScreen offer={blast} markets={markets} supplierName={profile?.name || 'Distribuidora'} supplierPhone={profile?.phone || ''} onDone={() => setBlast(null)} />
+  }
+
+  const price     = parseNum(offerPrice)
+  const canBlast  = price > 0
+  const validMkts = (markets || []).filter(m => m.phone).length
+  const qtyNum    = parseFloat(qty) || 0
+  const inp       = { display:'block', width:'100%', background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, padding:'11px 14px', color:'#e2e8f0', fontSize:15, fontWeight:600, boxSizing:'border-box', outline:'none' }
 
   return (
     <div style={{ padding:'16px 16px 100px' }}>
 
-      {/* ── Quick-publish banner after entry ── */}
-      {justAdded && (
-        <div style={{ background:'linear-gradient(135deg,#0d3d27,#0a2a1c)', border:'1px solid #10b981', borderRadius:16, padding:16, marginBottom:16 }}>
-          <div style={{ color:'#4ade80', fontWeight:900, fontSize:15, marginBottom:4 }}>
-            ✅ {justAdded.qty} {justAdded.unit} de "{justAdded.productName}" adicionados!
-          </div>
-          <div style={{ color:'#6ee7b7', fontSize:13, marginBottom:14 }}>
-            Quer publicar uma oferta para os mercados agora?
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <Btn onClick={() => { onGoToOferta(justAdded); setJustAdded(null) }}>
-              <Send size={15} /> Criar Oferta →
-            </Btn>
-            <Btn secondary onClick={() => setJustAdded(null)}>Só entrar no estoque</Btn>
-          </div>
+      {/* Header */}
+      <div style={{ marginBottom:18 }}>
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:20, marginBottom:2 }}>📦 Receber Produto</div>
+        <div style={{ color:'#475569', fontSize:13 }}>
+          Escaneia ou busca · produto aparece no portal de todos os mercados automaticamente
         </div>
-      )}
+        {validMkts > 0 && (
+          <div style={{ display:'inline-flex', alignItems:'center', gap:5, background:'#0d2137', border:'1px solid #14532d', borderRadius:20, padding:'4px 12px', marginTop:8 }}>
+            <div style={{ width:6, height:6, borderRadius:3, background:'#10b981' }} />
+            <span style={{ color:'#10b981', fontSize:12, fontWeight:700 }}>{validMkts} mercados conectados</span>
+          </div>
+        )}
+      </div>
 
-      <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18, marginBottom:4 }}>Receber Mercadoria</div>
-      <div style={{ color:'#475569', fontSize:13, marginBottom:20 }}>Busca o produto que chegou e registra a entrada</div>
       <ProductSearch onSelect={handleSelect} />
+
       {selected && (
-        <div style={{ background:'#0d2137', borderRadius:16, padding:16, marginTop:16, border:'1px solid #10b981' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-            <div>
-              <div style={{ color:'#10b981', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>Produto Selecionado</div>
-              <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:16 }}>{selected.name}</div>
-              {selected.sku && <div style={{ color:'#475569', fontSize:12, fontFamily:'monospace' }}>{selected.sku}</div>}
+        <div style={{ marginTop:14, borderRadius:20, overflow:'hidden', border:'1px solid #10b981' }}>
+
+          {/* Product header */}
+          <div style={{ background:'linear-gradient(135deg,#0f3d27,#0a2a1c)', padding:'14px 16px 12px', display:'flex', gap:12 }}>
+            <div style={{ flex:1 }}>
+              <div style={{ color:'#4ade80', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>✓ Produto</div>
+              <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18, lineHeight:1.2 }}>{selected.name}</div>
+              {selected.sku && <div style={{ color:'#334155', fontSize:11, fontFamily:'monospace', marginTop:3 }}>{selected.sku}</div>}
             </div>
-            <button onClick={() => setSelected(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'#475569' }}><X size={20} /></button>
+            <button onClick={reset} style={{ background:'rgba(0,0,0,0.3)', border:'none', borderRadius:10, padding:8, cursor:'pointer', color:'#64748b', alignSelf:'flex-start' }}><X size={17} /></button>
           </div>
 
-          {/* qty + unit */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 100px', gap:10, marginBottom:12 }}>
-            <div>
-              <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>QUANTIDADE</label>
-              <input value={qty} onChange={e => setQty(e.target.value)} type="number" placeholder="Ex: 200" style={inputStyle} />
-            </div>
-            <div>
-              <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>UNID.</label>
-              <select value={unit} onChange={e => setUnit(e.target.value)}
-                style={{ display:'block', width:'100%', marginTop:6, background:'#0a1929', border:'1px solid #1e4060', borderRadius:10, padding:12, color:'#e2e8f0', fontSize:14, boxSizing:'border-box', outline:'none' }}>
-                {UNITS.map(u => <option key={u}>{u}</option>)}
-              </select>
-            </div>
-          </div>
+          <div style={{ background:'#0d2137', padding:'16px', display:'flex', flexDirection:'column', gap:14 }}>
 
-          {/* custo + validade */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
+            {/* Qty + Unit */}
             <div>
-              <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>CUSTO (R$)</label>
-              <div style={{ position:'relative', marginTop:6 }}>
-                <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'#475569', fontWeight:700, fontSize:13 }}>R$</span>
-                <input value={cost} onChange={e => setCost(e.target.value)} placeholder="0,00"
-                  style={{ width:'100%', background:'#0a1929', border:'1px solid #1e4060', borderRadius:10, padding:'12px 12px 12px 34px', color:'#10b981', fontSize:15, fontWeight:700, boxSizing:'border-box', outline:'none' }}
-                />
+              <div style={{ color:'#94a3b8', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>Quantidade recebida</div>
+              <div style={{ display:'flex', gap:8 }}>
+                <input value={qty} onChange={e => setQty(e.target.value)} type="number" placeholder="Ex: 200"
+                  autoFocus style={{ ...inp, flex:2, fontSize:20, fontWeight:900, color:'#e2e8f0' }} />
+                <select value={unit} onChange={e => setUnit(e.target.value)}
+                  style={{ ...inp, flex:1, padding:'11px 8px' }}>
+                  {UNITS.map(u => <option key={u}>{u}</option>)}
+                </select>
               </div>
             </div>
-            <div>
-              <label style={{ color:'#f97316', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>📅 VALIDADE</label>
-              <input value={expiryDate} onChange={e => setExpiryDate(e.target.value)} type="date"
-                style={{ display:'block', width:'100%', marginTop:6, background:'#0a1929', border:'1px solid #7c2d12', borderRadius:10, padding:12, color:'#fed7aa', fontSize:14, fontWeight:700, boxSizing:'border-box', outline:'none' }}
-              />
-            </div>
-          </div>
 
-          <Btn full disabled={!qty || parseFloat(qty) <= 0 || saving} onClick={handleEntrada}>
-            <ArrowDownToLine size={18} />
-            {saving ? 'Registrando...' : 'Dar Entrada — ' + (qty || 0) + ' ' + unit}
-          </Btn>
+            {/* Custo + Validade */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              <div>
+                <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>Custo (R$)</div>
+                <div style={{ position:'relative' }}>
+                  <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:'#475569', fontSize:12 }}>R$</span>
+                  <input value={cost} onChange={e => setCost(e.target.value)} placeholder="0,00" style={{ ...inp, paddingLeft:28 }} />
+                </div>
+              </div>
+              <div>
+                <div style={{ color:'#f97316', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>📅 Validade</div>
+                <input value={expiryDate} onChange={e => setExpiryDate(e.target.value)} type="date"
+                  style={{ ...inp, border:'1px solid #7c2d12', color:'#fed7aa' }} />
+              </div>
+            </div>
+
+            {/* ────────────── OFFER SECTION ────────────── */}
+            <div style={{ background:'#0a1929', borderRadius:14, padding:14, border:`1px solid ${canBlast ? '#2563eb55' : '#1e3050'}` }}>
+              <div style={{ color:'#93c5fd', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+                <Zap size={12} /> Publicar oferta para os mercados
+              </div>
+
+              <div style={{ marginBottom: canBlast ? 10 : 0 }}>
+                <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>Preço de venda para os mercados</div>
+                <div style={{ position:'relative' }}>
+                  <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:'#3b82f6', fontSize:13, fontWeight:700 }}>R$</span>
+                  <input value={offerPrice} onChange={e => setOfferPrice(e.target.value)}
+                    placeholder={cost ? 'Sugerido: ' + String((parseNum(cost) * 1.3).toFixed(2)).replace('.', ',') : 'quanto quer cobrar?'}
+                    style={{ ...inp, border:`1px solid ${canBlast ? '#2563eb' : '#1e3050'}`, color:'#60a5fa', paddingLeft:28, fontSize:17, fontWeight:900 }} />
+                </div>
+                {canBlast && qty && (
+                  <div style={{ color:'#475569', fontSize:11, marginTop:4 }}>
+                    💰 Valor do lote: <strong style={{ color:'#f1f5f9' }}>{BRL.format(price * qtyNum)}</strong>
+                    {cost && parseNum(cost) > 0 && <span style={{ color:'#10b981', marginLeft:8 }}>· Margem: {Math.round(((price - parseNum(cost)) / parseNum(cost)) * 100)}%</span>}
+                  </div>
+                )}
+              </div>
+
+              {canBlast && (
+                <>
+                  <button onClick={() => setIsOpp(v => !v)}
+                    style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', cursor:'pointer', padding:'6px 0', marginBottom:8 }}>
+                    <div style={{ width:22, height:22, borderRadius:7, background: isOpp ? '#d97706' : '#1a3050', border:`1px solid ${isOpp ? '#f59e0b' : '#334155'}`, display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.2s' }}>
+                      {isOpp && <Check size={13} color="#fff" />}
+                    </div>
+                    <span style={{ color: isOpp ? '#fbbf24' : '#475569', fontSize:13, fontWeight:700 }}>🔥 Queima de estoque</span>
+                  </button>
+                  <input value={offerNote} onChange={e => setOfferNote(e.target.value)}
+                    placeholder="Nota para os mercados (ex: lote novo, entrega imediata...)"
+                    style={{ ...inp, fontSize:13 }} />
+                </>
+              )}
+            </div>
+
+            {/* ── ACTION BUTTON ── */}
+            <button
+              disabled={!qty || qtyNum <= 0 || saving}
+              onClick={handleSubmit}
+              style={{
+                display:'flex', alignItems:'center', justifyContent:'center', gap:10,
+                padding: canBlast ? '18px 20px' : '15px 20px',
+                borderRadius:16, border:'none', fontWeight:900, fontSize: canBlast ? 16 : 15,
+                cursor: (!qty || qtyNum <= 0 || saving) ? 'not-allowed' : 'pointer',
+                opacity: (!qty || qtyNum <= 0 || saving) ? 0.45 : 1,
+                background: canBlast
+                  ? 'linear-gradient(135deg,#1d4ed8,#10b981)'
+                  : 'linear-gradient(135deg,#10b981,#059669)',
+                color:'#fff',
+                boxShadow: canBlast ? '0 6px 24px rgba(16,185,129,0.3)' : 'none',
+                transition:'all 0.2s',
+              }}>
+              {saving ? '⏳ Salvando...'
+                : canBlast
+                  ? <><ArrowDownToLine size={18} /> Dar Entrada + <MessageCircle size={18} /> Disparar para {validMkts} mercado{validMkts !== 1 ? 's' : ''}</>
+                  : <><ArrowDownToLine size={18} /> Dar Entrada — {qtyNum || 0} {unit}</>
+              }
+            </button>
+            {canBlast && (
+              <div style={{ color:'#334155', fontSize:12, textAlign:'center', marginTop:-8 }}>
+                Produto será publicado no portal + WhatsApp enviado para cada mercado
+              </div>
+            )}
+
+          </div>
         </div>
       )}
       {estoque.length > 0 && (
@@ -696,7 +904,7 @@ function TabOfertas({ estoque, offers, setOffers, markets, profile, orders, preS
     setOffers(next); await persistKey(OFFERS_KEY, next)
   }
 
-  if (waOffer) return <WaOverlay offer={waOffer} markets={markets} supplierName={profile.name} orders={orders} onClose={() => setWaOffer(null)} />
+  if (waOffer) return <WaOverlay offer={waOffer} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} orders={orders} onClose={() => setWaOffer(null)} />
 
   if (mode === 'new') {
     const ok = selected && qty && price && !publishing
@@ -1218,7 +1426,7 @@ export default function Fornecedor() {
 
       <div style={{ flex:1, overflowY:'auto' }}>
         {tab === 'inicio'   && <TabInicio  estoque={estoque} offers={offers} orders={orders} profile={profile} setEstoque={setEstoque} setOffers={setOffers} setMarkets={setMarkets} setOrders={setOrders} />}
-        {tab === 'receber'  && <TabReceber estoque={estoque} setEstoque={setEstoque} onGoToOferta={goToOferta} />}
+        {tab === 'receber'  && <TabReceber estoque={estoque} setEstoque={setEstoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} />}
         {tab === 'ofertas'  && <TabOfertas estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} orders={orders} preSelected={preSelectedForOffer} onClearPreSelected={() => setPreSelectedForOffer(null)} />}
         {tab === 'pedidos'  && <TabPedidos orders={orders} setOrders={setOrders} />}
         {tab === 'mercados' && <TabMercados markets={markets} setMarkets={setMarkets} orders={orders} />}
