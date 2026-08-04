@@ -2,7 +2,7 @@
 
 ## What this is
 React + Vite + Tailwind MVP platform for retail management (PDV/automação comercial), Brazilian supermarket.
-Live URL: **https://corta-precos-pdv.netlify.app**
+Live URL: **https://zatendestock.netlify.app**
 GitHub Repo: **https://github.com/neteraa/corta-precos-pdv**
 Netlify site ID: `abd4863b-ef7b-4d7c-b3f2-85547f519485`
 Branch: `master`
@@ -163,7 +163,7 @@ nohup npm run dev > /tmp/vite.log 2>&1 &
 ```
 
 ## 🚀 PRODUCTION URL (PERMANENT — always online, no laptop needed)
-**https://corta-precos-pdv.netlify.app**
+**https://zatendestock.netlify.app**
 - Hosted on Netlify free tier (agn.girardi@gmail.com)
 - Admin: https://app.netlify.com/projects/corta-precos-pdv
 - Site ID: abd4863b-ef7b-4d7c-b3f2-85547f519485
@@ -241,7 +241,7 @@ After importing CSV, data persists across page reloads.
 Products now support: `minStock` (number), `expiryDate` (ISO date string), `unit` (UN/KG/G/LT/CX)
 
 ## Production deployment
-- URL: https://corta-precos-pdv.netlify.app
+- URL: https://zatendestock.netlify.app
 - Site ID: abd4863b-ef7b-4d7c-b3f2-85547f519485
 - Deploy via: `npx netlify-cli deploy --prod --dir=dist --site=abd4863b-ef7b-4d7c-b3f2-85547f519485`
 - Login: admin / 1234 (changeable in Configurações → Acesso ao Sistema)
