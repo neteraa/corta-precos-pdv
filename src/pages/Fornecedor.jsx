@@ -56,6 +56,43 @@ const SKU_MAP = Object.fromEntries(
 const cleanPhone  = p => '55' + (p || '').replace(/\D/g, '').replace(/^0/, '').slice(-11)
 const fmtDate     = iso => iso ? new Date(iso + 'T00:00').toLocaleDateString('pt-BR') : '-'
 const fmtDT       = dt  => new Date(dt).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
+
+/* ── Currency input mask ── */
+function CurrencyInput({ value, onChange, placeholder, style, autoFocus }) {
+  function handleChange(e) {
+    const digits = e.target.value.replace(/\D/g, '')
+    if (!digits) { onChange(''); return }
+    const num = parseInt(digits, 10) / 100
+    onChange(num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+  }
+  return (
+    <input
+      value={value}
+      onChange={handleChange}
+      placeholder={placeholder || '0,00'}
+      style={style}
+      inputMode="numeric"
+      autoFocus={autoFocus}
+    />
+  )
+}
+
+/* ── Open Food Facts EAN lookup ── */
+const eanCache = {}
+async function fetchEAN(ean) {
+  if (!ean || ean.length < 8) return null
+  if (eanCache[ean] !== undefined) return eanCache[ean]
+  try {
+    const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${ean}.json?fields=product_name,brands,image_front_url,stores,quantity`, { signal: AbortSignal.timeout(4000) })
+    const j = await r.json()
+    const result = j.status === 1 ? j.product : null
+    eanCache[ean] = result
+    return result
+  } catch {
+    eanCache[ean] = null
+    return null
+  }
+}
 const uid         = () => `${Date.now()}_${Math.random().toString(36).slice(2,6)}`
 const today       = () => new Date().toISOString().slice(0, 10)
 const parseNum    = s  => parseFloat((s || '0').replace(',', '.')) || 0
@@ -280,10 +317,12 @@ function WaOverlay({ offer, markets, supplierName, supplierPhone, orders = [], o
 function QuickProductInput({ onSelect }) {
   const [text,    setText]    = useState('')
   const [results, setResults] = useState([])
-  const [scan,    setScan]    = useState(false)
+  const [scan,      setScan]      = useState(false)
+  const [offInfo,   setOffInfo]   = useState(null)  // Open Food Facts product info
+  const [offLoading, setOffLoading] = useState(false)
 
   const doSearch = (q) => {
-    setText(q)
+    setText(q); setOffInfo(null)
     if (!q || q.length < 2) { setResults([]); return }
     const ql = q.toLowerCase()
     const skuHit = SKU_MAP[q]
@@ -293,13 +332,25 @@ function QuickProductInput({ onSelect }) {
     setResults(hits)
   }
 
+  const handleScan = async (sku) => {
+    setScan(false)
+    doSearch(sku)
+    // Look up EAN in Open Food Facts to confirm product
+    if (/^\d{8,14}$/.test(sku)) {
+      setOffLoading(true)
+      const info = await fetchEAN(sku)
+      setOffLoading(false)
+      setOffInfo(info)
+    }
+  }
+
   const confirmFreeText = () => {
     if (!text.trim()) return
     onSelect({ name: text.trim(), sku: '', price: null })
-    setText(''); setResults([])
+    setText(''); setResults([]); setOffInfo(null)
   }
 
-  const pick = (p) => { onSelect(p); setText(''); setResults([]) }
+  const pick = (p) => { onSelect(p); setText(''); setResults([]); setOffInfo(null) }
 
   const inp = { flex:1, background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, padding:'13px 14px', color:'#e2e8f0', fontSize:16, outline:'none' }
 
@@ -307,7 +358,31 @@ function QuickProductInput({ onSelect }) {
     <div style={{ position:'relative' }}>
       {scan && (
         <div style={{ position:'fixed', inset:0, zIndex:999, background:'#000' }}>
-          <CameraScanner onDetected={sku => { setScan(false); doSearch(sku) }} onClose={() => setScan(false)} />
+          <CameraScanner onDetected={handleScan} onClose={() => setScan(false)} />
+        </div>
+      )}
+      {/* Open Food Facts product confirmation card */}
+      {offLoading && (
+        <div style={{ background:'#0d2137', borderRadius:12, padding:'10px 14px', marginBottom:8, border:'1px solid #1e4060', color:'#64748b', fontSize:12 }}>
+          🔍 Buscando produto no banco global...
+        </div>
+      )}
+      {offInfo && !offLoading && (
+        <div style={{ background:'#0d3d27', borderRadius:12, padding:'12px 14px', marginBottom:8, border:'1px solid #14532d', display:'flex', gap:10, alignItems:'center' }}>
+          {offInfo.image_front_url && (
+            <img src={offInfo.image_front_url} alt="" style={{ width:44, height:44, borderRadius:8, objectFit:'cover', flexShrink:0 }} />
+          )}
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ color:'#4ade80', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:2 }}>✅ Produto identificado</div>
+            <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:13 }}>{offInfo.product_name || offInfo.brands || 'Nome não disponível'}</div>
+            {offInfo.brands && offInfo.product_name && <div style={{ color:'#64748b', fontSize:11 }}>{offInfo.brands}{offInfo.quantity ? ` · ${offInfo.quantity}` : ''}</div>}
+          </div>
+          <button onClick={() => {
+            const name = offInfo.product_name || offInfo.brands || text.trim()
+            pick({ name, sku: text.trim(), price: null })
+          }} style={{ background:'#14532d', border:'none', borderRadius:10, padding:'8px 12px', color:'#4ade80', fontWeight:700, fontSize:12, cursor:'pointer', flexShrink:0 }}>
+            Usar este
+          </button>
         </div>
       )}
       <div style={{ display:'flex', gap:8 }}>
@@ -754,8 +829,21 @@ const DEMO_ORDERS_HIST = [
 /* ── TabInicio ──────────────────────────────────────────────── */
 function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setOffers, setMarkets, setOrders, onNavigate }) {
   const [showBlitz,  setShowBlitz]  = useState(false)
-  const [blastAll,   setBlastAll]   = useState(false) // blast ALL offers at current prices
+  const [blastAll,   setBlastAll]   = useState(false)
+  const [editItem,   setEditItem]   = useState(null)  // stock item being edited
   const todayStr = today()
+
+  async function deleteEstoque(id) {
+    if (!window.confirm('Remover este item do estoque?')) return
+    const next = estoque.filter(e => e.id !== id)
+    setEstoque(next); await persistKey(ESTOQUE_KEY, next)
+  }
+
+  async function saveEditItem(patch) {
+    const next = estoque.map(e => e.id === editItem.id ? { ...e, ...patch } : e)
+    setEstoque(next); await persistKey(ESTOQUE_KEY, next)
+    setEditItem(null)
+  }
 
   /* Build combined WA message for ALL active offers — no price change */
   function buildDailyBlastMsg() {
@@ -828,6 +916,7 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
 
   if (singleBlast) return <BlastScreen offer={singleBlast} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setSingleBlast(null)} />
   if (blastAll) {
+
     const msg = buildDailyBlastMsg()
     if (!msg) { setBlastAll(false) }
     else return <BlastScreen customMsg={msg} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setBlastAll(false)} />
@@ -882,6 +971,42 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
     <div style={{ padding:'16px 16px 100px' }}>
 
       {showBlitz && <BlitzModal offers={offers} setOffers={setOffers} markets={markets} profile={profile} onClose={() => setShowBlitz(false)} />}
+
+      {/* Edit stock item modal */}
+      {editItem && (() => {
+        let newQty = String(editItem.qty)
+        let newExpiry = editItem.expiryDate || ''
+        let newPaid = editItem.totalPaid ? editItem.totalPaid.toLocaleString('pt-BR',{minimumFractionDigits:2}) : ''
+        return (
+          <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+            <div style={{ background:'#0a1929', borderRadius:20, padding:24, width:'100%', maxWidth:360, border:'1px solid #1e4060' }}>
+              <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:16, marginBottom:4 }}>✏️ Editar Estoque</div>
+              <div style={{ color:'#64748b', fontSize:12, marginBottom:16, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{editItem.productName}</div>
+              <label style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase' }}>Quantidade</label>
+              <input defaultValue={newQty} onChange={e => newQty = e.target.value} type="number"
+                style={{ display:'block', width:'100%', marginTop:6, marginBottom:12, background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, padding:'12px 14px', color:'#e2e8f0', fontSize:18, fontWeight:900, boxSizing:'border-box', outline:'none' }} />
+              <label style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase' }}>Total Pago (R$)</label>
+              <input defaultValue={newPaid} onChange={e => newPaid = e.target.value} inputMode="decimal"
+                style={{ display:'block', width:'100%', marginTop:6, marginBottom:12, background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, padding:'12px 14px', color:'#e2e8f0', fontSize:15, boxSizing:'border-box', outline:'none' }} />
+              <label style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase' }}>Validade</label>
+              <input defaultValue={newExpiry} onChange={e => newExpiry = e.target.value} type="date"
+                style={{ display:'block', width:'100%', marginTop:6, marginBottom:20, background:'#0d2137', border:'1px solid #7c2d12', borderRadius:12, padding:'12px 14px', color:'#fed7aa', fontSize:14, boxSizing:'border-box', outline:'none' }} />
+              <div style={{ display:'flex', gap:10 }}>
+                <button onClick={() => {
+                  const paid = parseNum(newPaid)
+                  const q    = parseFloat(newQty) || 0
+                  saveEditItem({ qty: q, expiryDate: newExpiry || null, totalPaid: paid, unitCost: paid > 0 && q > 0 ? paid/q : editItem.unitCost })
+                }} style={{ flex:1, background:'linear-gradient(135deg,#10b981,#059669)', border:'none', borderRadius:12, padding:12, color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  <Check size={16} /> Salvar
+                </button>
+                <button onClick={() => setEditItem(null)} style={{ flex:1, background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, padding:12, color:'#64748b', fontWeight:800, fontSize:14, cursor:'pointer' }}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Header greeting */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
@@ -1025,22 +1150,28 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
           {newToday.map(item => {
             const src = srcCfg(item.sourceType)
             return (
-              <div key={item.id} style={{ background:'#0d2137', borderRadius:12, padding:'10px 14px', marginBottom:6, border:'1px solid #1a3a50', display:'flex', gap:10, alignItems:'center' }}>
-                <span style={{ fontSize:16, flexShrink:0 }}>{src.emoji}</span>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ color:'#e2e8f0', fontWeight:700, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.productName}</div>
-                  {item.sourceName && <div style={{ color:'#334155', fontSize:11 }}>{item.sourceName}</div>}
-                </div>
-                <div style={{ textAlign:'right', flexShrink:0 }}>
-                  <div style={{ color:'#10b981', fontWeight:900, fontSize:16 }}>{item.qty}</div>
-                  <div style={{ color:'#475569', fontSize:11 }}>{item.unit}</div>
-                </div>
-                {item.totalPaid > 0 && (
-                  <div style={{ textAlign:'right', flexShrink:0 }}>
-                    <div style={{ color:'#334155', fontSize:11 }}>🔒 {BRL.format(item.totalPaid)}</div>
-                    <div style={{ color:'#1e3a50', fontSize:10 }}>total pago</div>
+              <div key={item.id} style={{ background:'#0d2137', borderRadius:12, marginBottom:6, border:'1px solid #1a3a50', overflow:'hidden' }}>
+                <div style={{ display:'flex', gap:10, alignItems:'center', padding:'10px 14px' }}>
+                  <span style={{ fontSize:16, flexShrink:0 }}>{src.emoji}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ color:'#e2e8f0', fontWeight:700, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.productName}</div>
+                    {item.sourceName && <div style={{ color:'#334155', fontSize:11 }}>{item.sourceName}</div>}
                   </div>
-                )}
+                  <div style={{ textAlign:'right', flexShrink:0 }}>
+                    <div style={{ color:'#10b981', fontWeight:900, fontSize:16 }}>{item.qty} <span style={{ fontSize:11, color:'#475569' }}>{item.unit}</span></div>
+                    {item.totalPaid > 0 && <div style={{ color:'#334155', fontSize:11 }}>🔒 {BRL.format(item.totalPaid)}</div>}
+                  </div>
+                </div>
+                <div style={{ display:'flex', borderTop:'1px solid #1a3a50' }}>
+                  <button onClick={() => setEditItem(item)}
+                    style={{ flex:1, background:'#1e3a5f22', border:'none', padding:'7px 0', color:'#64748b', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4 }}>
+                    ✏️ Editar
+                  </button>
+                  <button onClick={() => deleteEstoque(item.id)}
+                    style={{ flex:1, background:'#7c1d1d22', border:'none', borderLeft:'1px solid #1a3a50', padding:'7px 0', color:'#f87171', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:4 }}>
+                    🗑 Deletar
+                  </button>
+                </div>
               </div>
             )
           })}
@@ -1261,10 +1392,10 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
           {/* ── Total pago + unit cost ── */}
           <div>
             <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>Total pago pelo lote (interno 🔒)</div>
-            <div style={{ position:'relative' }}>
-              <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'#475569', fontSize:13, fontWeight:700 }}>R$</span>
-              <input value={totalPaid} onChange={e => setTotalPaid(e.target.value)} placeholder="0,00 — quanto pagou no total"
-                style={{ ...inp, paddingLeft:30 }} />
+            <div style={{ display:'flex', gap:0, alignItems:'center', background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, overflow:'hidden' }}>
+              <span style={{ padding:'0 12px', color:'#475569', fontSize:13, fontWeight:700 }}>R$</span>
+              <CurrencyInput value={totalPaid} onChange={setTotalPaid} placeholder="0,00 — quanto pagou no total"
+                style={{ flex:1, background:'transparent', border:'none', padding:'13px 12px 13px 0', color:'#e2e8f0', fontSize:16, fontWeight:700, outline:'none', width:'100%' }} />
             </div>
             {unitCost > 0 && (
               <div style={{ color:'#64748b', fontSize:12, marginTop:4, display:'flex', gap:10 }}>
@@ -1296,14 +1427,35 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
 
           {/* ── Preço de venda para mercados ── */}
           <div style={{ background:'#0a1929', borderRadius:14, padding:14, border:`1px solid ${canBlast ? '#2563eb55' : '#1e3050'}` }}>
-            <div style={{ color:'#93c5fd', fontSize:11, fontWeight:700, textTransform:'uppercase', marginBottom:10, display:'flex', alignItems:'center', gap:5 }}>
-              <Zap size={12} /> Preço p/ mercados {canBlast ? '— mercados NÃO veem origem nem custo' : ''}
+            <div style={{ color:'#93c5fd', fontSize:11, fontWeight:700, textTransform:'uppercase', marginBottom:8, display:'flex', alignItems:'center', gap:5 }}>
+              <Zap size={12} /> Preço p/ mercados (repasse) — mercados NÃO veem custo
             </div>
-            <div style={{ position:'relative', marginBottom: canBlast ? 10 : 0 }}>
-              <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'#3b82f6', fontSize:14, fontWeight:700 }}>R$</span>
-              <input value={offerPrice} onChange={e => setOfferPrice(e.target.value)}
-                placeholder={unitCost > 0 ? `Sugerido: ${(unitCost * 1.5).toFixed(2).replace('.',',')}` : 'quanto cobrar dos mercados?'}
-                style={{ ...inp, border:`1px solid ${canBlast ? '#2563eb' : '#1e3050'}`, color:'#60a5fa', paddingLeft:30, fontSize:18, fontWeight:900 }} />
+            {/* Suggested price pills */}
+            {(selected?.price || unitCost > 0) && (
+              <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
+                {unitCost > 0 && [1.3, 1.5, 1.8, 2.0].map(mult => {
+                  const sug = (unitCost * mult)
+                  const sugStr = sug.toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 })
+                  return (
+                    <button key={mult} onClick={() => setOfferPrice(sugStr)} style={{
+                      background:'#1e3a5f', border:'1px solid #2563eb44', borderRadius:20, padding:'4px 10px',
+                      color:'#93c5fd', fontSize:11, fontWeight:700, cursor:'pointer',
+                    }}>+{Math.round((mult-1)*100)}% → {BRL.format(sug)}</button>
+                  )
+                })}
+                {selected?.price && (
+                  <button onClick={() => setOfferPrice(selected.price.toLocaleString('pt-BR', {minimumFractionDigits:2}))} style={{
+                    background:'#0d3d1a', border:'1px solid #14532d', borderRadius:20, padding:'4px 10px',
+                    color:'#4ade80', fontSize:11, fontWeight:700, cursor:'pointer',
+                  }}>📊 Varejo: {BRL.format(selected.price)}</button>
+                )}
+              </div>
+            )}
+            <div style={{ display:'flex', gap:0, alignItems:'center', background:'#060e1a', border:`1px solid ${canBlast ? '#2563eb' : '#1e3050'}`, borderRadius:12, overflow:'hidden', marginBottom: canBlast ? 10 : 0 }}>
+              <span style={{ padding:'0 12px', color:'#3b82f6', fontSize:14, fontWeight:700 }}>R$</span>
+              <CurrencyInput value={offerPrice} onChange={setOfferPrice}
+                placeholder={unitCost > 0 ? `sugerido: ${(unitCost*1.5).toLocaleString('pt-BR',{minimumFractionDigits:2})}` : 'preço por unidade para mercados'}
+                style={{ flex:1, background:'transparent', border:'none', padding:'13px 12px 13px 0', color:'#60a5fa', fontSize:20, fontWeight:900, outline:'none', width:'100%' }} />
             </div>
             {canBlast && qtyNum > 0 && (
               <div style={{ color:'#475569', fontSize:12, marginBottom:10, display:'flex', gap:10, flexWrap:'wrap' }}>
@@ -2144,23 +2296,68 @@ function TabRelatorio({ estoque, offers, orders }) {
 
 /* ── Main Component ─────────────────────────────────────────── */
 /* ── EditProfileModal ────────────────────────────────────────── */
+const THEME_COLORS = [
+  { color:'#10b981', label:'Verde'    },
+  { color:'#f97316', label:'Laranja'  },
+  { color:'#3b82f6', label:'Azul'     },
+  { color:'#8b5cf6', label:'Roxo'     },
+  { color:'#ef4444', label:'Vermelho' },
+  { color:'#f59e0b', label:'Amarelo'  },
+]
+
 function EditProfileModal({ profile, onSave, onClose }) {
-  const [name, setName]   = useState(profile.name || '')
-  const [phone, setPhone] = useState(profile.phone || '')
+  const inp = { display:'block', width:'100%', marginTop:6, marginBottom:14, background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, padding:'12px 14px', color:'#e2e8f0', fontSize:14, boxSizing:'border-box', outline:'none' }
+  const lbl = { color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em' }
+  const [form, setForm] = useState({
+    name:         profile.name         || '',
+    phone:        profile.phone        || '',
+    businessName: profile.businessName || '',
+    city:         profile.city         || '',
+    address:      profile.address      || '',
+    cnpj:         profile.cnpj         || '',
+    themeColor:   profile.themeColor   || '#10b981',
+  })
+  const F = k => ({ value: form[k], onChange: e => setForm(p => ({ ...p, [k]: e.target.value })) })
+
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-      <div style={{ background:'#0a1929', borderRadius:20, padding:24, width:'100%', maxWidth:360, border:'1px solid #1e4060' }}>
-        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18, marginBottom:20 }}>Editar Perfil</div>
-        <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>Nome / Distribuidora</label>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: João Distribuidora"
-          style={{ display:'block', width:'100%', marginTop:6, marginBottom:14, background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, padding:'12px 14px', color:'#e2e8f0', fontSize:15, boxSizing:'border-box', outline:'none' }}
-        />
-        <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>Seu WhatsApp</label>
-        <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="(15) 99999-9999" type="tel"
-          style={{ display:'block', width:'100%', marginTop:6, marginBottom:20, background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, padding:'12px 14px', color:'#e2e8f0', fontSize:15, boxSizing:'border-box', outline:'none' }}
-        />
+    <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'20px 20px', overflowY:'auto' }}>
+      <div style={{ background:'#0a1929', borderRadius:20, padding:24, width:'100%', maxWidth:400, border:'1px solid #1e4060', marginTop:20 }}>
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18, marginBottom:4 }}>⚙️ Perfil da Distribuidora</div>
+        <div style={{ color:'#334155', fontSize:12, marginBottom:20 }}>Estas informações aparecem no cabeçalho e nas mensagens do ZAP</div>
+
+        <label style={lbl}>Nome do Responsável *</label>
+        <input {...F('name')} placeholder="Ex: João Silva" style={inp} />
+
+        <label style={lbl}>WhatsApp do Responsável *</label>
+        <input {...F('phone')} placeholder="(11) 99999-0000" type="tel" style={inp} />
+
+        <div style={{ borderTop:'1px solid #1a3a50', paddingTop:16, marginBottom:16 }}>
+          <div style={{ color:'#475569', fontSize:11, fontWeight:700, marginBottom:12 }}>DADOS DA EMPRESA</div>
+
+          <label style={lbl}>Nome da Empresa</label>
+          <input {...F('businessName')} placeholder="Ex: MEGA TUDO BARATO" style={inp} />
+
+          <label style={lbl}>Cidade / Estado</label>
+          <input {...F('city')} placeholder="Ex: Cotia, SP" style={inp} />
+
+          <label style={lbl}>Endereço</label>
+          <input {...F('address')} placeholder="Rua Bandeirantes, 221, Cotia, SP" style={inp} />
+
+          <label style={lbl}>CNPJ (opcional)</label>
+          <input {...F('cnpj')} placeholder="18.755.137/0001-11" style={{ ...inp, marginBottom:12 }} />
+
+          <label style={lbl}>Cor do tema</label>
+          <div style={{ display:'flex', gap:8, marginTop:6, marginBottom:14, flexWrap:'wrap' }}>
+            {THEME_COLORS.map(c => (
+              <button key={c.color} onClick={() => setForm(p => ({ ...p, themeColor: c.color }))} style={{
+                width:36, height:36, borderRadius:10, background:c.color, border: form.themeColor === c.color ? '3px solid #fff' : '3px solid transparent', cursor:'pointer', flexShrink:0,
+              }} title={c.label} />
+            ))}
+          </div>
+        </div>
+
         <div style={{ display:'flex', gap:10 }}>
-          <Btn full disabled={!name.trim()} onClick={() => onSave({ name: name.trim(), phone: phone.trim() })}>
+          <Btn full disabled={!form.name.trim()} onClick={() => onSave({ ...form, name: form.name.trim(), phone: form.phone.trim() })}>
             <Check size={16} /> Salvar
           </Btn>
           <Btn secondary full onClick={onClose}>Cancelar</Btn>
@@ -2171,13 +2368,22 @@ function EditProfileModal({ profile, onSave, onClose }) {
 }
 
 export default function Fornecedor() {
-  /* Default profile — no login gate. User can edit name/phone via header. */
+  /* Default profile — no login gate. User can edit via header. */
   const defaultProfile = () => {
     try {
       const saved = JSON.parse(localStorage.getItem(LOCAL))
       if (saved?.name) return saved
     } catch {}
-    return { name: 'Distribuidor', phone: '' }
+    // First-time: pre-fill with Mega Tudo Barato for demo
+    return {
+      name: 'Mega Tudo Barato',
+      phone: '11 2815-1989',
+      businessName: 'MEGA TUDO BARATO',
+      city: 'Cotia, SP',
+      address: 'Rua Bandeirantes, 221, Portal da Primavera, Cotia, SP',
+      cnpj: '18.755.137/0001-11',
+      themeColor: '#f97316',
+    }
   }
 
   const [profile,     setProfile]     = useState(defaultProfile)
@@ -2236,17 +2442,24 @@ export default function Fornecedor() {
         <EditProfileModal profile={profile} onSave={saveProfile} onClose={() => setEditingProfile(false)} />
       )}
 
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px 10px', background:'#060e1a', borderBottom:'1px solid #0f2035', position:'sticky', top:0, zIndex:10 }}>
-        <button onClick={() => setEditingProfile(true)} style={{ display:'flex', alignItems:'center', gap:10, background:'none', border:'none', cursor:'pointer', padding:0 }}>
-          <div style={{ width:36, height:36, borderRadius:10, background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <Truck size={18} color="#fff" />
+      {/* ── HEADER ── */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px 10px', background:'#060e1a', borderBottom:`1px solid ${(profile.themeColor||'#10b981')}22`, position:'sticky', top:0, zIndex:10 }}>
+        <button onClick={() => setEditingProfile(true)} style={{ display:'flex', alignItems:'center', gap:10, background:'none', border:'none', cursor:'pointer', padding:0, flex:1, minWidth:0 }}>
+          {/* Logo circle with initials or truck icon */}
+          <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${profile.themeColor||'#10b981'},${(profile.themeColor||'#10b981')}aa)`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:`0 4px 12px ${(profile.themeColor||'#10b981')}44` }}>
+            {profile.businessName
+              ? <span style={{ color:'#fff', fontWeight:900, fontSize:13 }}>{profile.businessName.split(' ').map(w=>w[0]).slice(0,3).join('').toUpperCase()}</span>
+              : <Truck size={18} color="#fff" />
+            }
           </div>
-          <div style={{ textAlign:'left' }}>
-            <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:15, lineHeight:1 }}>
-              {profile.name}
-              <span style={{ color:'#334155', fontWeight:400, fontSize:11, marginLeft:6 }}>✏️</span>
+          <div style={{ textAlign:'left', flex:1, minWidth:0 }}>
+            <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:14, lineHeight:1.1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+              {profile.businessName || profile.name}
+              <span style={{ color:'#334155', fontWeight:400, fontSize:10, marginLeft:5 }}>✏️</span>
             </div>
-            <div style={{ color:'#10b981', fontSize:11, fontWeight:600 }}>Portal do Distribuidor</div>
+            <div style={{ color: profile.themeColor || '#10b981', fontSize:10, fontWeight:700 }}>
+              {profile.city ? `📍 ${profile.city}` : 'Portal do Distribuidor'}
+            </div>
           </div>
         </button>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
