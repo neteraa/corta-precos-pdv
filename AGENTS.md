@@ -1,7 +1,91 @@
 # Corta Preços MVP — Project Notes
 
 ## What this is
-React + Vite + Tailwind MVP platform for retail management (PDV/automação comercial), inspired by Gdoor and gdoor.com.br.
+React + Vite + Tailwind MVP platform for retail management (PDV/automação comercial), Brazilian supermarket.
+Live URL: **https://corta-precos-pdv.netlify.app**
+Netlify site ID: `abd4863b-ef7b-4d7c-b3f2-85547f519485`
+Repo: `/workspace/project` · Branch: `master` · Latest commit: `a91f364`
+
+## Deploy command (always use this)
+```bash
+npm run build && npx netlify-cli deploy --prod --dir=dist --site=abd4863b-ef7b-4d7c-b3f2-85547f519485
+```
+
+---
+
+## Stack
+- React 18 + Vite + Tailwind CSS
+- Netlify hosting + Netlify Blobs (server-side persistence via `/api/persist` + `/api/restore`)
+- `src/store.jsx` — single global store with localStorage + Netlify Blobs sync every 30s
+- `netlify/functions/persist.js` + `restore.js` — serverless functions for cross-device sync
+
+## Key Architecture
+- **Store** (`src/store.jsx`): `StoreProvider` with `useStore()` hook
+  - Products, Sales, Customers, Promos, Cash, Operators, Photos (IndexedDB)
+  - `syncNow()` + `lastSync` + `syncing` — 30s auto-poll from server
+  - `expiryAlertDays` (default 30) — persisted to `localStorage('cp_expiry_days')`
+  - `upsertProduct`, `upsertPromo`, `assignPromoGroup` — key mutation functions
+- **Auth**: `src/utils/auth.js` — simple PIN auth
+
+## Pages
+| Route | File | Notes |
+|---|---|---|
+| `/pdv` | PDV.jsx | POS caixa, F2/F4/F10 shortcuts, barcode scanner |
+| `/produtos` | Produtos.jsx | CRUD + CSV import (Gdoor format) |
+| `/estoque` | Estoque.jsx | **Pagination 100/page, sortable columns, Receber Mercadoria with expiry date** |
+| `/validade` | Validade.jsx | **Full expiry control — configurable threshold, auto-alert, Gerar Promoção** |
+| `/dashboard` | Dashboard.jsx | **Expiry alert banner, KPIs, charts** |
+| `/scan` | ScanMobile.jsx | Mobile barcode scanner — `?mode=estoque` for stock entry with vencimento |
+| `/promocoes` | Promocoes.jsx | Promo groups (qty-based pricing) |
+| `/fiado` | Fiado.jsx | Credit/tab tracking |
+| `/relatorio` | Relatorio.jsx | Sales report |
+| `/validade` | Validade.jsx | Expiry control |
+| `/etiquetas` | Etiquetas.jsx | Label printing |
+| `/fidelidade` | Fidelidade.jsx | QR loyalty (WhatsApp) |
+| `/campanhas` | Campanhas.jsx | WhatsApp campaigns |
+| `/configuracoes` | Configuracoes.jsx | Backup, import CSV, reset |
+
+## COMPLETED FEATURES (as of commit a91f364)
+- ✅ Full PDV (caixa) with barcode scanner + keyboard shortcuts
+- ✅ 2795 products imported from Gdoor CSV (pipe-delimited, MacRoman encoding)
+- ✅ Estoque: pagination 100/page, sortable columns (name/category/cost/price/stock/stockValue/receivedAt)
+- ✅ Receber Mercadoria modal: expiry date per product, live countdown badge (green/yellow/orange/red)
+- ✅ Validade page: configurable alert threshold (slider + presets 7/15/30/45/60/90d), auto-alert banner, "Gerar Promoção" button per expiring product
+- ✅ Promoção modal: discount % slider, qty picker, live preview, creates promo + assigns product in 1 click
+- ✅ Dashboard: expiry alert banner showing top 3 expiring products with button to /validade
+- ✅ Cross-device sync: mobile scan → desktop sees in ≤30s; SyncBar in sidebar shows last sync time
+- ✅ ScanMobile: cadastro completo (nome/preço/unidade/qty/vencimento), vencimento saved to expiryDate
+- ✅ Product photos via IndexedDB + OpenFoodFacts picker
+- ✅ Promos, Fiado, Fidelidade/WhatsApp, Campanhas, Relatório, Etiquetas
+
+## Promo structure (SEED_PROMOS / upsertPromo)
+```js
+{ id: 'pr_xxx', name: 'label', group: 'UNIQUE_GROUP_KEY', qty: 2, totalPrice: 9.99, active: true }
+// products linked via: assignPromoGroup(productId, group)
+// products have p.promoGroup field
+```
+
+## Expiry system
+- `product.expiryDate` — ISO date string "YYYY-MM-DD"
+- `expiryAlertDays` — from store, configurable, default 30
+- Status: expired(<0) / critical(≤7) / warning(≤warnDays) / ok(>warnDays)
+- Set at: Receber Mercadoria modal (desktop) or ScanMobile (mobile)
+- Alerts shown: Validade page + Dashboard banner
+
+## CSS / Tailwind conventions
+- `btn-primary` = orange CTA button
+- `btn-ghost` = ghost button
+- `card` = white rounded-xl shadow card
+- `input` = styled input
+- `label` = styled label
+- Brand color: orange-500 (#ea580c) — use `text-orange-500`, `bg-orange-500`
+- `animate-pop` = entrance animation
+
+## Known issues / next possible work
+- Produtos page can be slow with 2795 products loaded (no virtual scroll)
+- Validade "Sem data (2795)" — products need expiry dates added via ScanMobile or Receber Mercadoria
+- Photos from OpenFoodFacts API can be unstable (503 errors)
+- No real auth (PIN only) — not production-safe for multi-user
 
 ## Stack
 - React 18, React Router 6, Recharts, Lucide React
