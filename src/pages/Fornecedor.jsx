@@ -2457,9 +2457,10 @@ export default function Fornecedor() {
               {profile.businessName || profile.name}
               <span style={{ color:'#334155', fontWeight:400, fontSize:10, marginLeft:5 }}>✏️</span>
             </div>
-            <div style={{ color: profile.themeColor || '#10b981', fontSize:10, fontWeight:700 }}>
-              {profile.city ? `📍 ${profile.city}` : 'Portal do Distribuidor'}
-            </div>
+            {!profile.businessName
+              ? <div style={{ color:'#f59e0b', fontSize:10, fontWeight:700 }}>⚠️ Toque aqui para configurar empresa</div>
+              : <div style={{ color: profile.themeColor || '#10b981', fontSize:10, fontWeight:700 }}>📍 {profile.city || 'Portal do Distribuidor'}</div>
+            }
           </div>
         </button>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
