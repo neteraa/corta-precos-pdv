@@ -19,6 +19,7 @@ const OFFERS_KEY  = 'cp_supplier_offers'
 const ESTOQUE_KEY = 'cp_fornecedor_estoque'
 const ORDERS_KEY  = 'cp_supplier_orders'
 const MKTS_KEY    = LOCAL + '_markets'
+const MKTS_SERVER_KEY = 'cp_distribuidor_markets'  // server-side persistence (cross-device)
 const API_PERSIST = '/api/persist'
 const API_RESTORE = '/api/restore'
 const UNITS       = ['CX', 'UND', 'FD', 'KG', 'LT', 'PC', 'DZ', 'SC']
@@ -57,11 +58,12 @@ async function fetchAll() {
     const r = await fetch(API_RESTORE)
     const { data } = await r.json()
     return {
-      estoque: data?.[ESTOQUE_KEY] ? JSON.parse(data[ESTOQUE_KEY]) : [],
-      offers:  data?.[OFFERS_KEY]  ? JSON.parse(data[OFFERS_KEY])  : [],
-      orders:  data?.[ORDERS_KEY]  ? JSON.parse(data[ORDERS_KEY])  : [],
+      estoque:  data?.[ESTOQUE_KEY]    ? JSON.parse(data[ESTOQUE_KEY])    : [],
+      offers:   data?.[OFFERS_KEY]     ? JSON.parse(data[OFFERS_KEY])     : [],
+      orders:   data?.[ORDERS_KEY]     ? JSON.parse(data[ORDERS_KEY])     : [],
+      markets:  data?.[MKTS_SERVER_KEY]? JSON.parse(data[MKTS_SERVER_KEY]): null, // null = not on server yet
     }
-  } catch { return { estoque: [], offers: [], orders: [] } }
+  } catch { return { estoque: [], offers: [], orders: [], markets: null } }
 }
 
 function buildOfferMsg(offer, supplierName) {
@@ -253,9 +255,9 @@ function SetupScreen({ onDone }) {
         <div style={{ width:72, height:72, borderRadius:22, background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
           <Truck size={36} color="#fff" />
         </div>
-        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:28 }}>FORNECEDOR</div>
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:28 }}>DISTRIBUIDOR</div>
         <div style={{ color:'#10b981', fontSize:14, marginTop:4 }}>
-          {saved.name ? `Bem-vindo de volta, ${saved.name.split(' ')[0]}!` : 'Portal de ofertas para mercados'}
+          {saved.name ? `Bem-vindo de volta, ${saved.name.split(' ')[0]}!` : 'Portal do Distribuidor'}
         </div>
       </div>
       <div style={{ background:'#0d2137', borderRadius:20, padding:24, width:'100%', maxWidth:360, border:'1px solid #1e4060' }}>
@@ -274,7 +276,7 @@ function SetupScreen({ onDone }) {
           <Check size={18} /> Entrar
         </Btn>
       </div>
-      <div style={{ color:'#1e4060', fontSize:12, marginTop:24 }}>Corta Precos PDV · Plataforma Fornecedor v2.0</div>
+      <div style={{ color:'#1e4060', fontSize:12, marginTop:24 }}>Corta Precos PDV · Plataforma Distribuidor v2.0</div>
     </div>
   )
 }
@@ -682,18 +684,21 @@ function TabMercados({ markets, setMarkets }) {
   const [mName, setMName]   = useState('')
   const [mPhone, setMPhone] = useState('')
 
-  function handleAdd() {
-    if (!mName.trim()) return
-    const next = [...markets, { id: uid(), name: mName.trim(), phone: mPhone.trim() }]
+  async function saveMarkets(next) {
     setMarkets(next)
     try { localStorage.setItem(MKTS_KEY, JSON.stringify(next)) } catch {}
+    // also persist to server so any device can load
+    await persistKey(MKTS_SERVER_KEY, next)
+  }
+
+  async function handleAdd() {
+    if (!mName.trim()) return
+    await saveMarkets([...markets, { id: uid(), name: mName.trim(), phone: mPhone.trim() }])
     setMName(''); setMPhone(''); setAdding(false)
   }
 
-  function handleDelete(id) {
-    const next = markets.filter(m => m.id !== id)
-    setMarkets(next)
-    try { localStorage.setItem(MKTS_KEY, JSON.stringify(next)) } catch {}
+  async function handleDelete(id) {
+    await saveMarkets(markets.filter(m => m.id !== id))
   }
 
   return (
@@ -745,32 +750,73 @@ function TabMercados({ markets, setMarkets }) {
 }
 
 /* ── Main Component ─────────────────────────────────────────── */
+/* ── EditProfileModal ────────────────────────────────────────── */
+function EditProfileModal({ profile, onSave, onClose }) {
+  const [name, setName]   = useState(profile.name || '')
+  const [phone, setPhone] = useState(profile.phone || '')
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ background:'#0a1929', borderRadius:20, padding:24, width:'100%', maxWidth:360, border:'1px solid #1e4060' }}>
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18, marginBottom:20 }}>Editar Perfil</div>
+        <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>Nome / Distribuidora</label>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: João Distribuidora"
+          style={{ display:'block', width:'100%', marginTop:6, marginBottom:14, background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, padding:'12px 14px', color:'#e2e8f0', fontSize:15, boxSizing:'border-box', outline:'none' }}
+        />
+        <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>Seu WhatsApp</label>
+        <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="(15) 99999-9999" type="tel"
+          style={{ display:'block', width:'100%', marginTop:6, marginBottom:20, background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, padding:'12px 14px', color:'#e2e8f0', fontSize:15, boxSizing:'border-box', outline:'none' }}
+        />
+        <div style={{ display:'flex', gap:10 }}>
+          <Btn full disabled={!name.trim()} onClick={() => onSave({ name: name.trim(), phone: phone.trim() })}>
+            <Check size={16} /> Salvar
+          </Btn>
+          <Btn secondary full onClick={onClose}>Cancelar</Btn>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Fornecedor() {
-  const [profile,  setProfile]  = useState(() => { try { return JSON.parse(localStorage.getItem(LOCAL)) } catch { return null } })
-  const [markets,  setMarkets]  = useState(() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })
-  const [estoque,  setEstoque]  = useState([])
-  const [offers,   setOffers]   = useState([])
-  const [orders,   setOrders]   = useState([])
-  const [tab,      setTab]      = useState('inicio')
-  const [syncing,  setSyncing]  = useState(false)
+  /* Default profile — no login gate. User can edit name/phone via header. */
+  const defaultProfile = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LOCAL))
+      if (saved?.name) return saved
+    } catch {}
+    return { name: 'Distribuidor', phone: '' }
+  }
+
+  const [profile,     setProfile]     = useState(defaultProfile)
+  const [markets,     setMarkets]     = useState(() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })
+  const [estoque,     setEstoque]     = useState([])
+  const [offers,      setOffers]      = useState([])
+  const [orders,      setOrders]      = useState([])
+  const [tab,         setTab]         = useState('inicio')
+  const [syncing,     setSyncing]     = useState(false)
+  const [editingProfile, setEditingProfile] = useState(false)
+
+  const saveProfile = (data) => {
+    setProfile(data)
+    try { localStorage.setItem(LOCAL, JSON.stringify(data)) } catch {}
+    setEditingProfile(false)
+  }
 
   const sync = useCallback(async () => {
     setSyncing(true)
-    const { estoque: e, offers: o, orders: ord } = await fetchAll()
+    const { estoque: e, offers: o, orders: ord, markets: mkt } = await fetchAll()
     setEstoque(e)
     setOffers(o.filter(of => of.supplierId === LOCAL || !of.supplierId))
     setOrders(ord)
+    // markets: server takes priority over localStorage when available
+    if (mkt !== null) {
+      setMarkets(mkt)
+      try { localStorage.setItem(MKTS_KEY, JSON.stringify(mkt)) } catch {}
+    }
     setSyncing(false)
   }, [])
 
-  useEffect(() => { if (profile) sync() }, [profile, sync])
-
-  function handleSetup(data) {
-    setProfile(data)
-    try { localStorage.setItem(LOCAL, JSON.stringify(data)) } catch {}
-  }
-
-  if (!profile) return <SetupScreen onDone={handleSetup} />
+  useEffect(() => { sync() }, [sync])
 
   const pendingOrders = orders.filter(o => o.status === 'pending').length
 
@@ -784,16 +830,25 @@ export default function Fornecedor() {
 
   return (
     <div style={{ minHeight:'100dvh', background:'#050f1a', display:'flex', flexDirection:'column', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+
+      {/* Edit profile modal */}
+      {editingProfile && (
+        <EditProfileModal profile={profile} onSave={saveProfile} onClose={() => setEditingProfile(false)} />
+      )}
+
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px 10px', background:'#060e1a', borderBottom:'1px solid #0f2035', position:'sticky', top:0, zIndex:10 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+        <button onClick={() => setEditingProfile(true)} style={{ display:'flex', alignItems:'center', gap:10, background:'none', border:'none', cursor:'pointer', padding:0 }}>
           <div style={{ width:36, height:36, borderRadius:10, background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <Truck size={18} color="#fff" />
           </div>
-          <div>
-            <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:15, lineHeight:1 }}>{profile.name}</div>
-            <div style={{ color:'#10b981', fontSize:11, fontWeight:600 }}>Portal do Fornecedor</div>
+          <div style={{ textAlign:'left' }}>
+            <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:15, lineHeight:1 }}>
+              {profile.name}
+              <span style={{ color:'#334155', fontWeight:400, fontSize:11, marginLeft:6 }}>✏️</span>
+            </div>
+            <div style={{ color:'#10b981', fontSize:11, fontWeight:600 }}>Portal do Distribuidor</div>
           </div>
-        </div>
+        </button>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
           <button onClick={sync} disabled={syncing} style={{ background:'none', border:'none', cursor:'pointer', color:'#475569', padding:4 }}>
             <RefreshCw size={16} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />

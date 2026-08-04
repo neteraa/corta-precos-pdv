@@ -158,7 +158,7 @@ export default function Layout() {
     {
       to: '/ofertas',
       icon: Truck,
-      label: 'Ofertas Fornecedor',
+      label: 'Ofertas Distribuidor',
       badge: pendingOffersCount > 0 ? String(pendingOffersCount) : undefined,
     },
   ]
