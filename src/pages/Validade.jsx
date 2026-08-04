@@ -84,8 +84,8 @@ export default function Validade() {
     upsertPromo({ id: `pr_venc_${Date.now()}`, name: label, group, qty, totalPrice: total, active: true })
     assignPromoGroup(product.id, group)
     setPromoModal(null)
-    setPromoToast(`✅ Promoção criada: ${label}`)
-    setTimeout(() => setPromoToast(null), 4000)
+    setPromoToast(label)
+    setTimeout(() => setPromoToast(null), 8000)
   }, [promoModal, promoDisc, promoQty, upsertPromo, assignPromoGroup])
 
   return (
@@ -341,8 +341,24 @@ export default function Validade() {
 
       {/* ── Toast ────────────────────────────────────────────── */}
       {promoToast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm font-bold px-5 py-3 rounded-2xl shadow-xl animate-pop">
-          {promoToast}
+        <div className="fixed bottom-6 left-4 right-4 z-50 animate-pop">
+          <div className="bg-gray-900 border border-green-600 text-white rounded-2xl shadow-xl overflow-hidden">
+            <div className="px-4 py-3">
+              <div className="text-xs text-green-400 font-black uppercase mb-1">✅ Promoção criada!</div>
+              <div className="text-sm font-bold text-gray-200 mb-3">{promoToast}</div>
+              <div className="flex gap-2">
+                <a href="/campanhas"
+                  className="flex-1 bg-green-600 hover:bg-green-500 text-white text-center text-sm font-black py-2 rounded-xl transition-colors"
+                  style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  <Zap className="w-4 h-4" /> Disparar no ZAP →
+                </a>
+                <button onClick={() => setPromoToast(null)}
+                  className="px-3 py-2 rounded-xl border border-gray-700 text-gray-400 text-sm font-bold hover:bg-gray-800 transition-colors">
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -282,9 +282,12 @@ export function StoreProvider({ children }) {
 
   const upsertPromo = useCallback((p) => {
     setPromos(prev => {
-      const next = p.id
-        ? prev.map(x => x.id === p.id ? { ...x, ...p } : x)
-        : [...prev, { ...p, id: `pr${Date.now()}`, createdAt: new Date().toISOString().slice(0,10) }]
+      const id   = p.id || `pr${Date.now()}`
+      const idx  = prev.findIndex(x => x.id === id)
+      const item = { createdAt: new Date().toISOString().slice(0,10), ...p, id }
+      const next = idx >= 0
+        ? prev.map(x => x.id === id ? { ...x, ...item } : x)   // update
+        : [item, ...prev]                                         // insert at top
       persist('cp_promos', next); return next
     })
   }, [persist])

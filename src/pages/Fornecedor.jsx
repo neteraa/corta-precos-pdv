@@ -281,8 +281,22 @@ function SetupScreen({ onDone }) {
   )
 }
 
+/* ── Demo seed data ─────────────────────────────────────────── */
+const DEMO_DATE = (d) => { const dt = new Date(); dt.setDate(dt.getDate() + d); return dt.toISOString().slice(0,10) }
+const DEMO_ESTOQUE = [
+  { id:'demo1', productName:'Coca-Cola 2L', sku:'7894900011630', qty:120, unit:'UND', cost:5.20, expiryDate:DEMO_DATE(45), receivedAt:today(), updatedAt:new Date().toISOString() },
+  { id:'demo2', productName:'Arroz Tio João 5kg', sku:'7896036500572', qty:80, unit:'SC', cost:18.50, expiryDate:DEMO_DATE(365), receivedAt:today(), updatedAt:new Date().toISOString() },
+  { id:'demo3', productName:'Óleo de Soja Soya 900ml', sku:'7896036500573', qty:60, unit:'UND', cost:6.80, expiryDate:DEMO_DATE(180), receivedAt:today(), updatedAt:new Date().toISOString() },
+  { id:'demo4', productName:'Biscoito Oreo 90g', sku:'7622210651557', qty:200, unit:'UND', cost:2.90, expiryDate:DEMO_DATE(12), receivedAt:today(), updatedAt:new Date().toISOString() },
+  { id:'demo5', productName:'Leite Integral Itambé 1L', sku:'7896051190016', qty:144, unit:'CX', cost:4.30, expiryDate:DEMO_DATE(30), receivedAt:today(), updatedAt:new Date().toISOString() },
+]
+const DEMO_OFFERS = [
+  { id:'doff1', supplierId:LOCAL, supplierName:'Distribuidora Demo', supplierPhone:'15999990000', productName:'Biscoito Oreo 90g', sku:'7622210651557', qty:200, unit:'UND', offerPrice:3.49, expiryDate:DEMO_DATE(12), isOpportunity:true, note:'Proximo do vencimento — oportunidade!', status:'pending', publishedAt:new Date().toISOString() },
+  { id:'doff2', supplierId:LOCAL, supplierName:'Distribuidora Demo', supplierPhone:'15999990000', productName:'Coca-Cola 2L', sku:'7894900011630', qty:120, unit:'UND', offerPrice:6.90, expiryDate:DEMO_DATE(45), isOpportunity:false, note:'', status:'pending', publishedAt:new Date().toISOString() },
+]
+
 /* ── TabInicio ──────────────────────────────────────────────── */
-function TabInicio({ estoque, offers, orders, profile }) {
+function TabInicio({ estoque, offers, orders, profile, setEstoque, setOffers }) {
   const stats = useMemo(() => ({
     itens:    estoque.filter(e => e.qty > 0).length,
     qtdTotal: estoque.reduce((s, e) => s + (e.qty || 0), 0),
@@ -290,6 +304,13 @@ function TabInicio({ estoque, offers, orders, profile }) {
     pedidos:  orders.filter(o => o.status === 'pending').length,
     receita:  orders.reduce((s, o) => s + (o.totalPrice || 0), 0),
   }), [estoque, offers, orders])
+
+  async function carregarDemo() {
+    setEstoque(DEMO_ESTOQUE)
+    setOffers(DEMO_OFFERS)
+    await persistKey(ESTOQUE_KEY, DEMO_ESTOQUE)
+    await persistKey(OFFERS_KEY, DEMO_OFFERS)
+  }
 
   return (
     <div style={{ padding:'16px 16px 100px' }}>
@@ -310,7 +331,10 @@ function TabInicio({ estoque, offers, orders, profile }) {
         <div style={{ background:'#0d2137', borderRadius:16, padding:24, textAlign:'center', border:'1px solid #1a3a50' }}>
           <Boxes size={32} color="#1e4060" style={{ marginBottom:8 }} />
           <div style={{ color:'#475569', fontSize:14 }}>Nenhum produto em estoque</div>
-          <div style={{ color:'#334155', fontSize:12, marginTop:4 }}>Use a aba Receber para dar entrada</div>
+          <div style={{ color:'#334155', fontSize:12, marginTop:4, marginBottom:16 }}>Use a aba Receber para dar entrada</div>
+          <button onClick={carregarDemo} style={{ background:'#0a2a4a', border:'1px solid #1e6091', borderRadius:12, padding:'10px 20px', color:'#93c5fd', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+            🎯 Carregar dados de exemplo
+          </button>
         </div>
       ) : estoque.map(item => (
         <div key={item.id} style={{ background:'#0d2137', borderRadius:14, padding:'12px 16px', marginBottom:8, border:'1px solid #1a3a50', display:'flex', alignItems:'center', gap:12 }}>
@@ -332,28 +356,32 @@ function TabInicio({ estoque, offers, orders, profile }) {
 }
 
 /* ── TabReceber ─────────────────────────────────────────────── */
-function TabReceber({ estoque, setEstoque }) {
-  const [selected, setSelected] = useState(null)
-  const [qty,  setQty]  = useState('')
-  const [unit, setUnit] = useState('CX')
-  const [cost, setCost] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [flash, setFlash]   = useState(null)
+function TabReceber({ estoque, setEstoque, onGoToOferta }) {
+  const [selected,    setSelected]    = useState(null)
+  const [qty,         setQty]         = useState('')
+  const [unit,        setUnit]        = useState('CX')
+  const [cost,        setCost]        = useState('')
+  const [expiryDate,  setExpiryDate]  = useState('')
+  const [saving,      setSaving]      = useState(false)
+  const [justAdded,   setJustAdded]   = useState(null) // triggers quick-publish banner
 
-  function handleSelect(p) { setSelected(p); setQty(''); setCost(p.price ? String(p.price).replace('.', ',') : ''); setUnit('CX') }
+  function handleSelect(p) {
+    setSelected(p); setQty(''); setCost(p.price ? String(p.price).replace('.', ',') : '')
+    setUnit('CX'); setExpiryDate(''); setJustAdded(null)
+  }
 
   async function handleEntrada() {
     if (!selected || !qty) return
     setSaving(true)
     const qtyNum = parseFloat(qty) || 0
+    const item   = { id: uid(), productName: selected.name, sku: selected.sku || '', qty: qtyNum, unit, cost: parseNum(cost), expiryDate: expiryDate || null, receivedAt: today(), updatedAt: new Date().toISOString() }
     const idx    = estoque.findIndex(e => e.sku === selected.sku && e.unit === unit)
     const next   = idx >= 0
-      ? estoque.map((e, i) => i === idx ? { ...e, qty: e.qty + qtyNum, updatedAt: new Date().toISOString() } : e)
-      : [...estoque, { id: uid(), productName: selected.name, sku: selected.sku || '', qty: qtyNum, unit, cost: parseNum(cost), receivedAt: today(), updatedAt: new Date().toISOString() }]
+      ? estoque.map((e, i) => i === idx ? { ...e, qty: e.qty + qtyNum, expiryDate: expiryDate || e.expiryDate, updatedAt: new Date().toISOString() } : e)
+      : [...estoque, item]
     setEstoque(next)
     await persistKey(ESTOQUE_KEY, next)
-    setFlash('✓ ' + qtyNum + ' ' + unit + ' de "' + selected.name + '" adicionados!')
-    setTimeout(() => setFlash(null), 3000)
+    setJustAdded(next[idx >= 0 ? idx : next.length - 1])
     setSelected(null); setQty(''); setSaving(false)
   }
 
@@ -362,11 +390,31 @@ function TabReceber({ estoque, setEstoque }) {
     setEstoque(next); await persistKey(ESTOQUE_KEY, next)
   }
 
+  const inputStyle = { display:'block', width:'100%', marginTop:6, background:'#0a1929', border:'1px solid #1e4060', borderRadius:10, padding:12, color:'#e2e8f0', fontSize:15, fontWeight:700, boxSizing:'border-box', outline:'none' }
+
   return (
     <div style={{ padding:'16px 16px 100px' }}>
-      {flash && <div style={{ background:'#14532d', color:'#86efac', borderRadius:12, padding:'12px 16px', marginBottom:16, fontWeight:700, fontSize:14 }}>{flash}</div>}
+
+      {/* ── Quick-publish banner after entry ── */}
+      {justAdded && (
+        <div style={{ background:'linear-gradient(135deg,#0d3d27,#0a2a1c)', border:'1px solid #10b981', borderRadius:16, padding:16, marginBottom:16 }}>
+          <div style={{ color:'#4ade80', fontWeight:900, fontSize:15, marginBottom:4 }}>
+            ✅ {justAdded.qty} {justAdded.unit} de "{justAdded.productName}" adicionados!
+          </div>
+          <div style={{ color:'#6ee7b7', fontSize:13, marginBottom:14 }}>
+            Quer publicar uma oferta para os mercados agora?
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <Btn onClick={() => { onGoToOferta(justAdded); setJustAdded(null) }}>
+              <Send size={15} /> Criar Oferta →
+            </Btn>
+            <Btn secondary onClick={() => setJustAdded(null)}>Só entrar no estoque</Btn>
+          </div>
+        </div>
+      )}
+
       <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18, marginBottom:4 }}>Receber Mercadoria</div>
-      <div style={{ color:'#475569', fontSize:13, marginBottom:20 }}>Escaneia ou busca o produto que chegou na carreta</div>
+      <div style={{ color:'#475569', fontSize:13, marginBottom:20 }}>Busca o produto que chegou e registra a entrada</div>
       <ProductSearch onSelect={handleSelect} />
       {selected && (
         <div style={{ background:'#0d2137', borderRadius:16, padding:16, marginTop:16, border:'1px solid #10b981' }}>
@@ -378,12 +426,12 @@ function TabReceber({ estoque, setEstoque }) {
             </div>
             <button onClick={() => setSelected(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'#475569' }}><X size={20} /></button>
           </div>
+
+          {/* qty + unit */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 100px', gap:10, marginBottom:12 }}>
             <div>
               <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>QUANTIDADE</label>
-              <input value={qty} onChange={e => setQty(e.target.value)} type="number" placeholder="Ex: 200"
-                style={{ display:'block', width:'100%', marginTop:6, background:'#0a1929', border:'1px solid #1e4060', borderRadius:10, padding:12, color:'#e2e8f0', fontSize:16, fontWeight:700, boxSizing:'border-box', outline:'none' }}
-              />
+              <input value={qty} onChange={e => setQty(e.target.value)} type="number" placeholder="Ex: 200" style={inputStyle} />
             </div>
             <div>
               <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>UNID.</label>
@@ -393,18 +441,29 @@ function TabReceber({ estoque, setEstoque }) {
               </select>
             </div>
           </div>
-          <div style={{ marginBottom:16 }}>
-            <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>CUSTO (opcional)</label>
-            <div style={{ position:'relative', marginTop:6 }}>
-              <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'#475569', fontWeight:700 }}>R$</span>
-              <input value={cost} onChange={e => setCost(e.target.value)} placeholder="0,00"
-                style={{ width:'100%', background:'#0a1929', border:'1px solid #1e4060', borderRadius:10, padding:'12px 12px 12px 36px', color:'#10b981', fontSize:16, fontWeight:700, boxSizing:'border-box', outline:'none' }}
+
+          {/* custo + validade */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
+            <div>
+              <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>CUSTO (R$)</label>
+              <div style={{ position:'relative', marginTop:6 }}>
+                <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'#475569', fontWeight:700, fontSize:13 }}>R$</span>
+                <input value={cost} onChange={e => setCost(e.target.value)} placeholder="0,00"
+                  style={{ width:'100%', background:'#0a1929', border:'1px solid #1e4060', borderRadius:10, padding:'12px 12px 12px 34px', color:'#10b981', fontSize:15, fontWeight:700, boxSizing:'border-box', outline:'none' }}
+                />
+              </div>
+            </div>
+            <div>
+              <label style={{ color:'#f97316', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>📅 VALIDADE</label>
+              <input value={expiryDate} onChange={e => setExpiryDate(e.target.value)} type="date"
+                style={{ display:'block', width:'100%', marginTop:6, background:'#0a1929', border:'1px solid #7c2d12', borderRadius:10, padding:12, color:'#fed7aa', fontSize:14, fontWeight:700, boxSizing:'border-box', outline:'none' }}
               />
             </div>
           </div>
+
           <Btn full disabled={!qty || parseFloat(qty) <= 0 || saving} onClick={handleEntrada}>
             <ArrowDownToLine size={18} />
-            {saving ? 'Registrando...' : 'Dar Entrada - ' + (qty || 0) + ' ' + unit}
+            {saving ? 'Registrando...' : 'Dar Entrada — ' + (qty || 0) + ' ' + unit}
           </Btn>
         </div>
       )}
@@ -413,19 +472,28 @@ function TabReceber({ estoque, setEstoque }) {
           <div style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', margin:'24px 0 10px' }}>
             Estoque Atual ({estoque.length} itens)
           </div>
-          {estoque.map(item => (
-            <div key={item.id} style={{ background:'#0d2137', borderRadius:14, padding:'12px 16px', marginBottom:8, border:'1px solid ' + (item.qty <= 0 ? '#7f1d1d' : '#1a3a50'), display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ color:'#e2e8f0', fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.productName}</div>
-                <div style={{ color:'#334155', fontSize:11, fontFamily:'monospace' }}>{item.sku}</div>
+          {estoque.map(item => {
+            const daysLeft = item.expiryDate ? Math.ceil((new Date(item.expiryDate) - new Date()) / 86400000) : null
+            const expColor = daysLeft == null ? null : daysLeft <= 0 ? '#ef4444' : daysLeft <= 7 ? '#f97316' : daysLeft <= 30 ? '#eab308' : '#10b981'
+            return (
+              <div key={item.id} style={{ background:'#0d2137', borderRadius:14, padding:'12px 16px', marginBottom:8, border:'1px solid ' + (item.qty <= 0 ? '#7f1d1d' : '#1a3a50'), display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ color:'#e2e8f0', fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.productName}</div>
+                  {item.expiryDate && (
+                    <div style={{ color: expColor, fontSize:11, fontWeight:700, marginTop:2 }}>
+                      📅 {daysLeft <= 0 ? 'VENCIDO' : `vence em ${daysLeft}d`} · {item.expiryDate}
+                    </div>
+                  )}
+                  {!item.expiryDate && <div style={{ color:'#334155', fontSize:11 }}>sem validade</div>}
+                </div>
+                <div style={{ textAlign:'center', flexShrink:0 }}>
+                  <div style={{ color: item.qty > 0 ? '#10b981' : '#ef4444', fontWeight:900, fontSize:22, lineHeight:1 }}>{item.qty}</div>
+                  <div style={{ color:'#475569', fontSize:11 }}>{item.unit}</div>
+                </div>
+                <button onClick={() => handleRemove(item.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#334155', padding:4 }}><Trash2 size={16} /></button>
               </div>
-              <div style={{ textAlign:'center', flexShrink:0 }}>
-                <div style={{ color: item.qty > 0 ? '#10b981' : '#ef4444', fontWeight:900, fontSize:22, lineHeight:1 }}>{item.qty}</div>
-                <div style={{ color:'#475569', fontSize:11 }}>{item.unit}</div>
-              </div>
-              <button onClick={() => handleRemove(item.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#334155', padding:4 }}><Trash2 size={16} /></button>
-            </div>
-          ))}
+            )
+          })}
         </>
       )}
     </div>
@@ -433,7 +501,7 @@ function TabReceber({ estoque, setEstoque }) {
 }
 
 /* ── TabOfertas ─────────────────────────────────────────────── */
-function TabOfertas({ estoque, offers, setOffers, markets, profile }) {
+function TabOfertas({ estoque, offers, setOffers, markets, profile, preSelected, onClearPreSelected }) {
   const [mode, setMode]           = useState('list')
   const [selected, setSelected]   = useState(null)
   const [fromStock, setFromStock] = useState(null)
@@ -446,10 +514,20 @@ function TabOfertas({ estoque, offers, setOffers, markets, profile }) {
   const [publishing, setPublishing] = useState(false)
   const [waOffer, setWaOffer] = useState(null)
 
+  // Pre-fill from "Receber → Criar Oferta" shortcut
+  useEffect(() => {
+    if (!preSelected) return
+    pickFromStock(preSelected)
+    if (preSelected.expiryDate) setExpiry(preSelected.expiryDate)
+    setMode('new')
+    onClearPreSelected?.()
+  }, [preSelected]) // eslint-disable-line
+
   function reset() { setSelected(null); setFromStock(null); setQty(''); setPrice(''); setExpiry(''); setIsOpp(false); setNote(''); setMode('list') }
   function pickFromStock(item) {
     setFromStock(item); setSelected({ name: item.productName, sku: item.sku })
     setUnit(item.unit); setQty(String(item.qty)); setPrice(item.cost ? String(item.cost).replace('.', ',') : '')
+    if (item.expiryDate) setExpiry(item.expiryDate)
   }
 
   async function handlePublish() {
@@ -795,6 +873,12 @@ export default function Fornecedor() {
   const [tab,         setTab]         = useState('inicio')
   const [syncing,     setSyncing]     = useState(false)
   const [editingProfile, setEditingProfile] = useState(false)
+  const [preSelectedForOffer, setPreSelectedForOffer] = useState(null) // item from Receber → Ofertas
+
+  const goToOferta = useCallback((item) => {
+    setPreSelectedForOffer(item)
+    setTab('ofertas')
+  }, [])
 
   const saveProfile = (data) => {
     setProfile(data)
@@ -862,9 +946,9 @@ export default function Fornecedor() {
       </div>
 
       <div style={{ flex:1, overflowY:'auto' }}>
-        {tab === 'inicio'   && <TabInicio  estoque={estoque} offers={offers} orders={orders} profile={profile} />}
-        {tab === 'receber'  && <TabReceber estoque={estoque} setEstoque={setEstoque} />}
-        {tab === 'ofertas'  && <TabOfertas estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} />}
+        {tab === 'inicio'   && <TabInicio  estoque={estoque} offers={offers} orders={orders} profile={profile} setEstoque={setEstoque} setOffers={setOffers} />}
+        {tab === 'receber'  && <TabReceber estoque={estoque} setEstoque={setEstoque} onGoToOferta={goToOferta} />}
+        {tab === 'ofertas'  && <TabOfertas estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} preSelected={preSelectedForOffer} onClearPreSelected={() => setPreSelectedForOffer(null)} />}
         {tab === 'pedidos'  && <TabPedidos orders={orders} setOrders={setOrders} />}
         {tab === 'mercados' && <TabMercados markets={markets} setMarkets={setMarkets} />}
       </div>
