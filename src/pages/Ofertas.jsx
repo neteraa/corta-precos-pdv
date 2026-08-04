@@ -619,10 +619,20 @@ export default function Ofertas() {
       window.open(`https://wa.me/${cleanPhone(order.supplierPhone)}?text=${encodeURIComponent(msg)}`, '_blank')
     }
 
+    // Auto-reduce distributor stock immediately on order
+    await reduceSupplierStock({ ...pedidoOffer, qty: orderData.qtyRequested || pedidoOffer.qty })
+
     // Add to local myOrders immediately so UI updates without polling
     setMyOrders(prev => [order, ...prev.filter(o => o.id !== order.id)])
+
+    // Also update local offer qty so the offer card shows updated remaining stock
+    setOffers(prev => prev.map(o => o.id === pedidoOffer.id
+      ? { ...o, qty: Math.max(0, o.qty - (orderData.qtyRequested || 0)) }
+      : o
+    ))
+
     setPedidoOffer(null)
-    setFilter('myorders') // Jump to "Meus Pedidos" tab to show the placed order
+    setFilter('myorders')
     showToast(`✅ Pedido enviado! ${order.qtyRequested} ${order.unit} de ${order.productName}`)
   }
 

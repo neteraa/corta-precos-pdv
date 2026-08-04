@@ -8,7 +8,7 @@ import {
   Truck, Package, Users, Plus, Camera, Search, Check, Trash2, X,
   MessageCircle, LayoutDashboard, ClipboardList, ArrowDownToLine,
   ShoppingCart, TrendingUp, Boxes, CircleDollarSign, CheckCircle,
-  RefreshCw, Phone, Send, MapPin, Zap, ChevronDown, ChevronUp,
+  RefreshCw, Phone, Send, MapPin, Zap, ChevronDown, ChevronUp, BarChart2,
 } from 'lucide-react'
 import CameraScanner from '../components/CameraScanner.jsx'
 import PRODUCTS_SEED from '../utils/products_seed.json'
@@ -547,7 +547,7 @@ function BlastScreen({ offer, customMsg, markets, supplierName, supplierPhone, o
 }
 
 /* ── OfferCard ──────────────────────────────────────────────── */
-function OfferCard({ offer, markets, supplierName, orders = [], onDelete, onUpdatePrice }) {
+function OfferCard({ offer, markets, supplierName, orders = [], onDelete, onUpdatePrice, onBlast }) {
   const [showWa,    setShowWa]    = useState(false)
   const [editMode,  setEditMode]  = useState(false)
   const [newPrice,  setNewPrice]  = useState('')
@@ -642,19 +642,31 @@ function OfferCard({ offer, markets, supplierName, orders = [], onDelete, onUpda
           )}
 
           {/* Footer */}
-          <div style={{ display:'flex', alignItems:'center', gap:6, paddingTop:10, borderTop:'1px solid #1a3a50', flexWrap:'wrap' }}>
-            <span style={{ color:'#334155', fontSize:10, flex:1 }}>
-              🕐 {fmtDT(offer.publishedAt)} · {markets.length} mercado{markets.length !== 1 ? 's' : ''}
-            </span>
-            <button onClick={() => setShowWa(true)}
-              style={{ background:'#14532d', color:'#86efac', border:'none', cursor:'pointer', padding:'7px 14px', borderRadius:10, fontSize:12, fontWeight:700, display:'flex', alignItems:'center', gap:5 }}>
-              <MessageCircle size={13} /> Reenviar ZAP
-            </button>
-            {onDelete && (
-              <button onClick={() => onDelete(offer.id)} style={{ background:'#1a0a0a', color:'#ef4444', border:'none', cursor:'pointer', padding:'7px 10px', borderRadius:10 }}>
-                <Trash2 size={13} />
+          <div style={{ paddingTop:10, borderTop:'1px solid #1a3a50' }}>
+            {/* BIG blast button */}
+            {onBlast && markets.filter(m => m.phone).length > 0 && (
+              <button onClick={() => onBlast(offer)}
+                style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%', padding:'12px', borderRadius:14, border:'none', cursor:'pointer', marginBottom:8,
+                  background:'linear-gradient(135deg,#16a34a,#15803d)', color:'#fff', fontWeight:900, fontSize:14,
+                  boxShadow:'0 4px 16px rgba(16,185,129,0.35)' }}>
+                <MessageCircle size={16} />
+                📱 Disparar para {markets.filter(m=>m.phone).length} mercados agora
               </button>
             )}
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ color:'#334155', fontSize:10, flex:1 }}>
+                🕐 {fmtDT(offer.publishedAt)} · {markets.length} mercado{markets.length !== 1 ? 's' : ''}
+              </span>
+              <button onClick={() => setShowWa(true)}
+                style={{ background:'#0a1929', color:'#64748b', border:'1px solid #1e3050', cursor:'pointer', padding:'5px 10px', borderRadius:8, fontSize:11, fontWeight:700, display:'flex', alignItems:'center', gap:4 }}>
+                <MessageCircle size={11} /> Por mercado
+              </button>
+              {onDelete && (
+                <button onClick={() => onDelete(offer.id)} style={{ background:'#1a0a0a', color:'#ef4444', border:'none', cursor:'pointer', padding:'5px 8px', borderRadius:8 }}>
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -731,7 +743,7 @@ const DEMO_ORDERS_HIST = [
 ]
 
 /* ── TabInicio ──────────────────────────────────────────────── */
-function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setOffers, setMarkets, setOrders }) {
+function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setOffers, setMarkets, setOrders, onNavigate }) {
   const [showBlitz, setShowBlitz] = useState(false)
   const todayStr = today()
 
@@ -837,10 +849,10 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
       {showBlitz && <BlitzModal offers={offers} setOffers={setOffers} markets={markets} profile={profile} onClose={() => setShowBlitz(false)} />}
 
       {/* Header greeting */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
         <div>
           <div style={{ color:'#10b981', fontSize:13, fontWeight:700 }}>Bom dia! 👋</div>
-          <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:22 }}>{profile.name}</div>
+          <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:20 }}>{profile.name}</div>
         </div>
         {offers.filter(o => o.status !== 'delivered').length > 0 && (
           <button onClick={() => setShowBlitz(true)}
@@ -848,6 +860,23 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
             <Zap size={16} /> Blitz
           </button>
         )}
+      </div>
+
+      {/* Quick action buttons */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:16 }}>
+        {[
+          { emoji:'📦', label:'Receber\nMercadoria', action:() => onNavigate?.('receber'), bg:'#0d3d27', border:'#14532d', color:'#4ade80' },
+          { emoji:'📱', label:'Disparar\nZAP',       action:() => { if (offers.filter(o=>o.status!=='delivered').length) setShowBlitz(true) }, bg:'#1e3a5f', border:'#2563eb', color:'#93c5fd' },
+          { emoji:'📋', label:'Ver\nPedidos',        action:() => onNavigate?.('pedidos'), bg: withAge.filter(e=>e.ageInDays>=2).length>0?'#3d1a0a':'#0d2137', border: withAge.filter(e=>e.ageInDays>=2).length>0?'#92400e':'#1a3a50', color:'#fcd34d' },
+        ].map((btn, i) => (
+          <button key={i} onClick={btn.action} style={{
+            background:btn.bg, border:`1px solid ${btn.border}`, borderRadius:14, padding:'12px 8px',
+            cursor:'pointer', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+          }}>
+            <span style={{ fontSize:24 }}>{btn.emoji}</span>
+            <span style={{ color:btn.color, fontSize:10, fontWeight:700, lineHeight:1.3, whiteSpace:'pre-line' }}>{btn.label}</span>
+          </button>
+        ))}
       </div>
 
       {/* ── FIFO Urgency ── */}
@@ -1239,7 +1268,9 @@ function TabOfertas({ estoque, offers, setOffers, markets, profile, orders, preS
   const [isOpp, setIsOpp] = useState(false)
   const [note, setNote]   = useState('')
   const [publishing, setPublishing] = useState(false)
-  const [waOffer, setWaOffer] = useState(null)
+  const [waOffer,    setWaOffer]    = useState(null)
+  const [blast,      setBlast]      = useState(null)  // single-offer blast
+  const [showBlitz,  setShowBlitz]  = useState(false) // all-offers blitz
 
   // Pre-fill from "Receber → Criar Oferta" shortcut
   useEffect(() => {
@@ -1283,6 +1314,7 @@ function TabOfertas({ estoque, offers, setOffers, markets, profile, orders, preS
   }
 
   if (waOffer) return <WaOverlay offer={waOffer} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} orders={orders} onClose={() => setWaOffer(null)} />
+  if (blast)   return <BlastScreen offer={blast} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setBlast(null)} />
 
   if (mode === 'new') {
     const ok = selected && qty && price && !publishing
@@ -1381,18 +1413,49 @@ function TabOfertas({ estoque, offers, setOffers, markets, profile, orders, preS
     )
   }
 
+  const validMkts = markets.filter(m => m.phone).length
+  const activeOffers = offers.filter(o => o.status !== 'delivered')
+
   return (
     <div style={{ padding:'16px 16px 100px' }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+      {showBlitz && <BlitzModal offers={offers} setOffers={setOffers} markets={markets} profile={profile} onClose={() => setShowBlitz(false)} />}
+
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
         <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18 }}>Minhas Ofertas</div>
-        <Btn sm onClick={() => setMode('new')}><Plus size={16} /> Nova Oferta</Btn>
+        <Btn sm onClick={() => setMode('new')}><Plus size={16} /> Nova</Btn>
       </div>
+
+      {/* GLOBAL BLAST CTA — only if there are offers + markets */}
+      {activeOffers.length > 0 && validMkts > 0 && (
+        <div style={{ background:'linear-gradient(135deg,#0d3d1a,#0a2a12)', borderRadius:16, padding:'14px 16px', marginBottom:16, border:'1px solid #14532d' }}>
+          <div style={{ color:'#4ade80', fontWeight:900, fontSize:14, marginBottom:4 }}>
+            📢 {activeOffers.length} oferta{activeOffers.length !== 1 ? 's' : ''} ativa{activeOffers.length !== 1 ? 's' : ''} · {validMkts} mercados
+          </div>
+          <div style={{ color:'#334155', fontSize:12, marginBottom:12 }}>Ainda não disparou? Avise todos agora.</div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={() => setBlast(activeOffers[0])}
+              style={{ flex:1, background:'linear-gradient(135deg,#16a34a,#15803d)', color:'#fff', border:'none', borderRadius:12, padding:'12px', fontWeight:900, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+              <MessageCircle size={16} /> Disparar ZAP Agora
+            </button>
+            <button onClick={() => setShowBlitz(true)}
+              style={{ background:'#78350f', color:'#fcd34d', border:'none', borderRadius:12, padding:'12px 14px', fontWeight:800, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
+              <Zap size={14} /> Blitz
+            </button>
+          </div>
+        </div>
+      )}
+
       {offers.length === 0 ? (
         <div style={{ background:'#0d2137', borderRadius:20, padding:32, textAlign:'center', border:'1px solid #1a3a50' }}>
           <Send size={32} color="#1e4060" style={{ marginBottom:8 }} />
-          <div style={{ color:'#475569', fontSize:15 }}>Nenhuma oferta enviada ainda</div>
+          <div style={{ color:'#475569', fontSize:15 }}>Nenhuma oferta ainda</div>
+          <div style={{ color:'#334155', fontSize:12, marginTop:4 }}>Use "Receber" para dar entrada e publicar</div>
         </div>
-      ) : offers.map(o => <OfferCard key={o.id} offer={o} markets={markets} supplierName={profile.name} orders={orders} onDelete={handleDelete} onUpdatePrice={handleUpdatePrice} />)}
+      ) : offers.map(o => (
+        <OfferCard key={o.id} offer={o} markets={markets} supplierName={profile.name} orders={orders}
+          onDelete={handleDelete} onUpdatePrice={handleUpdatePrice} onBlast={setBlast} />
+      ))}
     </div>
   )
 }
@@ -1695,6 +1758,196 @@ function TabMercados({ markets, setMarkets, orders }) {
   )
 }
 
+/* ── TabRelatorio ────────────────────────────────────────────── */
+function TabRelatorio({ estoque, offers, orders }) {
+  const [period, setPeriod] = useState('today') // today | week | month | all
+
+  const todayStr = today()
+  const periodStart = useMemo(() => {
+    const d = new Date()
+    if (period === 'today') return todayStr
+    if (period === 'week')  { d.setDate(d.getDate() - 7);  return d.toISOString().slice(0, 10) }
+    if (period === 'month') { d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10) }
+    return '2000-01-01'
+  }, [period, todayStr])
+
+  // Orders in period
+  const periodOrders = useMemo(() =>
+    orders.filter(o => (o.createdAt || '').slice(0, 10) >= periodStart)
+  , [orders, periodStart])
+
+  // Estoque received in period
+  const periodEstoque = useMemo(() =>
+    estoque.filter(e => (e.receivedAt || '').slice(0, 10) >= periodStart)
+  , [estoque, periodStart])
+
+  const revenue  = periodOrders.reduce((s, o) => s + (o.totalPrice || 0), 0)
+  const spent    = periodEstoque.reduce((s, e) => s + (e.totalPaid || 0), 0)
+  const profit   = revenue - spent
+  const ordersCount = periodOrders.length
+
+  // Top products by revenue
+  const topProducts = useMemo(() => {
+    const map = {}
+    periodOrders.forEach(o => {
+      const k = o.productName || 'Desconhecido'
+      map[k] = (map[k] || 0) + (o.totalPrice || 0)
+    })
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  }, [periodOrders])
+
+  // Top markets by volume
+  const topMarkets = useMemo(() => {
+    const map = {}
+    periodOrders.forEach(o => {
+      const k = o.storeName || 'Desconhecido'
+      map[k] = (map[k] || 0) + (o.totalPrice || 0)
+    })
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  }, [periodOrders])
+
+  // Pending (market hasn't paid yet)
+  const pending  = periodOrders.filter(o => o.status === 'pending').length
+  const confirmed = periodOrders.filter(o => o.status === 'confirmed').length
+  const delivered = periodOrders.filter(o => o.status === 'delivered').length
+
+  const card = { background:'#0d2137', borderRadius:14, padding:'14px 16px', border:'1px solid #1a3a50' }
+  const periodLabel = { today:'Hoje', week:'Últimos 7 dias', month:'Últimos 30 dias', all:'Todo período' }[period]
+
+  return (
+    <div style={{ padding:'16px 16px 100px' }}>
+
+      {/* Header */}
+      <div style={{ marginBottom:16 }}>
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:20, marginBottom:2 }}>📊 Relatórios</div>
+        <div style={{ color:'#475569', fontSize:13 }}>{periodLabel} · {ordersCount} pedido{ordersCount !== 1 ? 's' : ''}</div>
+      </div>
+
+      {/* Period selector */}
+      <div style={{ display:'flex', gap:6, marginBottom:16 }}>
+        {[['today','Hoje'],['week','7 dias'],['month','30 dias'],['all','Tudo']].map(([id, label]) => (
+          <button key={id} onClick={() => setPeriod(id)} style={{
+            flex:1, padding:'8px 0', borderRadius:12, border:`1px solid ${period===id?'#10b981':'#1e3050'}`,
+            background: period===id ? '#0d3d27' : '#0d2137',
+            color: period===id ? '#4ade80' : '#475569', fontWeight:800, fontSize:12, cursor:'pointer',
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {/* P&L cards */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:16 }}>
+        {[
+          { label:'Faturado', value:BRL.format(revenue), color:'#4ade80' },
+          { label:'Investido', value:spent > 0 ? BRL.format(spent) : '—', color:'#f87171' },
+          { label: profit > 0 ? 'Lucro' : profit < 0 ? 'Prejuízo' : 'Resultado',
+            value: profit !== 0 ? BRL.format(Math.abs(profit)) : '—',
+            color: profit > 0 ? '#10b981' : profit < 0 ? '#ef4444' : '#475569' },
+        ].map(c => (
+          <div key={c.label} style={{ ...card, textAlign:'center' }}>
+            <div style={{ color:c.color, fontWeight:900, fontSize:15 }}>{c.value}</div>
+            <div style={{ color:'#64748b', fontSize:10, fontWeight:700, marginTop:2 }}>{c.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Order status breakdown */}
+      <div style={{ ...card, marginBottom:16 }}>
+        <div style={{ color:'#94a3b8', fontSize:11, fontWeight:700, textTransform:'uppercase', marginBottom:10 }}>Status dos Pedidos</div>
+        <div style={{ display:'flex', gap:0 }}>
+          {[
+            { label:'Pendentes', value:pending,   color:'#f59e0b' },
+            { label:'Confirmados', value:confirmed, color:'#3b82f6' },
+            { label:'Entregues',  value:delivered, color:'#10b981' },
+          ].map((s, i) => (
+            <div key={s.label} style={{ flex:1, textAlign:'center', borderRight: i < 2 ? '1px solid #1a3a50' : 'none' }}>
+              <div style={{ color:s.color, fontWeight:900, fontSize:22 }}>{s.value}</div>
+              <div style={{ color:'#475569', fontSize:10 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Top products */}
+      {topProducts.length > 0 && (
+        <div style={{ ...card, marginBottom:16 }}>
+          <div style={{ color:'#94a3b8', fontSize:11, fontWeight:700, textTransform:'uppercase', marginBottom:10 }}>🏆 Top Produtos</div>
+          {topProducts.map(([name, rev], i) => {
+            const pct = topProducts[0][1] > 0 ? (rev / topProducts[0][1]) * 100 : 0
+            return (
+              <div key={name} style={{ marginBottom: i < topProducts.length - 1 ? 10 : 0 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                  <span style={{ color:'#e2e8f0', fontSize:13, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:8 }}>
+                    {i+1}. {name}
+                  </span>
+                  <span style={{ color:'#10b981', fontWeight:800, fontSize:13 }}>{BRL.format(rev)}</span>
+                </div>
+                <div style={{ height:4, background:'#1a3a50', borderRadius:2 }}>
+                  <div style={{ height:'100%', width:`${pct}%`, background:'#10b981', borderRadius:2, transition:'width 0.4s' }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Top markets */}
+      {topMarkets.length > 0 && (
+        <div style={{ ...card, marginBottom:16 }}>
+          <div style={{ color:'#94a3b8', fontSize:11, fontWeight:700, textTransform:'uppercase', marginBottom:10 }}>🏪 Top Mercados</div>
+          {topMarkets.map(([name, rev], i) => {
+            const pct = topMarkets[0][1] > 0 ? (rev / topMarkets[0][1]) * 100 : 0
+            return (
+              <div key={name} style={{ marginBottom: i < topMarkets.length - 1 ? 10 : 0 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                  <span style={{ color:'#e2e8f0', fontSize:13, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', paddingRight:8 }}>
+                    {i+1}. {name}
+                  </span>
+                  <span style={{ color:'#3b82f6', fontWeight:800, fontSize:13 }}>{BRL.format(rev)}</span>
+                </div>
+                <div style={{ height:4, background:'#1a3a50', borderRadius:2 }}>
+                  <div style={{ height:'100%', width:`${pct}%`, background:'#3b82f6', borderRadius:2, transition:'width 0.4s' }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Estoque investido no período */}
+      {periodEstoque.length > 0 && (
+        <div style={card}>
+          <div style={{ color:'#94a3b8', fontSize:11, fontWeight:700, textTransform:'uppercase', marginBottom:10 }}>
+            📦 Entradas no Período ({periodEstoque.length} lote{periodEstoque.length !== 1 ? 's' : ''})
+          </div>
+          {periodEstoque.map(item => {
+            const src = SOURCE_TYPES.find(s => s.id === item.sourceType) || SOURCE_TYPES[4]
+            return (
+              <div key={item.id} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, paddingBottom:8, borderBottom:'1px solid #1a3a50' }}>
+                <span style={{ fontSize:14 }}>{src.emoji}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ color:'#e2e8f0', fontSize:13, fontWeight:700, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.productName}</div>
+                  <div style={{ color:'#475569', fontSize:11 }}>{item.qty} {item.unit} · {item.receivedAt}</div>
+                </div>
+                <div style={{ textAlign:'right', flexShrink:0 }}>
+                  {item.totalPaid > 0 && <div style={{ color:'#f87171', fontWeight:700, fontSize:13 }}>{BRL.format(item.totalPaid)}</div>}
+                  {item.unitCost > 0 && <div style={{ color:'#334155', fontSize:11 }}>{BRL.format(item.unitCost)}/un</div>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {ordersCount === 0 && (
+        <div style={{ textAlign:'center', padding:'40px 0', color:'#334155' }}>
+          <BarChart2 size={40} style={{ marginBottom:8, opacity:0.3 }} />
+          <div style={{ fontSize:14 }}>Nenhum dado para {periodLabel.toLowerCase()}</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Main Component ─────────────────────────────────────────── */
 /* ── EditProfileModal ────────────────────────────────────────── */
 function EditProfileModal({ profile, onSave, onClose }) {
@@ -1773,11 +2026,12 @@ export default function Fornecedor() {
   const pendingOrders = orders.filter(o => o.status === 'pending').length
 
   const TABS = [
-    { id:'inicio',   icon: LayoutDashboard, label:'Inicio',   badge: 0 },
-    { id:'receber',  icon: ArrowDownToLine, label:'Receber',  badge: 0 },
-    { id:'ofertas',  icon: Send,            label:'Ofertas',  badge: offers.filter(o => o.status === 'pending').length },
-    { id:'pedidos',  icon: ClipboardList,   label:'Pedidos',  badge: pendingOrders },
-    { id:'mercados', icon: Users,           label:'Mercados', badge: markets.length },
+    { id:'inicio',    icon: LayoutDashboard, label:'Início',    badge: 0 },
+    { id:'receber',   icon: ArrowDownToLine, label:'Receber',   badge: 0 },
+    { id:'ofertas',   icon: Send,            label:'Ofertas',   badge: offers.filter(o=>o.status==='pending').length },
+    { id:'pedidos',   icon: ClipboardList,   label:'Pedidos',   badge: pendingOrders },
+    { id:'mercados',  icon: Users,           label:'Mercados',  badge: 0 },
+    { id:'relatorio', icon: BarChart2,       label:'Resultado', badge: 0 },
   ]
 
   return (
@@ -1814,11 +2068,12 @@ export default function Fornecedor() {
       </div>
 
       <div style={{ flex:1, overflowY:'auto' }}>
-        {tab === 'inicio'   && <TabInicio  estoque={estoque} offers={offers} orders={orders} profile={profile} markets={markets} setEstoque={setEstoque} setOffers={setOffers} setMarkets={setMarkets} setOrders={setOrders} />}
-        {tab === 'receber'  && <TabReceber estoque={estoque} setEstoque={setEstoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} />}
-        {tab === 'ofertas'  && <TabOfertas estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} orders={orders} preSelected={preSelectedForOffer} onClearPreSelected={() => setPreSelectedForOffer(null)} />}
-        {tab === 'pedidos'  && <TabPedidos orders={orders} setOrders={setOrders} />}
-        {tab === 'mercados' && <TabMercados markets={markets} setMarkets={setMarkets} orders={orders} />}
+        {tab === 'inicio'    && <TabInicio    estoque={estoque} offers={offers} orders={orders} profile={profile} markets={markets} setEstoque={setEstoque} setOffers={setOffers} setMarkets={setMarkets} setOrders={setOrders} onNavigate={setTab} />}
+        {tab === 'receber'   && <TabReceber   estoque={estoque} setEstoque={setEstoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} />}
+        {tab === 'ofertas'   && <TabOfertas   estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} orders={orders} preSelected={preSelectedForOffer} onClearPreSelected={() => setPreSelectedForOffer(null)} />}
+        {tab === 'pedidos'   && <TabPedidos   orders={orders} setOrders={setOrders} />}
+        {tab === 'mercados'  && <TabMercados  markets={markets} setMarkets={setMarkets} orders={orders} />}
+        {tab === 'relatorio' && <TabRelatorio estoque={estoque} offers={offers} orders={orders} />}
       </div>
 
       <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'#060e1a', borderTop:'1px solid #0f2035', display:'flex', padding:'0 0 env(safe-area-inset-bottom,0)', zIndex:20 }}>
