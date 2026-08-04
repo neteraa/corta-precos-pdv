@@ -4,13 +4,33 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Truck, Package, Check, X, Clock, ChevronDown, ChevronUp,
          Filter, RefreshCw, ShoppingCart, AlertTriangle, CheckCircle,
-         Phone, MessageCircle, Star } from 'lucide-react'
+         Phone, MessageCircle, Star, ClipboardList, CircleDollarSign } from 'lucide-react'
 import { useStore, BRL, fmtDate } from '../store.jsx'
 
 const OFFERS_KEY   = 'cp_supplier_offers'
 const ESTOQUE_KEY  = 'cp_fornecedor_estoque'
+const ORDERS_KEY   = 'cp_supplier_orders'
 const API_PERSIST  = '/api/persist'
 const API_RESTORE  = '/api/restore'
+
+const PAYMENT_OPTS = [
+  { id: 'pix',      label: 'PIX',         emoji: '⚡', color: '#10b981' },
+  { id: 'dinheiro', label: 'Dinheiro',     emoji: '💵', color: '#3b82f6' },
+  { id: 'boleto',   label: 'Boleto',       emoji: '📄', color: '#f59e0b' },
+  { id: 'prazo30',  label: 'Prazo 30d',    emoji: '📅', color: '#8b5cf6' },
+  { id: 'prazo60',  label: 'Prazo 60d',    emoji: '📅', color: '#ec4899' },
+  { id: 'cartao',   label: 'Cartão',       emoji: '💳', color: '#06b6d4' },
+]
+
+const uid = () => `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+const cleanPhone = p => '55' + (p || '').replace(/\D/g, '').replace(/^0/, '').slice(-11)
+
+async function saveOrders(orders) {
+  await fetch(API_PERSIST, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: ORDERS_KEY, value: JSON.stringify(orders) }),
+  }).catch(() => {})
+}
 
 async function reduceSupplierStock(offer) {
   try {
@@ -66,7 +86,7 @@ async function saveOffers(offers) {
 }
 
 /* ── OfferCard ──────────────────────────────────────────────── */
-function OfferCard({ offer, onAccept, onReject, onReceive, accepting }) {
+function OfferCard({ offer, onAccept, onReject, onReceive, onPedido, accepting }) {
   const [expanded, setExpanded] = useState(false)
   const expiry   = expiryInfo(offer.expiryDate)
   const accepted = offer.status === 'accepted'
@@ -170,21 +190,31 @@ function OfferCard({ offer, onAccept, onReject, onReceive, accepting }) {
 
         {/* Actions */}
         {isPending && (
-          <div className="flex gap-3 mt-4">
+          <div className="flex flex-col gap-2 mt-4">
+            {/* Fazer Pedido — primary CTA */}
             <button
-              onClick={() => onAccept(offer)}
-              disabled={accepting}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm text-white transition-all"
-              style={{ background: 'linear-gradient(135deg,#10b981,#059669)',
-                opacity: accepting ? 0.6 : 1 }}>
-              <Check size={16} />
-              Aceitar + Receber Mercadoria
+              onClick={() => onPedido && onPedido(offer)}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-sm text-white transition-all"
+              style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
+              <ClipboardList size={16} />
+              Fazer Pedido (qty + pagamento)
             </button>
-            <button
-              onClick={() => onReject(offer.id)}
-              className="px-4 py-3 rounded-xl font-bold text-sm text-gray-400 bg-gray-800 hover:bg-gray-700 transition-all">
-              <X size={16} />
-            </button>
+            {/* Aceitar lote inteiro */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => onAccept(offer)}
+                disabled={accepting}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-xs text-emerald-300 border border-emerald-800 bg-emerald-900/30 transition-all"
+                style={{ opacity: accepting ? 0.6 : 1 }}>
+                <Check size={13} />
+                Aceitar Lote Inteiro ({offer.qty} {offer.unit})
+              </button>
+              <button
+                onClick={() => onReject(offer.id)}
+                className="px-3 py-2.5 rounded-xl font-bold text-xs text-gray-400 bg-gray-800 hover:bg-gray-700 transition-all">
+                <X size={14} />
+              </button>
+            </div>
           </div>
         )}
 
@@ -201,15 +231,164 @@ function OfferCard({ offer, onAccept, onReject, onReceive, accepting }) {
   )
 }
 
+/* ── PedidoModal ────────────────────────────────────────────── */
+function PedidoModal({ offer, onClose, onConfirm }) {
+  const [qty,     setQty]     = useState('')
+  const [payment, setPayment] = useState('pix')
+  const [note,    setNote]    = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const maxQty   = offer.qty
+  const qtyNum   = parseFloat(qty) || 0
+  const total    = qtyNum * offer.offerPrice
+  const canPlace = qtyNum > 0 && qtyNum <= maxQty
+
+  async function handleConfirm() {
+    if (!canPlace) return
+    setLoading(true)
+    await onConfirm({
+      offerId: offer.id,
+      productName: offer.productName,
+      sku: offer.sku,
+      unit: offer.unit,
+      supplierName: offer.supplierName,
+      supplierPhone: offer.supplierPhone || '',
+      qtyRequested: qtyNum,
+      offerPrice: offer.offerPrice,
+      totalPrice: total,
+      paymentMethod: payment,
+      note: note.trim(),
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    })
+    setLoading(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-end justify-center p-0">
+      <div className="w-full max-w-lg bg-gray-900 rounded-t-3xl border-t border-gray-700 p-6 pb-10"
+        style={{ maxHeight: '92dvh', overflowY: 'auto' }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <div className="text-white font-black text-xl">Fazer Pedido</div>
+            <div className="text-emerald-400 font-bold text-sm mt-0.5 truncate">{offer.productName}</div>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-800 flex items-center justify-center">
+            <X size={18} className="text-gray-400" />
+          </button>
+        </div>
+
+        {/* Price info */}
+        <div className="bg-gray-800/60 rounded-2xl p-4 mb-5 grid grid-cols-3 gap-3 text-center">
+          <div>
+            <div className="text-emerald-400 font-black text-lg">{BRL.format(offer.offerPrice)}</div>
+            <div className="text-gray-500 text-[11px]">por {offer.unit}</div>
+          </div>
+          <div>
+            <div className="text-blue-400 font-black text-lg">{offer.qty} {offer.unit}</div>
+            <div className="text-gray-500 text-[11px]">disponível</div>
+          </div>
+          <div>
+            <div className="text-amber-400 font-black text-lg">
+              {qtyNum > 0 ? BRL.format(total) : '—'}
+            </div>
+            <div className="text-gray-500 text-[11px]">seu total</div>
+          </div>
+        </div>
+
+        {/* Qty */}
+        <label className="block text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">
+          Quantidade que você quer ({offer.unit})
+        </label>
+        <input
+          type="number" value={qty} onChange={e => setQty(e.target.value)}
+          min="1" max={maxQty} placeholder={`Máx: ${maxQty} ${offer.unit}`}
+          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-4 text-white text-2xl font-black text-center mb-1 outline-none focus:border-emerald-500"
+        />
+        {qtyNum > maxQty && (
+          <div className="text-red-400 text-xs font-bold mb-3">⚠ Máximo disponível: {maxQty} {offer.unit}</div>
+        )}
+        {/* Quick qty buttons */}
+        <div className="flex gap-2 mb-5 flex-wrap">
+          {[1, 5, 10, 25, 50].filter(n => n <= maxQty).map(n => (
+            <button key={n} onClick={() => setQty(String(n))}
+              className={`px-3 py-1.5 rounded-lg text-sm font-bold border transition-all ${
+                qtyNum === n ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600'
+              }`}>
+              {n}
+            </button>
+          ))}
+          <button onClick={() => setQty(String(maxQty))}
+            className={`px-3 py-1.5 rounded-lg text-sm font-bold border transition-all ${
+              qtyNum === maxQty ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600'
+            }`}>
+            Tudo ({maxQty})
+          </button>
+        </div>
+
+        {/* Payment */}
+        <label className="block text-gray-400 text-xs font-bold uppercase tracking-widest mb-3">
+          Forma de Pagamento
+        </label>
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          {PAYMENT_OPTS.map(p => (
+            <button key={p.id} onClick={() => setPayment(p.id)}
+              className={`rounded-xl py-3 font-bold text-sm flex flex-col items-center gap-1 border transition-all ${
+                payment === p.id
+                  ? 'border-emerald-500 bg-emerald-900/40 text-white'
+                  : 'border-gray-700 bg-gray-800 text-gray-400'
+              }`}>
+              <span className="text-xl">{p.emoji}</span>
+              <span className="text-xs font-black">{p.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Note */}
+        <label className="block text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">
+          Observação (opcional)
+        </label>
+        <textarea value={note} onChange={e => setNote(e.target.value)}
+          placeholder="Ex: Entrega na terça, entrada pelos fundos..."
+          rows={2}
+          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-gray-300 text-sm mb-5 outline-none focus:border-emerald-500 resize-none"
+        />
+
+        {/* Confirm */}
+        <button
+          onClick={handleConfirm}
+          disabled={!canPlace || loading}
+          className="w-full py-4 rounded-2xl font-black text-lg text-white flex items-center justify-center gap-3 transition-all"
+          style={{
+            background: canPlace ? 'linear-gradient(135deg,#10b981,#059669)' : '#1f2937',
+            opacity: loading ? 0.7 : 1,
+          }}>
+          <ClipboardList size={20} />
+          {loading ? 'Enviando pedido...' : `Pedir ${qtyNum > 0 ? `${qtyNum} ${offer.unit}` : ''}${qtyNum > 0 ? ` · ${BRL.format(total)}` : ''}`}
+        </button>
+
+        {offer.supplierPhone && canPlace && (
+          <div className="text-center text-gray-500 text-xs mt-3">
+            📲 O fornecedor receberá seu pedido por WhatsApp
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ── MAIN ───────────────────────────────────────────────────── */
 export default function Ofertas() {
   const { upsertProduct, products }  = useStore()
-  const [offers,    setOffers]    = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [accepting, setAccepting] = useState(false)
-  const [filter,    setFilter]    = useState('all')  // all | pending | accepted | opportunity
-  const [toast,     setToast]     = useState(null)
-  const [refreshAt, setRefreshAt] = useState(Date.now())
+  const [offers,      setOffers]     = useState([])
+  const [loading,     setLoading]    = useState(true)
+  const [accepting,   setAccepting]  = useState(false)
+  const [filter,      setFilter]     = useState('all')
+  const [toast,       setToast]      = useState(null)
+  const [refreshAt,   setRefreshAt]  = useState(Date.now())
+  const [pedidoOffer, setPedidoOffer] = useState(null)
 
   /* load */
   useEffect(() => {
@@ -265,6 +444,38 @@ export default function Ofertas() {
   /* mark as received (open /estoque manually) */
   function handleReceive(offer) {
     window.location.href = '/estoque'
+  }
+
+  /* place order → save to cp_supplier_orders + WhatsApp to supplier */
+  async function handlePedido(orderData) {
+    const order = { id: uid(), ...orderData }
+    try {
+      const r   = await fetch(API_RESTORE)
+      const j   = await r.json()
+      const raw = j?.data?.[ORDERS_KEY]
+      const existing = raw ? JSON.parse(raw) : []
+      await saveOrders([order, ...existing])
+    } catch {}
+
+    /* open WhatsApp to supplier if they have a phone */
+    const pay  = PAYMENT_OPTS.find(p => p.id === order.paymentMethod)
+    const msg  = [
+      `🛒 *NOVO PEDIDO — ${order.productName}*`,
+      ``,
+      `📦 Qtd: *${order.qtyRequested} ${order.unit}*`,
+      `💰 Total: *${BRL.format(order.totalPrice)}*`,
+      `${pay?.emoji || ''} Pagamento: *${pay?.label || order.paymentMethod}*`,
+      order.note ? `💬 Obs: ${order.note}` : '',
+      ``,
+      `⏰ ${new Date().toLocaleString('pt-BR')}`,
+    ].filter(Boolean).join('\n')
+
+    if (order.supplierPhone) {
+      window.open(`https://wa.me/${cleanPhone(order.supplierPhone)}?text=${encodeURIComponent(msg)}`, '_blank')
+    }
+
+    setPedidoOffer(null)
+    showToast(`✅ Pedido enviado! ${order.qtyRequested} ${order.unit} de ${order.productName}`)
   }
 
   /* filtered */
@@ -385,10 +596,20 @@ export default function Ofertas() {
             onAccept={handleAccept}
             onReject={handleReject}
             onReceive={handleReceive}
+            onPedido={setPedidoOffer}
             accepting={accepting}
           />
         ))}
       </div>
+
+      {/* Pedido Modal */}
+      {pedidoOffer && (
+        <PedidoModal
+          offer={pedidoOffer}
+          onClose={() => setPedidoOffer(null)}
+          onConfirm={handlePedido}
+        />
+      )}
 
       {/* Info footer */}
       {!loading && offers.length > 0 && (
