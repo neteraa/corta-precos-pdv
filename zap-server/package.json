@@ -1,0 +1,17 @@
+{
+  "name": "zap-server",
+  "version": "1.0.0",
+  "description": "Servidor local Baileys para ZatendeStock — disparo direto via WhatsApp",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "*",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "pino": "^9.7.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

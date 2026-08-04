@@ -423,7 +423,7 @@ function QuickProductInput({ onSelect }) {
 }
 
 /* ── BlitzModal ──────────────────────────────────────────────── */
-function BlitzModal({ offers, setOffers, markets, profile, onClose }) {
+function BlitzModal({ offers, setOffers, markets, profile, onClose, zapServerUrl, zapConnected }) {
   const [pct,     setPct]     = useState(20)
   const [blasting, setBlasting] = useState(false)
   const [blastMsg, setBlastMsg] = useState(null)
@@ -466,7 +466,7 @@ function BlitzModal({ offers, setOffers, markets, profile, onClose }) {
 
   if (blasting && blastMsg) {
     // Reuse BlastScreen logic but with custom combined message
-    return <BlastScreen customMsg={blastMsg} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={onClose} />
+    return <BlastScreen customMsg={blastMsg} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={onClose} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />
   }
 
   return (
@@ -520,14 +520,35 @@ function BlitzModal({ offers, setOffers, markets, profile, onClose }) {
 
 /* ── BlastScreen ─────────────────────────────────────────────── */
 /* Full-screen sequential WA dispatcher — one market at a time   */
-function BlastScreen({ offer, customMsg, markets, supplierName, supplierPhone, onDone }) {
-  const [idx, setIdx] = useState(0)
+function BlastScreen({ offer, customMsg, markets, supplierName, supplierPhone, onDone, zapServerUrl, zapConnected }) {
+  const [idx,     setIdx]   = useState(0)
+  const [apiSent, setApiSent] = useState(null) // null | 'sending' | { results, sent, total, error? }
   const valid  = (markets || []).filter(m => m.phone)
-  const done   = idx >= valid.length
-  const pct    = valid.length ? Math.round((idx / valid.length) * 100) : 100
+  const done   = apiSent?.sent != null ? true : idx >= valid.length
+  const pct    = apiSent?.sent != null
+    ? Math.round((apiSent.sent / Math.max(apiSent.total, 1)) * 100)
+    : valid.length ? Math.round((idx / valid.length) * 100) : 100
   const curr   = valid[idx]
   const msg    = customMsg || buildOfferMsg(offer, supplierName, supplierPhone)
 
+  /* ── Send via Baileys server — dispara TODOS de uma vez ── */
+  async function sendViaServer() {
+    if (!zapConnected || !zapServerUrl) return
+    setApiSent('sending')
+    try {
+      const r = await fetch(`${zapServerUrl}/send-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phones: valid.map(m => m.phone), message: msg }),
+      })
+      const data = await r.json()
+      setApiSent(data)
+    } catch (err) {
+      setApiSent({ sent: 0, total: valid.length, results: [], error: err.message })
+    }
+  }
+
+  /* ── Manual fallback via wa.me ── */
   function sendCurrent() {
     if (!curr) return
     window.open(`https://wa.me/${cleanPhone(curr.phone)}?text=${encodeURIComponent(msg)}`, '_blank')
@@ -595,19 +616,78 @@ function BlastScreen({ offer, customMsg, markets, supplierName, supplierPhone, o
 
       {/* Main area */}
       <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:20 }}>
-        {done ? (
+
+        {/* ── API mode: done ── */}
+        {apiSent?.sent != null ? (
           <>
             <div style={{ width:100, height:100, borderRadius:28, background:'linear-gradient(135deg,#14532d,#065f46)', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <CheckCircle size={52} color="#4ade80" />
             </div>
             <div style={{ textAlign:'center' }}>
-              <div style={{ color:'#4ade80', fontWeight:900, fontSize:22, marginBottom:4 }}>{valid.length} mercado{valid.length !== 1 ? 's' : ''} notificado{valid.length !== 1 ? 's' : ''}!</div>
-              <div style={{ color:'#475569', fontSize:14 }}>A oferta já está visível no portal de todos os mercados.</div>
+              <div style={{ color:'#4ade80', fontWeight:900, fontSize:22, marginBottom:4 }}>
+                {apiSent.sent}/{apiSent.total} mensagem{apiSent.total !== 1 ? 's' : ''} enviada{apiSent.total !== 1 ? 's' : ''}!
+              </div>
+              <div style={{ color:'#475569', fontSize:13 }}>Enviado direto pelo Baileys ⚡</div>
+              {apiSent.error && <div style={{ color:'#f87171', fontSize:12, marginTop:6 }}>Erro: {apiSent.error}</div>}
+            </div>
+            {/* Per-market results */}
+            {apiSent.results?.map(r => (
+              <div key={r.phone} style={{ display:'flex', alignItems:'center', gap:8, color: r.ok ? '#4ade80' : '#f87171', fontSize:12 }}>
+                {r.ok ? '✅' : '❌'} {r.phone} {r.error ? `— ${r.error}` : ''}
+              </div>
+            ))}
+          </>
+
+        /* ── API mode: sending ── */
+        ) : apiSent === 'sending' ? (
+          <>
+            <div style={{ width:100, height:100, borderRadius:28, background:'linear-gradient(135deg,#1e3a8a,#1d4ed8)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <MessageCircle size={52} color="#93c5fd" style={{ animation:'spin 1s linear infinite' }} />
+            </div>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ color:'#93c5fd', fontWeight:900, fontSize:20 }}>Enviando para {valid.length} mercados...</div>
+              <div style={{ color:'#475569', fontSize:13, marginTop:4 }}>Aguarde ~{Math.round(valid.length * 1.5)}s (1 por vez pra não levar ban)</div>
             </div>
           </>
+
+        /* ── Manual mode: done ── */
+        ) : done ? (
+          <>
+            <div style={{ width:100, height:100, borderRadius:28, background:'linear-gradient(135deg,#14532d,#065f46)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <CheckCircle size={52} color="#4ade80" />
+            </div>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ color:'#4ade80', fontWeight:900, fontSize:22, marginBottom:4 }}>{idx} mercado{idx !== 1 ? 's' : ''} notificado{idx !== 1 ? 's' : ''}!</div>
+              <div style={{ color:'#475569', fontSize:14 }}>A oferta já está visível no portal.</div>
+            </div>
+          </>
+
+        /* ── Main: server connected → 1 click ── */
+        ) : zapConnected ? (
+          <>
+            <div style={{ width:96, height:96, borderRadius:28, background:'linear-gradient(135deg,#064e3b,#065f46)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 0 40px rgba(16,185,129,0.4)' }}>
+              <Zap size={48} color="#4ade80" />
+            </div>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ color:'#10b981', fontWeight:700, fontSize:11, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:4 }}>⚡ Servidor ZAP conectado</div>
+              <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:20, marginBottom:4 }}>Disparar para {valid.length} mercados</div>
+              <div style={{ color:'#475569', fontSize:13 }}>de uma vez, sem abrir o WA!</div>
+            </div>
+            <button onClick={sendViaServer}
+              style={{ ...btnBase, width:'100%', maxWidth:340, background:'linear-gradient(135deg,#10b981,#059669)', padding:'20px 24px', fontSize:18, color:'#fff', boxShadow:'0 8px 32px rgba(16,185,129,0.5)' }}>
+              <Zap size={24} />
+              Disparar para todos agora!
+            </button>
+            <div style={{ color:'#334155', fontSize:12 }}>ou continue manual →</div>
+            <button onClick={sendCurrent}
+              style={{ ...btnBase, width:'100%', maxWidth:340, background:'#0d2137', border:'1px solid #1e4060', padding:'12px 24px', fontSize:14, color:'#64748b' }}>
+              <MessageCircle size={16} /> Abrir WA — {curr?.name?.split(' ')[0]}
+            </button>
+          </>
+
+        /* ── Manual mode: step by step ── */
         ) : (
           <>
-            {/* Market avatar */}
             <div style={{ width:96, height:96, borderRadius:28, background:'linear-gradient(135deg,#0f3460,#1e40af)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:40, fontWeight:900, color:'#93c5fd', boxShadow:'0 0 40px rgba(59,130,246,0.3)' }}>
               {curr?.name?.charAt(0)?.toUpperCase() || '?'}
             </div>
@@ -617,7 +697,6 @@ function BlastScreen({ offer, customMsg, markets, supplierName, supplierPhone, o
               {curr?.phone  && <div style={{ color:'#4ade80', fontSize:13, fontWeight:700, marginTop:2 }}>📞 {curr.phone}</div>}
               {curr?.address && <div style={{ color:'#475569', fontSize:12, marginTop:4 }}>📍 {curr.address}</div>}
             </div>
-            {/* Send button */}
             <button onClick={sendCurrent}
               style={{ ...btnBase, width:'100%', maxWidth:340, background:'linear-gradient(135deg,#16a34a,#15803d)', padding:'18px 24px', fontSize:17, color:'#fff', boxShadow:'0 8px 32px rgba(16,185,129,0.4)' }}>
               <MessageCircle size={22} />
@@ -872,7 +951,7 @@ const DEMO_ORDERS_HIST = [
 ]
 
 /* ── TabInicio ──────────────────────────────────────────────── */
-function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setOffers, setMarkets, setOrders, onNavigate }) {
+function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setOffers, setMarkets, setOrders, onNavigate, zapServerUrl, zapConnected }) {
   const [showBlitz,  setShowBlitz]  = useState(false)
   const [blastAll,   setBlastAll]   = useState(false)
   const [editItem,   setEditItem]   = useState(null)
@@ -973,12 +1052,12 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
     await persistKey(ORDERS_KEY,  DEMO_ORDERS_HIST)
   }
 
-  if (singleBlast) return <BlastScreen offer={singleBlast} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setSingleBlast(null)} />
+  if (singleBlast) return <BlastScreen offer={singleBlast} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setSingleBlast(null)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />
   if (blastAll) {
 
     const msg = buildDailyBlastMsg()
     if (!msg) { setBlastAll(false) }
-    else return <BlastScreen customMsg={msg} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setBlastAll(false)} />
+    else return <BlastScreen customMsg={msg} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setBlastAll(false)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />
   }
 
   const srcCfg = (id) => SOURCE_TYPES.find(s => s.id === id) || SOURCE_TYPES[4]
@@ -1054,7 +1133,7 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
   return (
     <div style={{ padding:'16px 16px 100px' }}>
 
-      {showBlitz && <BlitzModal offers={offers} setOffers={setOffers} markets={markets} profile={profile} onClose={() => setShowBlitz(false)} />}
+      {showBlitz && <BlitzModal offers={offers} setOffers={setOffers} markets={markets} profile={profile} onClose={() => setShowBlitz(false)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
 
       {/* Edit stock item modal */}
       {editItem && (() => {
@@ -1292,7 +1371,7 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
 const SUPPLIERS_KEY = 'cp_fornecedor_suppliers'
 
 /* ── TabReceber ─────────────────────────────────────────────── */
-function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }) {
+function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, zapServerUrl, zapConnected }) {
   const [selected,    setSelected]   = useState(null)  // { name, sku, price }
   const [sourceType,  setSourceType] = useState('leilao')
   const [sourceName,  setSourceName] = useState('')
@@ -1409,7 +1488,7 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
     setEstoque(next); await persistKey(ESTOQUE_KEY, next)
   }
 
-  if (blast) return <BlastScreen offer={blast} markets={markets} supplierName={profile?.name || 'Distribuidora'} supplierPhone={profile?.phone || ''} onDone={() => setBlast(null)} />
+  if (blast) return <BlastScreen offer={blast} markets={markets} supplierName={profile?.name || 'Distribuidora'} supplierPhone={profile?.phone || ''} onDone={() => setBlast(null)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />
 
   return (
     <div style={{ padding:'16px 16px 100px' }}>
@@ -1686,7 +1765,7 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
 }
 
 /* ── TabOfertas ─────────────────────────────────────────────── */
-function TabOfertas({ estoque, offers, setOffers, markets, profile, orders, preSelected, onClearPreSelected }) {
+function TabOfertas({ estoque, offers, setOffers, markets, profile, orders, preSelected, onClearPreSelected, zapServerUrl, zapConnected }) {
   const [mode, setMode]           = useState('list')
   const [selected, setSelected]   = useState(null)
   const [fromStock, setFromStock] = useState(null)
@@ -1743,7 +1822,7 @@ function TabOfertas({ estoque, offers, setOffers, markets, profile, orders, preS
   }
 
   if (waOffer) return <WaOverlay offer={waOffer} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} orders={orders} onClose={() => setWaOffer(null)} />
-  if (blast)   return <BlastScreen offer={blast} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setBlast(null)} />
+  if (blast)   return <BlastScreen offer={blast} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setBlast(null)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />
 
   if (mode === 'new') {
     const ok = selected && qty && price && !publishing
@@ -1847,7 +1926,7 @@ function TabOfertas({ estoque, offers, setOffers, markets, profile, orders, preS
 
   return (
     <div style={{ padding:'16px 16px 100px' }}>
-      {showBlitz && <BlitzModal offers={offers} setOffers={setOffers} markets={markets} profile={profile} onClose={() => setShowBlitz(false)} />}
+      {showBlitz && <BlitzModal offers={offers} setOffers={setOffers} markets={markets} profile={profile} onClose={() => setShowBlitz(false)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
 
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
@@ -2510,7 +2589,9 @@ function TabRelatorio({ estoque, offers, orders, markets }) {
 /* ══════════════════════════════════════════════════════════════ */
 /* ── MULTI-TENANT AUTH ─────────────────────────────────────── */
 /* ══════════════════════════════════════════════════════════════ */
-const SESSION_KEY = 'cp_session_v1'
+const SESSION_KEY    = 'cp_session_v1'
+const ZAP_SERVER_KEY = 'cp_zap_server_url'
+const ZAP_DEFAULT    = 'http://localhost:3001'
 
 const TENANTS = [
   {
@@ -2767,6 +2848,10 @@ export default function Fornecedor() {
   const [synced,      setSynced]      = useState(false)
   const [editingProfile, setEditingProfile] = useState(false)
   const [preSelectedForOffer, setPreSelectedForOffer] = useState(null)
+  const [zapServerUrl,  setZapServerUrl]  = useState(() => localStorage.getItem(ZAP_SERVER_KEY) || ZAP_DEFAULT)
+  const [zapConnected,  setZapConnected]  = useState(false)
+  const [zapPhone,      setZapPhone]      = useState(null)
+  const [editingZap,    setEditingZap]    = useState(false)
 
   const goToOferta = useCallback((item) => {
     setPreSelectedForOffer(item)
@@ -2869,6 +2954,25 @@ export default function Fornecedor() {
     return () => { document.title = prev }
   }, [])
 
+  // Ping local ZAP server every 8 seconds to check connection
+  useEffect(() => {
+    if (!session) return
+    async function ping() {
+      try {
+        const r = await fetch(`${zapServerUrl}/status`, { signal: AbortSignal.timeout(2000) })
+        const d = await r.json()
+        setZapConnected(d.connected === true)
+        setZapPhone(d.phone || null)
+      } catch {
+        setZapConnected(false)
+        setZapPhone(null)
+      }
+    }
+    ping()
+    const id = setInterval(ping, 8000)
+    return () => clearInterval(id)
+  }, [session, zapServerUrl])
+
   /* ── Login gate — after ALL hooks ── */
   if (!session) return <LoginPage onLogin={handleLogin} />
 
@@ -2889,6 +2993,56 @@ export default function Fornecedor() {
       {/* Edit profile modal */}
       {editingProfile && (
         <EditProfileModal profile={profile} onSave={saveProfile} onClose={() => setEditingProfile(false)} />
+      )}
+
+      {/* ZAP Server config modal */}
+      {editingZap && (
+        <div style={{ position:'fixed', inset:0, zIndex:400, background:'rgba(0,0,0,0.92)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <div style={{ background:'#0a1929', borderRadius:20, padding:24, width:'100%', maxWidth:380, border:'1px solid #1e4060' }}>
+            <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18, marginBottom:4 }}>⚡ Servidor ZAP Local</div>
+            <div style={{ color:'#475569', fontSize:12, marginBottom:16 }}>
+              Baileys no seu Mac dispara mensagens direto sem abrir o WA um por um
+            </div>
+            {/* Status */}
+            <div style={{ display:'flex', alignItems:'center', gap:10, background:'#0d2137', borderRadius:12, padding:'12px 14px', marginBottom:14, border:`1px solid ${zapConnected ? '#10b981' : '#1e4060'}` }}>
+              <div style={{ width:10, height:10, borderRadius:5, flexShrink:0, background: zapConnected ? '#10b981' : '#ef4444', boxShadow: zapConnected ? '0 0 8px #10b981' : 'none' }} />
+              <div>
+                <div style={{ color: zapConnected ? '#10b981' : '#f87171', fontWeight:800, fontSize:13 }}>
+                  {zapConnected ? `✅ Conectado${zapPhone ? ' — ' + zapPhone : ''}` : '🔴 Servidor offline'}
+                </div>
+                <div style={{ color:'#475569', fontSize:11 }}>
+                  {zapConnected ? 'Disparos automáticos prontos!' : 'Rode: cd zap-server && node server.js'}
+                </div>
+              </div>
+            </div>
+            {/* URL */}
+            <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>URL do servidor</div>
+            <input value={zapServerUrl} onChange={e => setZapServerUrl(e.target.value)} placeholder="http://localhost:3001"
+              style={{ display:'block', width:'100%', background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, padding:'11px 14px', color:'#e2e8f0', fontSize:14, boxSizing:'border-box', outline:'none', marginBottom:14 }} />
+            {/* Commands */}
+            <div style={{ background:'#050f1a', borderRadius:10, padding:'10px 14px', marginBottom:14, border:'1px solid #0f2035' }}>
+              <div style={{ color:'#64748b', fontSize:10, fontWeight:700, marginBottom:6 }}>Comandos no seu Mac:</div>
+              {['git pull', 'cd zap-server', 'npm install', 'node server.js'].map((cmd, i) => (
+                <div key={i} style={{ color:'#10b981', fontFamily:'monospace', fontSize:12, marginBottom:2 }}>$ {cmd}</div>
+              ))}
+              <div style={{ color:'#475569', fontSize:10, marginTop:6 }}>Escaneie o QR com o WA do distribuidor</div>
+            </div>
+            <div style={{ color:'#64748b', fontSize:10, marginBottom:14 }}>
+              💡 Acesse pelo <strong style={{ color:'#93c5fd' }}>localhost:5173</strong> (npm run dev) para evitar bloqueio HTTPS↔HTTP.
+              Para acesso remoto use <strong style={{ color:'#93c5fd' }}>ngrok http 3001</strong> e cole a URL https:// aqui.
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <button onClick={() => { localStorage.setItem(ZAP_SERVER_KEY, zapServerUrl); setEditingZap(false) }}
+                style={{ flex:1, padding:'12px', background:'linear-gradient(135deg,#10b981,#059669)', border:'none', borderRadius:12, color:'#fff', fontWeight:900, fontSize:14, cursor:'pointer' }}>
+                Salvar
+              </button>
+              <button onClick={() => setEditingZap(false)}
+                style={{ flex:1, padding:'12px', background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, color:'#64748b', fontWeight:700, fontSize:14, cursor:'pointer' }}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── HEADER ── */}
@@ -2918,6 +3072,11 @@ export default function Fornecedor() {
           <button onClick={sync} disabled={syncing} style={{ background:'none', border:'none', cursor:'pointer', color:'#475569', padding:4 }}>
             <RefreshCw size={16} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
           </button>
+          {/* ZAP Server indicator */}
+          <button onClick={() => setEditingZap(true)} title={zapConnected ? `ZAP conectado${zapPhone ? ': '+zapPhone : ''}` : 'Configurar Servidor ZAP'} style={{ display:'flex', alignItems:'center', gap:4, background:'#0d2137', border:`1px solid ${zapConnected ? '#10b981' : '#1e4060'}`, borderRadius:8, padding:'5px 8px', cursor:'pointer' }}>
+            <div style={{ width:6, height:6, borderRadius:3, background: zapConnected ? '#10b981' : '#334155', boxShadow: zapConnected ? '0 0 5px #10b981' : 'none', flexShrink:0 }} />
+            <span style={{ color: zapConnected ? '#10b981' : '#475569', fontSize:10, fontWeight:800, letterSpacing:'0.05em' }}>ZAP</span>
+          </button>
           <button onClick={handleLogout} title="Sair" style={{ background:'#1a1a2e', border:'1px solid #2d2d4e', borderRadius:8, padding:'5px 8px', cursor:'pointer', color:'#475569', fontSize:12, fontWeight:700 }}>
             Sair
           </button>
@@ -2930,9 +3089,9 @@ export default function Fornecedor() {
       </div>
 
       <div style={{ flex:1, overflowY:'auto' }}>
-        {tab === 'inicio'    && <TabInicio    estoque={estoque} offers={offers} orders={orders} profile={profile} markets={markets} setEstoque={setEstoque} setOffers={setOffers} setMarkets={setMarkets} setOrders={setOrders} onNavigate={setTab} />}
-        {tab === 'receber'   && <TabReceber   estoque={estoque} setEstoque={setEstoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} />}
-        {tab === 'ofertas'   && <TabOfertas   estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} orders={orders} preSelected={preSelectedForOffer} onClearPreSelected={() => setPreSelectedForOffer(null)} />}
+        {tab === 'inicio'    && <TabInicio    estoque={estoque} offers={offers} orders={orders} profile={profile} markets={markets} setEstoque={setEstoque} setOffers={setOffers} setMarkets={setMarkets} setOrders={setOrders} onNavigate={setTab} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
+        {tab === 'receber'   && <TabReceber   estoque={estoque} setEstoque={setEstoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
+        {tab === 'ofertas'   && <TabOfertas   estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} orders={orders} preSelected={preSelectedForOffer} onClearPreSelected={() => setPreSelectedForOffer(null)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
         {tab === 'pedidos'   && <TabPedidos   orders={orders} setOrders={setOrders} />}
         {tab === 'mercados'  && <TabMercados  markets={markets} setMarkets={setMarkets} orders={orders} />}
         {tab === 'relatorio' && <TabRelatorio estoque={estoque} offers={offers} orders={orders} markets={markets} />}
