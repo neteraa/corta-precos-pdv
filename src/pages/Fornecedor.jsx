@@ -873,7 +873,7 @@ function SetupScreen({ onDone }) {
   return (
     <div style={{ minHeight:'100dvh', background:'#050f1a', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
       <div style={{ textAlign:'center', marginBottom:24 }}>
-        <ZatendeStockLogo variant="banner" style={{ maxWidth:220 }} />
+        <ZatendeStockLogo variant="full" />
         <div style={{ color:'#10b981', fontSize:14, marginTop:10, fontWeight:700 }}>
           {saved.name ? `Bem-vindo de volta, ${saved.name.split(' ')[0]}!` : 'Portal do Distribuidor'}
         </div>
@@ -3021,7 +3021,7 @@ function LoginPage({ onLogin }) {
 
       {/* Platform branding */}
       <div style={{ textAlign:'center', marginBottom:32 }}>
-        <ZatendeStockLogo variant="banner" style={{ maxWidth:260 }} />
+        <ZatendeStockLogo variant="full" />
         <div style={{ color:'#10b981', fontSize:12, fontWeight:700, marginTop:10, textTransform:'uppercase', letterSpacing:'0.12em' }}>Portal do Distribuidor</div>
       </div>
 
