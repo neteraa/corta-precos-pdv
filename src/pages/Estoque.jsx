@@ -124,15 +124,17 @@ export default function Estoque() {
       if (idx >= 0) {
         const next = [...prev]; next[idx] = { ...next[idx], qty: next[idx].qty + 1 }; return next
       }
-      return [{ product: found, qty: 1 }, ...prev]
+      return [{ product: found, qty: 1, expiryDate: found.expiryDate || '' }, ...prev]
     })
     flashFeedback(`✅ ${found.name}`)
   }, [products])
 
   const confirmEntrada = () => {
-    entradaList.forEach(({ product, qty }) =>
-      upsertProduct({ ...product, stock: product.stock + qty, receivedAt: new Date().toISOString() })
-    )
+    entradaList.forEach(({ product, qty, expiryDate }) => {
+      const updates = { stock: product.stock + qty, receivedAt: new Date().toISOString() }
+      if (expiryDate) updates.expiryDate = expiryDate
+      upsertProduct({ ...product, ...updates })
+    })
     setEntradaList([]); setShowEntrada(false); flashFeedback('✅ Estoque atualizado!')
   }
 
@@ -418,32 +420,44 @@ export default function Estoque() {
                 <div className="text-center text-gray-400 py-10 text-sm">
                   Nenhum produto escaneado ainda.<br/>Passe o leitor nos produtos recebidos.
                 </div>
-              ) : entradaList.map(({ product, qty }) => (
-                <div key={product.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm text-gray-900 truncate">{product.name}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">
-                      Estoque atual: {product.stock} {product.unit || 'un.'} → ficará: <span className="font-bold text-green-600">{product.stock + qty}</span>
+              ) : entradaList.map(({ product, qty, expiryDate }) => {
+                const daysLeft = expiryDate ? Math.ceil((new Date(expiryDate+'T00:00') - new Date()) / 86400000) : null
+                const daysBadge = daysLeft === null ? null : daysLeft < 0 ? 'Vencido!' : daysLeft === 0 ? 'Hoje!' : `${daysLeft}d`
+                const daysBg    = daysLeft === null ? '' : daysLeft < 0 ? 'bg-red-100 text-red-600' : daysLeft <= 7 ? 'bg-orange-100 text-orange-600' : daysLeft <= 30 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+                return (
+                  <div key={product.id} className="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+                    <div className="flex items-center gap-3 px-4 py-2.5">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-gray-900 truncate">{product.name}</div>
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          Atual: <strong>{product.stock}</strong> {product.unit||'un'} → ficará: <span className="font-bold text-green-600">{product.stock + qty}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button onClick={() => setEntradaList(l => l.map(e => e.product.id === product.id ? { ...e, qty: Math.max(1, e.qty-1) } : e))}
+                          className="w-7 h-7 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center font-black text-gray-700">−</button>
+                        <input type="number" min="1" value={qty}
+                          onChange={e => { const v = Math.max(1, parseInt(e.target.value)||1); setEntradaList(l => l.map(x => x.product.id === product.id ? {...x, qty:v} : x)) }}
+                          className="w-14 text-center font-black text-sm border border-gray-300 rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                        <button onClick={() => setEntradaList(l => l.map(e => e.product.id === product.id ? {...e, qty: e.qty+1} : e))}
+                          className="w-7 h-7 rounded-lg bg-orange-500 hover:bg-orange-600 flex items-center justify-center font-black text-white">+</button>
+                        <button onClick={() => setEntradaList(l => l.filter(e => e.product.id !== product.id))}
+                          className="w-7 h-7 rounded-lg hover:bg-red-100 flex items-center justify-center text-red-400 hover:text-red-600">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    {/* expiry date row */}
+                    <div className="flex items-center gap-2 px-4 pb-2.5">
+                      <label className="text-xs font-bold text-orange-600 whitespace-nowrap">📅 Vencimento</label>
+                      <input type="date" value={expiryDate||''}
+                        onChange={e => setEntradaList(l => l.map(x => x.product.id === product.id ? {...x, expiryDate: e.target.value} : x))}
+                        className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white" />
+                      {daysBadge && <span className={`text-[11px] font-black px-2 py-0.5 rounded-full whitespace-nowrap ${daysBg}`}>{daysBadge}</span>}
                     </div>
                   </div>
-                  {/* qty controls */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button onClick={() => setEntradaList(l => l.map(e => e.product.id === product.id ? { ...e, qty: Math.max(1, e.qty - 1) } : e))}
-                      className="w-7 h-7 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center font-black text-gray-700">−</button>
-                    <input
-                      type="number" min="1" value={qty}
-                      onChange={e => { const v = Math.max(1, parseInt(e.target.value) || 1); setEntradaList(l => l.map(x => x.product.id === product.id ? { ...x, qty: v } : x)) }}
-                      className="w-14 text-center font-black text-sm border border-gray-300 rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    />
-                    <button onClick={() => setEntradaList(l => l.map(e => e.product.id === product.id ? { ...e, qty: e.qty + 1 } : e))}
-                      className="w-7 h-7 rounded-lg bg-brand-600 hover:bg-brand-700 flex items-center justify-center font-black text-white">+</button>
-                    <button onClick={() => setEntradaList(l => l.filter(e => e.product.id !== product.id))}
-                      className="w-7 h-7 rounded-lg hover:bg-red-100 flex items-center justify-center text-red-400 hover:text-red-600">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             {/* footer */}

@@ -4,14 +4,15 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from 'recharts'
-import { TrendingUp, ShoppingCart, Package, AlertTriangle, ArrowRight, Receipt, ClipboardList, X, Printer, Download, MessageCircle, Target, ArrowDownCircle, ArrowUpCircle, Plus } from 'lucide-react'
+import { TrendingUp, ShoppingCart, Package, AlertTriangle, ArrowRight, Receipt, ClipboardList, X, Printer, Download, MessageCircle, Target, ArrowDownCircle, ArrowUpCircle, Plus, Zap, CalendarClock } from 'lucide-react'
 import { useStore, BRL, fmtDate } from '../store.jsx'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 
 const COLORS = ['#ea580c', '#fb923c', '#f97316', '#c2410c', '#fed7aa', '#9a3412']
 
 export default function Dashboard() {
-  const { products, sales, cashMovements, salesGoal, setSalesGoal, addCashMovement } = useStore()
+  const { products, sales, cashMovements, salesGoal, setSalesGoal, addCashMovement, expiryAlertDays } = useStore()
+  const warnDays = expiryAlertDays || 30
   const navigate = useNavigate()
   const [showCaixa, setShowCaixa] = useState(false)
   const [movForm, setMovForm] = useState({ type: 'sangria', amount: '', reason: '' })
@@ -109,6 +110,21 @@ export default function Dashboard() {
 
     return { todaySales, totalVendas, faturamento, avgTicket, totalDesconto, byPayment, topToday, margem, date: today, todayMovs, sangriaTotal, suprimentoTotal, cashBalance }
   }, [sales, products, cashMovements, showCaixa])
+
+  const expiryAlert = useMemo(() => {
+    const now = Date.now()
+    const list = products
+      .filter(p => p.expiryDate)
+      .map(p => {
+        const d = Math.ceil((new Date(p.expiryDate + 'T00:00') - now) / 86400000)
+        return { ...p, days: d }
+      })
+      .filter(p => p.days <= warnDays)
+      .sort((a, b) => a.days - b.days)
+    const expired  = list.filter(p => p.days < 0).length
+    const critical = list.filter(p => p.days >= 0 && p.days <= 7).length
+    return { list, expired, critical, total: list.length }
+  }, [products, warnDays])
 
   const kpis = [
     {
@@ -255,6 +271,44 @@ export default function Dashboard() {
               {Math.min(100, ((todayRevenue / salesGoal.daily) * 100)).toFixed(0)}%
             </span>
           </div>
+        </div>
+      )}
+
+      {/* ── Expiry alert banner ────────────────────────────────── */}
+      {expiryAlert.total > 0 && (
+        <div className={`rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 ${
+          expiryAlert.expired > 0 ? 'bg-red-600' : expiryAlert.critical > 0 ? 'bg-orange-500' : 'bg-yellow-400'
+        }`}>
+          <CalendarClock className={`w-8 h-8 flex-shrink-0 ${expiryAlert.expired > 0 ? 'text-red-200' : 'text-gray-800'}`} />
+          <div className="flex-1 min-w-0">
+            <div className={`font-black text-lg leading-tight ${expiryAlert.expired > 0 ? 'text-white' : 'text-gray-900'}`}>
+              ⚠️ {expiryAlert.total} produto{expiryAlert.total > 1 ? 's' : ''} próximos ao vencimento!
+            </div>
+            <div className={`text-sm mt-0.5 ${expiryAlert.expired > 0 ? 'text-red-100' : 'text-gray-800'}`}>
+              {expiryAlert.expired  > 0 && `${expiryAlert.expired} vencido(s) · `}
+              {expiryAlert.critical > 0 && `${expiryAlert.critical} vence em ≤7 dias · `}
+              Alerta configurado para {warnDays} dias. Gere promoções antes de perder!
+            </div>
+            {/* top 3 preview */}
+            <div className="flex flex-wrap gap-2 mt-2">
+              {expiryAlert.list.slice(0, 3).map(p => (
+                <span key={p.id} className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                  expiryAlert.expired > 0 ? 'bg-white/20 text-white' : 'bg-white/60 text-gray-900'
+                }`}>
+                  {p.name.slice(0, 22)}{p.name.length > 22 ? '…' : ''} · {p.days < 0 ? 'VENCIDO' : `${p.days}d`}
+                </span>
+              ))}
+              {expiryAlert.list.length > 3 && (
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${expiryAlert.expired > 0 ? 'bg-white/20 text-white' : 'bg-white/60 text-gray-900'}`}>
+                  +{expiryAlert.list.length - 3} mais
+                </span>
+              )}
+            </div>
+          </div>
+          <button onClick={() => navigate('/validade')}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-black text-sm transition-colors whitespace-nowrap">
+            <Zap className="w-4 h-4" /> Ver + Gerar Promoções
+          </button>
         </div>
       )}
 

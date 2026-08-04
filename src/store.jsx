@@ -147,6 +147,16 @@ export function StoreProvider({ children }) {
     } catch { return SEED_PROMOS }
   })
 
+  // ── Expiry alert threshold ────────────────────────────────
+  const [expiryAlertDays, setExpiryAlertDaysState] = useState(() => {
+    try { return parseInt(localStorage.getItem('cp_expiry_days') || '30', 10) } catch { return 30 }
+  })
+  const setExpiryAlertDays = useCallback((days) => {
+    const n = Math.max(1, Math.min(365, parseInt(days, 10) || 30))
+    setExpiryAlertDaysState(n)
+    try { localStorage.setItem('cp_expiry_days', String(n)) } catch {}
+  }, [])
+
   // ── Persist: localStorage + server disk (fire-and-forget) ──
   const persist = useCallback((key, val) => {
     const str = JSON.stringify(val)
@@ -398,6 +408,7 @@ export function StoreProvider({ children }) {
       upsertOperator, deleteOperator,
       resetAll,
       syncNow, lastSync, syncing,
+      expiryAlertDays, setExpiryAlertDays,
     }}>
       {children}
     </Ctx.Provider>
