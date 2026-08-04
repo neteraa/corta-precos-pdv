@@ -319,3 +319,52 @@ em Ofertas.jsx agora usam localStorage como PRIMARY store e servidor como fallba
 - variant="wordmark": ícone SVG 26px + wordmark inline (headers/sidebars)
 - Cores: azul #5462D8 ("Zatende"), verde #4ade80 ("Stock")
 - NÃO usa og-image.png — SVG puro, nunca quebra
+
+---
+
+## TASK-8 — Multi-tenant localStorage (CONCLUÍDA 2026-08)
+
+### Separação de namespaces
+```
+mkt:{storeId}:{key}    →  Corta Preço / mercado (B2C)
+forn:{tenantId}:{key}  →  Mega Tudo Barato / distribuidor (B2B)
+```
+
+### Chaves de sessão (sempre flat — são os identificadores do namespace)
+| Chave | Quem escreve | Conteúdo |
+|---|---|---|
+| `cp_session` | Login.jsx | `{ loggedIn, user, storeId: 'default' }` |
+| `cp_session_v1` | Fornecedor.jsx | `{ id: 'mega', username: 'megatudo' }` |
+| `cp_market_session_v1` | Ofertas.jsx | `{ name, phone }` (identidade sem login PDV) |
+
+### Funções utilitárias: `src/utils/tenantStorage.js`
+- `mktKey(baseKey)` → `mkt:default:baseKey`
+- `fornKey(baseKey)` → `forn:mega:baseKey`
+- `migrateAndGet(baseKey, keyFn)` → lê chave nova; se vazia, copia da chave legada plana
+- `migrateToNamespace(baseKeys, keyFn)` → migração bulk na primeira entrada
+
+### Chaves planas compartilhadas (cross-system, sem namespace)
+Essas chaves são acessadas por AMBOS os portais para comunicação cross-system:
+- `cp_supplier_offers` — Fornecedor escreve, Ofertas lê
+- `cp_supplier_orders` — Ofertas escreve, Fornecedor lê
+- `cp_fornecedor_estoque` — Fornecedor escreve e lê
+- `cp_distribuidor_markets` — Fornecedor escreve (markets registrados)
+- `cp_forn_profile_v1` — Fornecedor escreve (logo, tema, dados), Ofertas lê para exibir
+
+### Sync em tempo real (mesmo browser, tabs diferentes)
+- **Ofertas → Fornecedor**: Ofertas salva pedido (`ORDERS_KEY`) → `storage` event dispara em Fornecedor → `orders` state atualizado automaticamente + badge "Pedidos" muda
+- **Fornecedor → Ofertas**: Fornecedor publica oferta (`OFFERS_KEY`) → `storage` event dispara em Ofertas → `setRefreshAt(Date.now())` recarrega lista
+- Backup: `setInterval(10s)` em Fornecedor lê `ORDERS_KEY` do localStorage para cobrir edge cases
+
+### Fluxo da demo (mesmo dispositivo, dois tabs)
+1. **Tab A** → `zatendestock.netlify.app/fornecedor` (login: megatudo / mega2024)
+2. **Tab B** → `zatendestock.netlify.app/ofertas?s=mega`
+3. Fornecedor publica oferta no Tab A → Tab B auto-atualiza (sem reload)
+4. Mercado faz pedido no Tab B → WhatsApp abre + Tab A atualiza badge "Pedidos" em ≤10s
+5. Fornecedor confirma pedido no Tab A → status muda para "confirmado"
+
+## Bugs corrigidos nessa versão (2026-08)
+1. `/ofertas` retornava 404 — `_redirects` mandava para function não deployada. Fix: `/* /index.html 200` simples
+2. Modal de identidade no `/ofertas` não aparecia na primeira visita — Fix: `useState(() => !hasSession)`
+3. Fornecedor não detectava novos pedidos sem reload — Fix: storage event + interval de 10s
+4. Ofertas não atualizava quando Fornecedor publicava oferta — Fix: storage event + `setRefreshAt`
