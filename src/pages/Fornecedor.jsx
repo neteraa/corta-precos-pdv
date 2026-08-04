@@ -540,7 +540,7 @@ function BlastScreen({ offer, customMsg, markets, supplierName, supplierPhone, o
     <div style={{ position:'fixed', inset:0, zIndex:300, background:'#050f1a', display:'flex', flexDirection:'column', padding:'env(safe-area-inset-top,24px) 24px 40px' }}>
 
       {/* Top bar */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24, paddingTop:16 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, paddingTop:16 }}>
         <div>
           <div style={{ color:'#10b981', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em' }}>
             {done ? '✅ Concluído' : 'Disparando no WhatsApp'}
@@ -553,6 +553,17 @@ function BlastScreen({ offer, customMsg, markets, supplierName, supplierPhone, o
           {done ? 'Fechar' : 'Pular tudo'}
         </button>
       </div>
+
+      {/* Lista de transmissão — copiar números */}
+      {!done && (
+        <button onClick={() => {
+          const nums = valid.map(m => cleanPhone(m.phone)).join('\n')
+          navigator.clipboard?.writeText(nums).catch(() => {})
+          alert(`📋 ${valid.length} números copiados!\n\nCole no WhatsApp:\nNovo grupo → Lista de Transmissão → colar os contatos\n\n${nums}`)
+        }} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%', marginBottom:12, padding:'10px', background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, color:'#64748b', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+          📋 Copiar todos os números (lista de transmissão)
+        </button>
+      )}
 
       {/* Progress bar */}
       <div style={{ background:'#0d2137', borderRadius:99, height:8, marginBottom:20, overflow:'hidden' }}>
@@ -920,6 +931,16 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
   , [orders, todayStr])
   const profit = soldToday - spentToday
 
+  /* Sold qty per product (from delivered orders) */
+  const soldPerProduct = useMemo(() => {
+    const map = {}
+    orders.filter(o => o.status === 'delivered').forEach(o => {
+      const key = (o.productName || '').toLowerCase()
+      if (key) map[key] = (map[key] || 0) + (o.qtyRequested || 0)
+    })
+    return map
+  }, [orders])
+
   /* Find matching active offer for a stock item */
   function findOffer(item) {
     return offers.find(o => o.status !== 'delivered' &&
@@ -965,19 +986,38 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
   const totalRevenue  = orders.reduce((s, o) => s + (o.totalPrice || 0), 0)
 
   const FifoRow = ({ item }) => {
-    const offer = findOffer(item)
-    const src   = srcCfg(item.sourceType)
-    const exp   = item.expiryDate ? Math.ceil((new Date(item.expiryDate) - new Date()) / 86400000) : null
+    const offer    = findOffer(item)
+    const src      = srcCfg(item.sourceType)
+    const exp      = item.expiryDate ? Math.ceil((new Date(item.expiryDate) - new Date()) / 86400000) : null
+    const soldQty  = soldPerProduct[(item.productName || '').toLowerCase()] || 0
+    const remaining = Math.max(0, item.qty - soldQty)
+    const expColor = exp === null ? null : exp <= 0 ? '#ef4444' : exp <= 7 ? '#f87171' : exp <= 30 ? '#f59e0b' : '#10b981'
     return (
       <div style={{ background:'#0d2137', borderRadius:14, marginBottom:8, overflow:'hidden', border:'1px solid ' + (item.ageInDays >= 2 ? '#7f1d1d' : '#78350f') }}>
-        <div style={{ padding:'10px 14px', display:'flex', gap:10, alignItems:'center' }}>
-          <div style={{ flexShrink:0, fontSize:16 }}>{src.emoji}</div>
+        <div style={{ padding:'10px 14px', display:'flex', gap:10, alignItems:'flex-start' }}>
+          <div style={{ flexShrink:0, fontSize:16, marginTop:2 }}>{src.emoji}</div>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.productName}</div>
-            <div style={{ color:'#64748b', fontSize:11, marginTop:1, display:'flex', gap:8 }}>
-              <span>{item.qty} {item.unit}</span>
-              {exp !== null && <span style={{ color: exp <= 7 ? '#f87171' : '#fbbf24' }}>· val: {exp <= 0 ? 'VENCIDO' : `${exp}d`}</span>}
-              {item.unitCost > 0 && <span style={{ color:'#334155' }}>· custo {BRL.format(item.unitCost)}/un 🔒</span>}
+
+            {/* Estoque: recebido / vendido / restante */}
+            <div style={{ display:'flex', gap:10, marginTop:4, flexWrap:'wrap' }}>
+              <span style={{ color:'#64748b', fontSize:11 }}>Recebido: <strong style={{ color:'#94a3b8' }}>{item.qty} {item.unit}</strong></span>
+              {soldQty > 0 && <span style={{ color:'#64748b', fontSize:11 }}>Vendido: <strong style={{ color:'#f97316' }}>{soldQty} {item.unit}</strong></span>}
+              <span style={{ color:'#64748b', fontSize:11 }}>Restam: <strong style={{ color: remaining <= 0 ? '#ef4444' : remaining <= item.qty * 0.2 ? '#f59e0b' : '#4ade80' }}>{remaining} {item.unit}</strong></span>
+            </div>
+
+            {/* Validade + custo */}
+            <div style={{ display:'flex', gap:8, marginTop:3, flexWrap:'wrap', alignItems:'center' }}>
+              {exp !== null && (
+                <span style={{ background: expColor + '22', color: expColor, borderRadius:6, padding:'1px 7px', fontSize:10, fontWeight:800 }}>
+                  {exp <= 0 ? '⚠️ VENCIDO' : exp <= 7 ? `🔴 Vence em ${exp}d` : exp <= 30 ? `🟡 Val: ${exp}d` : `🟢 Val: ${exp}d`}
+                </span>
+              )}
+              {item.unitCost > 0 && (
+                <span style={{ color:'#334155', fontSize:10 }}>
+                  🔒 custo {item.unitCost < 0.01 ? `R$${item.unitCost.toFixed(4).replace('.',',')}` : BRL.format(item.unitCost)}/un
+                </span>
+              )}
             </div>
           </div>
           <div style={{ textAlign:'right', flexShrink:0 }}>
@@ -985,6 +1025,12 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
             <div style={{ color: item.ageInDays >= 2 ? '#f87171' : '#fbbf24', fontSize:11, fontWeight:700 }}>
               {item.ageInDays === 0 ? 'hoje' : `há ${item.ageInDays}d`}
             </div>
+            {/* Barra de giro */}
+            {item.qty > 0 && (
+              <div style={{ width:52, height:4, background:'#1a3a50', borderRadius:2, marginTop:4, overflow:'hidden' }}>
+                <div style={{ height:'100%', width:`${Math.round((soldQty / item.qty) * 100)}%`, background:'#f97316', borderRadius:2 }} />
+              </div>
+            )}
           </div>
         </div>
         {offer && (
@@ -1251,19 +1297,21 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
   const [sourceType,  setSourceType] = useState('leilao')
   const [sourceName,  setSourceName] = useState('')
   const [supplierSuggestions, setSupplierSuggestions] = useState(false) // show dropdown
-  const [qty,         setQty]        = useState('')
-  const [unit,        setUnit]       = useState('UND')
-  const [totalPaid,   setTotalPaid]  = useState('')   // total pago pelo lote
-  const [expiryDate,  setExpiryDate] = useState('')
-  const [offerPrice,  setOfferPrice] = useState('')
-  const [isOpp,       setIsOpp]      = useState(false)
-  const [offerNote,   setOfferNote]  = useState('')
-  const [saving,      setSaving]     = useState(false)
-  const [blast,       setBlast]      = useState(null)
+  const [qty,           setQty]           = useState('')
+  const [unit,          setUnit]          = useState('UND')
+  const [totalPaid,     setTotalPaid]     = useState('')
+  const [expiryDate,    setExpiryDate]    = useState('')
+  const [offerPrice,    setOfferPrice]    = useState('')
+  const [isOpp,         setIsOpp]         = useState(false)
+  const [offerNote,     setOfferNote]     = useState('')
+  const [saving,        setSaving]        = useState(false)
+  const [blast,         setBlast]         = useState(null)
+  const [paletMode,     setPaletMode]     = useState(false)
+  const [paletCount,    setPaletCount]    = useState('')
+  const [unitsPerPalet, setUnitsPerPalet] = useState('')
 
   function handleSelect(p) {
     setSelected(p)
-    // Source stays as chosen; auto-suggest offer price from seed if available
     if (p.price) setOfferPrice(String((p.price * 1.35).toFixed(2)).replace('.', ','))
   }
 
@@ -1275,14 +1323,19 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
   function reset() {
     setSelected(null); setQty(''); setTotalPaid(''); setExpiryDate('')
     setOfferPrice(''); setIsOpp(false); setOfferNote(''); setSourceName('')
+    setPaletMode(false); setPaletCount(''); setUnitsPerPalet('')
   }
 
-  const qtyNum   = parseFloat(qty) || 0
-  const paid     = parseNum(totalPaid)
-  const unitCost = (paid > 0 && qtyNum > 0) ? paid / qtyNum : 0
-  const sellPrice = parseNum(offerPrice)
-  const margin   = unitCost > 0 && sellPrice > 0 ? Math.round(((sellPrice - unitCost) / unitCost) * 100) : null
-  const canBlast = sellPrice > 0
+  // Qty resolved: palete mode multiplies paletes × unidades/palete
+  const paletTotal = paletMode ? (parseFloat(paletCount || 0) * parseFloat(unitsPerPalet || 0)) : 0
+  const qtyNum     = paletMode ? paletTotal : (parseFloat(qty) || 0)
+  const paid       = parseNum(totalPaid)
+  const unitCost   = (paid > 0 && qtyNum > 0) ? paid / qtyNum : 0
+  const sellPrice  = parseNum(offerPrice)
+  // Margem bruta (sobre venda), não markup — max 100%, intuitiva para varejo
+  const margin     = sellPrice > 0 ? Math.round(((sellPrice - unitCost) / sellPrice) * 100) : null
+  const fmtCost    = v => v <= 0 ? '—' : v < 0.01 ? `R$${v.toFixed(4).replace('.',',')}` : v < 0.10 ? `R$${v.toFixed(3).replace('.',',')}` : BRL.format(v)
+  const canBlast   = sellPrice > 0
   const validMkts = (markets || []).filter(m => m.phone).length
   const inp = { display:'block', width:'100%', background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, padding:'11px 14px', color:'#e2e8f0', fontSize:15, fontWeight:600, boxSizing:'border-box', outline:'none' }
 
@@ -1309,7 +1362,7 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
   }
 
   async function handleSubmit() {
-    if (!selected || !qty) return
+    if (!selected || qtyNum <= 0) return
     // Warn if no sell price — can't ZAP without it
     if (sellPrice === 0) {
       const ok = window.confirm('⚠️ Preço de venda não definido!\n\nSem preço você não consegue disparar no ZAP.\n\nDefinir depois? (OK = sim, salva sem preço)')
@@ -1434,14 +1487,56 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
 
           {/* ── Qty + Unit ── */}
           <div>
-            <div style={{ color:'#94a3b8', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>Quantidade do lote</div>
-            <div style={{ display:'flex', gap:8 }}>
-              <input value={qty} onChange={e => setQty(e.target.value)} type="number" placeholder="Ex: 200" autoFocus
-                style={{ ...inp, flex:2, fontSize:22, fontWeight:900 }} />
-              <select value={unit} onChange={e => setUnit(e.target.value)} style={{ ...inp, flex:1, padding:'11px 8px' }}>
-                {UNITS.map(u => <option key={u}>{u}</option>)}
-              </select>
+            {/* Toggle: por unidade ou por palete */}
+            <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+              <button onClick={() => setPaletMode(false)} style={{ flex:1, padding:'7px 0', borderRadius:10, border:`1px solid ${!paletMode ? '#10b981' : '#1e4060'}`, background: !paletMode ? '#0d3d27' : '#0a1929', color: !paletMode ? '#4ade80' : '#475569', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                📦 Por Unidade / Caixa
+              </button>
+              <button onClick={() => setPaletMode(true)} style={{ flex:1, padding:'7px 0', borderRadius:10, border:`1px solid ${paletMode ? '#f59e0b' : '#1e4060'}`, background: paletMode ? '#78350f' : '#0a1929', color: paletMode ? '#fbbf24' : '#475569', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                🏗️ Por Palete
+              </button>
             </div>
+
+            <div style={{ color:'#94a3b8', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>
+              {paletMode ? 'Composição do Palete' : 'Quantidade do lote'}
+            </div>
+
+            {paletMode ? (
+              <>
+                <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:'#64748b', fontSize:10, marginBottom:4 }}>Nº de paletes</div>
+                    <input value={paletCount} onChange={e => setPaletCount(e.target.value)} type="number" placeholder="Ex: 3" autoFocus
+                      style={{ ...inp, fontSize:20, fontWeight:900, textAlign:'center' }} />
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', color:'#475569', fontWeight:900, fontSize:18, paddingTop:16 }}>×</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:'#64748b', fontSize:10, marginBottom:4 }}>Und / palete</div>
+                    <input value={unitsPerPalet} onChange={e => setUnitsPerPalet(e.target.value)} type="number" placeholder="Ex: 24"
+                      style={{ ...inp, fontSize:20, fontWeight:900, textAlign:'center' }} />
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ color:'#64748b', fontSize:10, marginBottom:4 }}>Unidade</div>
+                    <select value={unit} onChange={e => setUnit(e.target.value)} style={{ ...inp, padding:'11px 8px' }}>
+                      {UNITS.map(u => <option key={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </div>
+                {paletTotal > 0 && (
+                  <div style={{ background:'#0d3d27', borderRadius:10, padding:'8px 14px', color:'#4ade80', fontSize:13, fontWeight:700, marginBottom:4 }}>
+                    ✅ Total: {paletCount} pal × {unitsPerPalet} = <strong>{paletTotal} {unit}</strong>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ display:'flex', gap:8 }}>
+                <input value={qty} onChange={e => setQty(e.target.value)} type="number" placeholder="Ex: 200" autoFocus
+                  style={{ ...inp, flex:2, fontSize:22, fontWeight:900 }} />
+                <select value={unit} onChange={e => setUnit(e.target.value)} style={{ ...inp, flex:1, padding:'11px 8px' }}>
+                  {UNITS.map(u => <option key={u}>{u}</option>)}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* ── Total pago + unit cost ── */}
@@ -1453,10 +1548,10 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
                 style={{ flex:1, background:'transparent', border:'none', padding:'13px 12px 13px 0', color:'#e2e8f0', fontSize:16, fontWeight:700, outline:'none', width:'100%' }} />
             </div>
             {unitCost > 0 && (
-              <div style={{ color:'#64748b', fontSize:12, marginTop:4, display:'flex', gap:10 }}>
-                <span>💸 Custo/un: <strong style={{ color:'#f1f5f9' }}>{BRL.format(unitCost)}</strong></span>
-                {margin !== null && <span style={{ color: margin >= 30 ? '#4ade80' : margin >= 0 ? '#fbbf24' : '#f87171' }}>
-                  Margem: {margin > 0 ? '+' : ''}{margin}%
+              <div style={{ color:'#64748b', fontSize:12, marginTop:4, display:'flex', gap:10, flexWrap:'wrap' }}>
+                <span>💸 Custo/un: <strong style={{ color:'#f1f5f9' }}>{fmtCost(unitCost)}</strong></span>
+                {margin !== null && <span style={{ color: margin >= 40 ? '#4ade80' : margin >= 20 ? '#fbbf24' : '#f87171' }}>
+                  Margem bruta: {margin}%
                 </span>}
               </div>
             )}
@@ -1515,8 +1610,8 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
             {canBlast && qtyNum > 0 && (
               <div style={{ color:'#475569', fontSize:12, marginBottom:10, display:'flex', gap:10, flexWrap:'wrap' }}>
                 <span>💰 Fatura total: <strong style={{ color:'#f1f5f9' }}>{BRL.format(sellPrice * qtyNum)}</strong></span>
-                {unitCost > 0 && <span style={{ color: margin >= 0 ? '#4ade80' : '#f87171' }}>· Margem: {margin > 0 ? '+' : ''}{margin}%</span>}
-                {paid > 0 && <span style={{ color:'#10b981' }}>· Lucro lote: {BRL.format((sellPrice - unitCost) * qtyNum)}</span>}
+                {unitCost > 0 && <span style={{ color: margin >= 40 ? '#4ade80' : margin >= 20 ? '#fbbf24' : '#f87171' }}>· Margem: {margin}%</span>}
+                {paid > 0 && <span style={{ color:'#10b981' }}>· Lucro: {BRL.format((sellPrice - unitCost) * qtyNum)}</span>}
               </div>
             )}
             {canBlast && (
@@ -1537,7 +1632,7 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
 
           {/* ── Action button ── */}
           <button
-            disabled={!qty || qtyNum <= 0 || saving}
+            disabled={!selected || qtyNum <= 0 || saving}
             onClick={handleSubmit}
             style={{
               display:'flex', alignItems:'center', justifyContent:'center', gap:10,
