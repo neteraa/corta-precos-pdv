@@ -287,10 +287,35 @@ Products now support: `minStock` (number), `expiryDate` (ISO date string), `unit
 - sync() deve restaurar profile do servidor se localStorage vazio
 - saveProfile() deve persistir ao servidor além do localStorage
 
-## Fornecedor.jsx — Keys conhecidas
-- MKTS_KEY = LOCAL+'_markets' (localStorage)
-- MKTS_SERVER_KEY = 'cp_forn_markets_v1' (server)
-- ESTOQUE_KEY = 'cp_forn_estoque_v1' (server)
-- OFFERS_KEY = 'cp_forn_offers_v1' (server)
-- ORDERS_KEY = 'cp_forn_orders_v1' (server)
-- LOCAL = 'cp_fornecedor_v1' (localStorage profile)
+## Fornecedor.jsx — Keys corretas (ATENÇÃO: CORRIGI DO AGENTS ANTERIOR)
+- LOCAL = 'cp_fornecedor_v1' (localStorage profile, namespaced com fornKey())
+- OFFERS_KEY = 'cp_supplier_offers' (flat — shared com Ofertas.jsx)
+- ESTOQUE_KEY = 'cp_fornecedor_estoque' (flat — shared)
+- ORDERS_KEY = 'cp_supplier_orders' (flat — shared)
+- MKTS_SERVER_KEY = 'cp_distribuidor_markets' (flat — shared)
+- PROFILE_SERVER_KEY = 'cp_forn_profile_v1'
+- SESSION_KEY = 'cp_session_v1'
+
+## ⚠️ DEPLOY CRÍTICO — Netlify Functions NÃO deployadas via zip
+Quando se faz deploy via zip (API Netlify), as functions em netlify/functions/ NÃO são incluídas.
+O catch-all `/* /index.html 200` responde pelo /api/restore e /api/persist retornando HTML.
+
+**FIX IMPLEMENTADO (2025-08):** persistKey() e fetchAll() em Fornecedor.jsx + loadOffers/saveOrders
+em Ofertas.jsx agora usam localStorage como PRIMARY store e servidor como fallback.
+- Dados sempre escritos em localStorage (chave flat, sem namespace)
+- Fallback detecta resposta não-JSON (Content-Type check) antes de fazer JSON.parse
+- Cross-device sync ainda funciona quando functions estão deployadas (via netlify CLI --prod)
+- Para fazer deploy COM functions: `NETLIFY_AUTH_TOKEN=... NETLIFY_SITE_ID=... npx netlify deploy --prod`
+  (isso roda npm run build e deploya functions — leva ~5min)
+
+## Login credentials para demo/apresentação
+- Portal Corta Preço (mercado): admin / 1234 → https://zatendestock.netlify.app/login
+- Portal Distribuidor: megatudo / mega2024 → https://zatendestock.netlify.app/fornecedor
+- Cadastro de novos mercados: WhatsApp (011) 98595-0956
+
+## ZatendeStockLogo component
+- Arquivo: src/components/ZatendeStockLogo.jsx
+- variant="full": ícone SVG grande + wordmark + tagline (login screens)
+- variant="wordmark": ícone SVG 26px + wordmark inline (headers/sidebars)
+- Cores: azul #5462D8 ("Zatende"), verde #4ade80 ("Stock")
+- NÃO usa og-image.png — SVG puro, nunca quebra
