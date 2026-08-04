@@ -363,8 +363,36 @@ Essas chaves são acessadas por AMBOS os portais para comunicação cross-system
 4. Mercado faz pedido no Tab B → WhatsApp abre + Tab A atualiza badge "Pedidos" em ≤10s
 5. Fornecedor confirma pedido no Tab A → status muda para "confirmado"
 
-## Bugs corrigidos nessa versão (2026-08)
+## Bugs corrigidos (2026-08 TASK-8)
 1. `/ofertas` retornava 404 — `_redirects` mandava para function não deployada. Fix: `/* /index.html 200` simples
 2. Modal de identidade no `/ofertas` não aparecia na primeira visita — Fix: `useState(() => !hasSession)`
 3. Fornecedor não detectava novos pedidos sem reload — Fix: storage event + interval de 10s
 4. Ofertas não atualizava quando Fornecedor publicava oferta — Fix: storage event + `setRefreshAt`
+
+## Bugs corrigidos (2026-08 TASK-9/10 mobile+scanner+WA)
+5. **CRÍTICO — Netlify Functions não deployadas**: Todos os deploys anteriores via ZIP só enviavam `dist/`. As funções (`netlify/functions/`) NÃO eram incluídas. Resultado: `/api/restore` retornava HTML, `/api/persist` retornava 404, OG tags eram genéricas. Fix: usar Netlify CLI (`./node_modules/.bin/netlify deploy --prod --dir dist --functions netlify/functions --site ...`)
+6. **WhatsApp preview genérico**: `/ofertas?s=mega` mostrava OG tags do `index.html` em vez das do fornecedor. Fix: og-ofertas.js agora altera og:image além de og:title/og:description. Criado og-mega.png (1200x630, SVG→PNG via sharp) para Mega Tudo Barato.
+7. **og-ofertas.js CommonJS em pacote ESM**: Warning de bundler. Fix: convertido de `exports.handler` para `export const handler`.
+8. **WebSocket retry infinito no Netlify**: scan relay tentava reconectar a cada 3s pra sempre. Fix: backoff exponencial (3s→6s→12s→30s), para após 5 falhas.
+9. **Dashboard badge supplierOffers desatualizado**: store.jsx não ouvia a chave plana `cp_supplier_offers` no storage event. Fix: adicionado listener para essa chave.
+10. **Scanner inacessível no mobile**: indicador passivo "Scanner" no PDV virou botão clicável que abre /scan.
+11. **manifest.json start_url errado**: `"/fornecedor"` → `"/login"` para que mercados instalando o PWA abram tela correta.
+
+## Como deployar corretamente (com funções)
+```bash
+cd /workspace/project
+npm run build  # gera dist/
+./node_modules/.bin/netlify deploy --prod --dir dist --functions netlify/functions --site abd4863b-ef7b-4d7c-b3f2-85547f519485 --auth TOKEN
+```
+NÃO use deploy via ZIP API — não inclui funções!
+
+## Scanner — comportamento correto
+- **Mesmo device (PDV na aba 1 + /scan na aba 2)**: funciona via localStorage storage event ✅
+- **Cross-device (celular → PC diferente)**: NÃO funciona no Netlify (sem servidor WebSocket) ❌
+- **Fornecedor mobile**: CameraScanner standalone, funciona 100% sem relay ✅
+- **Estoque mobile**: /scan?mode=estoque funciona 100% standalone ✅
+
+## WhatsApp — como enviar ofertas
+- **INDIVIDUAL**: TabOfertas → clicar 📤 ao lado da oferta → BlastScreen → envia essa oferta específica
+- **TODAS DE UMA VEZ**: TabInicio → "📣 Disparar para todos" → usa buildDailyBlastMsg() → envia todas as offers ativas
+- **Preview do link**: compartilhar `https://zatendestock.netlify.app/ofertas?s=mega` → mostra "Mega Tudo Barato" + og-mega.png
