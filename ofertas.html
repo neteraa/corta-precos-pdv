@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <title>ZatendeStock – Portal de Ofertas</title>
+
+    <!-- Open Graph / WhatsApp preview — usado por crawlers (WhatsApp, Telegram, etc.)
+         Para preview por-fornecedor precisa de edge function (funciona via git deploy Netlify) -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:url"         content="https://zatendestock.netlify.app/ofertas" />
+    <meta property="og:title"       content="ZatendeStock – Portal de Ofertas" />
+    <meta property="og:description" content="Confira as ofertas exclusivas do seu fornecedor e faça seu pedido agora." />
+    <meta property="og:image"       content="https://zatendestock.netlify.app/og-image.png" />
+    <meta property="og:image:width"  content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card"        content="summary_large_image" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#10b981" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Ofertas ZatendeStock" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <style>
+      /* Previne flash branco antes do React hidrátar */
+      body { background: #050f1a; margin: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

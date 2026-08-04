@@ -1,0 +1,3 @@
+# OG tags dinâmicos por fornecedor — Netlify Function injeta og:title por ?s=TENANT_ID
+# Funciona para browser E bots (WhatsApp, Telegram, Google) sem Deno/Edge Function
+/ofertas  /.netlify/functions/og-ofertas  200

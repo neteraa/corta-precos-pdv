@@ -1,16 +1,17 @@
 [build]
-  command      = "npm run build"
-  publish      = "dist"
-  functions    = "netlify/functions"
-  edge_functions = "netlify/edge-functions"
+  command   = "npm run build"
+  publish   = "dist"
+  functions = "netlify/functions"
 
 [functions]
   node_bundler = "esbuild"
 
-# Edge function intercepta /ofertas para injetar OG tags dinâmicos por fornecedor
-[[edge_functions]]
-  path     = "/ofertas"
-  function = "og-ofertas"
+# /ofertas → função Node.js que injeta OG tags corretos por ?s=TENANT_ID
+# Funciona para browser E bots (WhatsApp, Telegram, Google)
+[[redirects]]
+  from   = "/ofertas"
+  to     = "/.netlify/functions/og-ofertas"
+  status = 200
 
 [[redirects]]
   from   = "/*"
