@@ -45,7 +45,8 @@ const MARKET_SESSION_KEY = 'cp_market_session_v1'  // identidade do mercado (sem
 const cleanPhone = p => '55' + (p || '').replace(/\D/g, '').replace(/^0/, '').slice(-11)
 
 async function saveOrders(orders) {
-  await fetch(API_PERSIST, {
+  try { localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)) } catch {}
+  fetch(API_PERSIST, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key: ORDERS_KEY, value: JSON.stringify(orders) }),
   }).catch(() => {})
@@ -53,11 +54,21 @@ async function saveOrders(orders) {
 
 async function reduceSupplierStock(offer) {
   try {
-    const r = await fetch(API_RESTORE)
-    const j = await r.json()
-    const raw = j?.data?.[ESTOQUE_KEY]
-    if (!raw) return
-    const estoque = JSON.parse(raw)
+    let estoque = null
+    try {
+      const r  = await fetch(API_RESTORE)
+      const ct = r.headers.get('content-type') || ''
+      if (ct.includes('application/json')) {
+        const j = await r.json()
+        if (j?.data?.[ESTOQUE_KEY]) estoque = JSON.parse(j.data[ESTOQUE_KEY])
+      }
+    } catch {}
+    if (!estoque) {
+      const local = localStorage.getItem(ESTOQUE_KEY)
+      if (!local) return
+      estoque = JSON.parse(local)
+    }
+    if (!estoque) return
     const idx = estoque.findIndex(e =>
       (offer.stockItemId && e.id === offer.stockItemId) ||
       (offer.sku && e.sku === offer.sku) ||
@@ -68,10 +79,11 @@ async function reduceSupplierStock(offer) {
       ? { ...e, qty: Math.max(0, e.qty - offer.qty), updatedAt: new Date().toISOString() }
       : e
     )
-    await fetch(API_PERSIST, {
+    try { localStorage.setItem(ESTOQUE_KEY, JSON.stringify(next)) } catch {}
+    fetch(API_PERSIST, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: ESTOQUE_KEY, value: JSON.stringify(next) }),
-    })
+    }).catch(() => {})
   } catch {}
 }
 
@@ -89,19 +101,30 @@ function expiryInfo(iso) {
 
 async function loadOffers() {
   try {
-    const r = await fetch(API_RESTORE)
-    const j = await r.json()
+    const r  = await fetch(API_RESTORE)
+    const ct = r.headers.get('content-type') || ''
+    if (!ct.includes('application/json')) throw new Error('not json')
+    const j  = await r.json()
     const raw = j?.data?.[OFFERS_KEY]
-    return raw ? JSON.parse(raw) : []
-  } catch { return [] }
+    if (raw) return JSON.parse(raw)
+    // server has no data yet — try localStorage (same-device / demo scenario)
+    const local = localStorage.getItem(OFFERS_KEY)
+    return local ? JSON.parse(local) : []
+  } catch {
+    // Server down — use localStorage written by Fornecedor.jsx persistKey
+    try { const v = localStorage.getItem(OFFERS_KEY); return v ? JSON.parse(v) : [] } catch { return [] }
+  }
 }
 
 async function saveOffers(offers) {
-  await fetch(API_PERSIST, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key: OFFERS_KEY, value: JSON.stringify(offers) }),
-  })
+  try { localStorage.setItem(OFFERS_KEY, JSON.stringify(offers)) } catch {}
+  try {
+    await fetch(API_PERSIST, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: OFFERS_KEY, value: JSON.stringify(offers) }),
+    })
+  } catch {}
 }
 
 /* ── OfferCard ──────────────────────────────────────────────── */
@@ -541,10 +564,13 @@ export default function Ofertas() {
   /* Supplier profile (logo + name) carregado do servidor */
   const [supplierProfile, setSupplierProfile] = useState(null)
   useEffect(() => {
-    fetch('/api/restore').then(r => r.json()).then(j => {
-      const raw = j?.data?.[supplierMeta.profileKey]
-      if (raw) setSupplierProfile(JSON.parse(raw))
-    }).catch(() => {})
+    fetch('/api/restore')
+      .then(r => r.headers.get('content-type')?.includes('json') ? r.json() : null)
+      .then(j => { const raw = j?.data?.[supplierMeta.profileKey]; if (raw) setSupplierProfile(JSON.parse(raw)) })
+      .catch(() => {
+        // fallback: read supplier profile from localStorage (written by Fornecedor.jsx)
+        try { const v = localStorage.getItem(supplierMeta.profileKey); if (v) setSupplierProfile(JSON.parse(v)) } catch {}
+      })
   }, [supplierMeta.profileKey])
 
   /* Identidade do mercado — PDV logado tem prioridade, senão usa sessão própria */
@@ -577,10 +603,20 @@ export default function Ofertas() {
   /* load + poll MY orders every 30s */
   async function loadMyOrders() {
     try {
-      const r = await fetch(API_RESTORE)
-      const j = await r.json()
-      const raw = j?.data?.[ORDERS_KEY]
-      const all = raw ? JSON.parse(raw) : []
+      let all = []
+      try {
+        const r  = await fetch(API_RESTORE)
+        const ct = r.headers.get('content-type') || ''
+        if (ct.includes('application/json')) {
+          const j = await r.json()
+          const raw = j?.data?.[ORDERS_KEY]
+          all = raw ? JSON.parse(raw) : []
+        }
+      } catch {}
+      if (!all.length) {
+        const local = localStorage.getItem(ORDERS_KEY)
+        all = local ? JSON.parse(local) : []
+      }
       const mine = all.filter(o =>
         (storePhone && o.storePhone && cleanPhone(o.storePhone) === cleanPhone(storePhone)) ||
         (storeName  && o.storeName  && o.storeName.toLowerCase() === storeName.toLowerCase())
@@ -650,10 +686,19 @@ export default function Ofertas() {
   async function handlePedido(orderData) {
     const order = { id: uid(), storeName, storePhone, ...orderData }
     try {
-      const r   = await fetch(API_RESTORE)
-      const j   = await r.json()
-      const raw = j?.data?.[ORDERS_KEY]
-      const existing = raw ? JSON.parse(raw) : []
+      let existing = []
+      try {
+        const r  = await fetch(API_RESTORE)
+        const ct = r.headers.get('content-type') || ''
+        if (ct.includes('application/json')) {
+          const j = await r.json()
+          existing = j?.data?.[ORDERS_KEY] ? JSON.parse(j.data[ORDERS_KEY]) : []
+        }
+      } catch {}
+      if (!existing.length) {
+        const local = localStorage.getItem(ORDERS_KEY)
+        if (local) existing = JSON.parse(local)
+      }
       await saveOrders([order, ...existing])
     } catch {}
 

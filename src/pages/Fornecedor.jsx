@@ -114,6 +114,9 @@ const today       = () => new Date().toISOString().slice(0, 10)
 const parseNum    = s  => parseFloat((s || '0').replace(',', '.')) || 0
 
 async function persistKey(key, value) {
+  // Always write to flat localStorage key (shared with Ofertas.jsx for same-device demo)
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+  // Best-effort server sync (Netlify Blobs — cross-device)
   try {
     await fetch(API_PERSIST, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -122,18 +125,33 @@ async function persistKey(key, value) {
   } catch {}
 }
 
+function fromLocalOrNull(key) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null } catch { return null }
+}
+
 async function fetchAll() {
   try {
-    const r = await fetch(API_RESTORE)
+    const r   = await fetch(API_RESTORE)
+    const ct  = r.headers.get('content-type') || ''
+    if (!ct.includes('application/json')) throw new Error('not JSON')
     const { data } = await r.json()
     return {
-      estoque:  data?.[ESTOQUE_KEY]       ? JSON.parse(data[ESTOQUE_KEY])       : [],
-      offers:   data?.[OFFERS_KEY]        ? JSON.parse(data[OFFERS_KEY])        : [],
-      orders:   data?.[ORDERS_KEY]        ? JSON.parse(data[ORDERS_KEY])        : [],
-      markets:  data?.[MKTS_SERVER_KEY]   ? JSON.parse(data[MKTS_SERVER_KEY])   : null,
-      profile:  data?.[PROFILE_SERVER_KEY]? JSON.parse(data[PROFILE_SERVER_KEY]): null,
+      estoque:  data?.[ESTOQUE_KEY]        ? JSON.parse(data[ESTOQUE_KEY])        : (fromLocalOrNull(ESTOQUE_KEY)  || []),
+      offers:   data?.[OFFERS_KEY]         ? JSON.parse(data[OFFERS_KEY])         : (fromLocalOrNull(OFFERS_KEY)   || []),
+      orders:   data?.[ORDERS_KEY]         ? JSON.parse(data[ORDERS_KEY])         : (fromLocalOrNull(ORDERS_KEY)   || []),
+      markets:  data?.[MKTS_SERVER_KEY]    ? JSON.parse(data[MKTS_SERVER_KEY])    : fromLocalOrNull(MKTS_SERVER_KEY),
+      profile:  data?.[PROFILE_SERVER_KEY] ? JSON.parse(data[PROFILE_SERVER_KEY]) : null,
     }
-  } catch { return { estoque: [], offers: [], orders: [], markets: null, profile: null } }
+  } catch {
+    // Server unavailable — fall back to flat localStorage (written by persistKey above)
+    return {
+      estoque: fromLocalOrNull(ESTOQUE_KEY)      || [],
+      offers:  fromLocalOrNull(OFFERS_KEY)       || [],
+      orders:  fromLocalOrNull(ORDERS_KEY)       || [],
+      markets: fromLocalOrNull(MKTS_SERVER_KEY),
+      profile: null,
+    }
+  }
 }
 
 function buildOfferMsg(offer, supplierName, supplierPhone) {
