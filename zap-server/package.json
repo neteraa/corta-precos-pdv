@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "pm2": "pm2 start server.js --name zap-server --restart-delay=3000",
+    "ngrok": "ngrok http --url=$NGROK_DOMAIN 3001"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "*",

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Auto-start do ZAP Server no Mac (launchd)
+  
+  1. Edita os caminhos abaixo (troca YOUR_USER)
+  2. cp com.zatendestock.zap.plist ~/Library/LaunchAgents/
+  3. launchctl load ~/Library/LaunchAgents/com.zatendestock.zap.plist
+  4. Para ver logs: tail -f /tmp/zap-server.log
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.zatendestock.zap</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/node</string>
+        <!-- TROCA o caminho abaixo para o seu diretório real -->
+        <string>/Users/YOUR_USER/zatendestock/zap-server/server.js</string>
+    </array>
+
+    <!-- Variáveis de ambiente opcionais -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>ZAP_PORT</key>
+        <string>3001</string>
+        <key>DELAY_MS</key>
+        <string>1500</string>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <!-- TROCA o caminho abaixo para o seu diretório real -->
+    <string>/Users/YOUR_USER/zatendestock/zap-server</string>
+
+    <!-- Reinicia automaticamente se travar -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Espera 5s antes de reiniciar -->
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+
+    <!-- Logs -->
+    <key>StandardOutPath</key>
+    <string>/tmp/zap-server.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/zap-server-error.log</string>
+
+    <!-- Inicia com o login do usuário -->
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>

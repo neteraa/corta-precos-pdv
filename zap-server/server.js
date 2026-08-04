@@ -25,9 +25,9 @@ const path      = require('path')
 const fs        = require('fs')
 
 /* ── Config ── */
-const PORT      = process.env.PORT || 3001
+const PORT      = process.env.ZAP_PORT || process.env.PORT || 3001
 const AUTH_DIR  = path.join(__dirname, 'auth')
-const DELAY_MS  = 1500   // delay entre mensagens pra não levar ban
+const DELAY_MS  = parseInt(process.env.DELAY_MS || '1500', 10)  // ms entre mensagens (anti-ban)
 
 /* ── Estado global ── */
 let sock        = null
@@ -121,15 +121,15 @@ function delay(ms) {
    ROTAS
 ───────────────────────────────────────────── */
 
-/* Status — ZatendeStock pinga aqui pra saber se o servidor está ativo */
-app.get('/status', (req, res) => {
-  res.json({
-    connected: isConnected,
-    phone: connectedPhone,
-    hasQR: !!qrString,
-    version: '1.0.0',
-  })
+/* Status / Ping — ZatendeStock pinga aqui pra saber se o servidor está ativo */
+const statusHandler = (req, res) => res.json({
+  connected: isConnected,
+  phone: connectedPhone,
+  hasQR: !!qrString,
+  version: '1.1.0',
 })
+app.get('/status', statusHandler)
+app.get('/ping',   statusHandler)  // alias
 
 /* Envia para UM número */
 app.post('/send', async (req, res) => {
@@ -191,8 +191,12 @@ app.post('/logout', async (req, res) => {
    START
 ───────────────────────────────────────────── */
 app.listen(PORT, () => {
-  console.log(`\n🚚 ZatendeStock ZAP Server`)
-  console.log(`📡 Porta: ${PORT}`)
-  console.log(`📁 Auth: ${AUTH_DIR}\n`)
+  console.log(`\n🚚 ZatendeStock ZAP Server v1.1`)
+  console.log(`📡 Local:  http://localhost:${PORT}`)
+  console.log(`📁 Auth:   ${AUTH_DIR}`)
+  console.log(`\n── Para expor via ngrok (URL estática):`)
+  console.log(`   ngrok http --url=SEU-DOMINIO.ngrok-free.app ${PORT}`)
+  console.log(`\n── Para rodar em VPS (portas HTTP):`)
+  console.log(`   ZAP_PORT=80 node server.js   (ou use nginx como proxy)\n`)
   connectWA()
 })
