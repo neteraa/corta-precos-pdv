@@ -2539,13 +2539,13 @@ export default function Fornecedor() {
     setProfile(prof)
     localStorage.setItem(LOCAL, JSON.stringify(prof))
 
-    // Pre-seed markets on first login for this tenant
-    const savedMkts = (() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) } catch { return null } })()
-    if ((!savedMkts || savedMkts.length === 0) && tenant.seedMarkets?.length) {
-      setMarkets(tenant.seedMarkets)
-      localStorage.setItem(MKTS_KEY, JSON.stringify(tenant.seedMarkets))
-    } else if (savedMkts) {
-      setMarkets(savedMkts)
+    // Merge seed markets into existing — ensures demo clients always present
+    if (tenant.seedMarkets?.length) {
+      const savedMkts = (() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })()
+      const existingIds = new Set(savedMkts.map(m => m.id))
+      const merged = [...savedMkts, ...tenant.seedMarkets.filter(m => !existingIds.has(m.id))]
+      setMarkets(merged)
+      localStorage.setItem(MKTS_KEY, JSON.stringify(merged))
     }
   }
 
