@@ -101,19 +101,25 @@ function expiryInfo(iso) {
 }
 
 async function loadOffers() {
+  const fromLocal = () => {
+    try { const v = localStorage.getItem(OFFERS_KEY); return v ? JSON.parse(v) : [] } catch { return [] }
+  }
   try {
     const r  = await fetch(API_RESTORE)
     const ct = r.headers.get('content-type') || ''
     if (!ct.includes('application/json')) throw new Error('not json')
     const j  = await r.json()
     const raw = j?.data?.[OFFERS_KEY]
-    if (raw) return JSON.parse(raw)
-    // server has no data yet — try localStorage (same-device / demo scenario)
-    const local = localStorage.getItem(OFFERS_KEY)
-    return local ? JSON.parse(local) : []
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      // If server has data, use it. If server has empty array, prefer localStorage
+      // (covers case where functions were just deployed but Fornecedor hasn't synced yet)
+      if (parsed.length > 0) return parsed
+    }
+    // No server data (or empty) — try localStorage
+    return fromLocal()
   } catch {
-    // Server down — use localStorage written by Fornecedor.jsx persistKey
-    try { const v = localStorage.getItem(OFFERS_KEY); return v ? JSON.parse(v) : [] } catch { return [] }
+    return fromLocal()
   }
 }
 
