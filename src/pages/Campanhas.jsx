@@ -130,16 +130,6 @@ export default function Campanhas() {
     setShowSearch(false)
   }, [])
 
-  /* open wa.me for one customer at a time (local mode) */
-  const openNextWaMe = useCallback((idx) => {
-    const list = audienceList.filter(hasPhone)
-    if (idx >= list.length) { setLocalMode(false); setLocalIdx(0); return }
-    const c = list[idx]
-    const text = encodeURIComponent(renderMsg(template, c))
-    window.open(`https://wa.me/${cleanPhone(c.phone)}?text=${text}`, '_blank')
-    setLocalIdx(idx + 1)
-  }, [audienceList, template])
-
   /* ── audience list ── */
   const fiados = useMemo(() => {
     const map = {}
@@ -222,6 +212,15 @@ export default function Campanhas() {
     setResults({ ok, fail })
     setSending(false)
   }
+
+  /* open wa.me for one customer at a time (local mode, no server needed) */
+  const openNextWaMe = useCallback((idx) => {
+    const list = audienceList.filter(hasPhone)
+    if (idx >= list.length) { setLocalMode(false); setLocalIdx(0); return }
+    const c = list[idx]
+    window.open(`https://wa.me/${cleanPhone(c.phone)}?text=${encodeURIComponent(renderMsg(template, c))}`, '_blank')
+    setLocalIdx(idx + 1)
+  }, [audienceList, template])
 
   /* ── save zatende config ── */
   const saveCfg = (e) => {
