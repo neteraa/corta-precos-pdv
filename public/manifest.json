@@ -2,7 +2,7 @@
   "name": "ZatendeStock",
   "short_name": "ZatendeStock",
   "description": "Gestão de estoque, ofertas e pedidos para distribuidoras e mercados",
-  "start_url": "/fornecedor",
+  "start_url": "/login",
   "display": "standalone",
   "background_color": "#050f1a",
   "theme_color": "#10b981",

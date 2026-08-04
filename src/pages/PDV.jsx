@@ -481,11 +481,15 @@ export default function PDV() {
 
           {/* RIGHT: controls row */}
           <div className="flex items-center gap-2 flex-wrap justify-end flex-shrink-0">
-            {/* scanner */}
-            <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 text-green-400 text-xs font-semibold px-2.5 py-1.5 rounded-full">
+            {/* scanner — tap on mobile or press F3 on desktop */}
+            <button
+              onClick={() => window.open('/scan', 'cp_scan', 'width=400,height=700')}
+              className="flex items-center gap-1.5 bg-white/5 border border-white/10 text-green-400 text-xs font-semibold px-2.5 py-1.5 rounded-full hover:bg-green-900/30 hover:border-green-500/30 active:scale-95 transition-all"
+              title="Abrir scanner de câmera (F3)"
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
-              Scanner
-            </div>
+              📷 Scanner
+            </button>
 
             {/* F-key quick bar */}
             <div className="hidden lg:flex items-center gap-1 flex-wrap">

@@ -19,31 +19,55 @@ function wsUrl() {
   return `${proto}://${window.location.host}/ws/scan`
 }
 
+// Exponential backoff: 3s → 6s → 12s → 30s → stops after 5 failures.
+// On Netlify there is no /ws/scan endpoint; localStorage is the live fallback.
+function makeReconnector(factory, maxAttempts = 5) {
+  let attempts = 0
+  let dead = false
+  let ws = null
+  let timer = null
+
+  function connect() {
+    if (dead) return
+    try {
+      ws = factory(
+        () => { attempts = 0 },                                       // onopen — reset counter
+        () => {                                                        // onclose
+          if (dead) return
+          attempts++
+          if (attempts >= maxAttempts) { dead = true; return }        // give up silently
+          const delay = Math.min(3000 * 2 ** (attempts - 1), 30_000) // 3s 6s 12s 24s 30s
+          timer = setTimeout(connect, delay)
+        }
+      )
+    } catch {}
+  }
+  connect()
+  return { get ws() { return ws }, stop() { dead = true; clearTimeout(timer); ws?.close() } }
+}
+
 /* ── SENDER (used in ScanMobile) ──────────────────────────── */
 export function useScanSender() {
   const wsRef = useRef(null)
 
   useEffect(() => {
-    let ws
-    const connect = () => {
-      try {
-        ws = new WebSocket(wsUrl())
-        ws.onopen  = () => { wsRef.current = ws }
-        ws.onclose = () => { wsRef.current = null; setTimeout(connect, 3000) }
-        ws.onerror = () => ws.close()
-      } catch {}
-    }
-    connect()
-    return () => ws?.close()
+    const r = makeReconnector((onopen, onclose) => {
+      const ws = new WebSocket(wsUrl())
+      ws.onopen  = () => { wsRef.current = ws; onopen() }
+      ws.onclose = () => { wsRef.current = null; onclose() }
+      ws.onerror = () => ws.close()
+      return ws
+    })
+    return () => r.stop()
   }, [])
 
   return (code) => {
     const payload = JSON.stringify({ code, ts: Date.now() })
-    // 1. WebSocket (cross-device)
+    // 1. WebSocket (cross-device — only when server supports /ws/scan)
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(payload)
     }
-    // 2. localStorage (same-browser fallback)
+    // 2. localStorage (same-browser fallback — always written)
     try {
       localStorage.removeItem(LS_KEY)
       localStorage.setItem(LS_KEY, payload)
@@ -57,7 +81,6 @@ export function useScanReceiver(onCode) {
   useEffect(() => { onCodeRef.current = onCode }, [onCode])
 
   useEffect(() => {
-    let ws
     const handle = (raw) => {
       try {
         const { code } = JSON.parse(raw)
@@ -65,17 +88,16 @@ export function useScanReceiver(onCode) {
       } catch {}
     }
 
-    const connect = () => {
-      try {
-        ws = new WebSocket(wsUrl())
-        ws.onmessage = (e) => handle(e.data)
-        ws.onclose   = () => setTimeout(connect, 3000)
-        ws.onerror   = () => ws.close()
-      } catch {}
-    }
-    connect()
+    const r = makeReconnector((onopen, onclose) => {
+      const ws = new WebSocket(wsUrl())
+      ws.onopen    = onopen
+      ws.onmessage = (e) => handle(e.data)
+      ws.onclose   = onclose
+      ws.onerror   = () => ws.close()
+      return ws
+    })
 
-    // localStorage fallback (same-browser multi-tab)
+    // localStorage fallback (same-browser multi-tab — always active)
     const onStorage = (e) => {
       if (e.key !== LS_KEY || !e.newValue) return
       handle(e.newValue)
@@ -83,7 +105,7 @@ export function useScanReceiver(onCode) {
     window.addEventListener('storage', onStorage)
 
     return () => {
-      ws?.close()
+      r.stop()
       window.removeEventListener('storage', onStorage)
     }
   }, []) // eslint-disable-line

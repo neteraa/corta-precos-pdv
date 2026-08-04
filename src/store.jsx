@@ -248,6 +248,8 @@ export function StoreProvider({ children }) {
         if (e.key === mktKey('cp_sales')    && e.newValue) setSales(JSON.parse(e.newValue))
         if (e.key === mktKey('cp_promos')   && e.newValue) setPromos(JSON.parse(e.newValue))
         if (e.key === mktKey('cp_customers')&& e.newValue) setCustomers(JSON.parse(e.newValue))
+        // Cross-system: Fornecedor writes flat key → Dashboard badge updates immediately
+        if (e.key === 'cp_supplier_offers'  && e.newValue) setSupplierOffers(JSON.parse(e.newValue))
       } catch {}
     }
     window.addEventListener('storage', onStorage)
