@@ -2657,7 +2657,7 @@ export default function Fornecedor() {
   }
 
   /* ── Auth handlers ── */
-  function handleLogin(tenant) {
+  async function handleLogin(tenant) {
     const s = { id: tenant.id, username: tenant.username }
     setSession(s)
     localStorage.setItem(SESSION_KEY, JSON.stringify(s))
@@ -2668,15 +2668,14 @@ export default function Fornecedor() {
     setProfile(prof)
     localStorage.setItem(LOCAL, JSON.stringify(prof))
 
-    // Merge seed markets; remove any known fake/demo IDs
-    if (tenant.seedMarkets?.length || tenant.purgeFakeIds?.length) {
-      const savedMkts = (() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })()
-      const fakeSet   = new Set(tenant.purgeFakeIds || [])
-      const cleaned   = savedMkts.filter(m => !fakeSet.has(m.id))
-      const existingIds = new Set(cleaned.map(m => m.id))
-      const merged    = [...cleaned, ...(tenant.seedMarkets || []).filter(m => !existingIds.has(m.id))]
+    // Merge seed markets into both localStorage AND server
+    if (tenant.seedMarkets?.length) {
+      const savedMkts   = (() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })()
+      const existingIds = new Set(savedMkts.map(m => m.id))
+      const merged      = [...savedMkts, ...tenant.seedMarkets.filter(m => !existingIds.has(m.id))]
       setMarkets(merged)
       localStorage.setItem(MKTS_KEY, JSON.stringify(merged))
+      persistKey(MKTS_SERVER_KEY, merged)   // persiste no servidor para cross-device
     }
   }
 
@@ -2691,10 +2690,14 @@ export default function Fornecedor() {
     setEstoque(e)
     setOffers(o.filter(of => of.supplierId === LOCAL || !of.supplierId))
     setOrders(ord)
-    // markets: server takes priority over localStorage when available
+    // markets: merge server data with localStorage seed (localStorage has priority for seed entries)
+    const localMkts = (() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })()
     if (mkt !== null) {
-      setMarkets(mkt)
-      try { localStorage.setItem(MKTS_KEY, JSON.stringify(mkt)) } catch {}
+      // Server returned markets: merge with local (local seed IDs win)
+      const serverIds = new Set(mkt.map(m => m.id))
+      const merged = [...mkt, ...localMkts.filter(m => !serverIds.has(m.id))]
+      setMarkets(merged)
+      try { localStorage.setItem(MKTS_KEY, JSON.stringify(merged)) } catch {}
     }
     setSyncing(false)
     setSynced(true)
@@ -2702,19 +2705,38 @@ export default function Fornecedor() {
 
   useEffect(() => { sync() }, [sync])
 
-  // Auto-seed demo data for tenant with autoSeedDemo flag — only when account is brand new
+  // Auto-seed demo data — ALWAYS merge after sync (dedup by ID; safe for real data)
   useEffect(() => {
     if (!synced || !session) return
     const tenant = TENANTS.find(t => t.id === session.id)
     if (!tenant?.autoSeedDemo) return
-    // Only seed if account is completely empty after sync
-    if (estoque.length > 0 || offers.length > 0 || orders.length > 0) return
-    setEstoque(DEMO_ESTOQUE)
-    setOffers(DEMO_OFFERS)
-    setOrders(DEMO_ORDERS_HIST)
-    persistKey(ESTOQUE_KEY, DEMO_ESTOQUE)
-    persistKey(OFFERS_KEY,  DEMO_OFFERS)
-    persistKey(ORDERS_KEY,  DEMO_ORDERS_HIST)
+
+    setOrders(prev => {
+      const ids = new Set(prev.map(o => o.id))
+      const merged = [...prev, ...DEMO_ORDERS_HIST.filter(o => !ids.has(o.id))]
+      persistKey(ORDERS_KEY, merged)
+      return merged
+    })
+    setOffers(prev => {
+      const ids = new Set(prev.map(o => o.id))
+      const merged = [...prev, ...DEMO_OFFERS.filter(o => !ids.has(o.id))]
+      persistKey(OFFERS_KEY, merged)
+      return merged
+    })
+    setEstoque(prev => {
+      const ids = new Set(prev.map(e => e.id))
+      const merged = [...prev, ...DEMO_ESTOQUE.filter(e => !ids.has(e.id))]
+      persistKey(ESTOQUE_KEY, merged)
+      return merged
+    })
+    // Ensure seed markets are in server (for cross-device)
+    setMarkets(prev => {
+      const ids = new Set(prev.map(m => m.id))
+      const merged = [...prev, ...(tenant.seedMarkets || []).filter(m => !ids.has(m.id))]
+      localStorage.setItem(MKTS_KEY, JSON.stringify(merged))
+      persistKey(MKTS_SERVER_KEY, merged)
+      return merged
+    })
   }, [synced]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const prev = document.title
