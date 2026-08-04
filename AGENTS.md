@@ -1,4 +1,4 @@
-# Corta Preços MVP — Project Notes
+# Corta Preços MVP — Project Notes (v4.0 — 2026-08)
 
 ## What this is
 React + Vite + Tailwind MVP platform for retail management (PDV/automação comercial), Brazilian supermarket.
