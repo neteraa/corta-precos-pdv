@@ -14,6 +14,7 @@ import CameraScanner from '../components/CameraScanner.jsx'
 import PRODUCTS_SEED from '../utils/products_seed.json'
 import { fornKey, migrateToNamespace } from '../utils/tenantStorage.js'
 import Footer from '../components/Footer.jsx'
+import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
 
 const BRL         = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const LOCAL       = 'cp_fornecedor_v1'
@@ -872,11 +873,8 @@ function SetupScreen({ onDone }) {
   return (
     <div style={{ minHeight:'100dvh', background:'#050f1a', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
       <div style={{ textAlign:'center', marginBottom:24 }}>
-        <div style={{ width:72, height:72, borderRadius:22, background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
-          <Truck size={36} color="#fff" />
-        </div>
-        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:28 }}>DISTRIBUIDOR</div>
-        <div style={{ color:'#10b981', fontSize:14, marginTop:4 }}>
+        <ZatendeStockLogo variant="banner" style={{ maxWidth:220 }} />
+        <div style={{ color:'#10b981', fontSize:14, marginTop:10, fontWeight:700 }}>
           {saved.name ? `Bem-vindo de volta, ${saved.name.split(' ')[0]}!` : 'Portal do Distribuidor'}
         </div>
       </div>
@@ -3022,12 +3020,9 @@ function LoginPage({ onLogin }) {
     <div style={{ minHeight:'100vh', background:'#050f1a', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'24px 20px' }}>
 
       {/* Platform branding */}
-      <div style={{ textAlign:'center', marginBottom:36 }}>
-        <div style={{ width:80, height:80, borderRadius:24, background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px', boxShadow:'0 12px 40px rgba(16,185,129,0.35)' }}>
-          <Truck size={38} color="#fff" />
-        </div>
-        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:28, letterSpacing:'-0.02em' }}>ZatendeStock</div>
-        <div style={{ color:'#10b981', fontSize:13, fontWeight:700, marginTop:4, textTransform:'uppercase', letterSpacing:'0.1em' }}>Portal do Distribuidor</div>
+      <div style={{ textAlign:'center', marginBottom:32 }}>
+        <ZatendeStockLogo variant="banner" style={{ maxWidth:260 }} />
+        <div style={{ color:'#10b981', fontSize:12, fontWeight:700, marginTop:10, textTransform:'uppercase', letterSpacing:'0.12em' }}>Portal do Distribuidor</div>
       </div>
 
       {/* Login card */}
@@ -3447,7 +3442,7 @@ export default function Fornecedor() {
       )}
 
       {/* ── HEADER ── */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px 10px', background:'#060e1a', borderBottom:`1px solid ${(profile.themeColor||'#10b981')}22`, position:'sticky', top:0, zIndex:10 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr auto 1fr', alignItems:'center', padding:'10px 14px 8px', background:'#060e1a', borderBottom:`1px solid ${(profile.themeColor||'#10b981')}22`, position:'sticky', top:0, zIndex:10 }}>
         <button onClick={() => setEditingProfile(true)} style={{ display:'flex', alignItems:'center', gap:10, background:'none', border:'none', cursor:'pointer', padding:0, flex:1, minWidth:0 }}>
           {/* Logo circle with initials or truck icon */}
           <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${profile.themeColor||'#10b981'},${(profile.themeColor||'#10b981')}aa)`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:`0 4px 12px ${(profile.themeColor||'#10b981')}44`, overflow:'hidden' }}>
@@ -3469,7 +3464,11 @@ export default function Fornecedor() {
             }
           </div>
         </button>
-        <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+
+        {/* ── center: ZatendeStock platform brand ── */}
+        <ZatendeStockLogo variant="wordmark" style={{ justifyContent:'center' }} />
+
+        <div style={{ display:'flex', gap:6, alignItems:'center', justifyContent:'flex-end' }}>
           <button onClick={sync} disabled={syncing} style={{ background:'none', border:'none', cursor:'pointer', color:'#475569', padding:4 }}>
             <RefreshCw size={16} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
           </button>

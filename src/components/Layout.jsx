@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import Footer from './Footer.jsx'
+import ZatendeStockLogo from './ZatendeStockLogo.jsx'
 import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
   Warehouse, Users, Settings, Menu, Phone, Instagram,
@@ -70,7 +71,12 @@ const EXTRAS = [
 function SidebarLogo() {
   return (
     <div className="px-4 pt-5 pb-4">
-      {/* brand block */}
+      {/* ZatendeStock platform brand */}
+      <div className="mb-3 flex items-center justify-center py-2 px-3 rounded-xl bg-gray-900/60 border border-gray-800">
+        <ZatendeStockLogo variant="wordmark" />
+      </div>
+
+      {/* Corta Preço brand block */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-orange-700 p-4 shadow-lg shadow-orange-900/40">
         {/* decorative scissors watermark */}
         <svg className="absolute -right-3 -top-3 w-20 h-20 text-black/10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
