@@ -7,9 +7,34 @@ import { Truck, Package, Check, X, Clock, ChevronDown, ChevronUp,
          Phone, MessageCircle, Star } from 'lucide-react'
 import { useStore, BRL, fmtDate } from '../store.jsx'
 
-const OFFERS_KEY  = 'cp_supplier_offers'
-const API_PERSIST = '/api/persist'
-const API_RESTORE = '/api/restore'
+const OFFERS_KEY   = 'cp_supplier_offers'
+const ESTOQUE_KEY  = 'cp_fornecedor_estoque'
+const API_PERSIST  = '/api/persist'
+const API_RESTORE  = '/api/restore'
+
+async function reduceSupplierStock(offer) {
+  try {
+    const r = await fetch(API_RESTORE)
+    const j = await r.json()
+    const raw = j?.data?.[ESTOQUE_KEY]
+    if (!raw) return
+    const estoque = JSON.parse(raw)
+    const idx = estoque.findIndex(e =>
+      (offer.stockItemId && e.id === offer.stockItemId) ||
+      (offer.sku && e.sku === offer.sku) ||
+      e.productName?.toLowerCase() === offer.productName?.toLowerCase()
+    )
+    if (idx < 0) return
+    const next = estoque.map((e, i) => i === idx
+      ? { ...e, qty: Math.max(0, e.qty - offer.qty), updatedAt: new Date().toISOString() }
+      : e
+    )
+    await fetch(API_PERSIST, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: ESTOQUE_KEY, value: JSON.stringify(next) }),
+    })
+  } catch {}
+}
 
 /* ── helpers ────────────────────────────────────────────────── */
 const daysUntil = iso => iso ? Math.ceil((new Date(iso + 'T00:00') - Date.now()) / 86400000) : null
@@ -197,7 +222,7 @@ export default function Ofertas() {
     setTimeout(() => setToast(null), 3500)
   }
 
-  /* accept → update blob + add to Receber Mercadoria (store) */
+  /* accept → update offer status + update market stock + reduce supplier stock */
   async function handleAccept(offer) {
     setAccepting(true)
     try {
@@ -205,7 +230,10 @@ export default function Ofertas() {
       setOffers(updated)
       await saveOffers(updated)
 
-      /* try to find product in store and update stock */
+      /* 1. reduce supplier stock (baixa automática no estoque do fornecedor) */
+      await reduceSupplierStock(offer)
+
+      /* 2. try to find product in market store and update stock */
       const existing = offer.productId ? products.find(p => p.id === offer.productId)
         : products.find(p => p.sku === offer.sku || p.name.toLowerCase() === offer.productName.toLowerCase())
 

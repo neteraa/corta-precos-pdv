@@ -1,13 +1,16 @@
 /**
- * /fornecedor — Portal do Fornecedor
- * Standalone mobile-first app — sem auth do mercado, tema verde esmeralda
+ * /fornecedor — Portal do Fornecedor (Sistema Independente)
+ * Sistema separado, vendido para fornecedores/distribuidoras.
+ * Tema verde esmeralda. Sem auth do mercado.
+ * Fluxo: recebe carreta → registra estoque → dispara pra mercados → baixa automática ao aceite.
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Truck, Package, Users, Plus, Camera, Search, Check, Trash2, X,
-  ChevronRight, Phone, Share2, Zap, MessageCircle, ArrowLeft,
-  Clock, Star, AlertCircle, CheckCircle, BarChart3, Edit3,
-  ShoppingCart, Scan, Send, ChevronDown, Info, Copy
+  ChevronRight, Phone, MessageCircle, ArrowLeft, LayoutDashboard,
+  ClipboardList, AlertCircle, CheckCircle, BarChart3,
+  ShoppingCart, Send, TrendingUp, Boxes, CircleDollarSign, Star,
+  ArrowDownToLine, RefreshCw, Edit2
 } from 'lucide-react'
 import CameraScanner from '../components/CameraScanner.jsx'
 import PRODUCTS_SEED from '../utils/products_seed.json'
