@@ -1,0 +1,381 @@
+/**
+ * /ofertas — Mercado recebe e aceita ofertas do fornecedor
+ */
+import React, { useState, useEffect, useMemo } from 'react'
+import { Truck, Package, Check, X, Clock, ChevronDown, ChevronUp,
+         Filter, RefreshCw, ShoppingCart, AlertTriangle, CheckCircle,
+         Phone, MessageCircle, Star } from 'lucide-react'
+import { useStore, BRL, fmtDate } from '../store.jsx'
+
+const OFFERS_KEY  = 'cp_supplier_offers'
+const API_PERSIST = '/api/persist'
+const API_RESTORE = '/api/restore'
+
+/* ── helpers ────────────────────────────────────────────────── */
+const daysUntil = iso => iso ? Math.ceil((new Date(iso + 'T00:00') - Date.now()) / 86400000) : null
+
+function expiryInfo(iso) {
+  const d = daysUntil(iso)
+  if (d === null) return null
+  if (d < 0)   return { label: 'VENCIDO',         cls: 'text-red-400',    bg: 'bg-red-900/40',   border: 'border-red-800' }
+  if (d <= 7)  return { label: `Vence em ${d}d`,   cls: 'text-orange-400', bg: 'bg-orange-900/40',border: 'border-orange-800' }
+  if (d <= 30) return { label: `Vence em ${d} dias`,cls: 'text-yellow-400',bg: 'bg-yellow-900/30',border: 'border-yellow-800' }
+  return            { label: `Vence em ${d} dias`, cls: 'text-green-400',  bg: 'bg-green-900/20', border: 'border-green-900' }
+}
+
+async function loadOffers() {
+  try {
+    const r = await fetch(API_RESTORE)
+    const j = await r.json()
+    const raw = j?.data?.[OFFERS_KEY]
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+async function saveOffers(offers) {
+  await fetch(API_PERSIST, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: OFFERS_KEY, value: JSON.stringify(offers) }),
+  })
+}
+
+/* ── OfferCard ──────────────────────────────────────────────── */
+function OfferCard({ offer, onAccept, onReject, onReceive, accepting }) {
+  const [expanded, setExpanded] = useState(false)
+  const expiry   = expiryInfo(offer.expiryDate)
+  const accepted = offer.status === 'accepted'
+  const rejected = offer.status === 'rejected'
+  const received = offer.status === 'received'
+  const isPending = offer.status === 'pending'
+  const isOpp = offer.isOpportunity
+
+  return (
+    <div className={`rounded-2xl border mb-4 overflow-hidden transition-all ${
+      isOpp ? 'border-amber-700/60' : 'border-gray-800'
+    } ${rejected ? 'opacity-50' : ''}`}
+      style={{ background: isOpp ? '#1a1200' : '#111827' }}>
+
+      {isOpp && (
+        <div className="flex items-center gap-2 px-4 py-2 text-xs font-black text-amber-300"
+          style={{ background: 'linear-gradient(90deg,#78350f,#92400e)' }}>
+          🔥 OPORTUNIDADE — Produto com oferta especial!
+        </div>
+      )}
+
+      <div className="p-4">
+        <div className="flex items-start gap-3">
+          {/* Icon */}
+          <div className={`w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center ${
+            isOpp ? 'bg-amber-900/50' : 'bg-gray-800'
+          }`}>
+            <Package size={22} className={isOpp ? 'text-amber-400' : 'text-emerald-400'} />
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-bold text-[15px] leading-tight truncate">
+              {offer.productName}
+            </div>
+            {offer.sku && (
+              <div className="text-gray-500 text-[11px] font-mono mt-0.5">{offer.sku}</div>
+            )}
+            <div className="flex flex-wrap gap-2 mt-2 items-center">
+              <span className="text-emerald-400 font-black text-lg">{BRL.format(offer.offerPrice)}</span>
+              <span className="text-xs font-bold text-gray-500">/un</span>
+              <span className="bg-gray-800 text-blue-300 text-[11px] font-bold px-2 py-0.5 rounded-lg">
+                {offer.qty} {offer.unit}
+              </span>
+              {expiry && (
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg ${expiry.bg} ${expiry.cls} border ${expiry.border}`}>
+                  📅 {expiry.label}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Status badge */}
+          <div className="flex-shrink-0">
+            {accepted && <span className="text-[11px] font-black text-emerald-400 bg-emerald-900/40 px-2 py-1 rounded-lg">✓ Aceita</span>}
+            {received && <span className="text-[11px] font-black text-blue-400 bg-blue-900/40 px-2 py-1 rounded-lg">✓ Recebida</span>}
+            {rejected && <span className="text-[11px] font-black text-red-400 bg-red-900/40 px-2 py-1 rounded-lg">✗ Recusada</span>}
+          </div>
+        </div>
+
+        {/* Supplier + date */}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-800">
+          <div className="flex items-center gap-2">
+            <Truck size={13} className="text-gray-500" />
+            <span className="text-gray-400 text-xs font-semibold">{offer.supplierName}</span>
+          </div>
+          <button onClick={() => setExpanded(v => !v)}
+            className="flex items-center gap-1 text-gray-500 text-[11px]">
+            {new Date(offer.publishedAt).toLocaleString('pt-BR', { day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit' })}
+            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
+        </div>
+
+        {/* Expanded note */}
+        {expanded && offer.note && (
+          <div className="mt-3 bg-gray-800/50 rounded-xl p-3">
+            <div className="text-gray-400 text-xs font-bold mb-1">💬 OBSERVAÇÃO</div>
+            <div className="text-gray-300 text-sm italic">{offer.note}</div>
+          </div>
+        )}
+
+        {/* Value calc */}
+        {expanded && (
+          <div className="mt-3 bg-gray-800/30 rounded-xl p-3 grid grid-cols-3 gap-3 text-center">
+            <div>
+              <div className="text-emerald-400 font-black text-base">{BRL.format(offer.offerPrice)}</div>
+              <div className="text-gray-500 text-[10px]">por unidade</div>
+            </div>
+            <div>
+              <div className="text-blue-400 font-black text-base">{offer.qty} {offer.unit}</div>
+              <div className="text-gray-500 text-[10px]">disponível</div>
+            </div>
+            <div>
+              <div className="text-amber-400 font-black text-base">
+                {BRL.format(offer.offerPrice * offer.qty)}
+              </div>
+              <div className="text-gray-500 text-[10px]">total lote</div>
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        {isPending && (
+          <div className="flex gap-3 mt-4">
+            <button
+              onClick={() => onAccept(offer)}
+              disabled={accepting}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm text-white transition-all"
+              style={{ background: 'linear-gradient(135deg,#10b981,#059669)',
+                opacity: accepting ? 0.6 : 1 }}>
+              <Check size={16} />
+              Aceitar + Receber Mercadoria
+            </button>
+            <button
+              onClick={() => onReject(offer.id)}
+              className="px-4 py-3 rounded-xl font-bold text-sm text-gray-400 bg-gray-800 hover:bg-gray-700 transition-all">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {accepted && (
+          <button
+            onClick={() => onReceive(offer)}
+            className="w-full mt-3 py-2.5 rounded-xl font-bold text-sm text-blue-300 bg-blue-900/30 border border-blue-800 hover:bg-blue-900/50 transition-all flex items-center justify-center gap-2">
+            <ShoppingCart size={15} />
+            Abrir Receber Mercadoria
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ── MAIN ───────────────────────────────────────────────────── */
+export default function Ofertas() {
+  const { upsertProduct, products }  = useStore()
+  const [offers,    setOffers]    = useState([])
+  const [loading,   setLoading]   = useState(true)
+  const [accepting, setAccepting] = useState(false)
+  const [filter,    setFilter]    = useState('all')  // all | pending | accepted | opportunity
+  const [toast,     setToast]     = useState(null)
+  const [refreshAt, setRefreshAt] = useState(Date.now())
+
+  /* load */
+  useEffect(() => {
+    setLoading(true)
+    loadOffers().then(o => { setOffers(o); setLoading(false) })
+  }, [refreshAt])
+
+  function showToast(msg, type = 'success') {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  /* accept → update blob + add to Receber Mercadoria (store) */
+  async function handleAccept(offer) {
+    setAccepting(true)
+    try {
+      const updated = offers.map(o => o.id === offer.id ? { ...o, status: 'accepted', acceptedAt: new Date().toISOString() } : o)
+      setOffers(updated)
+      await saveOffers(updated)
+
+      /* try to find product in store and update stock */
+      const existing = offer.productId ? products.find(p => p.id === offer.productId)
+        : products.find(p => p.sku === offer.sku || p.name.toLowerCase() === offer.productName.toLowerCase())
+
+      if (existing) {
+        upsertProduct({
+          ...existing,
+          stock: (existing.stock || 0) + offer.qty,
+          expiryDate: offer.expiryDate || existing.expiryDate,
+          cost: offer.offerPrice,
+        })
+        showToast(`✅ ${offer.productName} — estoque atualizado! +${offer.qty} ${offer.unit}`)
+      } else {
+        showToast(`✅ Oferta aceita! Produto não encontrado no cadastro — confira em Estoque.`, 'warn')
+      }
+    } catch (e) {
+      showToast('Erro ao aceitar oferta', 'error')
+    }
+    setAccepting(false)
+  }
+
+  /* reject */
+  async function handleReject(id) {
+    const updated = offers.map(o => o.id === id ? { ...o, status: 'rejected' } : o)
+    setOffers(updated)
+    await saveOffers(updated)
+    showToast('Oferta recusada')
+  }
+
+  /* mark as received (open /estoque manually) */
+  function handleReceive(offer) {
+    window.location.href = '/estoque'
+  }
+
+  /* filtered */
+  const filtered = useMemo(() => {
+    const sorted = [...offers].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
+    if (filter === 'pending')      return sorted.filter(o => o.status === 'pending')
+    if (filter === 'accepted')     return sorted.filter(o => o.status === 'accepted')
+    if (filter === 'opportunity')  return sorted.filter(o => o.isOpportunity)
+    return sorted
+  }, [offers, filter])
+
+  const pendingCount     = offers.filter(o => o.status === 'pending').length
+  const oppCount         = offers.filter(o => o.isOpportunity && o.status === 'pending').length
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-white pb-8 relative">
+
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 left-4 right-4 z-50 rounded-xl px-4 py-3 font-bold text-sm shadow-2xl ${
+          toast.type === 'error' ? 'bg-red-600' : toast.type === 'warn' ? 'bg-amber-600' : 'bg-emerald-600'
+        }`}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="bg-gray-900 border-b border-gray-800 px-5 py-4 sticky top-0 z-30">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h1 className="text-white font-black text-xl flex items-center gap-2">
+              <Truck size={20} className="text-emerald-400" />
+              Ofertas do Fornecedor
+            </h1>
+            <p className="text-gray-500 text-xs mt-0.5">
+              {pendingCount > 0
+                ? <span className="text-emerald-400 font-bold">{pendingCount} nova{pendingCount > 1 ? 's' : ''} aguardando</span>
+                : 'Nenhuma oferta pendente'}
+            </p>
+          </div>
+          <button onClick={() => setRefreshAt(Date.now())}
+            className="p-2.5 bg-gray-800 rounded-xl hover:bg-gray-700 transition-all">
+            <RefreshCw size={16} className="text-gray-400" />
+          </button>
+        </div>
+
+        {/* Alert banners */}
+        {pendingCount > 0 && (
+          <div className="bg-emerald-900/40 border border-emerald-700/50 rounded-xl px-3 py-2.5 flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-900 flex items-center justify-center flex-shrink-0">
+              <Truck size={15} className="text-emerald-400" />
+            </div>
+            <div>
+              <div className="text-emerald-300 font-black text-sm">
+                {pendingCount} oferta{pendingCount > 1 ? 's' : ''} aguardando resposta
+              </div>
+              <div className="text-emerald-600 text-xs">Aceite para atualizar o estoque automaticamente</div>
+            </div>
+          </div>
+        )}
+        {oppCount > 0 && (
+          <div className="bg-amber-900/30 border border-amber-700/50 rounded-xl px-3 py-2.5 flex items-center gap-3">
+            <span className="text-xl">🔥</span>
+            <div>
+              <div className="text-amber-300 font-black text-sm">
+                {oppCount} oportunidade{oppCount > 1 ? 's' : ''} especial{oppCount > 1 ? 'is' : ''}!
+              </div>
+              <div className="text-amber-700 text-xs">Produtos com oferta ou validade próxima</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Filters */}
+      <div className="px-5 py-3 flex gap-2 overflow-x-auto no-scrollbar">
+        {[
+          { id: 'all',         label: `Todas (${offers.length})` },
+          { id: 'pending',     label: `Pendentes (${pendingCount})` },
+          { id: 'accepted',    label: 'Aceitas' },
+          { id: 'opportunity', label: '🔥 Oportunidade' },
+        ].map(f => (
+          <button key={f.id} onClick={() => setFilter(f.id)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 ${
+              filter === f.id
+                ? 'bg-emerald-500 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div className="px-5">
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20 text-gray-600">
+            <RefreshCw size={28} className="animate-spin mb-3" />
+            <div className="text-sm">Carregando ofertas...</div>
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <Package size={48} className="text-gray-800 mb-4" />
+            <div className="text-gray-500 font-bold text-base">Nenhuma oferta encontrada</div>
+            <div className="text-gray-700 text-sm mt-1">
+              {filter === 'all'
+                ? 'Quando um fornecedor publicar uma oferta, ela aparecerá aqui'
+                : 'Tente outro filtro'}
+            </div>
+          </div>
+        )}
+
+        {!loading && filtered.map(offer => (
+          <OfferCard
+            key={offer.id}
+            offer={offer}
+            onAccept={handleAccept}
+            onReject={handleReject}
+            onReceive={handleReceive}
+            accepting={accepting}
+          />
+        ))}
+      </div>
+
+      {/* Info footer */}
+      {!loading && offers.length > 0 && (
+        <div className="px-5 mt-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <div className="text-gray-500 text-xs font-bold mb-1">📲 LINK PARA O FORNECEDOR</div>
+            <div className="bg-gray-800 rounded-lg px-3 py-2 text-emerald-400 text-xs font-mono">
+              corta-precos-pdv.netlify.app/fornecedor
+            </div>
+            <div className="text-gray-600 text-[11px] mt-2">
+              Envie este link para o fornecedor publicar ofertas diretamente pelo celular
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

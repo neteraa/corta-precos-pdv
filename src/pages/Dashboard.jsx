@@ -4,14 +4,14 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from 'recharts'
-import { TrendingUp, ShoppingCart, Package, AlertTriangle, ArrowRight, Receipt, ClipboardList, X, Printer, Download, MessageCircle, Target, ArrowDownCircle, ArrowUpCircle, Plus, Zap, CalendarClock } from 'lucide-react'
+import { TrendingUp, ShoppingCart, Package, AlertTriangle, ArrowRight, Receipt, ClipboardList, X, Printer, Download, MessageCircle, Target, ArrowDownCircle, ArrowUpCircle, Plus, Zap, CalendarClock, Truck } from 'lucide-react'
 import { useStore, BRL, fmtDate } from '../store.jsx'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 
 const COLORS = ['#ea580c', '#fb923c', '#f97316', '#c2410c', '#fed7aa', '#9a3412']
 
 export default function Dashboard() {
-  const { products, sales, cashMovements, salesGoal, setSalesGoal, addCashMovement, expiryAlertDays } = useStore()
+  const { products, sales, cashMovements, salesGoal, setSalesGoal, addCashMovement, expiryAlertDays, supplierOffers } = useStore()
   const warnDays = expiryAlertDays || 30
   const navigate = useNavigate()
   const [showCaixa, setShowCaixa] = useState(false)
@@ -125,6 +125,10 @@ export default function Dashboard() {
     const critical = list.filter(p => p.days >= 0 && p.days <= 7).length
     return { list, expired, critical, total: list.length }
   }, [products, warnDays])
+
+  const pendingOffers = useMemo(() =>
+    (supplierOffers || []).filter(o => o.status === 'pending'),
+  [supplierOffers])
 
   const kpis = [
     {
@@ -308,6 +312,28 @@ export default function Dashboard() {
           <button onClick={() => navigate('/validade')}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-black text-sm transition-colors whitespace-nowrap">
             <Zap className="w-4 h-4" /> Ver + Gerar Promoções
+          </button>
+        </div>
+      )}
+
+      {/* ── Supplier offers banner ─────────────────────────────── */}
+      {pendingOffers.length > 0 && (
+        <div className="flex items-center gap-4 rounded-2xl px-5 py-4 mb-4 bg-emerald-900/40 border border-emerald-700/50">
+          <div className="w-10 h-10 rounded-xl bg-emerald-900 flex items-center justify-center flex-shrink-0">
+            <Truck className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-emerald-300 font-black text-base">
+              🚚 {pendingOffers.length} nova{pendingOffers.length > 1 ? 's' : ''} oferta{pendingOffers.length > 1 ? 's' : ''} do fornecedor!
+            </div>
+            <div className="text-emerald-700 text-sm mt-0.5 truncate">
+              {pendingOffers.slice(0, 2).map(o => o.productName).join(' · ')}
+              {pendingOffers.length > 2 && ` · +${pendingOffers.length - 2} mais`}
+            </div>
+          </div>
+          <button onClick={() => navigate('/ofertas')}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm transition-colors whitespace-nowrap flex-shrink-0">
+            Ver Ofertas
           </button>
         </div>
       )}

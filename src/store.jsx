@@ -119,6 +119,11 @@ export function StoreProvider({ children }) {
     try { const s = localStorage.getItem('cp_operators'); return s ? JSON.parse(s) : [] } catch { return [] }
   })
 
+  // ── Supplier Offers ────────────────────────────────────────
+  const [supplierOffers, setSupplierOffers] = useState(() => {
+    try { const s = localStorage.getItem('cp_supplier_offers'); return s ? JSON.parse(s) : [] } catch { return [] }
+  })
+
   // ── Product photos (IndexedDB — loaded async on mount) ─────
   const [photos, setPhotos] = useState({})
   useEffect(() => { getAllPhotos().then(setPhotos).catch(() => {}) }, [])
@@ -205,7 +210,8 @@ export function StoreProvider({ children }) {
     if (data.cp_fiado)    { try { localStorage.setItem('cp_fiado', data.cp_fiado) } catch {} }
     if (data.cp_cash)     { setCashMovements(JSON.parse(data.cp_cash));   try { localStorage.setItem('cp_cash',      data.cp_cash)      } catch {} }
     if (data.cp_goal)     { setSalesGoalState(JSON.parse(data.cp_goal));  try { localStorage.setItem('cp_goal',      data.cp_goal)      } catch {} }
-    if (data.cp_operators){ setOperators(JSON.parse(data.cp_operators)); try { localStorage.setItem('cp_operators', data.cp_operators) } catch {} }
+    if (data.cp_operators)      { setOperators(JSON.parse(data.cp_operators));           try { localStorage.setItem('cp_operators',       data.cp_operators)       } catch {} }
+    if (data.cp_supplier_offers){ setSupplierOffers(JSON.parse(data.cp_supplier_offers)); try { localStorage.setItem('cp_supplier_offers', data.cp_supplier_offers) } catch {} }
 
     // Push local keys not yet on server
     if (!data.cp_customers) setCustomers(c  => { syncToServer('cp_customers', JSON.stringify(c));  return c })
@@ -409,6 +415,7 @@ export function StoreProvider({ children }) {
       resetAll,
       syncNow, lastSync, syncing,
       expiryAlertDays, setExpiryAlertDays,
+      supplierOffers,
     }}>
       {children}
     </Ctx.Provider>

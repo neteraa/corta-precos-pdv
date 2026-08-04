@@ -21,6 +21,8 @@ import Relatorio from './pages/Relatorio.jsx'
 import Etiquetas from './pages/Etiquetas.jsx'
 import Validade from './pages/Validade.jsx'
 import Campanhas from './pages/Campanhas.jsx'
+import Fornecedor from './pages/Fornecedor.jsx'
+import Ofertas from './pages/Ofertas.jsx'
 import { isLoggedIn } from './utils/auth.js'
 
 function RequireAuth({ children }) {
@@ -41,7 +43,8 @@ export default function App() {
         <Route path="/display" element={<CustomerDisplay />} />
         <Route path="/flyer"   element={<RequireAuth><Flyer /></RequireAuth>} />
         <Route path="/terminal" element={<RequireAuth><Terminal /></RequireAuth>} />
-        <Route path="/scan"    element={<ScanMobile />} />
+        <Route path="/scan"       element={<ScanMobile />} />
+        <Route path="/fornecedor" element={<Fornecedor />} />
 
         <Route element={<RequireAuth><Layout /></RequireAuth>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
@@ -59,6 +62,7 @@ export default function App() {
           <Route path="/etiquetas"     element={<Etiquetas />} />
           <Route path="/validade"      element={<Validade />} />
           <Route path="/campanhas"     element={<Campanhas />} />
+          <Route path="/ofertas"       element={<Ofertas />} />
         </Route>
       </Routes>
     </StoreProvider>

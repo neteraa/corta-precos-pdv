@@ -89,6 +89,26 @@ npm run build && npx netlify-cli deploy --prod --dir=dist --site=abd4863b-ef7b-4
 - Brand color: orange-500 (#ea580c) — use `text-orange-500`, `bg-orange-500`
 - `animate-pop` = entrance animation
 
+## Portal do Fornecedor (adicionado em 2026-08-04)
+- `/fornecedor` — standalone, mobile-first, tema verde esmeralda, SEM auth do mercado
+  - Setup: fornecedor se identifica com nome + telefone (localStorage `cp_fornecedor_v1`)
+  - Scanner de código de barras (reutiliza CameraScanner.jsx)
+  - Busca produto em products_seed.json (2817 itens) por nome ou SKU
+  - Form: qty, unidade (CX/UND/FD/KG/LT/PC), preço oferta, validade, nota
+  - Toggle 🔥 Oportunidade
+  - Publica em Netlify Blobs: `cp_supplier_offers`
+  - WhatsApp dispatch: overlay mostra cada mercado cadastrado, abre wa.me
+  - Aba Mercados: cadastrar contatos (nome + fone) salvos em `${LOCAL}_markets`
+
+- `/ofertas` — dentro do app do mercado (autenticado, com sidebar)
+  - Filtros: todas / pendentes / aceitas / oportunidade
+  - Aceitar oferta → atualiza estoque via `upsertProduct` (qty + expiryDate + cost)
+  - Badge dinâmico no sidebar com contagem de pendentes
+  - Dashboard: banner verde quando há pendentes → navega para /ofertas
+
+- Novas keys Netlify Blobs: `cp_supplier_offers`
+- Store: `supplierOffers` state + `applyServerData` lida com `cp_supplier_offers`
+
 ## Known issues / next possible work
 - Produtos page can be slow with 2795 products loaded (no virtual scroll)
 - Validade "Sem data (2795)" — products need expiry dates added via ScanMobile or Receber Mercadoria

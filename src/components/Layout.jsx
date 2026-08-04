@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
   Warehouse, Users, Settings, Menu, Phone, Instagram,
   QrCode, Tag, Star, Download, Monitor, Camera, Scissors, HandCoins, LogOut,
-  BarChart2, Printer, CalendarClock, Megaphone, RefreshCw
+  BarChart2, Printer, CalendarClock, Megaphone, RefreshCw, Truck
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import { logout } from '../utils/auth.js'
@@ -148,7 +148,20 @@ function NavSection({ title, items, onClose }) {
 export default function Layout() {
   const [open, setOpen]   = useState(false)
   const { canInstall, install } = useInstallPWA()
+  const { supplierOffers } = useStore()
   const navigate          = useNavigate()
+
+  const pendingOffersCount = (supplierOffers || []).filter(o => o.status === 'pending').length
+
+  const dynamicExtras = [
+    ...EXTRAS,
+    {
+      to: '/ofertas',
+      icon: Truck,
+      label: 'Ofertas Fornecedor',
+      badge: pendingOffersCount > 0 ? String(pendingOffersCount) : undefined,
+    },
+  ]
 
   const handleLogout = () => {
     logout()
@@ -172,9 +185,9 @@ export default function Layout() {
 
         {/* nav */}
         <nav className="flex-1 overflow-y-auto pb-2 space-y-3">
-          <NavSection title="Caixa"   items={CAIXA}  onClose={() => setOpen(false)} />
-          <NavSection title="Gestão"  items={GESTAO} onClose={() => setOpen(false)} />
-          <NavSection title="Extras"  items={EXTRAS} onClose={() => setOpen(false)} />
+          <NavSection title="Caixa"   items={CAIXA}         onClose={() => setOpen(false)} />
+          <NavSection title="Gestão"  items={GESTAO}        onClose={() => setOpen(false)} />
+          <NavSection title="Extras"  items={dynamicExtras} onClose={() => setOpen(false)} />
         </nav>
 
         {/* ── bottom shortcuts ──────────────────────────── */}
