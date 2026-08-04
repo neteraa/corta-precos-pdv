@@ -830,8 +830,11 @@ const DEMO_ORDERS_HIST = [
 function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setOffers, setMarkets, setOrders, onNavigate }) {
   const [showBlitz,  setShowBlitz]  = useState(false)
   const [blastAll,   setBlastAll]   = useState(false)
-  const [editItem,   setEditItem]   = useState(null)  // stock item being edited
+  const [editItem,   setEditItem]   = useState(null)
+  const [toast,      setToast]      = useState('')
   const todayStr = today()
+
+  function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3500) }
 
   async function deleteEstoque(id) {
     if (!window.confirm('Remover este item do estoque?')) return
@@ -907,11 +910,11 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
   }
 
   async function carregarDemo() {
-    setEstoque(DEMO_ESTOQUE); setOffers(DEMO_OFFERS); setMarkets(DEMO_MARKETS)
+    // NOTE: não sobrescreve markets — preserva clientes reais cadastrados
+    setEstoque(DEMO_ESTOQUE); setOffers(DEMO_OFFERS)
     setOrders(prev => { const ids = new Set(prev.map(o => o.id)); return [...DEMO_ORDERS_HIST.filter(o => !ids.has(o.id)), ...prev] })
     await persistKey(ESTOQUE_KEY, DEMO_ESTOQUE)
     await persistKey(OFFERS_KEY,  DEMO_OFFERS)
-    await persistKey(MKTS_SERVER_KEY, DEMO_MARKETS)
   }
 
   if (singleBlast) return <BlastScreen offer={singleBlast} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setSingleBlast(null)} />
@@ -1026,7 +1029,12 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:16 }}>
         {[
           { emoji:'📦', label:'Receber\nMercadoria', action:() => onNavigate?.('receber'), bg:'#0d3d27', border:'#14532d', color:'#4ade80' },
-          { emoji:'📱', label:'Disparar\nZAP',       action:() => { if (offers.filter(o=>o.status!=='delivered').length > 0) setBlastAll(true) }, bg:'#1e3a5f', border:'#2563eb', color:'#93c5fd' },
+          { emoji:'📱', label:'Disparar\nZAP',       action:() => {
+              const active = offers.filter(o => o.status !== 'delivered' && o.offerPrice > 0)
+              if (active.length > 0) setBlastAll(true)
+              else if (markets.length === 0) showToast('⚠️ Nenhum mercado cadastrado! Vá em "Mercados" e adicione um cliente.')
+              else showToast('⚠️ Sem ofertas com preço! Receba uma mercadoria e defina o preço de venda.')
+            }, bg:'#1e3a5f', border:'#2563eb', color:'#93c5fd' },
           { emoji:'📋', label:'Ver\nPedidos',        action:() => onNavigate?.('pedidos'), bg: withAge.filter(e=>e.ageInDays>=2).length>0?'#3d1a0a':'#0d2137', border: withAge.filter(e=>e.ageInDays>=2).length>0?'#92400e':'#1a3a50', color:'#fcd34d' },
         ].map((btn, i) => (
           <button key={i} onClick={btn.action} style={{
@@ -1189,6 +1197,13 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
           </button>
         </div>
       )}
+
+      {/* ── Toast ── */}
+      {toast && (
+        <div style={{ position:'fixed', bottom:88, left:'50%', transform:'translateX(-50%)', zIndex:500, background:'#1c1917', border:'1px solid #f97316', borderRadius:16, padding:'14px 22px', color:'#fed7aa', fontSize:14, fontWeight:700, boxShadow:'0 8px 40px rgba(0,0,0,0.6)', maxWidth:'90vw', textAlign:'center', whiteSpace:'pre-line' }}>
+          {toast}
+        </div>
+      )}
     </div>
   )
 }
@@ -1260,6 +1275,11 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
 
   async function handleSubmit() {
     if (!selected || !qty) return
+    // Warn if no sell price — can't ZAP without it
+    if (sellPrice === 0) {
+      const ok = window.confirm('⚠️ Preço de venda não definido!\n\nSem preço você não consegue disparar no ZAP.\n\nDefinir depois? (OK = sim, salva sem preço)')
+      if (!ok) return
+    }
     setSaving(true)
 
     // 1. Add to estoque — 🔒 internal fields (never in offer object)
@@ -2314,12 +2334,10 @@ const TENANTS = [
       themeColor: '#f97316',
     },
     seedMarkets: [
-      { id:'mega_mkt1', name:'Mercado Corta Preços',    phone:'15996604075', contact:'Proprietário',  address:'Vila Bom Jesus, Itapeva, SP',        city:'Itapeva/SP'   },
-      { id:'mega_mkt2', name:'Supermercado Família',    phone:'11987654321', contact:'Donizete',      address:'Rua das Flores, 150, Cotia, SP',     city:'Cotia/SP'     },
-      { id:'mega_mkt3', name:'Mercearia Boa Compra',    phone:'11976543210', contact:'Maria Silva',   address:'Rua das Oliveiras, 400, São Roque',  city:'São Roque/SP' },
-      { id:'mega_mkt4', name:'Hortifruti das Colinas',  phone:'15988776655', contact:'Pedro Almeida', address:'Av. Central, 22, Boituva, SP',       city:'Boituva/SP'   },
-      { id:'mega_mkt5', name:'Atacado Bom Preço',       phone:'15991234567', contact:'Ana Clara',     address:'Rua do Comércio, 320, Sorocaba, SP', city:'Sorocaba/SP'  },
+      { id:'mega_mkt1', name:'Mercado Corta Preços', phone:'15996604075', contact:'Proprietário', address:'Vila Bom Jesus, Itapeva, SP', city:'Itapeva/SP' },
     ],
+    // IDs de mercados demo criados antes — remover ao logar
+    purgeFakeIds: ['mega_mkt2','mega_mkt3','mega_mkt4','mega_mkt5'],
   },
 ]
 
@@ -2539,11 +2557,13 @@ export default function Fornecedor() {
     setProfile(prof)
     localStorage.setItem(LOCAL, JSON.stringify(prof))
 
-    // Merge seed markets into existing — ensures demo clients always present
-    if (tenant.seedMarkets?.length) {
+    // Merge seed markets; remove any known fake/demo IDs
+    if (tenant.seedMarkets?.length || tenant.purgeFakeIds?.length) {
       const savedMkts = (() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })()
-      const existingIds = new Set(savedMkts.map(m => m.id))
-      const merged = [...savedMkts, ...tenant.seedMarkets.filter(m => !existingIds.has(m.id))]
+      const fakeSet   = new Set(tenant.purgeFakeIds || [])
+      const cleaned   = savedMkts.filter(m => !fakeSet.has(m.id))
+      const existingIds = new Set(cleaned.map(m => m.id))
+      const merged    = [...cleaned, ...(tenant.seedMarkets || []).filter(m => !existingIds.has(m.id))]
       setMarkets(merged)
       localStorage.setItem(MKTS_KEY, JSON.stringify(merged))
     }
@@ -2648,7 +2668,7 @@ export default function Fornecedor() {
           return (
             <button key={id} onClick={() => setTab(id)} style={{ flex:1, background:'none', border:'none', cursor:'pointer', padding:'12px 4px 8px', display:'flex', flexDirection:'column', alignItems:'center', gap:3, position:'relative' }}>
               {badge > 0 && (
-                <div style={{ position:'absolute', top:8, right:'50%', transform:'translateX(10px)', background:'#ef4444', color:'#fff', borderRadius:10, minWidth:16, height:16, fontSize:10, fontWeight:900, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px' }}>{badge}</div>
+                <div style={{ position:'absolute', top:8, right:'50%', transform:'translateX(10px)', background:'#ef4444', color:'#fff', borderRadius:10, minWidth:16, height:16, fontSize:10, fontWeight:900, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', animation: id === 'pedidos' ? 'badgePulse 1.2s ease-in-out infinite' : 'none' }}>{badge}</div>
               )}
               <Icon size={20} color={active ? '#10b981' : '#475569'} />
               <span style={{ fontSize:9, fontWeight:700, color: active ? '#10b981' : '#475569' }}>{label}</span>
@@ -2656,7 +2676,10 @@ export default function Fornecedor() {
           )
         })}
       </div>
-      <style>{"@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }"}</style>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+        @keyframes badgePulse { 0%,100% { transform: translateX(10px) scale(1) } 50% { transform: translateX(10px) scale(1.35) } }
+      `}</style>
     </div>
   )
 }
