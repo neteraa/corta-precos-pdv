@@ -11,14 +11,14 @@ import { X, Camera, Loader } from 'lucide-react'
  *   compact               — smaller inline mode (default: false = full overlay)
  */
 export default function CameraScanner({ onScan, onDetected, onClose, compact = false }) {
-  // support both prop names
-  const handleCode = onScan || onDetected
   const [state, setState] = useState('idle')   // idle | starting | scanning | error
   const [errMsg, setErrMsg] = useState('')
   const [lastCode, setLastCode] = useState('')
-  const scannerRef = useRef(null)
-  const idRef      = useRef('cs_' + Math.random().toString(36).slice(2, 8))
-  const lastRef    = useRef(null)   // debounce same code within 1.5 s
+  const scannerRef  = useRef(null)
+  const idRef       = useRef('cs_' + Math.random().toString(36).slice(2, 8))
+  const lastRef     = useRef(null)   // debounce same code within 1.5 s
+  const handleRef   = useRef(null)   // always-current callback, never stale
+  handleRef.current = onScan || onDetected
 
   useEffect(() => {
     const id = idRef.current
@@ -34,7 +34,7 @@ export default function CameraScanner({ onScan, onDetected, onClose, compact = f
         lastRef.current = code
         setTimeout(() => { lastRef.current = null }, 1500)
         setLastCode(code)
-        handleCode?.(code)
+        handleRef.current?.(code)
       },
       () => {}   // per-frame errors are normal — ignore
     )

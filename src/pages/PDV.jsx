@@ -125,18 +125,19 @@ function CartItem({ item, idx, onQty, onRemove, BRL }) {
    scan-input ref.
 ───────────────────────────────────────────────────────────── */
 function useHIDScanner(onScan) {
-  const buf = useRef('')
-  const timer = useRef(null)
+  const buf      = useRef('')
+  const timer    = useRef(null)
+  const onScanRef = useRef(onScan)
+  useEffect(() => { onScanRef.current = onScan }, [onScan])
 
   useEffect(() => {
     const commit = () => {
       const code = buf.current.trim()
       buf.current = ''
-      if (code.length >= 4) onScan(code)
+      if (code.length >= 4) onScanRef.current(code)
     }
 
     const handler = (e) => {
-      // Let normal input elements handle their own events
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
 
@@ -145,7 +146,6 @@ function useHIDScanner(onScan) {
         commit()
         return
       }
-      // Only accumulate printable chars
       if (e.key.length === 1) {
         buf.current += e.key
         clearTimeout(timer.current)
@@ -155,7 +155,7 @@ function useHIDScanner(onScan) {
 
     window.addEventListener('keydown', handler)
     return () => { window.removeEventListener('keydown', handler); clearTimeout(timer.current) }
-  }, [onScan])
+  }, []) // listener registrado UMA VEZ — callback sempre atualizado via ref
 }
 
 export default function PDV() {
