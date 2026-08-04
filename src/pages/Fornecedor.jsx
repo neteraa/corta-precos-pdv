@@ -831,20 +831,33 @@ const DEMO_OFFERS = [
 ]
 
 const DEMO_ORDERS_HIST = [
-  // Mês passado — entregues
+  // ── 2 meses atrás (60-30 dias) ─────────────────────────────
+  { id:'dord12', storeName:'Mercado Corta Preços',   storePhone:'15996604075', productName:'Heineken 350ml Lata',       qtyRequested:96,  unit:'UND', totalPrice:364.80, status:'delivered', createdAt:DEMO_AGO(60) },
+  { id:'dord13', storeName:'Supermercado São Jorge', storePhone:'15988554433', productName:'Óleo de Soja Soya 900ml',   qtyRequested:30,  unit:'UND', totalPrice:207.00, status:'delivered', createdAt:DEMO_AGO(58) },
+  { id:'dord14', storeName:'Armazém do Povo',        storePhone:'15991234567', productName:'Coca-Cola 2L',              qtyRequested:48,  unit:'UND', totalPrice:331.20, status:'delivered', createdAt:DEMO_AGO(55) },
+  { id:'dord15', storeName:'Mercado Corta Preços',   storePhone:'15996604075', productName:'Arroz Tio João 5kg',        qtyRequested:15,  unit:'SC',  totalPrice:277.50, status:'delivered', createdAt:DEMO_AGO(52) },
+  { id:'dord16', storeName:'Mini Mercado Expresso',  storePhone:'15976543210', productName:'Feijão Preto 1kg',          qtyRequested:20,  unit:'SC',  totalPrice:108.00, status:'delivered', createdAt:DEMO_AGO(50) },
+  { id:'dord17', storeName:'Mercearia do Dinho',     storePhone:'15997665544', productName:'Heineken 350ml Lata',       qtyRequested:60,  unit:'UND', totalPrice:228.00, status:'delivered', createdAt:DEMO_AGO(47) },
+  { id:'dord18', storeName:'Supermercado São Jorge', storePhone:'15988554433', productName:'Biscoito Oreo 90g',         qtyRequested:100, unit:'UND', totalPrice:220.00, status:'delivered', createdAt:DEMO_AGO(44) },
+  { id:'dord19', storeName:'Mercado Corta Preços',   storePhone:'15996604075', productName:'Óleo de Soja Soya 900ml',   qtyRequested:36,  unit:'UND', totalPrice:244.80, status:'delivered', createdAt:DEMO_AGO(41) },
+  { id:'dord20', storeName:'Armazém do Povo',        storePhone:'15991234567', productName:'Arroz Tio João 5kg',        qtyRequested:10,  unit:'SC',  totalPrice:185.00, status:'delivered', createdAt:DEMO_AGO(38) },
+  { id:'dord21', storeName:'Mini Mercado Expresso',  storePhone:'15976543210', productName:'Heineken 350ml Lata',       qtyRequested:80,  unit:'UND', totalPrice:304.00, status:'delivered', createdAt:DEMO_AGO(35) },
+  { id:'dord22', storeName:'Mercearia do Dinho',     storePhone:'15997665544', productName:'Coca-Cola 2L',              qtyRequested:60,  unit:'UND', totalPrice:414.00, status:'delivered', createdAt:DEMO_AGO(32) },
+  { id:'dord23', storeName:'Mercado Corta Preços',   storePhone:'15996604075', productName:'Leite Integral Itambé 1L', qtyRequested:24,  unit:'CX',  totalPrice:124.80, status:'delivered', createdAt:DEMO_AGO(30) },
+  // ── Mês passado (28-7 dias) ──────────────────────────────────
   { id:'dord1',  storeName:'Supermercado São Jorge', storePhone:'15988554433', productName:'Feijão Preto 1kg',          qtyRequested:40,  unit:'SC',  totalPrice:248.00, status:'delivered', createdAt:DEMO_AGO(28) },
-  { id:'dord2',  storeName:'Mercearia do Dinho',      storePhone:'15997665544', productName:'Óleo de Soja Soya 900ml',   qtyRequested:24,  unit:'UND', totalPrice:196.80, status:'delivered', createdAt:DEMO_AGO(25) },
-  { id:'dord3',  storeName:'Armazém do Povo',         storePhone:'15991234567', productName:'Feijão Preto 1kg',          qtyRequested:30,  unit:'SC',  totalPrice:186.00, status:'delivered', createdAt:DEMO_AGO(22) },
-  { id:'dord4',  storeName:'Mini Mercado Expresso',   storePhone:'15976543210', productName:'Coca-Cola 2L',              qtyRequested:60,  unit:'UND', totalPrice:414.00, status:'delivered', createdAt:DEMO_AGO(20) },
+  { id:'dord2',  storeName:'Mercearia do Dinho',     storePhone:'15997665544', productName:'Óleo de Soja Soya 900ml',   qtyRequested:24,  unit:'UND', totalPrice:196.80, status:'delivered', createdAt:DEMO_AGO(25) },
+  { id:'dord3',  storeName:'Armazém do Povo',        storePhone:'15991234567', productName:'Feijão Preto 1kg',          qtyRequested:30,  unit:'SC',  totalPrice:186.00, status:'delivered', createdAt:DEMO_AGO(22) },
+  { id:'dord4',  storeName:'Mini Mercado Expresso',  storePhone:'15976543210', productName:'Coca-Cola 2L',              qtyRequested:60,  unit:'UND', totalPrice:414.00, status:'delivered', createdAt:DEMO_AGO(20) },
   { id:'dord5',  storeName:'Supermercado São Jorge', storePhone:'15988554433', productName:'Heineken 350ml Lata',       qtyRequested:120, unit:'UND', totalPrice:456.00, status:'delivered', createdAt:DEMO_AGO(15) },
-  { id:'dord6',  storeName:'Mercearia do Dinho',      storePhone:'15997665544', productName:'Biscoito Oreo 90g',         qtyRequested:50,  unit:'UND', totalPrice:110.00, status:'delivered', createdAt:DEMO_AGO(12) },
-  { id:'dord7',  storeName:'Armazém do Povo',         storePhone:'15991234567', productName:'Heineken 350ml Lata',       qtyRequested:60,  unit:'UND', totalPrice:228.00, status:'delivered', createdAt:DEMO_AGO(10) },
-  { id:'dord8',  storeName:'Mini Mercado Expresso',   storePhone:'15976543210', productName:'Leite Integral Itambé 1L', qtyRequested:48,  unit:'CX',  totalPrice:249.60, status:'delivered', createdAt:DEMO_AGO(7)  },
-  // Semana — confirmados
+  { id:'dord6',  storeName:'Mercearia do Dinho',     storePhone:'15997665544', productName:'Biscoito Oreo 90g',         qtyRequested:50,  unit:'UND', totalPrice:110.00, status:'delivered', createdAt:DEMO_AGO(12) },
+  { id:'dord7',  storeName:'Armazém do Povo',        storePhone:'15991234567', productName:'Heineken 350ml Lata',       qtyRequested:60,  unit:'UND', totalPrice:228.00, status:'delivered', createdAt:DEMO_AGO(10) },
+  { id:'dord8',  storeName:'Mini Mercado Expresso',  storePhone:'15976543210', productName:'Leite Integral Itambé 1L', qtyRequested:48,  unit:'CX',  totalPrice:249.60, status:'delivered', createdAt:DEMO_AGO(7)  },
+  // ── Semana — confirmados ─────────────────────────────────────
   { id:'dord9',  storeName:'Supermercado São Jorge', storePhone:'15988554433', productName:'Arroz Tio João 5kg',        qtyRequested:20,  unit:'SC',  totalPrice:370.00, status:'confirmed', createdAt:DEMO_AGO(3)  },
-  { id:'dord10', storeName:'Mercearia do Dinho',      storePhone:'15997665544', productName:'Panetone Bauducco Amassado',qtyRequested:60,  unit:'UND', totalPrice:90.00,  status:'confirmed', createdAt:DEMO_AGO(2)  },
-  // Hoje — pendente (acaba de chegar!)
-  { id:'dord11', storeName:'Mini Mercado Expresso',   storePhone:'15976543210', productName:'Coca-Cola 2L',              qtyRequested:24,  unit:'UND', totalPrice:165.60, status:'pending',   createdAt:DEMO_AGO(0)  },
+  { id:'dord10', storeName:'Mercearia do Dinho',     storePhone:'15997665544', productName:'Panetone Bauducco Amassado',qtyRequested:60,  unit:'UND', totalPrice:90.00,  status:'confirmed', createdAt:DEMO_AGO(2)  },
+  // ── Hoje — pendente (acaba de chegar!) ───────────────────────
+  { id:'dord11', storeName:'Mini Mercado Expresso',  storePhone:'15976543210', productName:'Coca-Cola 2L',              qtyRequested:24,  unit:'UND', totalPrice:165.60, status:'pending',   createdAt:DEMO_AGO(0)  },
 ]
 
 /* ── TabInicio ──────────────────────────────────────────────── */
@@ -931,15 +944,9 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
   }
 
   async function carregarDemo() {
+    // Mercados já gerenciados pelo auto-seed — só recarrega estoque/ofertas/pedidos
     setEstoque(DEMO_ESTOQUE); setOffers(DEMO_OFFERS)
     setOrders(prev => { const ids = new Set(prev.map(o => o.id)); return [...DEMO_ORDERS_HIST.filter(o => !ids.has(o.id)), ...prev] })
-    // Garante que mercados demo estejam presentes (sem sobrescrever reais)
-    setMarkets(prev => {
-      const ids = new Set(prev.map(m => m.id))
-      const merged = [...prev, ...DEMO_MARKETS.filter(m => !ids.has(m.id))]
-      localStorage.setItem(MKTS_KEY, JSON.stringify(merged))
-      return merged
-    })
     await persistKey(ESTOQUE_KEY, DEMO_ESTOQUE)
     await persistKey(OFFERS_KEY,  DEMO_OFFERS)
     await persistKey(ORDERS_KEY,  DEMO_ORDERS_HIST)
@@ -1937,8 +1944,9 @@ function MarketForm({ initial = {}, onSave, onCancel }) {
 
 /* ── TabMercados ────────────────────────────────────────────── */
 function TabMercados({ markets, setMarkets, orders }) {
-  const [adding,  setAdding]  = useState(false)
-  const [editing, setEditing] = useState(null) // market id being edited
+  const [adding,   setAdding]   = useState(false)
+  const [editing,  setEditing]  = useState(null)
+  const [expanded, setExpanded] = useState(null) // market id with history open
 
   async function saveMarkets(next) {
     setMarkets(next)
@@ -1962,16 +1970,19 @@ function TabMercados({ markets, setMarkets, orders }) {
   }
 
   function marketStats(m) {
-    const mOrders = (orders || []).filter(o =>
+    const mOrders   = (orders || []).filter(o =>
       (o.storePhone && cleanPhone(o.storePhone) === cleanPhone(m.phone)) ||
       (o.storeName  && o.storeName.toLowerCase() === m.name.toLowerCase())
-    )
+    ).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     const delivered = mOrders.filter(o => o.status === 'delivered')
     const total     = mOrders.reduce((s, o) => s + (o.totalPrice || 0), 0)
-    const last      = mOrders.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))[0]
+    const last      = mOrders[0]
     const daysAgo   = last ? Math.floor((Date.now() - new Date(last.createdAt)) / 86400000) : null
-    return { count: mOrders.length, delivered: delivered.length, total, daysAgo, lastProduct: last?.productName }
+    return { count: mOrders.length, delivered: delivered.length, total, daysAgo, lastProduct: last?.productName, orders: mOrders }
   }
+
+  const STATUS_LABEL = { delivered: { t:'Entregue', c:'#10b981' }, confirmed: { t:'Confirmado', c:'#3b82f6' }, pending: { t:'Pendente', c:'#f97316' }, cancelled: { t:'Cancelado', c:'#ef4444' } }
+  const fmtShort = iso => { const [y,m,d] = (iso || '').slice(0,10).split('-'); return `${d}/${m}/${y?.slice(2)}` }
 
   return (
     <div style={{ padding:'16px 16px 100px' }}>
@@ -2030,19 +2041,19 @@ function TabMercados({ markets, setMarkets, orders }) {
               </div>
             )}
 
-            {/* Purchase history */}
+            {/* Purchase stats + histórico toggle */}
             <div style={{ padding:'10px 16px 14px', borderTop:'1px solid #1a3a50', background:'#0a1929' }}>
               {st.count === 0 ? (
                 <div style={{ color:'#334155', fontSize:12, textAlign:'center' }}>Nenhum pedido ainda — envie uma oferta! 🚀</div>
-              ) : (
-                <div style={{ display:'flex', gap:16, flexWrap:'wrap' }}>
+              ) : (<>
+                <div style={{ display:'flex', gap:14, flexWrap:'wrap', alignItems:'center' }}>
                   <div style={{ textAlign:'center' }}>
                     <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18, lineHeight:1 }}>{st.count}</div>
                     <div style={{ color:'#64748b', fontSize:10 }}>pedidos</div>
                   </div>
                   <div style={{ textAlign:'center' }}>
                     <div style={{ color:'#10b981', fontWeight:900, fontSize:18, lineHeight:1 }}>{BRL.format(st.total)}</div>
-                    <div style={{ color:'#64748b', fontSize:10 }}>comprado</div>
+                    <div style={{ color:'#64748b', fontSize:10 }}>faturado</div>
                   </div>
                   <div style={{ textAlign:'center' }}>
                     <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18, lineHeight:1 }}>{st.delivered}</div>
@@ -2050,20 +2061,37 @@ function TabMercados({ markets, setMarkets, orders }) {
                   </div>
                   {st.daysAgo !== null && (
                     <div style={{ textAlign:'center' }}>
-                      <div style={{ color:'#93c5fd', fontWeight:900, fontSize:18, lineHeight:1 }}>
-                        {st.daysAgo === 0 ? 'hoje' : `${st.daysAgo}d`}
-                      </div>
+                      <div style={{ color:'#93c5fd', fontWeight:900, fontSize:18, lineHeight:1 }}>{st.daysAgo === 0 ? 'hoje' : `${st.daysAgo}d`}</div>
                       <div style={{ color:'#64748b', fontSize:10 }}>último</div>
                     </div>
                   )}
-                  {st.lastProduct && (
-                    <div style={{ flex:1, minWidth:120 }}>
-                      <div style={{ color:'#475569', fontSize:10 }}>último produto</div>
-                      <div style={{ color:'#e2e8f0', fontSize:12, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{st.lastProduct}</div>
-                    </div>
-                  )}
+                  <button onClick={() => setExpanded(expanded === m.id ? null : m.id)} style={{ marginLeft:'auto', background:'none', border:'1px solid #1e4060', borderRadius:8, padding:'5px 10px', color:'#64748b', fontSize:11, fontWeight:700, cursor:'pointer' }}>
+                    {expanded === m.id ? '▲ Fechar' : '📋 Histórico'}
+                  </button>
                 </div>
-              )}
+
+                {/* Expandable order history */}
+                {expanded === m.id && (
+                  <div style={{ marginTop:12, borderTop:'1px solid #1a3a50', paddingTop:10 }}>
+                    <div style={{ color:'#475569', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:8 }}>Histórico de compras — {st.count} pedido{st.count !== 1 ? 's' : ''}</div>
+                    {st.orders.map((o, i) => {
+                      const sl = STATUS_LABEL[o.status] || { t: o.status, c:'#64748b' }
+                      return (
+                        <div key={o.id} style={{ display:'flex', alignItems:'center', gap:8, paddingBottom:8, marginBottom: i < st.orders.length - 1 ? 8 : 0, borderBottom: i < st.orders.length - 1 ? '1px solid #0f2035' : 'none' }}>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ color:'#e2e8f0', fontSize:13, fontWeight:700, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{o.productName}</div>
+                            <div style={{ color:'#64748b', fontSize:11 }}>{o.qtyRequested} {o.unit} · {fmtShort(o.createdAt)}</div>
+                          </div>
+                          <div style={{ textAlign:'right', flexShrink:0 }}>
+                            <div style={{ color:'#10b981', fontWeight:800, fontSize:13 }}>{BRL.format(o.totalPrice || 0)}</div>
+                            <div style={{ background: sl.c + '22', color: sl.c, borderRadius:6, padding:'1px 6px', fontSize:10, fontWeight:700, marginTop:2 }}>{sl.t}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </>)}
             </div>
           </div>
         )
@@ -2668,14 +2696,19 @@ export default function Fornecedor() {
     setProfile(prof)
     localStorage.setItem(LOCAL, JSON.stringify(prof))
 
-    // Merge seed markets into both localStorage AND server
+    // Demo tenants: substituir mercados completamente (limpa lixo de sessões antigas)
+    // Real tenants: merge preservando cadastros manuais
     if (tenant.seedMarkets?.length) {
-      const savedMkts   = (() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })()
-      const existingIds = new Set(savedMkts.map(m => m.id))
-      const merged      = [...savedMkts, ...tenant.seedMarkets.filter(m => !existingIds.has(m.id))]
-      setMarkets(merged)
-      localStorage.setItem(MKTS_KEY, JSON.stringify(merged))
-      persistKey(MKTS_SERVER_KEY, merged)   // persiste no servidor para cross-device
+      const mkts = tenant.autoSeedDemo
+        ? tenant.seedMarkets                        // substitui — demo sempre parte limpo
+        : (() => {                                  // merge — real preserva cadastros manuais
+            const saved = (() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })()
+            const ids   = new Set(saved.map(m => m.id))
+            return [...saved, ...tenant.seedMarkets.filter(m => !ids.has(m.id))]
+          })()
+      setMarkets(mkts)
+      localStorage.setItem(MKTS_KEY, JSON.stringify(mkts))
+      persistKey(MKTS_SERVER_KEY, mkts)
     }
   }
 
@@ -2729,14 +2762,11 @@ export default function Fornecedor() {
       persistKey(ESTOQUE_KEY, merged)
       return merged
     })
-    // Ensure seed markets are in server (for cross-device)
-    setMarkets(prev => {
-      const ids = new Set(prev.map(m => m.id))
-      const merged = [...prev, ...(tenant.seedMarkets || []).filter(m => !ids.has(m.id))]
-      localStorage.setItem(MKTS_KEY, JSON.stringify(merged))
-      persistKey(MKTS_SERVER_KEY, merged)
-      return merged
-    })
+    // Demo tenant: substituir mercados completamente (remove telefones errados de sessões antigas)
+    const freshMkts = tenant.seedMarkets || []
+    setMarkets(freshMkts)
+    localStorage.setItem(MKTS_KEY, JSON.stringify(freshMkts))
+    persistKey(MKTS_SERVER_KEY, freshMkts)
   }, [synced]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const prev = document.title
