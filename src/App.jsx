@@ -45,6 +45,8 @@ export default function App() {
         <Route path="/terminal" element={<RequireAuth><Terminal /></RequireAuth>} />
         <Route path="/scan"       element={<ScanMobile />} />
         <Route path="/fornecedor" element={<Fornecedor />} />
+        {/* /ofertas é pública — mercados acessam sem login PDV (usa ?s=TENANT_ID) */}
+        <Route path="/ofertas"    element={<Ofertas />} />
 
         <Route element={<RequireAuth><Layout /></RequireAuth>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
@@ -62,7 +64,6 @@ export default function App() {
           <Route path="/etiquetas"     element={<Etiquetas />} />
           <Route path="/validade"      element={<Validade />} />
           <Route path="/campanhas"     element={<Campanhas />} />
-          <Route path="/ofertas"       element={<Ofertas />} />
         </Route>
       </Routes>
     </StoreProvider>

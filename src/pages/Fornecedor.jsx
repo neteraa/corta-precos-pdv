@@ -15,6 +15,17 @@ import PRODUCTS_SEED from '../utils/products_seed.json'
 
 const BRL         = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const LOCAL       = 'cp_fornecedor_v1'
+
+/* URL do portal de mercados com ID do tenant (para WhatsApp link preview correto) */
+function ofertasUrl() {
+  try {
+    const s = JSON.parse(localStorage.getItem('cp_session_v1') || '{}')
+    const id = s.id || 'mega'
+    return `https://zatendestock.netlify.app/ofertas?s=${id}`
+  } catch {
+    return 'https://zatendestock.netlify.app/ofertas?s=mega'
+  }
+}
 const OFFERS_KEY  = 'cp_supplier_offers'
 const ESTOQUE_KEY = 'cp_fornecedor_estoque'
 const ORDERS_KEY  = 'cp_supplier_orders'
@@ -140,7 +151,7 @@ function buildOfferMsg(offer, supplierName, supplierPhone) {
     offer.note ? '💬 ' + offer.note : '',
     '',
     '👉 *Fazer pedido agora:*',
-    'https://zatendestock.netlify.app/ofertas',
+    ofertasUrl(),
     '',
     supplierPhone ? '📞 ' + supplierName + ' · ' + supplierPhone : '📞 ' + supplierName,
   ]
@@ -446,7 +457,7 @@ function BlitzModal({ offers, setOffers, markets, profile, onClose, zapServerUrl
       '🏃 Estoque limitado! Primeiro que pedir leva!',
       '',
       '👉 *Fazer pedido:*',
-      'https://zatendestock.netlify.app/ofertas',
+      ofertasUrl(),
       '',
       profile.phone ? `📞 ${profile.name} · ${profile.phone}` : `📞 ${profile.name}`,
     ]
@@ -985,7 +996,7 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
       ...active.map(o => `📦 *${o.productName}* — ${BRL.format(o.offerPrice)}/un  ·  ${o.qty} ${o.unit}${o.expiryDate ? `  ·  val ${fmtDate(o.expiryDate)}` : ''}`),
       '',
       '👉 *Fazer pedido agora:*',
-      'https://zatendestock.netlify.app/ofertas',
+      ofertasUrl(),
       '',
       profile.phone ? `📞 ${profile.name} · ${profile.phone}` : `📞 ${profile.name}`,
     ]
@@ -2638,9 +2649,9 @@ function TabMercados({ markets, setMarkets, orders, recurrences, setRecurrences 
       <div style={{ background:'#0a1929', borderRadius:14, padding:'14px 16px', marginTop:8, border:'1px solid #1e4060' }}>
         <div style={{ color:'#10b981', fontSize:11, fontWeight:700, textTransform:'uppercase', marginBottom:4 }}>🔗 Link do Portal (envie para os mercados)</div>
         <div style={{ color:'#60a5fa', fontSize:13, fontFamily:'monospace', wordBreak:'break-all', marginBottom:8 }}>
-          https://zatendestock.netlify.app/ofertas
+          {ofertasUrl()}
         </div>
-        <a href={'https://wa.me/?text=' + encodeURIComponent('Olá! Acesse nossas ofertas exclusivas aqui: https://zatendestock.netlify.app/ofertas')}
+        <a href={'https://wa.me/?text=' + encodeURIComponent('Olá! Acesse nossas ofertas exclusivas aqui: ' + ofertasUrl())}
           target="_blank" rel="noreferrer"
           style={{ display:'inline-flex', alignItems:'center', gap:6, background:'#14532d', color:'#4ade80', borderRadius:10, padding:'8px 14px', textDecoration:'none', fontSize:12, fontWeight:700 }}>
           <MessageCircle size={13} /> Enviar link pelo ZAP

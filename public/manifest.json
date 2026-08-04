@@ -1,12 +1,12 @@
 {
-  "name": "Corta Preços — PDV",
-  "short_name": "Corta Preços",
-  "description": "Sistema PDV Corta Preços — frente de caixa, promoções e estoque",
-  "start_url": "/pdv",
+  "name": "ZatendeStock",
+  "short_name": "ZatendeStock",
+  "description": "Gestão de estoque, ofertas e pedidos para distribuidoras e mercados",
+  "start_url": "/fornecedor",
   "display": "standalone",
-  "background_color": "#111827",
-  "theme_color": "#ea580c",
-  "orientation": "landscape",
+  "background_color": "#050f1a",
+  "theme_color": "#10b981",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "icon-192.png",
@@ -22,9 +22,8 @@
     }
   ],
   "shortcuts": [
-    { "name": "Abrir Caixa",   "url": "/pdv",       "description": "Frente de caixa" },
-    { "name": "Dashboard",     "url": "/dashboard", "description": "Visão geral" },
-    { "name": "Tela do Cliente","url": "/display",  "description": "Display do cliente" }
+    { "name": "Portal Distribuidor", "url": "/fornecedor", "description": "Portal do Distribuidor" },
+    { "name": "Ver Ofertas",         "url": "/ofertas",    "description": "Portal de Ofertas" }
   ],
   "categories": ["business", "productivity"]
 }

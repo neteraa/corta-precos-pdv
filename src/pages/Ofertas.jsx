@@ -1,7 +1,8 @@
 /**
  * /ofertas — Mercado recebe e aceita ofertas do fornecedor
  */
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Truck, Package, Check, X, Clock, ChevronDown, ChevronUp,
          Filter, RefreshCw, ShoppingCart, AlertTriangle, CheckCircle,
          Phone, MessageCircle, Star, ClipboardList, CircleDollarSign,
@@ -24,6 +25,23 @@ const PAYMENT_OPTS = [
 ]
 
 const uid = () => `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+
+/* Dados estáticos dos fornecedores — espelha TENANTS em Fornecedor.jsx
+   Adicionar aqui quando criar novo tenant */
+const SUPPLIER_INFO = {
+  mega: {
+    id:          'mega',
+    name:        'Mega Tudo Barato',
+    city:        'Cotia, SP',
+    phone:       '11 2815-1989',
+    offersKey:   'cp_supplier_offers',
+    profileKey:  'cp_forn_profile_v1',
+    themeColor:  '#f97316',
+  },
+}
+
+const MARKET_SESSION_KEY = 'cp_market_session_v1'  // identidade do mercado (sem login PDV)
+
 const cleanPhone = p => '55' + (p || '').replace(/\D/g, '').replace(/^0/, '').slice(-11)
 
 async function saveOrders(orders) {
@@ -487,14 +505,59 @@ function OrderCard({ order }) {
   )
 }
 
+/* ── MarketIdentityForm ─────────────────────────────────────── */
+function MarketIdentityForm({ initial, onSave, onCancel }) {
+  const [name,  setName]  = useState(initial?.name  || '')
+  const [phone, setPhone] = useState(initial?.phone || '')
+  const inp = { display:'block', width:'100%', background:'#050f1a', border:'1px solid #1e4060', borderRadius:10, padding:'10px 12px', color:'#e2e8f0', fontSize:16, boxSizing:'border-box', outline:'none', marginBottom:10 }
+  return (
+    <div>
+      <label style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', display:'block', marginBottom:4 }}>Nome do Mercado *</label>
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Mercado Qualidade" style={inp} />
+      <label style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', display:'block', marginBottom:4 }}>WhatsApp (com DDD)</label>
+      <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="(15) 99999-0000" type="tel" style={inp} />
+      <div style={{ display:'flex', gap:8, marginTop:4 }}>
+        <button disabled={!name.trim()} onClick={() => onSave({ name: name.trim(), phone })}
+          style={{ flex:1, padding:'11px 0', borderRadius:12, border:'none', background: name.trim() ? 'linear-gradient(135deg,#10b981,#059669)' : '#1a3a50', color:'#fff', fontWeight:800, fontSize:14, cursor: name.trim() ? 'pointer' : 'default' }}>
+          ✓ Confirmar
+        </button>
+        {onCancel && (
+          <button onClick={onCancel} style={{ padding:'11px 16px', borderRadius:12, border:'1px solid #1e4060', background:'transparent', color:'#64748b', fontWeight:700, fontSize:14, cursor:'pointer' }}>
+            Cancelar
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ── MAIN ───────────────────────────────────────────────────── */
 export default function Ofertas() {
   const { upsertProduct, products }  = useStore()
+  const [searchParams]  = useSearchParams()
+  const supplierSlug    = searchParams.get('s') || 'mega'   // ?s=mega (default: mega)
+  const supplierMeta    = SUPPLIER_INFO[supplierSlug] || SUPPLIER_INFO.mega
+
+  /* Supplier profile (logo + name) carregado do servidor */
+  const [supplierProfile, setSupplierProfile] = useState(null)
+  useEffect(() => {
+    fetch('/api/restore').then(r => r.json()).then(j => {
+      const raw = j?.data?.[supplierMeta.profileKey]
+      if (raw) setSupplierProfile(JSON.parse(raw))
+    }).catch(() => {})
+  }, [supplierMeta.profileKey])
+
+  /* Identidade do mercado — PDV logado tem prioridade, senão usa sessão própria */
   const storeSettings = useMemo(() => {
     try { return JSON.parse(localStorage.getItem('cp_settings') || '{}') } catch { return {} }
   }, [])
-  const storeName  = storeSettings.storeName  || 'Mercado'
-  const storePhone = storeSettings.phone       || ''
+  const [marketSession, setMarketSession] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(MARKET_SESSION_KEY) || 'null') } catch { return null }
+  })
+  const [showIdentity, setShowIdentity] = useState(false)
+
+  const storeName  = storeSettings.storeName  || marketSession?.name  || ''
+  const storePhone = storeSettings.phone       || marketSession?.phone || ''
   const [offers,      setOffers]     = useState([])
   const [myOrders,    setMyOrders]   = useState([])
   const [loading,     setLoading]    = useState(true)
@@ -636,18 +699,25 @@ export default function Ofertas() {
     showToast(`✅ Pedido enviado! ${order.qtyRequested} ${order.unit} de ${order.productName}`)
   }
 
-  /* filtered */
+  /* filtered — filtra por fornecedor (supplierSlug) quando ?s= está presente */
+  const supplierOffers = useMemo(() => offers.filter(o => {
+    if (!supplierSlug) return true
+    const n = (o.supplierName || '').toLowerCase()
+    return n.includes(supplierMeta.name.toLowerCase().split(' ')[0].toLowerCase()) ||
+           (o.supplierId && o.supplierId === supplierSlug)
+  }), [offers, supplierSlug, supplierMeta.name])
+
   const filtered = useMemo(() => {
-    const sorted = [...offers].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
+    const sorted = [...supplierOffers].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
     if (filter === 'pending')     return sorted.filter(o => o.status === 'pending')
     if (filter === 'accepted')    return sorted.filter(o => o.status === 'accepted')
     if (filter === 'opportunity') return sorted.filter(o => o.isOpportunity)
     if (filter === 'myorders')    return [] // handled separately
     return sorted
-  }, [offers, filter])
+  }, [supplierOffers, filter])
 
-  const pendingCount  = offers.filter(o => o.status === 'pending').length
-  const oppCount      = offers.filter(o => o.isOpportunity && o.status === 'pending').length
+  const pendingCount  = supplierOffers.filter(o => o.status === 'pending').length
+  const oppCount      = supplierOffers.filter(o => o.isOpportunity && o.status === 'pending').length
   const confirmedOrders = myOrders.filter(o => o.status === 'confirmed' || o.status === 'delivered').length
 
   return (
@@ -662,35 +732,62 @@ export default function Ofertas() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-800 px-5 py-4 sticky top-0 z-30">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h1 className="text-white font-black text-xl flex items-center gap-2">
-              <Truck size={20} className="text-emerald-400" />
-              Ofertas do Fornecedor
-            </h1>
-            <p className="text-gray-500 text-xs mt-0.5">
-              {pendingCount > 0
-                ? <span className="text-emerald-400 font-bold">{pendingCount} nova{pendingCount > 1 ? 's' : ''} aguardando</span>
-                : 'Nenhuma oferta pendente'}
-            </p>
+      {/* ── Supplier branded header ── */}
+      <div className="sticky top-0 z-30" style={{ background: '#050f1a', borderBottom:'1px solid #1a3a50' }}>
+        {/* Logo + Nome do Fornecedor */}
+        <div style={{ background: supplierMeta.themeColor + '18', borderBottom:'1px solid ' + supplierMeta.themeColor + '44', padding:'12px 16px', display:'flex', alignItems:'center', gap:12 }}>
+          {/* Logo */}
+          <div style={{ width:52, height:52, borderRadius:16, overflow:'hidden', flexShrink:0, border:'2px solid ' + supplierMeta.themeColor + '66', background:'#0a1929', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            {supplierProfile?.logoUrl
+              ? <img src={supplierProfile.logoUrl} alt="logo" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              : <span style={{ color: supplierMeta.themeColor, fontSize:22, fontWeight:900 }}>{supplierMeta.name.charAt(0)}</span>
+            }
           </div>
-          <div className="flex items-center gap-2">
-            {confirmedOrders > 0 && (
-              <div className="flex items-center gap-1 bg-emerald-900/50 border border-emerald-700/50 rounded-xl px-2 py-1">
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-emerald-300 text-xs font-bold">{confirmedOrders} confirmado{confirmedOrders > 1 ? 's' : ''}!</span>
-              </div>
-            )}
-            <button onClick={() => { setRefreshAt(Date.now()); loadMyOrders() }}
-              className="p-2.5 bg-gray-800 rounded-xl hover:bg-gray-700 transition-all">
-              <RefreshCw size={16} className="text-gray-400" />
-            </button>
+          {/* Info */}
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:17, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+              {supplierProfile?.name || supplierMeta.name}
+            </div>
+            <div style={{ color: supplierMeta.themeColor, fontSize:11, fontWeight:700, marginTop:1 }}>
+              🛒 Ofertas do Dia
+              {supplierMeta.city && <span style={{ color:'#475569', fontWeight:400 }}> · {supplierMeta.city}</span>}
+            </div>
           </div>
+          {/* Pending badge */}
+          {pendingCount > 0 && (
+            <div style={{ background: supplierMeta.themeColor + '22', border:'1px solid ' + supplierMeta.themeColor + '55', borderRadius:20, padding:'4px 10px', flexShrink:0 }}>
+              <span style={{ color: supplierMeta.themeColor, fontSize:11, fontWeight:800 }}>{pendingCount} nova{pendingCount > 1 ? 's' : ''}</span>
+            </div>
+          )}
         </div>
+        <div className="px-5 py-2.5 flex items-center gap-2">
+          {/* Status text */}
+          <div style={{ flex:1, minWidth:0 }}>
+            {pendingCount > 0
+              ? <span className="text-emerald-400 font-bold text-xs">{pendingCount} nova{pendingCount > 1 ? 's' : ''} aguardando</span>
+              : <span className="text-gray-500 text-xs">Nenhuma oferta pendente</span>}
+          </div>
+          {confirmedOrders > 0 && (
+            <div className="flex items-center gap-1 bg-emerald-900/50 border border-emerald-700/50 rounded-xl px-2 py-1" style={{ flexShrink:0 }}>
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-emerald-300 text-xs font-bold">{confirmedOrders} ✓</span>
+            </div>
+          )}
+          {/* Identidade do mercado */}
+          <button onClick={() => setShowIdentity(true)}
+            style={{ background:'#0d2137', border:'1px solid #1e4060', borderRadius:10, padding:'5px 10px', color: storeName ? '#94a3b8' : '#f59e0b', fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 }}>
+            {storeName ? `👋 ${storeName.split(' ')[0]}` : '👋 Meu nome'}
+          </button>
+          <button onClick={() => { setRefreshAt(Date.now()); loadMyOrders() }}
+            className="p-2.5 bg-gray-800 rounded-xl hover:bg-gray-700 transition-all" style={{ flexShrink:0 }}>
+            <RefreshCw size={16} className="text-gray-400" />
+          </button>
+        </div>
+      </div>
 
-        {/* Alert banners */}
+      {/* Alert banners */}
+      <div className="px-5 py-2">
+        {false && null /* spacer */}
         {pendingCount > 0 && (
           <div className="bg-emerald-900/40 border border-emerald-700/50 rounded-xl px-3 py-2.5 flex items-center gap-3 mb-2">
             <div className="w-8 h-8 rounded-lg bg-emerald-900 flex items-center justify-center flex-shrink-0">
@@ -815,6 +912,26 @@ export default function Ofertas() {
           />
         ))}
       </div>
+
+      {/* ── Market Identity Modal ── */}
+      {showIdentity && (
+        <div style={{ position:'fixed', inset:0, zIndex:200, background:'#000000cc', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+          <div style={{ background:'#0d2137', borderRadius:20, padding:24, width:'100%', maxWidth:360, border:'1px solid #1e4060' }}>
+            <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:17, marginBottom:4 }}>👋 Identifique seu mercado</div>
+            <div style={{ color:'#475569', fontSize:12, marginBottom:16 }}>Seus pedidos ficam separados dos outros. Não precisa de senha.</div>
+            <MarketIdentityForm
+              initial={{ name: storeName, phone: storePhone }}
+              onSave={(d) => {
+                const session = { name: d.name, phone: d.phone }
+                setMarketSession(session)
+                try { localStorage.setItem(MARKET_SESSION_KEY, JSON.stringify(session)) } catch {}
+                setShowIdentity(false)
+              }}
+              onCancel={() => setShowIdentity(false)}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Pedido Modal */}
       {pedidoOffer && (
