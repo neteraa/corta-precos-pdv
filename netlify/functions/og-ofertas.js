@@ -2,26 +2,30 @@
  * Netlify Function — OG tags dinâmicos por fornecedor para /ofertas
  *
  * WhatsApp / Telegram / Google crawlers fazem GET /ofertas?s=TENANT_ID.
- * Esta função serve o HTML correto com og:title do fornecedor,
+ * Esta função serve o HTML correto com og:title/og:image do fornecedor,
  * modificando o index.html do servidor em tempo real.
  *
  * Adicionar novos fornecedores: só adicionar entrada em SUPPLIERS.
  */
 
-const https = require('https')
+import https from 'https'
+
+const BASE = 'https://zatendestock.netlify.app'
 
 const SUPPLIERS = {
   mega: {
     name:        'Mega Tudo Barato',
-    description: '🛒 Confira as ofertas exclusivas de hoje! Cotia, SP.',
-    ogUrl:       'https://zatendestock.netlify.app/ofertas?s=mega',
+    description: '🛒 Ofertas exclusivas de hoje — Cotia, SP. Peça direto pelo celular!',
+    ogUrl:       `${BASE}/ofertas?s=mega`,
+    ogImage:     `${BASE}/og-mega.png`,
   },
 }
 
 const DEFAULT = {
   name:        'ZatendeStock – Portal de Ofertas',
   description: 'Confira as ofertas exclusivas do seu fornecedor e faça seu pedido agora.',
-  ogUrl:       'https://zatendestock.netlify.app/ofertas',
+  ogUrl:       `${BASE}/ofertas`,
+  ogImage:     `${BASE}/og-image.png`,
 }
 
 /* Busca index.html do CDN (é o shell React, não tem conteúdo dinâmico) */
@@ -35,14 +39,14 @@ function fetchHtml(url) {
   })
 }
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   const s        = (event.queryStringParameters || {}).s || ''
   const supplier = SUPPLIERS[s] || DEFAULT
   const title    = s && SUPPLIERS[s] ? `Ofertas — ${supplier.name}` : DEFAULT.name
 
   try {
     /* Usa o index.html como base — sempre existe, sem "pretty URL" conflict */
-    const html = await fetchHtml('https://zatendestock.netlify.app/index.html')
+    const html = await fetchHtml(`${BASE}/index.html`)
 
     const modified = html
       .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
@@ -57,6 +61,10 @@ exports.handler = async (event) => {
       .replace(
         /(<meta property="og:url"\s+content=")[^"]*(")/,
         `$1${supplier.ogUrl}$2`
+      )
+      .replace(
+        /(<meta property="og:image"\s+content=")[^"]*(")/,
+        `$1${supplier.ogImage}$2`
       )
 
     return {
