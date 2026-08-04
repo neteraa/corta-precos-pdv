@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import { Send, Copy, Check, Search, X, MessageCircle, Users, ChevronDown, ChevronUp,
-         Zap, Settings, Phone, AlertCircle, Plus, Trash2 } from 'lucide-react'
+         Zap, Settings, Phone, AlertCircle, Plus, Trash2, Flame, ExternalLink } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
 
 /* ── helpers ─────────────────────────────────────────────── */
@@ -82,7 +82,7 @@ function ProductRow({ p, onAdd }) {
    MAIN
 ══════════════════════════════════════════════════════════ */
 export default function Campanhas() {
-  const { products, customers, sales } = useStore()
+  const { products, customers, sales, promos } = useStore()
 
   // zatende config stored in localStorage
   const [cfg, setCfg] = useState(() => {
@@ -105,6 +105,40 @@ export default function Campanhas() {
   const [sending, setSending]       = useState(false)
   const [results, setResults]       = useState(null) // { ok, fail }
   const [copied, setCopied]         = useState(false)
+
+  // local wa.me sequential dispatch (no Zatende needed)
+  const [localMode, setLocalMode]   = useState(false)
+  const [localIdx,  setLocalIdx]    = useState(0)
+
+  /* ── active promos (from store — created in Validade page) ── */
+  const activePromos = useMemo(() =>
+    (promos || []).filter(p => p.active !== false).slice(0, 6)
+  , [promos])
+
+  /* load a promo as campaign template */
+  const loadPromo = useCallback((promo) => {
+    const lines = [
+      '🚨 *OFERTA ANTIVENCIMENTO — {{loja}}*',
+      '',
+      promo.name ? `*${promo.name}*` : '',
+      promo.totalPrice ? `💰 por apenas ${BRL.format(promo.totalPrice)}` : '',
+      '⚡ Quantidade limitada! Corre antes que acabe.',
+      '',
+      '📍 Venha já ou fale com a gente! — {{data}}',
+    ].filter(Boolean).join('\n')
+    setTemplate(lines)
+    setShowSearch(false)
+  }, [])
+
+  /* open wa.me for one customer at a time (local mode) */
+  const openNextWaMe = useCallback((idx) => {
+    const list = audienceList.filter(hasPhone)
+    if (idx >= list.length) { setLocalMode(false); setLocalIdx(0); return }
+    const c = list[idx]
+    const text = encodeURIComponent(renderMsg(template, c))
+    window.open(`https://wa.me/${cleanPhone(c.phone)}?text=${text}`, '_blank')
+    setLocalIdx(idx + 1)
+  }, [audienceList, template])
 
   /* ── audience list ── */
   const fiados = useMemo(() => {
@@ -255,6 +289,89 @@ export default function Campanhas() {
         </div>
       )}
 
+      {/* ── Promoções Prontas (de vencimento) ── */}
+      {activePromos.length > 0 && (
+        <div className="card p-4 border-l-4 border-red-400 bg-red-50/40 space-y-3">
+          <div className="flex items-center gap-2">
+            <Flame className="w-4 h-4 text-red-500" />
+            <h2 className="text-sm font-black text-red-700 uppercase tracking-wide">
+              Promoções Prontas para Disparar
+            </h2>
+            <span className="text-xs bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">{activePromos.length}</span>
+          </div>
+          <p className="text-xs text-red-600">Criadas na aba Validade — clique para carregar no template e disparar</p>
+          <div className="flex flex-wrap gap-2">
+            {activePromos.map(promo => (
+              <button key={promo.id} onClick={() => loadPromo(promo)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-white hover:bg-red-50 transition-colors text-left group">
+                <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <Flame className="w-3.5 h-3.5 text-red-500" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-gray-800 truncate max-w-[180px]">{promo.name}</div>
+                  {promo.totalPrice && (
+                    <div className="text-[11px] text-red-600 font-bold">{BRL.format(promo.totalPrice)}</div>
+                  )}
+                </div>
+                <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded group-hover:bg-orange-100 flex-shrink-0">
+                  Carregar →
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Local dispatch overlay (no Zatende) ── */}
+      {localMode && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="text-center mb-5">
+              <div className="w-14 h-14 rounded-2xl bg-green-100 flex items-center justify-center mx-auto mb-3">
+                <MessageCircle className="w-7 h-7 text-green-600" />
+              </div>
+              <h3 className="font-black text-lg text-gray-900">Disparo Local (wa.me)</h3>
+              <p className="text-sm text-gray-500 mt-1">Sem servidor — abre o WhatsApp no celular</p>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-4 mb-5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">Progresso</span>
+                <span className="font-black text-green-600">{localIdx} / {audienceList.filter(hasPhone).length}</span>
+              </div>
+              <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-2 bg-green-500 rounded-full transition-all"
+                  style={{ width: `${audienceList.filter(hasPhone).length > 0 ? (localIdx / audienceList.filter(hasPhone).length) * 100 : 0}%` }} />
+              </div>
+              {localIdx < audienceList.filter(hasPhone).length && (
+                <div className="text-xs text-gray-500 mt-2 text-center">
+                  Próximo: <strong>{audienceList.filter(hasPhone)[localIdx]?.name}</strong>
+                </div>
+              )}
+            </div>
+
+            {localIdx < audienceList.filter(hasPhone).length ? (
+              <button onClick={() => openNextWaMe(localIdx)}
+                className="w-full py-3.5 rounded-xl font-black text-white text-base flex items-center justify-center gap-2"
+                style={{ background: 'linear-gradient(135deg,#25d366,#128c7e)' }}>
+                <ExternalLink className="w-5 h-5" />
+                Abrir WhatsApp #{localIdx + 1} — {audienceList.filter(hasPhone)[localIdx]?.name}
+              </button>
+            ) : (
+              <div className="text-center">
+                <div className="text-green-600 font-black text-lg mb-3">✅ Todos enviados!</div>
+                <button onClick={() => { setLocalMode(false); setLocalIdx(0) }}
+                  className="btn-ghost w-full">Fechar</button>
+              </div>
+            )}
+            <button onClick={() => { setLocalMode(false); setLocalIdx(0) }}
+              className="w-full mt-2 text-sm text-gray-400 hover:text-gray-600 transition-colors py-2">
+              Cancelar disparo
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         {/* ── Left: editor ── */}
         <div className="lg:col-span-3 space-y-4">
@@ -373,21 +490,33 @@ export default function Campanhas() {
           {/* Actions */}
           <div className="flex flex-wrap gap-2">
             <button onClick={copyNumbers}
-              className="flex items-center gap-2 btn-ghost text-sm flex-1 justify-center">
+              className="flex items-center gap-2 btn-ghost text-sm justify-center px-3 py-2 rounded-xl border border-gray-200">
               {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-              {copied ? 'Copiado!' : `Copiar ${audienceList.filter(hasPhone).length} números`}
+              {copied ? 'Copiado!' : `Copiar números`}
             </button>
 
+            {/* LOCAL dispatch — no Zatende needed */}
+            <button
+              onClick={() => { setLocalIdx(0); setLocalMode(true) }}
+              disabled={!audienceList.filter(hasPhone).length}
+              className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl transition-colors flex-1 justify-center text-white disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg,#25d366,#128c7e)' }}>
+              <MessageCircle className="w-4 h-4" />
+              Disparar Local ({audienceList.filter(hasPhone).length}) — sem servidor
+            </button>
+
+            {/* Zatende — requires server */}
             <button
               onClick={sendAll}
-              disabled={sending || !audienceList.filter(hasPhone).length}
-              className={`flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-colors flex-1 justify-center
+              disabled={sending || !cfgOk || !audienceList.filter(hasPhone).length}
+              title={!cfgOk ? 'Configure o Zatende primeiro' : ''}
+              className={`flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl transition-colors justify-center
                 ${cfgOk
-                  ? 'bg-green-600 hover:bg-green-700 text-white disabled:opacity-50'
-                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}>
+                  ? 'bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
               {sending
                 ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Enviando...</>
-                : <><Zap className="w-4 h-4" /> Enviar via Zatende ({audienceList.filter(hasPhone).length})</>
+                : <><Zap className="w-4 h-4" /> Zatende</>
               }
             </button>
           </div>

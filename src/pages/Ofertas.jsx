@@ -4,7 +4,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Truck, Package, Check, X, Clock, ChevronDown, ChevronUp,
          Filter, RefreshCw, ShoppingCart, AlertTriangle, CheckCircle,
-         Phone, MessageCircle, Star, ClipboardList, CircleDollarSign } from 'lucide-react'
+         Phone, MessageCircle, Star, ClipboardList, CircleDollarSign,
+         MapPin, CalendarClock } from 'lucide-react'
 import { useStore, BRL, fmtDate } from '../store.jsx'
 
 const OFFERS_KEY   = 'cp_supplier_offers'
@@ -219,12 +220,13 @@ function OfferCard({ offer, onAccept, onReject, onReceive, onPedido, accepting }
         )}
 
         {accepted && (
-          <button
-            onClick={() => onReceive(offer)}
-            className="w-full mt-3 py-2.5 rounded-xl font-bold text-sm text-blue-300 bg-blue-900/30 border border-blue-800 hover:bg-blue-900/50 transition-all flex items-center justify-center gap-2">
-            <ShoppingCart size={15} />
-            Abrir Receber Mercadoria
-          </button>
+          <div className="mt-3 flex items-center justify-between bg-emerald-900/30 border border-emerald-800 rounded-xl px-3 py-2.5">
+            <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+              <CheckCircle size={14} />
+              Estoque atualizado automaticamente
+            </div>
+            <a href="/estoque" className="text-[11px] text-blue-400 underline">Ver estoque →</a>
+          </div>
         )}
       </div>
     </div>
@@ -233,10 +235,14 @@ function OfferCard({ offer, onAccept, onReject, onReceive, onPedido, accepting }
 
 /* ── PedidoModal ────────────────────────────────────────────── */
 function PedidoModal({ offer, onClose, onConfirm }) {
-  const [qty,     setQty]     = useState('')
-  const [payment, setPayment] = useState('pix')
-  const [note,    setNote]    = useState('')
-  const [loading, setLoading] = useState(false)
+  const [qty,          setQty]          = useState('')
+  const [payment,      setPayment]      = useState('pix')
+  const [deliveryType, setDeliveryType] = useState('entrega')  // 'entrega' | 'retirada'
+  const [address,      setAddress]      = useState('')
+  const [schedDate,    setSchedDate]    = useState('')
+  const [schedTime,    setSchedTime]    = useState('')
+  const [note,         setNote]         = useState('')
+  const [loading,      setLoading]      = useState(false)
 
   const maxQty   = offer.qty
   const qtyNum   = parseFloat(qty) || 0
@@ -257,6 +263,10 @@ function PedidoModal({ offer, onClose, onConfirm }) {
       offerPrice: offer.offerPrice,
       totalPrice: total,
       paymentMethod: payment,
+      deliveryType,
+      address: deliveryType === 'entrega' ? address.trim() : '',
+      schedDate,
+      schedTime,
       note: note.trim(),
       status: 'pending',
       createdAt: new Date().toISOString(),
@@ -346,12 +356,66 @@ function PedidoModal({ offer, onClose, onConfirm }) {
           ))}
         </div>
 
+        {/* Delivery / Pickup */}
+        <label className="block text-gray-400 text-xs font-bold uppercase tracking-widest mb-3">
+          Entrega ou Retirada?
+        </label>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {[
+            { id: 'entrega',  icon: '🚚', label: 'Entrega',  sub: 'Fornecedor entrega' },
+            { id: 'retirada', icon: '📦', label: 'Retirada', sub: 'Busco no fornecedor' },
+          ].map(o => (
+            <button key={o.id} onClick={() => setDeliveryType(o.id)}
+              className={`rounded-xl py-3 px-3 flex flex-col items-center gap-1 border transition-all ${
+                deliveryType === o.id
+                  ? 'border-emerald-500 bg-emerald-900/40 text-white'
+                  : 'border-gray-700 bg-gray-800 text-gray-400'
+              }`}>
+              <span className="text-2xl">{o.icon}</span>
+              <span className="text-xs font-black">{o.label}</span>
+              <span className="text-[10px] text-gray-500">{o.sub}</span>
+            </button>
+          ))}
+        </div>
+
+        {deliveryType === 'entrega' && (
+          <div className="mb-4">
+            <label className="block text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">
+              <MapPin size={11} className="inline mr-1" />Endereço de Entrega
+            </label>
+            <input value={address} onChange={e => setAddress(e.target.value)}
+              placeholder="Ex: Rua das Flores 123, Centro"
+              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-gray-300 text-sm mb-2 outline-none focus:border-emerald-500"
+            />
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          <div>
+            <label className="block text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">
+              <CalendarClock size={11} className="inline mr-1" />
+              {deliveryType === 'entrega' ? 'Data de Entrega' : 'Data de Retirada'}
+            </label>
+            <input type="date" value={schedDate} onChange={e => setSchedDate(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-3 text-gray-300 text-sm outline-none focus:border-emerald-500"
+            />
+          </div>
+          <div>
+            <label className="block text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">
+              Horário
+            </label>
+            <input type="time" value={schedTime} onChange={e => setSchedTime(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-3 text-gray-300 text-sm outline-none focus:border-emerald-500"
+            />
+          </div>
+        </div>
+
         {/* Note */}
         <label className="block text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">
           Observação (opcional)
         </label>
         <textarea value={note} onChange={e => setNote(e.target.value)}
-          placeholder="Ex: Entrega na terça, entrada pelos fundos..."
+          placeholder="Ex: Entrada pelos fundos, ligar antes..."
           rows={2}
           className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-gray-300 text-sm mb-5 outline-none focus:border-emerald-500 resize-none"
         />
@@ -382,6 +446,9 @@ function PedidoModal({ offer, onClose, onConfirm }) {
 /* ── MAIN ───────────────────────────────────────────────────── */
 export default function Ofertas() {
   const { upsertProduct, products }  = useStore()
+  const storeName = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('cp_settings') || '{}').storeName || 'Mercado' } catch { return 'Mercado' }
+  }, [])
   const [offers,      setOffers]     = useState([])
   const [loading,     setLoading]    = useState(true)
   const [accepting,   setAccepting]  = useState(false)
@@ -441,9 +508,10 @@ export default function Ofertas() {
     showToast('Oferta recusada')
   }
 
-  /* mark as received (open /estoque manually) */
+  /* mark as received — show link, don't force navigate */
   function handleReceive(offer) {
-    window.location.href = '/estoque'
+    // noop — acceptance already updates stock automatically via upsertProduct
+    // user can navigate to /estoque independently
   }
 
   /* place order → save to cp_supplier_orders + WhatsApp to supplier */
@@ -457,17 +525,25 @@ export default function Ofertas() {
       await saveOrders([order, ...existing])
     } catch {}
 
-    /* open WhatsApp to supplier if they have a phone */
-    const pay  = PAYMENT_OPTS.find(p => p.id === order.paymentMethod)
+    /* open WhatsApp to supplier with full order details */
+    const pay       = PAYMENT_OPTS.find(p => p.id === order.paymentMethod)
+    const isEntrega = order.deliveryType !== 'retirada'
+    const sched     = [order.schedDate, order.schedTime].filter(Boolean).join(' às ')
     const msg  = [
-      `🛒 *NOVO PEDIDO — ${order.productName}*`,
+      `🛒 *NOVO PEDIDO — ${storeName || 'Mercado'}*`,
       ``,
-      `📦 Qtd: *${order.qtyRequested} ${order.unit}*`,
-      `💰 Total: *${BRL.format(order.totalPrice)}*`,
-      `${pay?.emoji || ''} Pagamento: *${pay?.label || order.paymentMethod}*`,
-      order.note ? `💬 Obs: ${order.note}` : '',
+      `📦 *${order.productName}*${order.sku ? ` (${order.sku})` : ''}`,
+      `   Qtd: *${order.qtyRequested} ${order.unit}*`,
+      `   Total: *${BRL.format(order.totalPrice)}*`,
+      `   ${pay?.emoji || '💰'} Pagamento: *${pay?.label || order.paymentMethod}*`,
       ``,
-      `⏰ ${new Date().toLocaleString('pt-BR')}`,
+      isEntrega
+        ? `🚚 *ENTREGA* no mercado${order.address ? `\n   📍 ${order.address}` : ''}`
+        : `📦 *RETIRADA* no fornecedor`,
+      sched ? `   🕐 ${sched}` : '',
+      order.note ? `\n💬 ${order.note}` : '',
+      ``,
+      `✅ Responda confirmando para confirmar`,
     ].filter(Boolean).join('\n')
 
     if (order.supplierPhone) {

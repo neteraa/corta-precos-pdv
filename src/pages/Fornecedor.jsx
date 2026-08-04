@@ -24,12 +24,12 @@ const API_RESTORE = '/api/restore'
 const UNITS       = ['CX', 'UND', 'FD', 'KG', 'LT', 'PC', 'DZ', 'SC']
 
 const PAYMENT_INFO = {
-  pix:      { emoji: '\u26a1', label: 'PIX',       color: '#10b981' },
-  dinheiro: { emoji: '\ud83d\udcb5', label: 'Dinheiro',  color: '#3b82f6' },
-  boleto:   { emoji: '\ud83d\udcc4', label: 'Boleto',    color: '#f59e0b' },
-  prazo30:  { emoji: '\ud83d\udcc5', label: 'Prazo 30d', color: '#8b5cf6' },
-  prazo60:  { emoji: '\ud83d\udcc5', label: 'Prazo 60d', color: '#ec4899' },
-  cartao:   { emoji: '\ud83d\udcb3', label: 'Cartao',    color: '#06b6d4' },
+  pix:      { emoji: '⚡', label: 'PIX',       color: '#10b981' },
+  dinheiro: { emoji: '💵', label: 'Dinheiro',  color: '#3b82f6' },
+  boleto:   { emoji: '📄', label: 'Boleto',    color: '#f59e0b' },
+  prazo30:  { emoji: '📅', label: 'Prazo 30d', color: '#8b5cf6' },
+  prazo60:  { emoji: '📅', label: 'Prazo 60d', color: '#ec4899' },
+  cartao:   { emoji: '💳', label: 'Cartao',    color: '#06b6d4' },
 }
 
 const SKU_MAP = Object.fromEntries(
@@ -66,13 +66,13 @@ async function fetchAll() {
 
 function buildOfferMsg(offer, supplierName) {
   const lines = [
-    '\ud83d\ude9a *NOVA OFERTA - ' + supplierName + '*',
+    '🚚 *NOVA OFERTA - ' + supplierName + '*',
     '',
-    '\ud83d\udce6 *' + offer.productName + '*',
+    '📦 *' + offer.productName + '*',
     offer.sku ? '   Cod: ' + offer.sku : '',
     '   ' + offer.qty + ' ' + offer.unit + '  .  ' + BRL.format(offer.offerPrice) + '/un',
-    offer.expiryDate ? '\ud83d\udcc5 Vence: ' + fmtDate(offer.expiryDate) : '',
-    offer.isOpportunity ? '\ud83d\udd25 *OPORTUNIDADE - estoque limitado!*' : '',
+    offer.expiryDate ? '📅 Vence: ' + fmtDate(offer.expiryDate) : '',
+    offer.isOpportunity ? '🔥 *OPORTUNIDADE - estoque limitado!*' : '',
     offer.note ? '\ud83d\udcac ' + offer.note : '',
     '',
     '\u2705 Ver e aceitar: https://corta-precos-pdv.netlify.app/ofertas',
@@ -174,7 +174,7 @@ function WaOverlay({ offer, markets, supplierName, onClose }) {
           <div style={{ width:56, height:56, borderRadius:18, background:'#14532d', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 12px' }}>
             <CheckCircle size={28} color="#4ade80" />
           </div>
-          <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:20 }}>Oferta Publicada! \ud83c\udf89</div>
+          <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:20 }}>Oferta Publicada! 🎉</div>
           <div style={{ color:'#10b981', fontSize:13, marginTop:4 }}>Notifique os mercados pelo WhatsApp</div>
         </div>
         {markets.length === 0
@@ -192,7 +192,7 @@ function WaOverlay({ offer, markets, supplierName, onClose }) {
             </a>
           ))
         }
-        <div style={{ marginTop:8 }}><Btn full onClick={onClose}>\u2713 Pronto, fechar</Btn></div>
+        <div style={{ marginTop:8 }}><Btn full onClick={onClose}>✓ Pronto, fechar</Btn></div>
       </div>
     </div>
   )
@@ -207,7 +207,7 @@ function OfferCard({ offer, markets, supplierName, onDelete }) {
       {showWa && <WaOverlay offer={offer} markets={markets} supplierName={supplierName} onClose={() => setShowWa(false)} />}
       <div style={{ background:'#0d2137', borderRadius:16, padding:'14px 16px', marginBottom:10, border:'1px solid ' + (offer.isOpportunity ? '#059669' : '#1a3a50'), position:'relative', overflow:'hidden' }}>
         {offer.isOpportunity && (
-          <div style={{ position:'absolute', top:0, right:0, background:'linear-gradient(135deg,#d97706,#f59e0b)', color:'#000', fontSize:10, fontWeight:900, padding:'3px 10px', borderRadius:'0 16px 0 10px' }}>\ud83d\udd25 OPORTUNIDADE</div>
+          <div style={{ position:'absolute', top:0, right:0, background:'linear-gradient(135deg,#d97706,#f59e0b)', color:'#000', fontSize:10, fontWeight:900, padding:'3px 10px', borderRadius:'0 16px 0 10px' }}>🔥 OPORTUNIDADE</div>
         )}
         <div style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
           <div style={{ width:40, height:40, borderRadius:10, background:'#0a2540', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -219,7 +219,7 @@ function OfferCard({ offer, markets, supplierName, onDelete }) {
               <span style={{ color:'#10b981', fontWeight:900, fontSize:15 }}>{BRL.format(offer.offerPrice)}/un</span>
               <span style={{ background:'#0a2540', color:'#93c5fd', fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:8 }}>{offer.qty} {offer.unit}</span>
               <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:20, background: accepted ? '#14532d' : '#1a3a50', color: accepted ? '#86efac' : '#64748b' }}>
-                {accepted ? '\u2713 Aceita' : '\u23f3 Aguardando'}
+                {accepted ? '✓ Aceita' : '⏳ Aguardando'}
               </span>
             </div>
             {offer.note && <div style={{ color:'#64748b', fontSize:12, marginTop:4, fontStyle:'italic' }}>{offer.note}</div>}
@@ -244,8 +244,9 @@ function OfferCard({ offer, markets, supplierName, onDelete }) {
 
 /* ── SetupScreen ────────────────────────────────────────────── */
 function SetupScreen({ onDone }) {
-  const [name, setName]   = useState('')
-  const [phone, setPhone] = useState('')
+  const saved = (() => { try { return JSON.parse(localStorage.getItem(LOCAL)) || {} } catch { return {} } })()
+  const [name, setName]   = useState(saved.name  || '')
+  const [phone, setPhone] = useState(saved.phone || '')
   return (
     <div style={{ minHeight:'100dvh', background:'#050f1a', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
       <div style={{ textAlign:'center', marginBottom:24 }}>
@@ -253,10 +254,14 @@ function SetupScreen({ onDone }) {
           <Truck size={36} color="#fff" />
         </div>
         <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:28 }}>FORNECEDOR</div>
-        <div style={{ color:'#10b981', fontSize:14, marginTop:4 }}>Portal de ofertas para mercados</div>
+        <div style={{ color:'#10b981', fontSize:14, marginTop:4 }}>
+          {saved.name ? `Bem-vindo de volta, ${saved.name.split(' ')[0]}!` : 'Portal de ofertas para mercados'}
+        </div>
       </div>
       <div style={{ background:'#0d2137', borderRadius:20, padding:24, width:'100%', maxWidth:360, border:'1px solid #1e4060' }}>
-        <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:16, marginBottom:20 }}>Identifique-se</div>
+        <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:16, marginBottom:20 }}>
+          {saved.name ? '✓ Confirmar identidade' : 'Identifique-se'}
+        </div>
         <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>Nome / Distribuidora</label>
         <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Joao Distribuidora"
           style={{ display:'block', width:'100%', marginTop:6, marginBottom:16, background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, padding:'12px 14px', color:'#e2e8f0', fontSize:15, boxSizing:'border-box', outline:'none' }}
@@ -287,7 +292,7 @@ function TabInicio({ estoque, offers, orders, profile }) {
   return (
     <div style={{ padding:'16px 16px 100px' }}>
       <div style={{ marginBottom:20 }}>
-        <div style={{ color:'#10b981', fontSize:13, fontWeight:700 }}>Bom dia! \ud83d\udc4b</div>
+        <div style={{ color:'#10b981', fontSize:13, fontWeight:700 }}>Bom dia! 👋</div>
         <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:22 }}>{profile.name}</div>
       </div>
       <div style={{ display:'flex', gap:10, marginBottom:10 }}>
@@ -345,7 +350,7 @@ function TabReceber({ estoque, setEstoque }) {
       : [...estoque, { id: uid(), productName: selected.name, sku: selected.sku || '', qty: qtyNum, unit, cost: parseNum(cost), receivedAt: today(), updatedAt: new Date().toISOString() }]
     setEstoque(next)
     await persistKey(ESTOQUE_KEY, next)
-    setFlash('\u2713 ' + qtyNum + ' ' + unit + ' de "' + selected.name + '" adicionados!')
+    setFlash('✓ ' + qtyNum + ' ' + unit + ' de "' + selected.name + '" adicionados!')
     setTimeout(() => setFlash(null), 3000)
     setSelected(null); setQty(''); setSaving(false)
   }
@@ -539,7 +544,7 @@ function TabOfertas({ estoque, offers, setOffers, markets, profile }) {
 
         <div style={{ marginTop:12, background:'#0d2137', border:'1px solid #1e4060', borderRadius:14, padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', cursor:'pointer' }} onClick={() => setIsOpp(v => !v)}>
           <div>
-            <div style={{ color: isOpp ? '#fcd34d' : '#94a3b8', fontWeight:800, fontSize:14 }}>{isOpp ? '\ud83d\udd25' : '\u2b50'} Marcar como Oportunidade</div>
+            <div style={{ color: isOpp ? '#fcd34d' : '#94a3b8', fontWeight:800, fontSize:14 }}>{isOpp ? '🔥' : '⭐'} Marcar como Oportunidade</div>
             <div style={{ color:'#475569', fontSize:12 }}>Preco especial ou estoque urgente</div>
           </div>
           <div style={{ width:44, height:24, borderRadius:12, background: isOpp ? '#10b981' : '#1e4060', display:'flex', alignItems:'center', padding:'0 3px', transition:'all .2s' }}>
@@ -584,7 +589,7 @@ function TabOfertas({ estoque, offers, setOffers, markets, profile }) {
 function TabPedidos({ orders, setOrders }) {
   const pending = orders.filter(o => o.status === 'pending').length
   const total   = orders.reduce((s, o) => s + (o.totalPrice || 0), 0)
-  const payInfo = id => PAYMENT_INFO[id] || { emoji: '\ud83d\udcb0', label: id || 'N/A', color: '#94a3b8' }
+  const payInfo = id => PAYMENT_INFO[id] || { emoji: '💰', label: id || 'N/A', color: '#94a3b8' }
 
   async function updateStatus(id, status) {
     const next = orders.map(o => o.id === id ? { ...o, status, updatedAt: new Date().toISOString() } : o)
@@ -598,7 +603,7 @@ function TabPedidos({ orders, setOrders }) {
 
   const sBg  = s => s === 'delivered' ? '#14532d' : s === 'confirmed' ? '#1e3a5f' : '#78350f'
   const sTxt = s => s === 'delivered' ? '#86efac' : s === 'confirmed' ? '#93c5fd' : '#fcd34d'
-  const sLbl = s => s === 'delivered' ? '\u2713 Entregue' : s === 'confirmed' ? '\u2713 Confirmado' : '\ud83d\udce6 Pendente'
+  const sLbl = s => s === 'delivered' ? '✓ Entregue' : s === 'confirmed' ? '✓ Confirmado' : '📦 Pendente'
 
   return (
     <div style={{ padding:'16px 16px 100px' }}>
@@ -648,17 +653,17 @@ function TabPedidos({ orders, setOrders }) {
               {order.status === 'pending' && (
                 <button onClick={() => updateStatus(order.id, 'confirmed')}
                   style={{ flex:1, background:'linear-gradient(135deg,#10b981,#059669)', color:'#fff', border:'none', borderRadius:12, padding:10, fontWeight:800, fontSize:13, cursor:'pointer' }}>
-                  \u2713 Confirmar Pedido
+                  ✓ Confirmar Pedido
                 </button>
               )}
               {order.status === 'confirmed' && (
                 <button onClick={() => updateStatus(order.id, 'delivered')}
                   style={{ flex:1, background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'#fff', border:'none', borderRadius:12, padding:10, fontWeight:800, fontSize:13, cursor:'pointer' }}>
-                  \ud83d\ude9a Marcar Entregue
+                  🚚 Marcar Entregue
                 </button>
               )}
               {order.status === 'delivered' && (
-                <div style={{ flex:1, textAlign:'center', color:'#86efac', fontSize:13, fontWeight:700, padding:10 }}>\u2713 Entregue</div>
+                <div style={{ flex:1, textAlign:'center', color:'#86efac', fontSize:13, fontWeight:700, padding:10 }}>✓ Entregue</div>
               )}
               <button onClick={() => deleteOrder(order.id)} style={{ background:'#1a0a0a', color:'#ef4444', border:'none', borderRadius:10, padding:'8px 10px', cursor:'pointer' }}>
                 <Trash2 size={14} />
