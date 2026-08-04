@@ -1390,6 +1390,7 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, 
   const [paletMode,     setPaletMode]     = useState(false)
   const [paletCount,    setPaletCount]    = useState('')
   const [unitsPerPalet, setUnitsPerPalet] = useState('')
+  const [costMode,      setCostMode]      = useState('perUnit') // 'perUnit' | 'totalLot'
 
   function handleSelect(p) {
     setSelected(p)
@@ -1404,14 +1405,21 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, 
   function reset() {
     setSelected(null); setQty(''); setTotalPaid(''); setExpiryDate('')
     setOfferPrice(''); setIsOpp(false); setOfferNote(''); setSourceName('')
-    setPaletMode(false); setPaletCount(''); setUnitsPerPalet('')
+    setPaletMode(false); setPaletCount(''); setUnitsPerPalet(''); setCostMode('perUnit')
   }
 
   // Qty resolved: palete mode multiplies paletes × unidades/palete
   const paletTotal = paletMode ? (parseFloat(paletCount || 0) * parseFloat(unitsPerPalet || 0)) : 0
   const qtyNum     = paletMode ? paletTotal : (parseFloat(qty) || 0)
   const paid       = parseNum(totalPaid)
-  const unitCost   = (paid > 0 && qtyNum > 0) ? paid / qtyNum : 0
+  // costMode: 'perUnit' = usuário digita preço/un, sistema calcula total
+  //           'totalLot' = usuário digita o total pago, sistema calcula custo/un
+  const unitCost        = costMode === 'perUnit'
+    ? paid                                              // direto: R$3/un
+    : (paid > 0 && qtyNum > 0 ? paid / qtyNum : 0)     // total ÷ qty
+  const totalPaidActual = costMode === 'perUnit'
+    ? paid * qtyNum                                     // R$3 × 700 = R$2.100
+    : paid                                              // valor digitado já é o total
   const sellPrice  = parseNum(offerPrice)
   // Margem bruta (sobre venda), não markup — max 100%, intuitiva para varejo
   const margin     = sellPrice > 0 ? Math.round(((sellPrice - unitCost) / sellPrice) * 100) : null
@@ -1454,7 +1462,7 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, 
     // 1. Add to estoque — 🔒 internal fields (never in offer object)
     const item = {
       id: uid(), productName: selected.name, sku: selected.sku || '',
-      qty: qtyNum, unit, unitCost, totalPaid: paid,
+      qty: qtyNum, unit, unitCost, totalPaid: totalPaidActual,
       sourceType, sourceName: sourceName.trim() || null, // save supplier name for autocomplete
 
       expiryDate: expiryDate || null,
@@ -1620,20 +1628,52 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, 
             )}
           </div>
 
-          {/* ── Total pago + unit cost ── */}
+          {/* ── Custo de compra ── */}
           <div>
-            <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>Total pago pelo lote (interno 🔒)</div>
-            <div style={{ display:'flex', gap:0, alignItems:'center', background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, overflow:'hidden' }}>
-              <span style={{ padding:'0 12px', color:'#475569', fontSize:13, fontWeight:700 }}>R$</span>
-              <CurrencyInput value={totalPaid} onChange={setTotalPaid} placeholder="0,00 — quanto pagou no total"
-                style={{ flex:1, background:'transparent', border:'none', padding:'13px 12px 13px 0', color:'#e2e8f0', fontSize:16, fontWeight:700, outline:'none', width:'100%' }} />
+            {/* Toggle modo de custo */}
+            <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+              <button onClick={() => setCostMode('perUnit')} style={{ flex:1, padding:'7px 0', borderRadius:10, border:`1px solid ${costMode === 'perUnit' ? '#3b82f6' : '#1e4060'}`, background: costMode === 'perUnit' ? '#1e3a5f' : '#0a1929', color: costMode === 'perUnit' ? '#93c5fd' : '#475569', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                💸 Preço por unidade
+              </button>
+              <button onClick={() => setCostMode('totalLot')} style={{ flex:1, padding:'7px 0', borderRadius:10, border:`1px solid ${costMode === 'totalLot' ? '#8b5cf6' : '#1e4060'}`, background: costMode === 'totalLot' ? '#2e1065' : '#0a1929', color: costMode === 'totalLot' ? '#c4b5fd' : '#475569', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                🧾 Total do lote
+              </button>
             </div>
-            {unitCost > 0 && (
-              <div style={{ color:'#64748b', fontSize:12, marginTop:4, display:'flex', gap:10, flexWrap:'wrap' }}>
-                <span>💸 Custo/un: <strong style={{ color:'#f1f5f9' }}>{fmtCost(unitCost)}</strong></span>
-                {margin !== null && <span style={{ color: margin >= 40 ? '#4ade80' : margin >= 20 ? '#fbbf24' : '#f87171' }}>
-                  Margem bruta: {margin}%
-                </span>}
+
+            <div style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:6 }}>
+              {costMode === 'perUnit' ? 'Custo por unidade (interno 🔒)' : 'Total pago pelo lote (interno 🔒)'}
+            </div>
+            <div style={{ display:'flex', gap:0, alignItems:'center', background:'#0a1929', border:`1px solid ${costMode === 'perUnit' ? '#2563eb55' : '#4c1d9555'}`, borderRadius:12, overflow:'hidden' }}>
+              <span style={{ padding:'0 12px', color:'#475569', fontSize:13, fontWeight:700 }}>R$</span>
+              <CurrencyInput value={totalPaid} onChange={setTotalPaid}
+                placeholder={costMode === 'perUnit' ? 'Ex: 3,00 — quanto pagou por unidade' : 'Ex: 2.100,00 — total investido no lote'}
+                style={{ flex:1, background:'transparent', border:'none', padding:'13px 12px 13px 0', color:'#e2e8f0', fontSize:16, fontWeight:700, outline:'none', width:'100%' }} />
+              {costMode === 'perUnit' && <span style={{ padding:'0 12px', color:'#475569', fontSize:12, fontWeight:700, flexShrink:0 }}>/un</span>}
+            </div>
+
+            {/* Feedback de custo/total */}
+            {paid > 0 && qtyNum > 0 && (
+              <div style={{ marginTop:6, background:'#050f1a', borderRadius:8, padding:'8px 12px' }}>
+                {costMode === 'perUnit' ? (
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap', fontSize:12 }}>
+                    <span style={{ color:'#64748b' }}>💸 {fmtCost(unitCost)}/un</span>
+                    <span style={{ color:'#64748b' }}>×</span>
+                    <span style={{ color:'#94a3b8', fontWeight:700 }}>{qtyNum} {unit}</span>
+                    <span style={{ color:'#64748b' }}>=</span>
+                    <span style={{ color:'#c4b5fd', fontWeight:900 }}>{BRL.format(totalPaidActual)} total investido</span>
+                  </div>
+                ) : (
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap', fontSize:12 }}>
+                    <span style={{ color:'#c4b5fd', fontWeight:900 }}>{BRL.format(totalPaidActual)}</span>
+                    <span style={{ color:'#64748b' }}>÷ {qtyNum} {unit} =</span>
+                    <span style={{ color:'#94a3b8', fontWeight:700 }}>💸 {fmtCost(unitCost)}/un</span>
+                  </div>
+                )}
+                {margin !== null && sellPrice > 0 && (
+                  <div style={{ marginTop:4, color: margin >= 40 ? '#4ade80' : margin >= 20 ? '#fbbf24' : '#f87171', fontSize:12, fontWeight:700 }}>
+                    Margem bruta: {margin}%
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1690,9 +1730,10 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, 
             </div>
             {canBlast && qtyNum > 0 && (
               <div style={{ color:'#475569', fontSize:12, marginBottom:10, display:'flex', gap:10, flexWrap:'wrap' }}>
-                <span>💰 Fatura total: <strong style={{ color:'#f1f5f9' }}>{BRL.format(sellPrice * qtyNum)}</strong></span>
+                <span>💰 Faturamento: <strong style={{ color:'#f1f5f9' }}>{BRL.format(sellPrice * qtyNum)}</strong></span>
                 {unitCost > 0 && <span style={{ color: margin >= 40 ? '#4ade80' : margin >= 20 ? '#fbbf24' : '#f87171' }}>· Margem: {margin}%</span>}
                 {paid > 0 && <span style={{ color:'#10b981' }}>· Lucro: {BRL.format((sellPrice - unitCost) * qtyNum)}</span>}
+                {paid > 0 && <span style={{ color:'#c4b5fd' }}>· Investido: {BRL.format(totalPaidActual)}</span>}
               </div>
             )}
             {canBlast && (
