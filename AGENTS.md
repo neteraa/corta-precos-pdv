@@ -89,25 +89,56 @@ npm run build && npx netlify-cli deploy --prod --dir=dist --site=abd4863b-ef7b-4
 - Brand color: orange-500 (#ea580c) — use `text-orange-500`, `bg-orange-500`
 - `animate-pop` = entrance animation
 
-## Portal do Fornecedor (adicionado em 2026-08-04)
-- `/fornecedor` — standalone, mobile-first, tema verde esmeralda, SEM auth do mercado
-  - Setup: fornecedor se identifica com nome + telefone (localStorage `cp_fornecedor_v1`)
-  - Scanner de código de barras (reutiliza CameraScanner.jsx)
-  - Busca produto em products_seed.json (2817 itens) por nome ou SKU
-  - Form: qty, unidade (CX/UND/FD/KG/LT/PC), preço oferta, validade, nota
-  - Toggle 🔥 Oportunidade
-  - Publica em Netlify Blobs: `cp_supplier_offers`
-  - WhatsApp dispatch: overlay mostra cada mercado cadastrado, abre wa.me
-  - Aba Mercados: cadastrar contatos (nome + fone) salvos em `${LOCAL}_markets`
+## Sistema do Distribuidor (/fornecedor) — v3.0 (2026-08-04)
+**Produto vendido separadamente para distribuidoras/atacadistas de giro rápido (leilão, danificado, contato)**
 
-- `/ofertas` — dentro do app do mercado (autenticado, com sidebar)
-  - Filtros: todas / pendentes / aceitas / oportunidade
-  - Aceitar oferta → atualiza estoque via `upsertProduct` (qty + expiryDate + cost)
-  - Badge dinâmico no sidebar com contagem de pendentes
-  - Dashboard: banner verde quando há pendentes → navega para /ofertas
+### Architecture
+- URL: `/fornecedor` — standalone, SEM auth do mercado, tema verde esmeralda
+- Netlify Blobs keys: `cp_supplier_offers`, `cp_fornecedor_estoque`, `cp_supplier_orders`, `cp_distribuidor_markets`
+- CameraScanner: prop `onScan` OR `onDetected` (ambas funcionam)
 
-- Novas keys Netlify Blobs: `cp_supplier_offers`
-- Store: `supplierOffers` state + `applyServerData` lida com `cp_supplier_offers`
+### Tabs do Distribuidor
+- **Início** — FIFO Dashboard: 🔴URGENTE(2d+) / ⚡Atenção(1d) / ✅Hoje + Balanço do dia (gastou/vendeu/lucro) + Botão Blitz
+- **Receber** — Entrada de lote: sourceType (🔨Leilão/📦Danificado/👤Contato/🏭Atacadista/❓Avulso) + QuickProductInput (texto livre sem SKU) + totalPaid→unitCost automático + validade shortcuts (7/15/30/60/90d) + preço p/mercados + margem ao vivo
+- **Ofertas** — OfferCard com preço editável inline + WaOverlay por mercado
+- **Pedidos** — TabPedidos: Confirmar/Entregar → abre WA automático para o mercado notificando
+- **Mercados** — CRM dos clientes (nome, ZAP, endereço, responsável, CNPJ)
+- **Perfil** — identidade do distribuidor
+
+### Componentes internos (Fornecedor.jsx ~1600 linhas)
+- `QuickProductInput` — texto livre + scan; "Usar: [nome]" sem precisar de SKU
+- `BlastScreen` — fullscreen sequential WA dispatcher; aceita `offer` ou `customMsg`
+- `BlitzModal` — baixa % de todas as ofertas ativas + dispara WA combinado para todos
+- `FifoRow` / `FifoPanel` — FIFO aging em TabInicio; botões -10%/-20%/-30% + ZAP direto
+- `WaOverlay` — manda ZAP por mercado com histórico de pedidos
+- `OfferCard` — preço editável inline, badge URGENTE ≤14d
+- `BlitzModal` — seleciona % + preview + aplica em todas as ofertas
+
+### Campos do estoque item (INTERNO — nunca vaza para offer object)
+```js
+{ sourceType, sourceName, totalPaid, unitCost, receivedAt, expiryDate, ... }
+```
+
+### Offer object (o que mercado vê — sem custo/origem/margem)
+```js
+{ supplierId, supplierName, supplierPhone, productName, sku, qty, unit, offerPrice, expiryDate, isOpportunity, note, status, publishedAt }
+```
+
+## Portal do Mercado (/ofertas) — v2.0 (2026-08-04)
+- Filtros: Todas / Pendentes / **📋 Meus Pedidos** / 🔥 Oportunidade
+- **Meus Pedidos**: polling de 30s em `cp_supplier_orders`; filtra por storeName/storePhone
+- `OrderCard`: status badges — 🕐Aguardando / ✅Confirmado! / 🚚A Caminho / 📦Entregue!
+- Badge pulsante no header quando há pedidos confirmados
+- Após fazer pedido: redireciona automaticamente para tab "Meus Pedidos"
+- `reduceSupplierStock`: baixa automaticamente do estoque do distribuidor ao aceitar oferta
+
+### Fluxo completo confirmado
+1. Distribuidor: Receber → produto + preço → Dar Entrada + Disparar
+2. BlastScreen: abre ZAP para cada mercado com link do portal
+3. Mercado: /ofertas → vê oferta → Fazer Pedido → ZAP vai para distribuidor
+4. Distribuidor: Pedidos → "Confirmar + 📱 Avisar Mercado" → ZAP automático de confirmação
+5. Mercado: Meus Pedidos atualiza em ≤30s mostrando "✅ Confirmado!"
+6. Distribuidor: "Entreguei + 📱 Avisar Mercado" → ZAP de entrega
 
 ## Known issues / next possible work
 - Produtos page can be slow with 2795 products loaded (no virtual scroll)
