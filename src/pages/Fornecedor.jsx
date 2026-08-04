@@ -2294,7 +2294,128 @@ function TabRelatorio({ estoque, offers, orders }) {
   )
 }
 
-/* ── Main Component ─────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════ */
+/* ── MULTI-TENANT AUTH ─────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════ */
+const SESSION_KEY = 'cp_session_v1'
+
+const TENANTS = [
+  {
+    id: 'mega',
+    username: 'megatudo',
+    password: 'mega2024',
+    profile: {
+      name: 'Mega Tudo Barato',
+      phone: '11 2815-1989',
+      businessName: 'MEGA TUDO BARATO',
+      city: 'Cotia, SP',
+      address: 'Rua Bandeirantes, 221, Portal da Primavera, Cotia, SP',
+      cnpj: '18.755.137/0001-11',
+      themeColor: '#f97316',
+    },
+    seedMarkets: [
+      { id:'mega_mkt1', name:'Mercado Corta Preços',    phone:'15996604075', contact:'Proprietário',  address:'Vila Bom Jesus, Itapeva, SP',        city:'Itapeva/SP'   },
+      { id:'mega_mkt2', name:'Supermercado Família',    phone:'11987654321', contact:'Donizete',      address:'Rua das Flores, 150, Cotia, SP',     city:'Cotia/SP'     },
+      { id:'mega_mkt3', name:'Mercearia Boa Compra',    phone:'11976543210', contact:'Maria Silva',   address:'Rua das Oliveiras, 400, São Roque',  city:'São Roque/SP' },
+      { id:'mega_mkt4', name:'Hortifruti das Colinas',  phone:'15988776655', contact:'Pedro Almeida', address:'Av. Central, 22, Boituva, SP',       city:'Boituva/SP'   },
+      { id:'mega_mkt5', name:'Atacado Bom Preço',       phone:'15991234567', contact:'Ana Clara',     address:'Rua do Comércio, 320, Sorocaba, SP', city:'Sorocaba/SP'  },
+    ],
+  },
+]
+
+/* ── LoginPage ───────────────────────────────────────────────── */
+function LoginPage({ onLogin }) {
+  const [user,    setUser]    = useState('')
+  const [pass,    setPass]    = useState('')
+  const [error,   setError]   = useState('')
+  const [loading, setLoading] = useState(false)
+  const [showPass, setShowPass] = useState(false)
+
+  const inp = { display:'block', width:'100%', background:'#0a1929', border:'1px solid #1e4060', borderRadius:14, padding:'14px 16px', color:'#e2e8f0', fontSize:16, boxSizing:'border-box', outline:'none', marginBottom:12 }
+
+  function handleLogin() {
+    if (!user || !pass) return
+    setLoading(true); setError('')
+    setTimeout(() => {
+      const tenant = TENANTS.find(t => t.username === user.trim().toLowerCase() && t.password === pass)
+      if (tenant) {
+        onLogin(tenant)
+      } else {
+        setError('Usuário ou senha incorretos')
+        setLoading(false)
+      }
+    }, 700) // simulate network delay
+  }
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#050f1a', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'24px 20px' }}>
+
+      {/* Platform branding */}
+      <div style={{ textAlign:'center', marginBottom:36 }}>
+        <div style={{ width:80, height:80, borderRadius:24, background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px', boxShadow:'0 12px 40px rgba(16,185,129,0.35)' }}>
+          <Truck size={38} color="#fff" />
+        </div>
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:28, letterSpacing:'-0.02em' }}>Corta Preços</div>
+        <div style={{ color:'#10b981', fontSize:13, fontWeight:700, marginTop:4, textTransform:'uppercase', letterSpacing:'0.1em' }}>Portal do Distribuidor</div>
+      </div>
+
+      {/* Login card */}
+      <div style={{ background:'#0a1929', borderRadius:24, padding:'28px 24px', width:'100%', maxWidth:380, border:'1px solid #1e4060', boxShadow:'0 24px 64px rgba(0,0,0,0.5)' }}>
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:20, marginBottom:4 }}>Entrar</div>
+        <div style={{ color:'#475569', fontSize:13, marginBottom:24 }}>Acesso restrito a distribuidoras cadastradas</div>
+
+        <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>Usuário</label>
+        <input value={user} onChange={e => { setUser(e.target.value); setError('') }} placeholder="Seu usuário"
+          style={{ ...inp, marginTop:6 }} autoCapitalize="none" autoCorrect="off"
+          onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+
+        <label style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>Senha</label>
+        <div style={{ position:'relative', marginTop:6, marginBottom: error ? 8 : 20 }}>
+          <input value={pass} onChange={e => { setPass(e.target.value); setError('') }}
+            type={showPass ? 'text' : 'password'} placeholder="Sua senha"
+            style={{ ...inp, marginBottom:0, paddingRight:48 }}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+          <button onClick={() => setShowPass(v => !v)} style={{ position:'absolute', right:14, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#475569', padding:4 }}>
+            {showPass ? '🙈' : '👁'}
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ background:'#7c1d1d', border:'1px solid #991b1b', borderRadius:10, padding:'10px 14px', color:'#fca5a5', fontSize:13, marginBottom:16, display:'flex', alignItems:'center', gap:6 }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        <button onClick={handleLogin} disabled={loading || !user || !pass}
+          style={{ width:'100%', background: loading || !user || !pass ? '#1e4060' : 'linear-gradient(135deg,#10b981,#059669)', border:'none', borderRadius:14, padding:'16px', color:'#fff', fontWeight:900, fontSize:16, cursor: loading ? 'wait' : 'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:10, transition:'all 0.2s', boxShadow: !loading && user && pass ? '0 8px 24px rgba(16,185,129,0.35)' : 'none' }}>
+          {loading ? '⏳ Entrando...' : '🔐 Entrar'}
+        </button>
+
+        {/* Demo credentials */}
+        <div style={{ marginTop:20, padding:'14px 16px', background:'#060e1a', borderRadius:14, border:'1px dashed #1e4060' }}>
+          <div style={{ color:'#334155', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:10 }}>ACESSO PARA DEMONSTRAÇÃO</div>
+          {TENANTS.map(t => (
+            <button key={t.id} onClick={() => { setUser(t.username); setPass(t.password); setError('') }}
+              style={{ display:'flex', alignItems:'center', gap:10, width:'100%', background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, padding:'10px 14px', cursor:'pointer', marginBottom:6 }}>
+              <div style={{ width:32, height:32, borderRadius:10, background:`linear-gradient(135deg,${t.profile.themeColor},${t.profile.themeColor}aa)`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <span style={{ color:'#fff', fontWeight:900, fontSize:11 }}>{t.profile.businessName.split(' ').map(w=>w[0]).slice(0,3).join('')}</span>
+              </div>
+              <div style={{ textAlign:'left' }}>
+                <div style={{ color:'#e2e8f0', fontWeight:700, fontSize:13 }}>{t.profile.businessName}</div>
+                <div style={{ color:'#475569', fontSize:11 }}>👤 {t.username} · 🔑 {t.password}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ color:'#1e3a50', fontSize:12, marginTop:24, textAlign:'center' }}>
+        Corta Preços Soluções Comerciais • {new Date().getFullYear()}
+      </div>
+    </div>
+  )
+}
+
 /* ── EditProfileModal ────────────────────────────────────────── */
 const THEME_COLORS = [
   { color:'#10b981', label:'Verde'    },
@@ -2368,25 +2489,24 @@ function EditProfileModal({ profile, onSave, onClose }) {
 }
 
 export default function Fornecedor() {
-  /* Default profile — no login gate. User can edit via header. */
-  const defaultProfile = () => {
+  /* ══ ALL HOOKS FIRST — no conditional hooks (React rules) ══ */
+
+  /* ── Session ── */
+  const [session, setSession] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(SESSION_KEY)) } catch { return null }
+  })
+
+  /* ── Profile — loaded from localStorage, falls back to tenant default ── */
+  const [profile, setProfile] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(LOCAL))
       if (saved?.name) return saved
     } catch {}
-    // First-time: pre-fill with Mega Tudo Barato for demo
-    return {
-      name: 'Mega Tudo Barato',
-      phone: '11 2815-1989',
-      businessName: 'MEGA TUDO BARATO',
-      city: 'Cotia, SP',
-      address: 'Rua Bandeirantes, 221, Portal da Primavera, Cotia, SP',
-      cnpj: '18.755.137/0001-11',
-      themeColor: '#f97316',
-    }
-  }
+    const s = (() => { try { return JSON.parse(localStorage.getItem(SESSION_KEY)) } catch { return null } })()
+    const tenant = s ? TENANTS.find(t => t.id === s.id) : null
+    return tenant?.profile || { name: 'Distribuidor', phone: '' }
+  })
 
-  const [profile,     setProfile]     = useState(defaultProfile)
   const [markets,     setMarkets]     = useState(() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })
   const [estoque,     setEstoque]     = useState([])
   const [offers,      setOffers]      = useState([])
@@ -2394,7 +2514,7 @@ export default function Fornecedor() {
   const [tab,         setTab]         = useState('inicio')
   const [syncing,     setSyncing]     = useState(false)
   const [editingProfile, setEditingProfile] = useState(false)
-  const [preSelectedForOffer, setPreSelectedForOffer] = useState(null) // item from Receber → Ofertas
+  const [preSelectedForOffer, setPreSelectedForOffer] = useState(null)
 
   const goToOferta = useCallback((item) => {
     setPreSelectedForOffer(item)
@@ -2405,6 +2525,33 @@ export default function Fornecedor() {
     setProfile(data)
     try { localStorage.setItem(LOCAL, JSON.stringify(data)) } catch {}
     setEditingProfile(false)
+  }
+
+  /* ── Auth handlers ── */
+  function handleLogin(tenant) {
+    const s = { id: tenant.id, username: tenant.username }
+    setSession(s)
+    localStorage.setItem(SESSION_KEY, JSON.stringify(s))
+
+    // Set profile from tenant (preserve edits if businessName matches)
+    const saved = (() => { try { return JSON.parse(localStorage.getItem(LOCAL)) } catch { return null } })()
+    const prof = (saved?.businessName === tenant.profile.businessName) ? saved : tenant.profile
+    setProfile(prof)
+    localStorage.setItem(LOCAL, JSON.stringify(prof))
+
+    // Pre-seed markets on first login for this tenant
+    const savedMkts = (() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) } catch { return null } })()
+    if ((!savedMkts || savedMkts.length === 0) && tenant.seedMarkets?.length) {
+      setMarkets(tenant.seedMarkets)
+      localStorage.setItem(MKTS_KEY, JSON.stringify(tenant.seedMarkets))
+    } else if (savedMkts) {
+      setMarkets(savedMkts)
+    }
+  }
+
+  function handleLogout() {
+    setSession(null)
+    localStorage.removeItem(SESSION_KEY)
   }
 
   const sync = useCallback(async () => {
@@ -2422,6 +2569,9 @@ export default function Fornecedor() {
   }, [])
 
   useEffect(() => { sync() }, [sync])
+
+  /* ── Login gate — after ALL hooks ── */
+  if (!session) return <LoginPage onLogin={handleLogin} />
 
   const pendingOrders = orders.filter(o => o.status === 'pending').length
 
@@ -2463,9 +2613,12 @@ export default function Fornecedor() {
             }
           </div>
         </button>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+        <div style={{ display:'flex', gap:6, alignItems:'center' }}>
           <button onClick={sync} disabled={syncing} style={{ background:'none', border:'none', cursor:'pointer', color:'#475569', padding:4 }}>
             <RefreshCw size={16} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
+          </button>
+          <button onClick={handleLogout} title="Sair" style={{ background:'#1a1a2e', border:'1px solid #2d2d4e', borderRadius:8, padding:'5px 8px', cursor:'pointer', color:'#475569', fontSize:12, fontWeight:700 }}>
+            Sair
           </button>
           {pendingOrders > 0 && (
             <div style={{ background:'#78350f', border:'1px solid #92400e', borderRadius:10, padding:'4px 10px', color:'#fcd34d', fontSize:12, fontWeight:700 }}>
