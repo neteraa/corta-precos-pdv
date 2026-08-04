@@ -446,9 +446,11 @@ function PedidoModal({ offer, onClose, onConfirm }) {
 /* ── MAIN ───────────────────────────────────────────────────── */
 export default function Ofertas() {
   const { upsertProduct, products }  = useStore()
-  const storeName = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem('cp_settings') || '{}').storeName || 'Mercado' } catch { return 'Mercado' }
+  const storeSettings = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('cp_settings') || '{}') } catch { return {} }
   }, [])
+  const storeName  = storeSettings.storeName  || 'Mercado'
+  const storePhone = storeSettings.phone       || ''
   const [offers,      setOffers]     = useState([])
   const [loading,     setLoading]    = useState(true)
   const [accepting,   setAccepting]  = useState(false)
@@ -516,7 +518,7 @@ export default function Ofertas() {
 
   /* place order → save to cp_supplier_orders + WhatsApp to supplier */
   async function handlePedido(orderData) {
-    const order = { id: uid(), ...orderData }
+    const order = { id: uid(), storeName, storePhone, ...orderData }
     try {
       const r   = await fetch(API_RESTORE)
       const j   = await r.json()
