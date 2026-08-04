@@ -798,32 +798,53 @@ function SetupScreen({ onDone }) {
 /* ── Demo seed data ─────────────────────────────────────────── */
 const DEMO_DATE = (d) => { const dt = new Date(); dt.setDate(dt.getDate() + d); return dt.toISOString().slice(0,10) }
 const DEMO_AGO  = (d) => { const dt = new Date(); dt.setDate(dt.getDate() - d); return dt.toISOString() }
-const DEMO_ESTOQUE = [
-  // Arrived today — normal
-  { id:'demo1', productName:'Coca-Cola 2L',           sku:'7894900011630', qty:120, unit:'UND', unitCost:5.20,  totalPaid:624,  sourceType:'atacadista', sourceName:'Atacado Central SP', expiryDate:DEMO_DATE(45),  receivedAt:today(), updatedAt:new Date().toISOString() },
-  { id:'demo2', productName:'Arroz Tio João 5kg',     sku:'7896036500572', qty:80,  unit:'SC',  unitCost:18.50, totalPaid:1480, sourceType:'atacadista', sourceName:'Atacado Central SP', expiryDate:DEMO_DATE(365), receivedAt:today(), updatedAt:new Date().toISOString() },
-  // Arrived yesterday — attention
-  { id:'demo3', productName:'Óleo de Soja Soya 900ml',sku:'7896036500573', qty:60,  unit:'UND', unitCost:6.80,  totalPaid:408,  sourceType:'contato',    sourceName:'Pedro da Soya',      expiryDate:DEMO_DATE(180), receivedAt:DEMO_DATE(-1), updatedAt:new Date().toISOString() },
-  // Arrived 2 days ago — URGENT
-  { id:'demo4', productName:'Panetone Bauducco Amassado', sku:'', qty:156, unit:'UND', unitCost:0.80, totalPaid:125, sourceType:'leilao', sourceName:'Leilão CAIXA SP — Lote 44', expiryDate:DEMO_DATE(12), receivedAt:DEMO_DATE(-2), updatedAt:new Date().toISOString() },
-  { id:'demo5', productName:'Leite Integral Itambé 1L',sku:'7896051190016',qty:144, unit:'CX',  unitCost:4.30,  totalPaid:619,  sourceType:'danificado',  sourceName:'Caixa amassada, produto OK', expiryDate:DEMO_DATE(30),  receivedAt:DEMO_DATE(-2), updatedAt:new Date().toISOString() },
-]
-const DEMO_OFFERS = [
-  { id:'doff1', supplierId:LOCAL, supplierName:'Distribuidora Demo', supplierPhone:'15999990000', productName:'Panetone Bauducco Amassado', sku:'', qty:156, unit:'UND', offerPrice:1.50, expiryDate:DEMO_DATE(12), isOpportunity:true,  note:'Embalagem amassada, produto 100% OK — preço de custo!', status:'pending', publishedAt:DEMO_AGO(2) },
-  { id:'doff2', supplierId:LOCAL, supplierName:'Distribuidora Demo', supplierPhone:'15999990000', productName:'Leite Integral Itambé 1L',   sku:'7896051190016', qty:144, unit:'CX',  offerPrice:5.20, expiryDate:DEMO_DATE(30), isOpportunity:true,  note:'Caixa amassada, leite perfeito — entrega imediata', status:'pending', publishedAt:DEMO_AGO(2) },
-  { id:'doff3', supplierId:LOCAL, supplierName:'Distribuidora Demo', supplierPhone:'15999990000', productName:'Coca-Cola 2L',              sku:'7894900011630', qty:120, unit:'UND', offerPrice:6.90, expiryDate:DEMO_DATE(45), isOpportunity:false, note:'Lote novo, direto do atacado',                      status:'pending', publishedAt:DEMO_AGO(0) },
-]
+
+/* ── Demo data — 30 dias de operação simulada ─────────────── */
 const DEMO_MARKETS = [
-  { id:'dmkt1', name:'Mercado Qualidade Preço', phone:'15996604075', contact:'André Porfírio', address:'Rua das Rosas 450, Centro, Sorocaba/SP', cnpj:'12.345.678/0001-99', notes:'Paga à vista, prefere entrega 2ª e 5ª feira' },
-  { id:'dmkt2', name:'Supermercado São João',   phone:'15999110001', contact:'Maria Costa',   address:'Av. Paulista 1200, Jardim, Sorocaba/SP',  cnpj:'98.765.432/0001-11', notes:'Compra grande quantidade, paga em 15 dias' },
-  { id:'dmkt3', name:'Mercadinho do Bairro',    phone:'15988220002', contact:'Carlos Mendes', address:'Rua das Orquídeas 88, Vila Nova, SP',      cnpj:'',                   notes:'Pequeno volume, mas fidelizado' },
+  { id:'dmkt1', name:'Supermercado São Jorge',  phone:'15988554433', contact:'Jorge Pereira',  address:'Rua das Acácias, 80, Tatuí, SP',              city:'Tatuí/SP'          },
+  { id:'dmkt2', name:'Mercearia do Dinho',       phone:'15997665544', contact:'Claudinho',      address:'Rua Benedito Costa, 220, Itapetininga, SP',    city:'Itapetininga/SP'   },
+  { id:'dmkt3', name:'Mini Mercado Expresso',    phone:'15976543210', contact:'Fátima Alves',   address:'Av. Brasil, 1200, Sorocaba, SP',               city:'Sorocaba/SP'       },
+  { id:'dmkt4', name:'Armazém do Povo',          phone:'15991234567', contact:'Roberto Santos', address:'Rua Central, 44, São Roque, SP',               city:'São Roque/SP'      },
 ]
+
+const DEMO_ESTOQUE = [
+  // Hoje
+  { id:'demo1', productName:'Coca-Cola 2L',              sku:'7894900011630', qty:120, unit:'UND', unitCost:5.20,  totalPaid:624,  sourceType:'atacadista', sourceName:'Atacado Central SP',         expiryDate:DEMO_DATE(45),  receivedAt:today(),       updatedAt:new Date().toISOString() },
+  { id:'demo2', productName:'Arroz Tio João 5kg',        sku:'7896036500572', qty:80,  unit:'SC',  unitCost:18.50, totalPaid:1480, sourceType:'atacadista', sourceName:'Atacado Central SP',         expiryDate:DEMO_DATE(365), receivedAt:today(),       updatedAt:new Date().toISOString() },
+  // Ontem
+  { id:'demo3', productName:'Óleo de Soja Soya 900ml',   sku:'7896036500573', qty:60,  unit:'UND', unitCost:6.80,  totalPaid:408,  sourceType:'contato',    sourceName:'Pedro Distribuição',         expiryDate:DEMO_DATE(180), receivedAt:DEMO_DATE(-1), updatedAt:new Date().toISOString() },
+  // 2 dias — URGENTE
+  { id:'demo4', productName:'Panetone Bauducco Amassado', sku:'',             qty:156, unit:'UND', unitCost:0.80,  totalPaid:125,  sourceType:'leilao',     sourceName:'Leilão CAIXA SP — Lote 44', expiryDate:DEMO_DATE(12),  receivedAt:DEMO_DATE(-2), updatedAt:new Date().toISOString() },
+  { id:'demo5', productName:'Leite Integral Itambé 1L',  sku:'7896051190016', qty:144, unit:'CX',  unitCost:4.30,  totalPaid:619,  sourceType:'danificado', sourceName:'Caixa amassada, produto OK', expiryDate:DEMO_DATE(30),  receivedAt:DEMO_DATE(-2), updatedAt:new Date().toISOString() },
+  // Semana passada — histórico
+  { id:'demo6', productName:'Biscoito Oreo 90g',         sku:'7622210651557', qty:200, unit:'UND', unitCost:1.80,  totalPaid:360,  sourceType:'danificado', sourceName:'Estoque amassado',           expiryDate:DEMO_DATE(8),   receivedAt:DEMO_DATE(-6), updatedAt:new Date().toISOString() },
+  { id:'demo7', productName:'Heineken 350ml Lata',       sku:'7896045506873', qty:300, unit:'UND', unitCost:2.10,  totalPaid:630,  sourceType:'contato',    sourceName:'Distribuidora Gobo',         expiryDate:DEMO_DATE(90),  receivedAt:DEMO_DATE(-8), updatedAt:new Date().toISOString() },
+  { id:'demo8', productName:'Feijão Preto 1kg',          sku:'7896085085505', qty:100, unit:'SC',  unitCost:5.40,  totalPaid:540,  sourceType:'atacadista', sourceName:'Atacado Central SP',         expiryDate:DEMO_DATE(180), receivedAt:DEMO_DATE(-15),updatedAt:new Date().toISOString() },
+]
+
+const DEMO_OFFERS = [
+  { id:'doff1', supplierId:LOCAL, supplierName:'Mega Tudo Barato', supplierPhone:'11 2815-1989', productName:'Panetone Bauducco Amassado', sku:'',             qty:156, unit:'UND', offerPrice:1.50, expiryDate:DEMO_DATE(12), isOpportunity:true,  note:'Embalagem amassada, produto 100% OK — preço abaixo do custo!', status:'pending', publishedAt:DEMO_AGO(2)  },
+  { id:'doff2', supplierId:LOCAL, supplierName:'Mega Tudo Barato', supplierPhone:'11 2815-1989', productName:'Leite Integral Itambé 1L',  sku:'7896051190016', qty:144, unit:'CX',  offerPrice:5.20, expiryDate:DEMO_DATE(30), isOpportunity:true,  note:'Caixa amassada — leite perfeito. Entrega imediata.',           status:'pending', publishedAt:DEMO_AGO(2)  },
+  { id:'doff3', supplierId:LOCAL, supplierName:'Mega Tudo Barato', supplierPhone:'11 2815-1989', productName:'Coca-Cola 2L',             sku:'7894900011630', qty:120, unit:'UND', offerPrice:6.90, expiryDate:DEMO_DATE(45), isOpportunity:false, note:'Lote novo, direto do atacado. Mínimo 12 un.',                  status:'pending', publishedAt:DEMO_AGO(0)  },
+  { id:'doff4', supplierId:LOCAL, supplierName:'Mega Tudo Barato', supplierPhone:'11 2815-1989', productName:'Heineken 350ml Lata',      sku:'7896045506873', qty:300, unit:'UND', offerPrice:3.80, expiryDate:DEMO_DATE(90), isOpportunity:false, note:'Geladinha. Frete incluso acima de 100 unidades.',              status:'pending', publishedAt:DEMO_AGO(8)  },
+  { id:'doff5', supplierId:LOCAL, supplierName:'Mega Tudo Barato', supplierPhone:'11 2815-1989', productName:'Biscoito Oreo 90g',        sku:'7622210651557', qty:200, unit:'UND', offerPrice:2.20, expiryDate:DEMO_DATE(8),  isOpportunity:true,  note:'⚠️ Vence em breve — URGENTE! Preço especial pra girar rápido.', status:'pending', publishedAt:DEMO_AGO(6)  },
+]
+
 const DEMO_ORDERS_HIST = [
-  { id:'dord1', storeName:'Mercado Qualidade Preço', storePhone:'15996604075', productName:'Coca-Cola 2L',      qtyRequested:48, unit:'UND', totalPrice:331.20, status:'delivered', createdAt:DEMO_AGO(12) },
-  { id:'dord2', storeName:'Mercado Qualidade Preço', storePhone:'15996604075', productName:'Arroz Tio João 5kg',qtyRequested:20, unit:'SC',  totalPrice:370.00, status:'confirmed', createdAt:DEMO_AGO(3)  },
-  { id:'dord3', storeName:'Supermercado São João',   storePhone:'15999110001', productName:'Leite Itambé 1L',   qtyRequested:96, unit:'CX',  totalPrice:412.80, status:'delivered', createdAt:DEMO_AGO(20) },
-  { id:'dord4', storeName:'Supermercado São João',   storePhone:'15999110001', productName:'Óleo Soya 900ml',   qtyRequested:60, unit:'UND', totalPrice:408.00, status:'delivered', createdAt:DEMO_AGO(7)  },
-  { id:'dord5', storeName:'Mercadinho do Bairro',    storePhone:'15988220002', productName:'Biscoito Oreo',     qtyRequested:50, unit:'UND', totalPrice:174.50, status:'pending',   createdAt:DEMO_AGO(1)  },
+  // Mês passado — entregues
+  { id:'dord1',  storeName:'Supermercado São Jorge', storePhone:'15988554433', productName:'Feijão Preto 1kg',          qtyRequested:40,  unit:'SC',  totalPrice:248.00, status:'delivered', createdAt:DEMO_AGO(28) },
+  { id:'dord2',  storeName:'Mercearia do Dinho',      storePhone:'15997665544', productName:'Óleo de Soja Soya 900ml',   qtyRequested:24,  unit:'UND', totalPrice:196.80, status:'delivered', createdAt:DEMO_AGO(25) },
+  { id:'dord3',  storeName:'Armazém do Povo',         storePhone:'15991234567', productName:'Feijão Preto 1kg',          qtyRequested:30,  unit:'SC',  totalPrice:186.00, status:'delivered', createdAt:DEMO_AGO(22) },
+  { id:'dord4',  storeName:'Mini Mercado Expresso',   storePhone:'15976543210', productName:'Coca-Cola 2L',              qtyRequested:60,  unit:'UND', totalPrice:414.00, status:'delivered', createdAt:DEMO_AGO(20) },
+  { id:'dord5',  storeName:'Supermercado São Jorge', storePhone:'15988554433', productName:'Heineken 350ml Lata',       qtyRequested:120, unit:'UND', totalPrice:456.00, status:'delivered', createdAt:DEMO_AGO(15) },
+  { id:'dord6',  storeName:'Mercearia do Dinho',      storePhone:'15997665544', productName:'Biscoito Oreo 90g',         qtyRequested:50,  unit:'UND', totalPrice:110.00, status:'delivered', createdAt:DEMO_AGO(12) },
+  { id:'dord7',  storeName:'Armazém do Povo',         storePhone:'15991234567', productName:'Heineken 350ml Lata',       qtyRequested:60,  unit:'UND', totalPrice:228.00, status:'delivered', createdAt:DEMO_AGO(10) },
+  { id:'dord8',  storeName:'Mini Mercado Expresso',   storePhone:'15976543210', productName:'Leite Integral Itambé 1L', qtyRequested:48,  unit:'CX',  totalPrice:249.60, status:'delivered', createdAt:DEMO_AGO(7)  },
+  // Semana — confirmados
+  { id:'dord9',  storeName:'Supermercado São Jorge', storePhone:'15988554433', productName:'Arroz Tio João 5kg',        qtyRequested:20,  unit:'SC',  totalPrice:370.00, status:'confirmed', createdAt:DEMO_AGO(3)  },
+  { id:'dord10', storeName:'Mercearia do Dinho',      storePhone:'15997665544', productName:'Panetone Bauducco Amassado',qtyRequested:60,  unit:'UND', totalPrice:90.00,  status:'confirmed', createdAt:DEMO_AGO(2)  },
+  // Hoje — pendente (acaba de chegar!)
+  { id:'dord11', storeName:'Mini Mercado Expresso',   storePhone:'15976543210', productName:'Coca-Cola 2L',              qtyRequested:24,  unit:'UND', totalPrice:165.60, status:'pending',   createdAt:DEMO_AGO(0)  },
 ]
 
 /* ── TabInicio ──────────────────────────────────────────────── */
@@ -910,11 +931,18 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
   }
 
   async function carregarDemo() {
-    // NOTE: não sobrescreve markets — preserva clientes reais cadastrados
     setEstoque(DEMO_ESTOQUE); setOffers(DEMO_OFFERS)
     setOrders(prev => { const ids = new Set(prev.map(o => o.id)); return [...DEMO_ORDERS_HIST.filter(o => !ids.has(o.id)), ...prev] })
+    // Garante que mercados demo estejam presentes (sem sobrescrever reais)
+    setMarkets(prev => {
+      const ids = new Set(prev.map(m => m.id))
+      const merged = [...prev, ...DEMO_MARKETS.filter(m => !ids.has(m.id))]
+      localStorage.setItem(MKTS_KEY, JSON.stringify(merged))
+      return merged
+    })
     await persistKey(ESTOQUE_KEY, DEMO_ESTOQUE)
     await persistKey(OFFERS_KEY,  DEMO_OFFERS)
+    await persistKey(ORDERS_KEY,  DEMO_ORDERS_HIST)
   }
 
   if (singleBlast) return <BlastScreen offer={singleBlast} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setSingleBlast(null)} />
@@ -2334,10 +2362,13 @@ const TENANTS = [
       themeColor: '#f97316',
     },
     seedMarkets: [
-      { id:'mega_mkt1', name:'Mercado Corta Preços', phone:'15996604075', contact:'Proprietário', address:'Vila Bom Jesus, Itapeva, SP', city:'Itapeva/SP' },
+      { id:'mega_mkt1', name:'Mercado Corta Preços',  phone:'15996604075', contact:'Proprietário',  address:'Vila Bom Jesus, Itapeva, SP',           city:'Itapeva/SP'        },
+      { id:'mega_mkt2', name:'Supermercado São Jorge', phone:'15988554433', contact:'Jorge Pereira', address:'Rua das Acácias, 80, Tatuí, SP',        city:'Tatuí/SP'          },
+      { id:'mega_mkt3', name:'Mercearia do Dinho',     phone:'15997665544', contact:'Claudinho',     address:'Rua Benedito Costa, 220, Itapetininga', city:'Itapetininga/SP'   },
+      { id:'mega_mkt4', name:'Mini Mercado Expresso',  phone:'15976543210', contact:'Fátima Alves',  address:'Av. Brasil, 1200, Sorocaba, SP',        city:'Sorocaba/SP'       },
+      { id:'mega_mkt5', name:'Armazém do Povo',        phone:'15991234567', contact:'Roberto Santos',address:'Rua Central, 44, São Roque, SP',        city:'São Roque/SP'      },
     ],
-    // IDs de mercados demo criados antes — remover ao logar
-    purgeFakeIds: ['mega_mkt2','mega_mkt3','mega_mkt4','mega_mkt5'],
+    autoSeedDemo: true, // carrega DEMO_ESTOQUE/OFFERS/ORDERS na primeira entrada
   },
 ]
 
@@ -2531,6 +2562,7 @@ export default function Fornecedor() {
   const [orders,      setOrders]      = useState([])
   const [tab,         setTab]         = useState('inicio')
   const [syncing,     setSyncing]     = useState(false)
+  const [synced,      setSynced]      = useState(false)
   const [editingProfile, setEditingProfile] = useState(false)
   const [preSelectedForOffer, setPreSelectedForOffer] = useState(null)
 
@@ -2586,9 +2618,25 @@ export default function Fornecedor() {
       try { localStorage.setItem(MKTS_KEY, JSON.stringify(mkt)) } catch {}
     }
     setSyncing(false)
+    setSynced(true)
   }, [])
 
   useEffect(() => { sync() }, [sync])
+
+  // Auto-seed demo data for tenant with autoSeedDemo flag — only when account is brand new
+  useEffect(() => {
+    if (!synced || !session) return
+    const tenant = TENANTS.find(t => t.id === session.id)
+    if (!tenant?.autoSeedDemo) return
+    // Only seed if account is completely empty after sync
+    if (estoque.length > 0 || offers.length > 0 || orders.length > 0) return
+    setEstoque(DEMO_ESTOQUE)
+    setOffers(DEMO_OFFERS)
+    setOrders(DEMO_ORDERS_HIST)
+    persistKey(ESTOQUE_KEY, DEMO_ESTOQUE)
+    persistKey(OFFERS_KEY,  DEMO_OFFERS)
+    persistKey(ORDERS_KEY,  DEMO_ORDERS_HIST)
+  }, [synced]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const prev = document.title
     document.title = 'ZatendeStock – Portal do Distribuidor'
