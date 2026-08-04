@@ -3368,6 +3368,31 @@ export default function Fornecedor() {
     return () => { document.title = prev }
   }, [])
 
+  // Auto-detect new orders written by Ofertas.jsx (same browser, cross-tab)
+  useEffect(() => {
+    if (!session) return
+    function checkOrders() {
+      const raw = localStorage.getItem(ORDERS_KEY)
+      if (!raw) return
+      try {
+        const fresh = JSON.parse(raw)
+        setOrders(prev => {
+          const prevIds = new Set(prev.map(o => o.id))
+          return fresh.some(o => !prevIds.has(o.id)) || fresh.length !== prev.length ? fresh : prev
+        })
+      } catch {}
+    }
+    function onStorageOrders(e) {
+      if (e.key === ORDERS_KEY) checkOrders()
+    }
+    const iv = setInterval(checkOrders, 10_000)
+    window.addEventListener('storage', onStorageOrders)
+    return () => {
+      clearInterval(iv)
+      window.removeEventListener('storage', onStorageOrders)
+    }
+  }, [session])
+
   // Ping local ZAP server every 8 seconds to check connection
   useEffect(() => {
     if (!session) return

@@ -8,6 +8,7 @@ import { Truck, Package, Check, X, Clock, ChevronDown, ChevronUp,
          Phone, MessageCircle, Star, ClipboardList, CircleDollarSign,
          MapPin, CalendarClock } from 'lucide-react'
 import { useStore, BRL, fmtDate } from '../store.jsx'
+import Footer from '../components/Footer.jsx'
 
 const OFFERS_KEY   = 'cp_supplier_offers'
 const ESTOQUE_KEY  = 'cp_fornecedor_estoque'
@@ -580,7 +581,8 @@ export default function Ofertas() {
   const [marketSession, setMarketSession] = useState(() => {
     try { return JSON.parse(localStorage.getItem(MARKET_SESSION_KEY) || 'null') } catch { return null }
   })
-  const [showIdentity, setShowIdentity] = useState(false)
+  // Auto-show on first visit when market has no saved identity
+  const [showIdentity, setShowIdentity] = useState(() => !storeSettings.storeName && !JSON.parse(localStorage.getItem(MARKET_SESSION_KEY) || 'null')?.name)
 
   const storeName  = storeSettings.storeName  || marketSession?.name  || ''
   const storePhone = storeSettings.phone       || marketSession?.phone || ''
@@ -630,6 +632,16 @@ export default function Ofertas() {
     const iv = setInterval(loadMyOrders, 30000)
     return () => clearInterval(iv)
   }, [storeName, storePhone]) // eslint-disable-line
+
+  // Auto-refresh offers + orders when Fornecedor writes to localStorage (same browser, another tab)
+  useEffect(() => {
+    function onStorage(e) {
+      if (e.key === OFFERS_KEY) setRefreshAt(Date.now())
+      if (e.key === ORDERS_KEY) loadMyOrders()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, []) // eslint-disable-line
 
   function showToast(msg, type = 'success') {
     setToast({ msg, type })
@@ -1001,6 +1013,10 @@ export default function Ofertas() {
           </div>
         </div>
       )}
+
+      <div className="pb-4">
+        <Footer variant="forn" />
+      </div>
     </div>
   )
 }
