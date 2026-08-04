@@ -2086,7 +2086,7 @@ function TabMercados({ markets, setMarkets, orders }) {
 }
 
 /* ── TabRelatorio ────────────────────────────────────────────── */
-function TabRelatorio({ estoque, offers, orders }) {
+function TabRelatorio({ estoque, offers, orders, markets }) {
   const [period, setPeriod] = useState('today') // today | week | month | all
 
   const todayStr = today()
@@ -2257,6 +2257,48 @@ function TabRelatorio({ estoque, offers, orders }) {
           })}
         </div>
       )}
+
+      {/* ── Conversão de mercados ── */}
+      {(markets || []).length > 0 && (() => {
+        const buyerPhones = new Set(periodOrders.map(o => o.storePhone).filter(Boolean))
+        const buyerNames  = new Set(periodOrders.map(o => o.storeName).filter(Boolean))
+        const activeMkts  = (markets || []).filter(m => buyerPhones.has(m.phone) || buyerNames.has(m.name))
+        const total       = (markets || []).length
+        const pct         = total > 0 ? Math.round((activeMkts.length / total) * 100) : 0
+        const barColor    = pct >= 75 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#ef4444'
+        return (
+          <div style={{ ...card, marginBottom:16 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+              <div style={{ color:'#94a3b8', fontSize:11, fontWeight:700, textTransform:'uppercase' }}>📊 Conversão de Mercados</div>
+              <div style={{ color: barColor, fontWeight:900, fontSize:22, lineHeight:1 }}>{pct}<span style={{ fontSize:13, fontWeight:700 }}>%</span></div>
+            </div>
+            {/* Barra principal */}
+            <div style={{ height:12, background:'#1a3a50', borderRadius:99, marginBottom:12, overflow:'hidden' }}>
+              <div style={{ height:'100%', width:`${pct}%`, background:`linear-gradient(90deg,${barColor}88,${barColor})`, borderRadius:99, transition:'width 0.6s ease' }} />
+            </div>
+            <div style={{ color:'#475569', fontSize:12, marginBottom:12 }}>
+              <span style={{ color:'#e2e8f0', fontWeight:700 }}>{activeMkts.length}</span> de <span style={{ color:'#e2e8f0', fontWeight:700 }}>{total}</span> mercados compraram no período
+            </div>
+            {/* Lista de mercados com status */}
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {(markets || []).map(m => {
+                const bought = buyerPhones.has(m.phone) || buyerNames.has(m.name)
+                const revenue = periodOrders.filter(o => o.storePhone === m.phone || o.storeName === m.name).reduce((s, o) => s + (o.totalPrice || 0), 0)
+                return (
+                  <div key={m.id} style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <div style={{ width:8, height:8, borderRadius:4, background: bought ? barColor : '#1e4060', flexShrink:0 }} />
+                    <span style={{ color: bought ? '#e2e8f0' : '#475569', fontSize:13, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.name}</span>
+                    {bought
+                      ? <span style={{ color: barColor, fontWeight:700, fontSize:12, flexShrink:0 }}>{BRL.format(revenue)}</span>
+                      : <span style={{ color:'#334155', fontSize:11, flexShrink:0 }}>sem pedido</span>
+                    }
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Top markets */}
       {topMarkets.length > 0 && (
@@ -2486,14 +2528,49 @@ function EditProfileModal({ profile, onSave, onClose }) {
     address:      profile.address      || '',
     cnpj:         profile.cnpj         || '',
     themeColor:   profile.themeColor   || '#10b981',
+    logo:         profile.logo         || '',
   })
   const F = k => ({ value: form[k], onChange: e => setForm(p => ({ ...p, [k]: e.target.value })) })
+
+  function handleLogo(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) { alert('Imagem muito grande! Use uma com menos de 2MB.'); return }
+    const reader = new FileReader()
+    reader.onload = ev => setForm(p => ({ ...p, logo: ev.target.result }))
+    reader.readAsDataURL(file)
+  }
+
+  const theme = form.themeColor || '#10b981'
+  const initials = (form.businessName || form.name || '?').split(' ').map(w => w[0]).slice(0,3).join('').toUpperCase()
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'flex-start', justifyContent:'center', padding:'20px 20px', overflowY:'auto' }}>
       <div style={{ background:'#0a1929', borderRadius:20, padding:24, width:'100%', maxWidth:400, border:'1px solid #1e4060', marginTop:20 }}>
         <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18, marginBottom:4 }}>⚙️ Perfil da Distribuidora</div>
         <div style={{ color:'#334155', fontSize:12, marginBottom:20 }}>Estas informações aparecem no cabeçalho e nas mensagens do ZAP</div>
+
+        {/* Logo upload */}
+        <label style={lbl}>Logo da Empresa</label>
+        <div style={{ display:'flex', alignItems:'center', gap:16, marginTop:8, marginBottom:16 }}>
+          <div style={{ width:72, height:72, borderRadius:18, background:`linear-gradient(135deg,${theme},${theme}99)`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, overflow:'hidden', border:`2px solid ${theme}44` }}>
+            {form.logo
+              ? <img src={form.logo} alt="logo" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              : <span style={{ color:'#fff', fontWeight:900, fontSize:18 }}>{initials}</span>
+            }
+          </div>
+          <div style={{ flex:1 }}>
+            <label style={{ display:'block', background:'#0d2137', border:'1px dashed #1e4060', borderRadius:12, padding:'12px 16px', cursor:'pointer', textAlign:'center', color:'#64748b', fontSize:13 }}>
+              📷 {form.logo ? 'Trocar logo' : 'Enviar logo'}
+              <input type="file" accept="image/*" onChange={handleLogo} style={{ display:'none' }} />
+            </label>
+            {form.logo && (
+              <button onClick={() => setForm(p => ({ ...p, logo: '' }))} style={{ marginTop:6, background:'none', border:'none', color:'#ef4444', fontSize:12, cursor:'pointer', width:'100%' }}>
+                🗑 Remover logo
+              </button>
+            )}
+          </div>
+        </div>
 
         <label style={lbl}>Nome do Responsável *</label>
         <input {...F('name')} placeholder="Ex: João Silva" style={inp} />
@@ -2520,7 +2597,9 @@ function EditProfileModal({ profile, onSave, onClose }) {
           <div style={{ display:'flex', gap:8, marginTop:6, marginBottom:14, flexWrap:'wrap' }}>
             {THEME_COLORS.map(c => (
               <button key={c.color} onClick={() => setForm(p => ({ ...p, themeColor: c.color }))} style={{
-                width:36, height:36, borderRadius:10, background:c.color, border: form.themeColor === c.color ? '3px solid #fff' : '3px solid transparent', cursor:'pointer', flexShrink:0,
+                width:36, height:36, borderRadius:10, background:c.color,
+                border: form.themeColor === c.color ? '3px solid #fff' : '3px solid transparent',
+                cursor:'pointer', flexShrink:0, boxShadow: form.themeColor === c.color ? `0 0 12px ${c.color}88` : 'none',
               }} title={c.label} />
             ))}
           </div>
@@ -2669,10 +2748,12 @@ export default function Fornecedor() {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px 10px', background:'#060e1a', borderBottom:`1px solid ${(profile.themeColor||'#10b981')}22`, position:'sticky', top:0, zIndex:10 }}>
         <button onClick={() => setEditingProfile(true)} style={{ display:'flex', alignItems:'center', gap:10, background:'none', border:'none', cursor:'pointer', padding:0, flex:1, minWidth:0 }}>
           {/* Logo circle with initials or truck icon */}
-          <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${profile.themeColor||'#10b981'},${(profile.themeColor||'#10b981')}aa)`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:`0 4px 12px ${(profile.themeColor||'#10b981')}44` }}>
-            {profile.businessName
-              ? <span style={{ color:'#fff', fontWeight:900, fontSize:13 }}>{profile.businessName.split(' ').map(w=>w[0]).slice(0,3).join('').toUpperCase()}</span>
-              : <Truck size={18} color="#fff" />
+          <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${profile.themeColor||'#10b981'},${(profile.themeColor||'#10b981')}aa)`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:`0 4px 12px ${(profile.themeColor||'#10b981')}44`, overflow:'hidden' }}>
+            {profile.logo
+              ? <img src={profile.logo} alt="logo" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              : profile.businessName
+                ? <span style={{ color:'#fff', fontWeight:900, fontSize:13 }}>{profile.businessName.split(' ').map(w=>w[0]).slice(0,3).join('').toUpperCase()}</span>
+                : <Truck size={18} color="#fff" />
             }
           </div>
           <div style={{ textAlign:'left', flex:1, minWidth:0 }}>
@@ -2707,7 +2788,7 @@ export default function Fornecedor() {
         {tab === 'ofertas'   && <TabOfertas   estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} orders={orders} preSelected={preSelectedForOffer} onClearPreSelected={() => setPreSelectedForOffer(null)} />}
         {tab === 'pedidos'   && <TabPedidos   orders={orders} setOrders={setOrders} />}
         {tab === 'mercados'  && <TabMercados  markets={markets} setMarkets={setMarkets} orders={orders} />}
-        {tab === 'relatorio' && <TabRelatorio estoque={estoque} offers={offers} orders={orders} />}
+        {tab === 'relatorio' && <TabRelatorio estoque={estoque} offers={offers} orders={orders} markets={markets} />}
       </div>
 
       <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'#060e1a', borderTop:'1px solid #0f2035', display:'flex', padding:'0 0 env(safe-area-inset-bottom,0)', zIndex:20 }}>
