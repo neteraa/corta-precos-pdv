@@ -744,8 +744,26 @@ const DEMO_ORDERS_HIST = [
 
 /* ── TabInicio ──────────────────────────────────────────────── */
 function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setOffers, setMarkets, setOrders, onNavigate }) {
-  const [showBlitz, setShowBlitz] = useState(false)
+  const [showBlitz,  setShowBlitz]  = useState(false)
+  const [blastAll,   setBlastAll]   = useState(false) // blast ALL offers at current prices
   const todayStr = today()
+
+  /* Build combined WA message for ALL active offers — no price change */
+  function buildDailyBlastMsg() {
+    const active = offers.filter(o => o.status !== 'delivered' && o.offerPrice > 0)
+    if (!active.length) return null
+    const lines = [
+      `🚚 *OFERTAS DO DIA — ${profile.name}*`,
+      '',
+      ...active.map(o => `📦 *${o.productName}* — ${BRL.format(o.offerPrice)}/un  ·  ${o.qty} ${o.unit}${o.expiryDate ? `  ·  val ${fmtDate(o.expiryDate)}` : ''}`),
+      '',
+      '👉 *Fazer pedido agora:*',
+      'https://corta-precos-pdv.netlify.app/ofertas',
+      '',
+      profile.phone ? `📞 ${profile.name} · ${profile.phone}` : `📞 ${profile.name}`,
+    ]
+    return lines.join('\n')
+  }
 
   /* FIFO aging */
   const withAge = useMemo(() =>
@@ -775,10 +793,13 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
     )
   }
 
-  /* Reduce offer price and start blast */
+  /* Reduce offer price and start blast — accepts stock item OR offer object */
   const [singleBlast, setSingleBlast] = useState(null)
-  async function quickBlast(item, discountPct) {
-    const offer = findOffer(item)
+  async function quickBlast(itemOrOffer, discountPct) {
+    // Support both: stock item (has productName, look up offer) or direct offer object (has offerPrice)
+    const offer = itemOrOffer.offerPrice !== undefined
+      ? itemOrOffer  // direct offer object
+      : findOffer(itemOrOffer) // stock item → find matching offer
     if (!offer) return
     const newPrice = parseFloat((offer.offerPrice * (1 - discountPct / 100)).toFixed(2))
     const newOffer = { ...offer, offerPrice: newPrice }
@@ -797,6 +818,11 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
   }
 
   if (singleBlast) return <BlastScreen offer={singleBlast} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setSingleBlast(null)} />
+  if (blastAll) {
+    const msg = buildDailyBlastMsg()
+    if (!msg) { setBlastAll(false) }
+    else return <BlastScreen customMsg={msg} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setBlastAll(false)} />
+  }
 
   const srcCfg = (id) => SOURCE_TYPES.find(s => s.id === id) || SOURCE_TYPES[4]
   const pendingOrders = orders.filter(o => o.status === 'pending').length
@@ -866,7 +892,7 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:16 }}>
         {[
           { emoji:'📦', label:'Receber\nMercadoria', action:() => onNavigate?.('receber'), bg:'#0d3d27', border:'#14532d', color:'#4ade80' },
-          { emoji:'📱', label:'Disparar\nZAP',       action:() => { if (offers.filter(o=>o.status!=='delivered').length) setShowBlitz(true) }, bg:'#1e3a5f', border:'#2563eb', color:'#93c5fd' },
+          { emoji:'📱', label:'Disparar\nZAP',       action:() => { if (offers.filter(o=>o.status!=='delivered').length > 0) setBlastAll(true) }, bg:'#1e3a5f', border:'#2563eb', color:'#93c5fd' },
           { emoji:'📋', label:'Ver\nPedidos',        action:() => onNavigate?.('pedidos'), bg: withAge.filter(e=>e.ageInDays>=2).length>0?'#3d1a0a':'#0d2137', border: withAge.filter(e=>e.ageInDays>=2).length>0?'#92400e':'#1a3a50', color:'#fcd34d' },
         ].map((btn, i) => (
           <button key={i} onClick={btn.action} style={{
@@ -901,27 +927,39 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
       )}
 
       {/* ── Balanço do Dia ── */}
-      <div style={{ background:'#0d2137', borderRadius:16, padding:'14px 16px', marginBottom:20, border:'1px solid #1a3a50' }}>
-        <div style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>💰 Balanço de hoje</div>
-        <div style={{ display:'flex', gap:0 }}>
-          <div style={{ flex:1, textAlign:'center' }}>
-            <div style={{ color:'#f87171', fontWeight:900, fontSize:18 }}>{spentToday > 0 ? BRL.format(spentToday) : '—'}</div>
-            <div style={{ color:'#64748b', fontSize:11 }}>gastou</div>
-          </div>
-          <div style={{ width:1, background:'#1a3a50' }} />
-          <div style={{ flex:1, textAlign:'center' }}>
-            <div style={{ color:'#4ade80', fontWeight:900, fontSize:18 }}>{soldToday > 0 ? BRL.format(soldToday) : '—'}</div>
-            <div style={{ color:'#64748b', fontSize:11 }}>vendeu</div>
-          </div>
-          <div style={{ width:1, background:'#1a3a50' }} />
-          <div style={{ flex:1, textAlign:'center' }}>
-            <div style={{ color: profit > 0 ? '#10b981' : profit < 0 ? '#f87171' : '#475569', fontWeight:900, fontSize:18 }}>
-              {profit !== 0 ? BRL.format(Math.abs(profit)) : '—'}
+      {(() => {
+        const todayEntradas = estoque.filter(e => e.receivedAt === todayStr)
+        const hasCostData   = todayEntradas.some(e => e.totalPaid > 0)
+        const showProfit    = hasCostData && soldToday > 0
+        return (
+          <div style={{ background:'#0d2137', borderRadius:16, padding:'14px 16px', marginBottom:16, border:'1px solid #1a3a50' }}>
+            <div style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>💰 Balanço de Hoje</div>
+            <div style={{ display:'flex', gap:0 }}>
+              <div style={{ flex:1, textAlign:'center' }}>
+                <div style={{ color:'#f87171', fontWeight:900, fontSize:18 }}>{hasCostData ? BRL.format(spentToday) : '—'}</div>
+                <div style={{ color:'#64748b', fontSize:11 }}>investido</div>
+              </div>
+              <div style={{ width:1, background:'#1a3a50' }} />
+              <div style={{ flex:1, textAlign:'center' }}>
+                <div style={{ color:'#4ade80', fontWeight:900, fontSize:18 }}>{soldToday > 0 ? BRL.format(soldToday) : '—'}</div>
+                <div style={{ color:'#64748b', fontSize:11 }}>faturado</div>
+              </div>
+              <div style={{ width:1, background:'#1a3a50' }} />
+              <div style={{ flex:1, textAlign:'center' }}>
+                <div style={{ color: showProfit ? (profit >= 0 ? '#10b981' : '#f87171') : '#334155', fontWeight:900, fontSize:18 }}>
+                  {showProfit ? BRL.format(Math.abs(profit)) : '—'}
+                </div>
+                <div style={{ color:'#64748b', fontSize:11 }}>{showProfit ? (profit >= 0 ? 'lucro' : 'prejuízo') : 'resultado'}</div>
+              </div>
             </div>
-            <div style={{ color:'#64748b', fontSize:11 }}>{profit > 0 ? 'lucro' : profit < 0 ? 'prejuízo' : 'resultado'}</div>
+            {!hasCostData && todayEntradas.length > 0 && (
+              <div style={{ color:'#334155', fontSize:10, textAlign:'center', marginTop:8 }}>
+                ℹ️ Informe o "Total pago" ao dar entrada para ver o lucro
+              </div>
+            )}
           </div>
-        </div>
-      </div>
+        )
+      })()}
 
       {/* ── Stats ── */}
       <div style={{ display:'flex', gap:10, marginBottom:10 }}>
@@ -932,6 +970,42 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
         <StatCard icon={ClipboardList}    label="Pedidos"  value={pendingOrders}         sub="a confirmar"  color="#f59e0b" />
         <StatCard icon={CircleDollarSign} label="Total"    value={BRL.format(totalRevenue)} sub="em pedidos" color="#8b5cf6" />
       </div>
+
+      {/* ── Ofertas Ativas — blast por produto ── */}
+      {offers.filter(o => o.status !== 'delivered').length > 0 && (
+        <div style={{ marginBottom:16 }}>
+          <div style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>
+            📢 Ofertas Ativas — toque para disparar
+          </div>
+          {offers.filter(o => o.status !== 'delivered').map(offer => (
+            <div key={offer.id} style={{ background:'#0d2137', borderRadius:12, marginBottom:6, border:'1px solid #1a3a50', overflow:'hidden' }}>
+              <div style={{ padding:'10px 14px', display:'flex', gap:10, alignItems:'center' }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ color:'#e2e8f0', fontWeight:800, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{offer.productName}</div>
+                  <div style={{ display:'flex', gap:8, alignItems:'center', marginTop:2 }}>
+                    <span style={{ color:'#10b981', fontWeight:900, fontSize:15 }}>{BRL.format(offer.offerPrice)}/un</span>
+                    <span style={{ color:'#334155', fontSize:11 }}>{offer.qty} {offer.unit}</span>
+                    {offer.expiryDate && (() => { const d = Math.ceil((new Date(offer.expiryDate) - Date.now())/86400000); return d <= 14 ? <span style={{ background:'#7c2d12', color:'#fca5a5', fontSize:10, fontWeight:900, padding:'1px 6px', borderRadius:6 }}>URGENTE</span> : null })()}
+                  </div>
+                </div>
+              </div>
+              {/* Per-offer blast buttons */}
+              <div style={{ display:'flex', borderTop:'1px solid #1a3a50' }}>
+                <button onClick={() => setSingleBlast(offer)}
+                  style={{ flex:1, background:'linear-gradient(135deg,#14532d,#166534)', color:'#4ade80', border:'none', cursor:'pointer', padding:'9px 0', fontWeight:800, fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', gap:5 }}>
+                  <MessageCircle size={13} /> 📱 Disparar para {markets.filter(m=>m.phone).length} mercados
+                </button>
+                {[10,20,30].map(pct => (
+                  <button key={pct} onClick={() => quickBlast(offer.productName ? { ...estoque.find(e=>e.productName===offer.productName), ...offer } : offer, pct)}
+                    style={{ background:'#78350f', color:'#fcd34d', border:'none', borderLeft:'1px solid #1a3a50', cursor:'pointer', padding:'9px 10px', fontWeight:800, fontSize:11, whiteSpace:'nowrap' }}>
+                    -{pct}%
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Chegou hoje ── */}
       {newToday.length > 0 && (
@@ -979,11 +1053,14 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
   )
 }
 
+const SUPPLIERS_KEY = 'cp_fornecedor_suppliers'
+
 /* ── TabReceber ─────────────────────────────────────────────── */
 function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }) {
   const [selected,    setSelected]   = useState(null)  // { name, sku, price }
   const [sourceType,  setSourceType] = useState('leilao')
   const [sourceName,  setSourceName] = useState('')
+  const [supplierSuggestions, setSupplierSuggestions] = useState(false) // show dropdown
   const [qty,         setQty]        = useState('')
   const [unit,        setUnit]       = useState('UND')
   const [totalPaid,   setTotalPaid]  = useState('')   // total pago pelo lote
@@ -1019,6 +1096,28 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
   const validMkts = (markets || []).filter(m => m.phone).length
   const inp = { display:'block', width:'100%', background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, padding:'11px 14px', color:'#e2e8f0', fontSize:15, fontWeight:600, boxSizing:'border-box', outline:'none' }
 
+  // Supplier autocomplete — local list keyed by sourceType
+  const savedSuppliers = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem(SUPPLIERS_KEY) || '{}') } catch { return {} }
+  }, [sourceName]) // re-read when user types (to refresh after save)
+  const currentTypeSuggestions = (savedSuppliers[sourceType] || []).filter(
+    s => sourceName.trim() === '' || s.toLowerCase().includes(sourceName.toLowerCase())
+  )
+
+  function pickSupplier(name) { setSourceName(name); setSupplierSuggestions(false) }
+
+  function saveSupplierIfNew(name) {
+    if (!name.trim()) return
+    try {
+      const all = JSON.parse(localStorage.getItem(SUPPLIERS_KEY) || '{}')
+      const list = all[sourceType] || []
+      if (!list.includes(name.trim())) {
+        all[sourceType] = [name.trim(), ...list].slice(0, 20)
+        localStorage.setItem(SUPPLIERS_KEY, JSON.stringify(all))
+      }
+    } catch {}
+  }
+
   async function handleSubmit() {
     if (!selected || !qty) return
     setSaving(true)
@@ -1027,7 +1126,8 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
     const item = {
       id: uid(), productName: selected.name, sku: selected.sku || '',
       qty: qtyNum, unit, unitCost, totalPaid: paid,
-      sourceType, sourceName: sourceName.trim() || null,
+      sourceType, sourceName: sourceName.trim() || null, // save supplier name for autocomplete
+
       expiryDate: expiryDate || null,
       receivedAt: today(), updatedAt: new Date().toISOString(),
     }
@@ -1037,6 +1137,7 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
       : [...estoque, item]
     setEstoque(nextEstoque)
     await persistKey(ESTOQUE_KEY, nextEstoque)
+    saveSupplierIfNew(sourceName.trim())
 
     // 2. Create offer (🔒 cost/source NEVER included)
     if (sellPrice > 0) {
@@ -1093,9 +1194,26 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile }
             </button>
           ))}
         </div>
-        <input value={sourceName} onChange={e => setSourceName(e.target.value)}
-          placeholder="Quem vendeu? (ex: contato do Pedro, Leilão CAIXA SP — opcional)"
-          style={{ ...inp, marginTop:8, fontSize:13, color:'#64748b' }} />
+        {/* Supplier autocomplete */}
+        <div style={{ position:'relative', marginTop:8 }}>
+          <input
+            value={sourceName}
+            onChange={e => { setSourceName(e.target.value); setSupplierSuggestions(true) }}
+            onFocus={() => setSupplierSuggestions(true)}
+            onBlur={() => setTimeout(() => setSupplierSuggestions(false), 150)}
+            placeholder="Quem vendeu? (ex: Pedro, Leilão CAIXA SP — opcional)"
+            style={{ ...inp, fontSize:13, color:'#94a3b8' }}
+          />
+          {supplierSuggestions && currentTypeSuggestions.length > 0 && (
+            <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:99, background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, marginTop:4, overflow:'hidden', boxShadow:'0 8px 32px rgba(0,0,0,0.5)' }}>
+              {currentTypeSuggestions.map(s => (
+                <button key={s} onMouseDown={() => pickSupplier(s)} style={{ display:'block', width:'100%', textAlign:'left', background:'none', border:'none', padding:'10px 14px', color:'#e2e8f0', fontSize:13, cursor:'pointer' }}>
+                  ⭐ {s}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Step 2: Product ── */}
@@ -1814,13 +1932,54 @@ function TabRelatorio({ estoque, offers, orders }) {
   const card = { background:'#0d2137', borderRadius:14, padding:'14px 16px', border:'1px solid #1a3a50' }
   const periodLabel = { today:'Hoje', week:'Últimos 7 dias', month:'Últimos 30 dias', all:'Todo período' }[period]
 
+  function exportCSV() {
+    const rows = [
+      ['# RELATÓRIO CORTA PREÇOS — ' + periodLabel],
+      ['# Gerado em ' + new Date().toLocaleString('pt-BR')],
+      [],
+      ['## PEDIDOS RECEBIDOS'],
+      ['Data', 'Mercado', 'Telefone', 'Produto', 'Qtd', 'Unidade', 'Total (R$)', 'Status'],
+      ...periodOrders.map(o => [
+        o.createdAt?.slice(0,10) || '', o.storeName || '', o.storePhone || '',
+        o.productName || '', o.qtyRequested || '', o.unit || '',
+        (o.totalPrice || 0).toFixed(2).replace('.', ','), o.status || '',
+      ]),
+      [],
+      ['## ENTRADAS DE ESTOQUE'],
+      ['Data', 'Produto', 'Qtd', 'Unidade', 'Origem', 'Fornecedor', 'Total Pago (R$)', 'Custo/Un (R$)'],
+      ...periodEstoque.map(e => [
+        e.receivedAt || '', e.productName || '', e.qty || '', e.unit || '',
+        e.sourceType || '', e.sourceName || '',
+        (e.totalPaid || 0).toFixed(2).replace('.', ','),
+        (e.unitCost  || 0).toFixed(2).replace('.', ','),
+      ]),
+      [],
+      ['## RESUMO'],
+      ['Faturado (R$)', revenue.toFixed(2).replace('.', ',')],
+      ['Investido (R$)', spent.toFixed(2).replace('.', ',')],
+      ['Resultado (R$)', profit.toFixed(2).replace('.', ',')],
+    ]
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url; a.download = `relatorio-${period}-${today()}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div style={{ padding:'16px 16px 100px' }}>
 
       {/* Header */}
-      <div style={{ marginBottom:16 }}>
-        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:20, marginBottom:2 }}>📊 Relatórios</div>
-        <div style={{ color:'#475569', fontSize:13 }}>{periodLabel} · {ordersCount} pedido{ordersCount !== 1 ? 's' : ''}</div>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:16 }}>
+        <div>
+          <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:20, marginBottom:2 }}>📊 Relatórios</div>
+          <div style={{ color:'#475569', fontSize:13 }}>{periodLabel} · {ordersCount} pedido{ordersCount !== 1 ? 's' : ''}</div>
+        </div>
+        <button onClick={exportCSV}
+          style={{ background:'#0d3d27', border:'1px solid #14532d', borderRadius:12, padding:'8px 14px', color:'#4ade80', fontWeight:800, fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
+          ⬇️ CSV
+        </button>
       </div>
 
       {/* Period selector */}
@@ -1931,6 +2090,32 @@ function TabRelatorio({ estoque, offers, orders }) {
                 <div style={{ textAlign:'right', flexShrink:0 }}>
                   {item.totalPaid > 0 && <div style={{ color:'#f87171', fontWeight:700, fontSize:13 }}>{BRL.format(item.totalPaid)}</div>}
                   {item.unitCost > 0 && <div style={{ color:'#334155', fontSize:11 }}>{BRL.format(item.unitCost)}/un</div>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Pedidos list */}
+      {periodOrders.length > 0 && (
+        <div style={card}>
+          <div style={{ color:'#94a3b8', fontSize:11, fontWeight:700, textTransform:'uppercase', marginBottom:10 }}>
+            📋 Pedidos no Período
+          </div>
+          {periodOrders.map(o => {
+            const stBg  = o.status === 'delivered' ? '#14532d' : o.status === 'confirmed' ? '#1e3a5f' : '#78350f'
+            const stClr = o.status === 'delivered' ? '#86efac' : o.status === 'confirmed' ? '#93c5fd' : '#fcd34d'
+            const stLbl = o.status === 'delivered' ? 'Entregue' : o.status === 'confirmed' ? 'Confirmado' : 'Pendente'
+            return (
+              <div key={o.id} style={{ display:'flex', alignItems:'center', gap:8, paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1a3a50' }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ color:'#e2e8f0', fontSize:13, fontWeight:700, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{o.productName}</div>
+                  <div style={{ color:'#475569', fontSize:11 }}>{o.storeName} · {o.qtyRequested} {o.unit} · {o.createdAt?.slice(0,10)}</div>
+                </div>
+                <div style={{ textAlign:'right', flexShrink:0 }}>
+                  <div style={{ color:'#10b981', fontWeight:800, fontSize:13 }}>{BRL.format(o.totalPrice)}</div>
+                  <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:10, background:stBg, color:stClr }}>{stLbl}</span>
                 </div>
               </div>
             )
