@@ -484,16 +484,25 @@ function BlastScreen({ offer, customMsg, markets, supplierName, supplierPhone, o
         <div style={{ background: done ? '#10b981' : 'linear-gradient(90deg,#3b82f6,#10b981)', height:'100%', width:`${pct}%`, borderRadius:99, transition:'width 0.4s ease' }} />
       </div>
 
-      {/* Offer summary */}
+      {/* Offer summary — safe for both single-offer and customMsg (all-offers) modes */}
       <div style={{ background:'#0d2137', borderRadius:16, padding:'12px 16px', marginBottom:24, display:'flex', gap:12, alignItems:'center', border:'1px solid #1a3a50' }}>
         <div style={{ width:40, height:40, borderRadius:12, background:'#0a2540', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
           <Package size={18} color="#10b981" />
         </div>
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{offer.productName}</div>
-          <div style={{ color:'#10b981', fontSize:12, fontWeight:700 }}>{BRL.format(offer.offerPrice)}/un · {offer.qty} {offer.unit}</div>
+          {offer ? (
+            <>
+              <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{offer.productName}</div>
+              <div style={{ color:'#10b981', fontSize:12, fontWeight:700 }}>{BRL.format(offer.offerPrice)}/un · {offer.qty} {offer.unit}</div>
+            </>
+          ) : (
+            <>
+              <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:14 }}>Todas as ofertas do dia</div>
+              <div style={{ color:'#10b981', fontSize:12, fontWeight:700 }}>Mensagem com todos os produtos enviada</div>
+            </>
+          )}
         </div>
-        {offer.expiryDate && (
+        {offer?.expiryDate && (
           <div style={{ background:'#7c2d12', borderRadius:8, padding:'3px 8px', color:'#fed7aa', fontSize:10, fontWeight:700, flexShrink:0 }}>📅 {offer.expiryDate}</div>
         )}
       </div>
