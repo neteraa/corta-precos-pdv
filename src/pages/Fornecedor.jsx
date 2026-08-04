@@ -21,6 +21,7 @@ const ORDERS_KEY  = 'cp_supplier_orders'
 const MKTS_KEY    = LOCAL + '_markets'
 const MKTS_SERVER_KEY     = 'cp_distribuidor_markets'   // server-side persistence (cross-device)
 const PROFILE_SERVER_KEY  = 'cp_forn_profile_v1'         // profile + logoUrl cross-device
+const RECURRENCE_KEY      = 'cp_forn_recurrences_v1'     // recorrências por mercado
 const API_PERSIST = '/api/persist'
 const API_RESTORE = '/api/restore'
 const UNITS       = ['UND', 'CX', 'FD', 'KG', 'LT', 'PC', 'DZ', 'SC']
@@ -953,7 +954,7 @@ const DEMO_ORDERS_HIST = [
 ]
 
 /* ── TabInicio ──────────────────────────────────────────────── */
-function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setOffers, setMarkets, setOrders, onNavigate, zapServerUrl, zapConnected }) {
+function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setOffers, setMarkets, setOrders, onNavigate, zapServerUrl, zapConnected, recurrences, setRecurrences }) {
   const [showBlitz,  setShowBlitz]  = useState(false)
   const [blastAll,   setBlastAll]   = useState(false)
   const [editItem,   setEditItem]   = useState(null)
@@ -1209,6 +1210,35 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
         ))}
       </div>
 
+      {/* ── Recorrências do dia ── */}
+      {recurrences?.length > 0 && (() => {
+        const due = recurrences.filter(r => {
+          if (!r.lastContact) return true
+          const d = new Date(r.lastContact)
+          d.setDate(d.getDate() + parseInt(r.frequency, 10))
+          return d <= new Date()
+        })
+        if (due.length === 0) return null
+        return (
+          <div style={{ background:'#7c2d1222', borderRadius:14, padding:'12px 14px', marginBottom:14, border:'1px solid #92400e' }}>
+            <div style={{ color:'#fcd34d', fontSize:12, fontWeight:800, marginBottom:8 }}>📅 {due.length} recorrência{due.length !== 1 ? 's' : ''} pra contatar hoje</div>
+            {due.slice(0, 3).map(r => (
+              <div key={r.id} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                <span style={{ color:'#f1f5f9', fontSize:12, flex:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                  <strong>{r.marketName}</strong> — {r.productName} ({r.qty} {r.unit})
+                </span>
+                <a href={`https://wa.me/${cleanPhone(r.marketPhone)}?text=${encodeURIComponent(`Olá ${r.marketName}! Você costuma pedir ${r.productName} (${r.qty} ${r.unit}). Quer renovar? 📦`)}`}
+                  target="_blank" rel="noreferrer"
+                  style={{ background:'#14532d', borderRadius:8, padding:'4px 10px', color:'#4ade80', fontSize:11, fontWeight:700, textDecoration:'none', display:'flex', alignItems:'center', gap:3, flexShrink:0 }}>
+                  <MessageCircle size={11} /> ZAP
+                </a>
+              </div>
+            ))}
+            {due.length > 3 && <div style={{ color:'#64748b', fontSize:11, marginTop:4 }}>+{due.length - 3} mais — veja em Mercados</div>}
+          </div>
+        )
+      })()}
+
       {/* ── FIFO Urgency ── */}
       {urgent.length > 0 && (
         <div style={{ marginBottom:16 }}>
@@ -1391,6 +1421,9 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, 
   const [paletCount,    setPaletCount]    = useState('')
   const [unitsPerPalet, setUnitsPerPalet] = useState('')
   const [costMode,      setCostMode]      = useState('perUnit') // 'perUnit' | 'totalLot'
+  const [viewMode,      setViewMode]      = useState('entry')   // 'entry' | 'stock'
+  const [stockFilter,   setStockFilter]   = useState('all')     // 'all' | 'noPrice' | 'expiring' | 'lowQty'
+  const [editPrice,     setEditPrice]     = useState(null)      // id of item being inline-edited
 
   function handleSelect(p) {
     setSelected(p)
@@ -1426,7 +1459,7 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, 
   const fmtCost    = v => v <= 0 ? '—' : v < 0.01 ? `R$${v.toFixed(4).replace('.',',')}` : v < 0.10 ? `R$${v.toFixed(3).replace('.',',')}` : BRL.format(v)
   const canBlast   = sellPrice > 0
   const validMkts = (markets || []).filter(m => m.phone).length
-  const inp = { display:'block', width:'100%', background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, padding:'11px 14px', color:'#e2e8f0', fontSize:15, fontWeight:600, boxSizing:'border-box', outline:'none' }
+  const inp = { display:'block', width:'100%', background:'#0a1929', border:'1px solid #1e4060', borderRadius:12, padding:'11px 14px', color:'#e2e8f0', fontSize:16, fontWeight:600, boxSizing:'border-box', outline:'none' }
 
   // Supplier autocomplete — local list keyed by sourceType
   const savedSuppliers = useMemo(() => {
@@ -1500,8 +1533,128 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, 
 
   if (blast) return <BlastScreen offer={blast} markets={markets} supplierName={profile?.name || 'Distribuidora'} supplierPhone={profile?.phone || ''} onDone={() => setBlast(null)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />
 
+  /* ── Stock view computed values ── */
+  const totalInvested = estoque.reduce((s, e) => s + (e.totalPaid || 0), 0)
+  const hoje = today()
+  const stockWithMeta = estoque.map(e => {
+    const daysLeft = e.expiryDate ? Math.ceil((new Date(e.expiryDate) - new Date()) / 86400000) : null
+    const hasPrice  = !!e.offerPrice && e.offerPrice > 0
+    const margin    = (e.offerPrice > 0 && e.unitCost > 0) ? Math.round(((e.offerPrice - e.unitCost) / e.offerPrice) * 100) : null
+    return { ...e, daysLeft, hasPrice, margin }
+  })
+  const filteredStock = stockFilter === 'all'     ? stockWithMeta
+    : stockFilter === 'noPrice'  ? stockWithMeta.filter(e => !e.hasPrice)
+    : stockFilter === 'expiring' ? stockWithMeta.filter(e => e.daysLeft != null && e.daysLeft <= 30)
+    : stockFilter === 'lowQty'   ? stockWithMeta.filter(e => e.qty <= 5)
+    : stockWithMeta
+  const stockAlerts = {
+    noPrice:  stockWithMeta.filter(e => !e.hasPrice).length,
+    expiring: stockWithMeta.filter(e => e.daysLeft != null && e.daysLeft <= 30).length,
+    lowQty:   stockWithMeta.filter(e => e.qty <= 5).length,
+  }
+
   return (
     <div style={{ padding:'16px 16px 100px' }}>
+
+      {/* ── Segmented control: Entrada vs Estoque ── */}
+      <div style={{ display:'flex', background:'#0a1929', borderRadius:14, padding:4, marginBottom:16, border:'1px solid #1e4060' }}>
+        <button onClick={() => setViewMode('entry')} style={{ flex:1, padding:'10px 0', borderRadius:10, border:'none', background: viewMode === 'entry' ? 'linear-gradient(135deg,#10b981,#059669)' : 'transparent', color: viewMode === 'entry' ? '#fff' : '#475569', fontWeight:800, fontSize:13, cursor:'pointer', transition:'all 0.2s' }}>
+          📥 Dar Entrada
+        </button>
+        <button onClick={() => setViewMode('stock')} style={{ flex:1, padding:'10px 0', borderRadius:10, border:'none', background: viewMode === 'stock' ? '#1e3a5f' : 'transparent', color: viewMode === 'stock' ? '#93c5fd' : '#475569', fontWeight:800, fontSize:13, cursor:'pointer', transition:'all 0.2s', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+          📦 Estoque {estoque.length > 0 && <span style={{ background: viewMode === 'stock' ? '#2563eb44' : '#1a3a50', borderRadius:10, padding:'1px 6px', fontSize:11 }}>{estoque.length}</span>}
+        </button>
+      </div>
+
+      {/* ════════════════════════════════════════
+          STOCK VIEW
+      ════════════════════════════════════════ */}
+      {viewMode === 'stock' && (
+        <div>
+          {/* Stats row */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:14 }}>
+            <div style={{ background:'#0d2137', borderRadius:12, padding:'10px 12px', border:'1px solid #1a3a50', textAlign:'center' }}>
+              <div style={{ color:'#10b981', fontWeight:900, fontSize:18 }}>{estoque.filter(e => e.qty > 0).length}</div>
+              <div style={{ color:'#475569', fontSize:10, fontWeight:700 }}>ITENS</div>
+            </div>
+            <div style={{ background:'#0d2137', borderRadius:12, padding:'10px 12px', border:'1px solid #1a3a50', textAlign:'center' }}>
+              <div style={{ color:'#c4b5fd', fontWeight:900, fontSize:14 }}>{BRL.format(totalInvested)}</div>
+              <div style={{ color:'#475569', fontSize:10, fontWeight:700 }}>INVESTIDO</div>
+            </div>
+            <div style={{ background: stockAlerts.expiring > 0 ? '#7c2d1222' : '#0d2137', borderRadius:12, padding:'10px 12px', border:`1px solid ${stockAlerts.expiring > 0 ? '#92400e' : '#1a3a50'}`, textAlign:'center' }}>
+              <div style={{ color: stockAlerts.expiring > 0 ? '#fcd34d' : '#64748b', fontWeight:900, fontSize:18 }}>{stockAlerts.expiring}</div>
+              <div style={{ color:'#475569', fontSize:10, fontWeight:700 }}>VENCENDO</div>
+            </div>
+          </div>
+
+          {/* Filter pills */}
+          <div style={{ display:'flex', gap:6, marginBottom:12, overflowX:'auto', paddingBottom:4 }}>
+            {[
+              { id:'all',      label:`Todos`, count: estoque.length, color:'#64748b' },
+              { id:'noPrice',  label:'Sem preço', count: stockAlerts.noPrice,  color:'#f59e0b' },
+              { id:'expiring', label:'Vencendo',  count: stockAlerts.expiring, color:'#f97316' },
+              { id:'lowQty',   label:'Pouco estoque', count: stockAlerts.lowQty, color:'#ef4444' },
+            ].map(f => (
+              <button key={f.id} onClick={() => setStockFilter(f.id)} style={{
+                flexShrink:0, padding:'6px 12px', borderRadius:20,
+                border:`1.5px solid ${stockFilter === f.id ? f.color : '#1e4060'}`,
+                background: stockFilter === f.id ? f.color+'22' : '#0d2137',
+                color: stockFilter === f.id ? f.color : '#475569',
+                fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap',
+              }}>
+                {f.label}{f.count > 0 ? ` (${f.count})` : ''}
+              </button>
+            ))}
+          </div>
+
+          {/* Stock table */}
+          {filteredStock.length === 0 ? (
+            <div style={{ textAlign:'center', padding:32, color:'#334155' }}>Nenhum item neste filtro</div>
+          ) : (
+            filteredStock.map(item => {
+              const expColor = item.daysLeft == null ? '#334155'
+                : item.daysLeft <= 0 ? '#ef4444' : item.daysLeft <= 7 ? '#f97316'
+                : item.daysLeft <= 30 ? '#eab308' : '#10b981'
+              return (
+                <div key={item.id} style={{ background:'#0d2137', borderRadius:14, padding:'12px 14px', marginBottom:8, border:`1px solid ${item.daysLeft != null && item.daysLeft <= 7 ? '#92400e' : '#1a3a50'}` }}>
+                  <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
+                    {/* Qty badge */}
+                    <div style={{ width:52, flexShrink:0, textAlign:'center', background:'#050f1a', borderRadius:10, padding:'8px 4px', border:`1px solid ${item.qty > 0 ? '#1e4060' : '#7f1d1d'}` }}>
+                      <div style={{ color: item.qty > 0 ? '#10b981' : '#ef4444', fontWeight:900, fontSize:20, lineHeight:1 }}>{item.qty}</div>
+                      <div style={{ color:'#475569', fontSize:10 }}>{item.unit}</div>
+                    </div>
+                    {/* Info */}
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.productName}</div>
+                      <div style={{ display:'flex', gap:8, marginTop:3, flexWrap:'wrap' }}>
+                        {item.unitCost > 0 && <span style={{ color:'#94a3b8', fontSize:11 }}>💸 {fmtCost(item.unitCost)}/un</span>}
+                        {item.hasPrice
+                          ? <span style={{ color: item.margin >= 40 ? '#4ade80' : item.margin >= 20 ? '#fbbf24' : '#f87171', fontSize:11, fontWeight:700 }}>
+                              🏷️ {BRL.format(item.offerPrice)} · {item.margin}% mg
+                            </span>
+                          : <span style={{ color:'#f59e0b', fontSize:11, fontWeight:700 }}>⚠️ sem preço de venda</span>
+                        }
+                        {item.daysLeft != null && (
+                          <span style={{ color: expColor, fontSize:11, fontWeight:700 }}>
+                            📅 {item.daysLeft <= 0 ? 'VENCIDO' : `${item.daysLeft}d`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Actions */}
+                    <button onClick={() => handleRemove(item.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#334155', padding:4, flexShrink:0 }}><Trash2 size={15} /></button>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════
+          ENTRY VIEW (original form)
+      ════════════════════════════════════════ */}
+      {viewMode === 'entry' && (<>
 
       {/* Header */}
       <div style={{ marginBottom:16 }}>
@@ -1774,35 +1927,7 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, 
           {canBlast && <div style={{ color:'#334155', fontSize:12, textAlign:'center', marginTop:-6 }}>Mercados não veem custo, origem ou margem</div>}
         </div>
       )}
-      {estoque.length > 0 && (
-        <>
-          <div style={{ color:'#64748b', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', margin:'24px 0 10px' }}>
-            Estoque Atual ({estoque.length} itens)
-          </div>
-          {estoque.map(item => {
-            const daysLeft = item.expiryDate ? Math.ceil((new Date(item.expiryDate) - new Date()) / 86400000) : null
-            const expColor = daysLeft == null ? null : daysLeft <= 0 ? '#ef4444' : daysLeft <= 7 ? '#f97316' : daysLeft <= 30 ? '#eab308' : '#10b981'
-            return (
-              <div key={item.id} style={{ background:'#0d2137', borderRadius:14, padding:'12px 16px', marginBottom:8, border:'1px solid ' + (item.qty <= 0 ? '#7f1d1d' : '#1a3a50'), display:'flex', alignItems:'center', gap:12 }}>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ color:'#e2e8f0', fontWeight:700, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.productName}</div>
-                  {item.expiryDate && (
-                    <div style={{ color: expColor, fontSize:11, fontWeight:700, marginTop:2 }}>
-                      📅 {daysLeft <= 0 ? 'VENCIDO' : `vence em ${daysLeft}d`} · {item.expiryDate}
-                    </div>
-                  )}
-                  {!item.expiryDate && <div style={{ color:'#334155', fontSize:11 }}>sem validade</div>}
-                </div>
-                <div style={{ textAlign:'center', flexShrink:0 }}>
-                  <div style={{ color: item.qty > 0 ? '#10b981' : '#ef4444', fontWeight:900, fontSize:22, lineHeight:1 }}>{item.qty}</div>
-                  <div style={{ color:'#475569', fontSize:11 }}>{item.unit}</div>
-                </div>
-                <button onClick={() => handleRemove(item.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#334155', padding:4 }}><Trash2 size={16} /></button>
-              </div>
-            )
-          })}
-        </>
-      )}
+      </>)}
     </div>
   )
 }
@@ -2139,7 +2264,7 @@ function TabPedidos({ orders, setOrders }) {
 function MarketForm({ initial = {}, onSave, onCancel }) {
   const F = (k) => ({ value: form[k], onChange: e => setForm(p => ({...p, [k]: e.target.value})) })
   const [form, setForm] = useState({ name:'', phone:'', address:'', contact:'', cnpj:'', notes:'', logoUrl:'', ...initial })
-  const inp = { background:'#0a1929', border:'1px solid #1e4060', borderRadius:10, padding:'10px 12px', color:'#e2e8f0', fontSize:14, boxSizing:'border-box', outline:'none', width:'100%', display:'block', marginBottom:10 }
+  const inp = { background:'#0a1929', border:'1px solid #1e4060', borderRadius:10, padding:'10px 12px', color:'#e2e8f0', fontSize:16, boxSizing:'border-box', outline:'none', width:'100%', display:'block', marginBottom:10 }
 
   function handleLogo(e) {
     const file = e.target.files?.[0]
@@ -2208,11 +2333,78 @@ function MarketForm({ initial = {}, onSave, onCancel }) {
   )
 }
 
+/* ── RecurrenceForm ──────────────────────────────────────────── */
+function RecurrenceForm({ onSave, onCancel }) {
+  const [form, setForm] = useState({ productName:'', qty:'', unit:'CX', price:'', frequency:'7', note:'' })
+  const F = k => ({ value: form[k], onChange: e => setForm(p => ({...p, [k]: e.target.value})) })
+  const inp = { background:'#050f1a', border:'1px solid #1e4060', borderRadius:8, padding:'7px 10px', color:'#e2e8f0', fontSize:14, outline:'none', width:'100%', boxSizing:'border-box' }
+  return (
+    <div style={{ background:'#0a1929', borderRadius:12, padding:12, marginBottom:10, border:'1px solid #10b981' }}>
+      <div style={{ color:'#10b981', fontSize:11, fontWeight:700, textTransform:'uppercase', marginBottom:10 }}>+ Nova Recorrência</div>
+      <input {...F('productName')} placeholder="Produto (ex: Coca-Cola 2L)" style={{ ...inp, marginBottom:8 }} />
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 80px 80px', gap:6, marginBottom:8 }}>
+        <input {...F('qty')} placeholder="Qtd" type="number" min="1" style={inp} />
+        <select value={form.unit} onChange={e => setForm(p => ({...p, unit: e.target.value}))} style={{ ...inp, padding:'7px 6px' }}>
+          {UNITS.map(u => <option key={u}>{u}</option>)}
+        </select>
+        <select value={form.frequency} onChange={e => setForm(p => ({...p, frequency: e.target.value}))} style={{ ...inp, padding:'7px 6px' }}>
+          <option value="7">7d</option>
+          <option value="14">14d</option>
+          <option value="30">30d</option>
+          <option value="60">60d</option>
+          <option value="90">90d</option>
+        </select>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+        <input {...F('price')} placeholder="Preço/un (opcional)" type="number" step="0.01" style={inp} />
+        <input {...F('note')} placeholder="Obs (opcional)" style={inp} />
+      </div>
+      <div style={{ display:'flex', gap:8 }}>
+        <Btn full disabled={!form.productName.trim() || !form.qty} onClick={() => onSave({ ...form, qty: parseInt(form.qty), price: parseFloat(form.price) || 0 })}>
+          <Check size={14} /> Salvar
+        </Btn>
+        <Btn secondary onClick={onCancel}>Cancelar</Btn>
+      </div>
+    </div>
+  )
+}
+
 /* ── TabMercados ────────────────────────────────────────────── */
-function TabMercados({ markets, setMarkets, orders }) {
-  const [adding,   setAdding]   = useState(false)
-  const [editing,  setEditing]  = useState(null)
-  const [expanded, setExpanded] = useState(null) // market id with history open
+function TabMercados({ markets, setMarkets, orders, recurrences, setRecurrences }) {
+  const [adding,    setAdding]    = useState(false)
+  const [editing,   setEditing]   = useState(null)
+  const [expanded,  setExpanded]  = useState(null)   // market id → show order history
+  const [showRecur, setShowRecur] = useState(null)   // market id → show recurrence panel
+  const [addingRec, setAddingRec] = useState(null)   // market id → show add recurrence form
+
+  /* Recurrence helpers */
+  function saveRecurrences(next) {
+    setRecurrences(next)
+    try { localStorage.setItem(RECURRENCE_KEY, JSON.stringify(next)) } catch {}
+    persistKey(RECURRENCE_KEY, next)
+  }
+
+  function addRecurrence(mkt, form) {
+    const rec = { id: uid(), marketId: mkt.id, marketName: mkt.name, marketPhone: mkt.phone, ...form, lastContact: null, createdAt: new Date().toISOString() }
+    saveRecurrences([...recurrences, rec])
+    setAddingRec(null)
+  }
+
+  function removeRecurrence(id) {
+    saveRecurrences(recurrences.filter(r => r.id !== id))
+  }
+
+  function markContacted(id) {
+    saveRecurrences(recurrences.map(r => r.id === id ? { ...r, lastContact: today() } : r))
+  }
+
+  function isDue(rec) {
+    if (!rec.lastContact) return true
+    const freqDays = parseInt(rec.frequency, 10)
+    const nextDue = new Date(rec.lastContact)
+    nextDue.setDate(nextDue.getDate() + freqDays)
+    return nextDue <= new Date()
+  }
 
   async function saveMarkets(next) {
     setMarkets(next)
@@ -2334,10 +2526,86 @@ function TabMercados({ markets, setMarkets, orders }) {
                       <div style={{ color:'#64748b', fontSize:10 }}>último</div>
                     </div>
                   )}
-                  <button onClick={() => setExpanded(expanded === m.id ? null : m.id)} style={{ marginLeft:'auto', background:'none', border:'1px solid #1e4060', borderRadius:8, padding:'5px 10px', color:'#64748b', fontSize:11, fontWeight:700, cursor:'pointer' }}>
-                    {expanded === m.id ? '▲ Fechar' : '📋 Histórico'}
-                  </button>
+                  <div style={{ marginLeft:'auto', display:'flex', gap:6 }}>
+                    {/* Recorrências button */}
+                    {(() => {
+                      const mRecs = recurrences.filter(r => r.marketId === m.id)
+                      const due   = mRecs.filter(isDue).length
+                      return (
+                        <button onClick={() => { setShowRecur(showRecur === m.id ? null : m.id); setExpanded(null) }}
+                          style={{ background: due > 0 ? '#78350f22' : 'none', border:`1px solid ${due > 0 ? '#92400e' : '#1e4060'}`, borderRadius:8, padding:'5px 10px', cursor:'pointer', color: due > 0 ? '#fcd34d' : '#64748b', fontSize:11, fontWeight:700, display:'flex', alignItems:'center', gap:4 }}>
+                          📅 {mRecs.length > 0 ? mRecs.length : '+'}
+                          {due > 0 && <span style={{ background:'#ef4444', color:'#fff', borderRadius:8, width:14, height:14, fontSize:9, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:900 }}>{due}</span>}
+                        </button>
+                      )
+                    })()}
+                    <button onClick={() => { setExpanded(expanded === m.id ? null : m.id); setShowRecur(null) }} style={{ background:'none', border:'1px solid #1e4060', borderRadius:8, padding:'5px 10px', color:'#64748b', fontSize:11, fontWeight:700, cursor:'pointer' }}>
+                      {expanded === m.id ? '▲' : '📋'}
+                    </button>
+                  </div>
                 </div>
+
+                {/* ── Recurrence panel ── */}
+                {showRecur === m.id && (() => {
+                  const mRecs = recurrences.filter(r => r.marketId === m.id)
+                  return (
+                    <div style={{ marginTop:10, borderTop:'1px solid #1a3a50', paddingTop:10 }}>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                        <div style={{ color:'#f1f5f9', fontSize:12, fontWeight:800 }}>📅 Pedidos Recorrentes</div>
+                        <button onClick={() => setAddingRec(addingRec === m.id ? null : m.id)}
+                          style={{ background:'#0d2137', border:'1px solid #10b981', borderRadius:8, padding:'4px 10px', color:'#10b981', fontSize:11, fontWeight:700, cursor:'pointer' }}>
+                          + Adicionar
+                        </button>
+                      </div>
+
+                      {/* Add recurrence form */}
+                      {addingRec === m.id && <RecurrenceForm onSave={form => addRecurrence(m, form)} onCancel={() => setAddingRec(null)} />}
+
+                      {/* Recurrence list */}
+                      {mRecs.length === 0 ? (
+                        <div style={{ color:'#334155', fontSize:12, textAlign:'center', padding:'12px 0' }}>
+                          Sem recorrências. Adicione um produto que ele compra regularmente.
+                        </div>
+                      ) : mRecs.map(rec => {
+                        const due = isDue(rec)
+                        return (
+                          <div key={rec.id} style={{ background: due ? '#7c2d1222' : '#050f1a', borderRadius:10, padding:'10px 12px', marginBottom:6, border:`1px solid ${due ? '#92400e' : '#1e4060'}` }}>
+                            <div style={{ display:'flex', alignItems:'flex-start', gap:8 }}>
+                              <div style={{ flex:1 }}>
+                                <div style={{ color:'#f1f5f9', fontWeight:700, fontSize:13 }}>{rec.productName}</div>
+                                <div style={{ display:'flex', gap:8, marginTop:2, flexWrap:'wrap' }}>
+                                  <span style={{ color:'#64748b', fontSize:11 }}>{rec.qty} {rec.unit}</span>
+                                  {rec.price > 0 && <span style={{ color:'#10b981', fontSize:11 }}>{BRL.format(rec.price)}/un</span>}
+                                  <span style={{ color:'#8b5cf6', fontSize:11 }}>a cada {rec.frequency}d</span>
+                                  {rec.lastContact
+                                    ? <span style={{ color: due ? '#fcd34d' : '#475569', fontSize:11 }}>
+                                        {due ? '⚠️ DUE!' : `✓ ${rec.lastContact}`}
+                                      </span>
+                                    : <span style={{ color:'#f59e0b', fontSize:11 }}>⚡ Nunca contatado</span>
+                                  }
+                                </div>
+                                {rec.note && <div style={{ color:'#475569', fontSize:11, marginTop:2 }}>💬 {rec.note}</div>}
+                              </div>
+                              <div style={{ display:'flex', gap:4, flexShrink:0 }}>
+                                {due && (
+                                  <a href={`https://wa.me/${cleanPhone(m.phone)}?text=${encodeURIComponent(`Olá ${m.name}! Você costuma pedir ${rec.productName} (${rec.qty} ${rec.unit}). Quer renovar? 📦`)}`}
+                                    target="_blank" rel="noreferrer" onClick={() => markContacted(rec.id)}
+                                    style={{ background:'#14532d', border:'none', borderRadius:8, padding:'5px 8px', color:'#4ade80', fontSize:11, cursor:'pointer', textDecoration:'none', display:'flex', alignItems:'center', gap:3, fontWeight:700 }}>
+                                    <MessageCircle size={11} /> ZAP
+                                  </a>
+                                )}
+                                <button onClick={() => markContacted(rec.id)} title="Marcar como contatado hoje"
+                                  style={{ background:'none', border:'1px solid #1e4060', borderRadius:8, padding:'5px 8px', color:'#64748b', fontSize:11, cursor:'pointer' }}>✓</button>
+                                <button onClick={() => removeRecurrence(rec.id)}
+                                  style={{ background:'none', border:'none', cursor:'pointer', color:'#334155', padding:4 }}><Trash2 size={12} /></button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
 
                 {/* Expandable order history */}
                 {expanded === m.id && (
@@ -2938,6 +3206,9 @@ export default function Fornecedor() {
   const [estoque,     setEstoque]     = useState([])
   const [offers,      setOffers]      = useState([])
   const [orders,      setOrders]      = useState([])
+  const [recurrences, setRecurrences] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(RECURRENCE_KEY) || '[]') } catch { return [] }
+  })
   const [tab,         setTab]         = useState('inicio')
   const [syncing,     setSyncing]     = useState(false)
   const [synced,      setSynced]      = useState(false)
@@ -3193,11 +3464,11 @@ export default function Fornecedor() {
       </div>
 
       <div style={{ flex:1, overflowY:'auto' }}>
-        {tab === 'inicio'    && <TabInicio    estoque={estoque} offers={offers} orders={orders} profile={profile} markets={markets} setEstoque={setEstoque} setOffers={setOffers} setMarkets={setMarkets} setOrders={setOrders} onNavigate={setTab} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
+        {tab === 'inicio'    && <TabInicio    estoque={estoque} offers={offers} orders={orders} profile={profile} markets={markets} setEstoque={setEstoque} setOffers={setOffers} setMarkets={setMarkets} setOrders={setOrders} onNavigate={setTab} zapServerUrl={zapServerUrl} zapConnected={zapConnected} recurrences={recurrences} setRecurrences={setRecurrences} />}
         {tab === 'receber'   && <TabReceber   estoque={estoque} setEstoque={setEstoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
         {tab === 'ofertas'   && <TabOfertas   estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} orders={orders} preSelected={preSelectedForOffer} onClearPreSelected={() => setPreSelectedForOffer(null)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
         {tab === 'pedidos'   && <TabPedidos   orders={orders} setOrders={setOrders} />}
-        {tab === 'mercados'  && <TabMercados  markets={markets} setMarkets={setMarkets} orders={orders} />}
+        {tab === 'mercados'  && <TabMercados  markets={markets} setMarkets={setMarkets} orders={orders} recurrences={recurrences} setRecurrences={setRecurrences} />}
         {tab === 'relatorio' && <TabRelatorio estoque={estoque} offers={offers} orders={orders} markets={markets} />}
       </div>
 
