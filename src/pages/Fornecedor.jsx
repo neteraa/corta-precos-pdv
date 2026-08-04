@@ -19,7 +19,8 @@ const OFFERS_KEY  = 'cp_supplier_offers'
 const ESTOQUE_KEY = 'cp_fornecedor_estoque'
 const ORDERS_KEY  = 'cp_supplier_orders'
 const MKTS_KEY    = LOCAL + '_markets'
-const MKTS_SERVER_KEY = 'cp_distribuidor_markets'  // server-side persistence (cross-device)
+const MKTS_SERVER_KEY     = 'cp_distribuidor_markets'   // server-side persistence (cross-device)
+const PROFILE_SERVER_KEY  = 'cp_forn_profile_v1'         // profile + logoUrl cross-device
 const API_PERSIST = '/api/persist'
 const API_RESTORE = '/api/restore'
 const UNITS       = ['UND', 'CX', 'FD', 'KG', 'LT', 'PC', 'DZ', 'SC']
@@ -111,12 +112,13 @@ async function fetchAll() {
     const r = await fetch(API_RESTORE)
     const { data } = await r.json()
     return {
-      estoque:  data?.[ESTOQUE_KEY]    ? JSON.parse(data[ESTOQUE_KEY])    : [],
-      offers:   data?.[OFFERS_KEY]     ? JSON.parse(data[OFFERS_KEY])     : [],
-      orders:   data?.[ORDERS_KEY]     ? JSON.parse(data[ORDERS_KEY])     : [],
-      markets:  data?.[MKTS_SERVER_KEY]? JSON.parse(data[MKTS_SERVER_KEY]): null, // null = not on server yet
+      estoque:  data?.[ESTOQUE_KEY]       ? JSON.parse(data[ESTOQUE_KEY])       : [],
+      offers:   data?.[OFFERS_KEY]        ? JSON.parse(data[OFFERS_KEY])        : [],
+      orders:   data?.[ORDERS_KEY]        ? JSON.parse(data[ORDERS_KEY])        : [],
+      markets:  data?.[MKTS_SERVER_KEY]   ? JSON.parse(data[MKTS_SERVER_KEY])   : null,
+      profile:  data?.[PROFILE_SERVER_KEY]? JSON.parse(data[PROFILE_SERVER_KEY]): null,
     }
-  } catch { return { estoque: [], offers: [], orders: [], markets: null } }
+  } catch { return { estoque: [], offers: [], orders: [], markets: null, profile: null } }
 }
 
 function buildOfferMsg(offer, supplierName, supplierPhone) {
@@ -1683,7 +1685,7 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, 
             <div style={{ display:'flex', gap:0, alignItems:'center', background:'#060e1a', border:`1px solid ${canBlast ? '#2563eb' : '#1e3050'}`, borderRadius:12, overflow:'hidden', marginBottom: canBlast ? 10 : 0 }}>
               <span style={{ padding:'0 12px', color:'#3b82f6', fontSize:14, fontWeight:700 }}>R$</span>
               <CurrencyInput value={offerPrice} onChange={setOfferPrice}
-                placeholder={unitCost > 0 ? `sugerido: ${(unitCost*1.5).toLocaleString('pt-BR',{minimumFractionDigits:2})}` : 'preço por unidade para mercados'}
+                placeholder={unitCost > 0 ? `sugerido: ${fmtCost(unitCost * 1.5)}` : 'preço por unidade para mercados'}
                 style={{ flex:1, background:'transparent', border:'none', padding:'13px 12px 13px 0', color:'#60a5fa', fontSize:20, fontWeight:900, outline:'none', width:'100%' }} />
             </div>
             {canBlast && qtyNum > 0 && (
@@ -1970,9 +1972,17 @@ function TabOfertas({ estoque, offers, setOffers, markets, profile, orders, preS
 
 /* ── TabPedidos ─────────────────────────────────────────────── */
 function TabPedidos({ orders, setOrders }) {
+  const [filter, setFilter] = useState('all') // all | pending | confirmed | delivered | cancelled
   const pending = orders.filter(o => o.status === 'pending').length
   const total   = orders.reduce((s, o) => s + (o.totalPrice || 0), 0)
   const payInfo = id => PAYMENT_INFO[id] || { emoji: '💰', label: id || 'N/A', color: '#94a3b8' }
+  const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter)
+  const FILTERS = [
+    { id:'all',       label:'Todos',      count: orders.length,                                        color:'#64748b' },
+    { id:'pending',   label:'Pendentes',  count: orders.filter(o=>o.status==='pending').length,        color:'#f59e0b' },
+    { id:'confirmed', label:'Confirmados',count: orders.filter(o=>o.status==='confirmed').length,      color:'#3b82f6' },
+    { id:'delivered', label:'Entregues',  count: orders.filter(o=>o.status==='delivered').length,      color:'#10b981' },
+  ].filter(f => f.id === 'all' || f.count > 0)
 
   async function updateStatus(id, status) {
     const next = orders.map(o => o.id === id ? { ...o, status, updatedAt: new Date().toISOString() } : o)
@@ -2001,26 +2011,40 @@ function TabPedidos({ orders, setOrders }) {
 
   return (
     <div style={{ padding:'16px 16px 100px' }}>
-      <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18, marginBottom:16 }}>Pedidos Recebidos</div>
-
-      <div style={{ display:'flex', gap:10, marginBottom:20 }}>
-        <div style={{ flex:1, background:'#0d2137', borderRadius:14, padding:12, border:'1px solid #1a3a50', textAlign:'center' }}>
-          <div style={{ color:'#f59e0b', fontWeight:900, fontSize:20 }}>{pending}</div>
-          <div style={{ color:'#64748b', fontSize:11, fontWeight:700 }}>PENDENTES</div>
-        </div>
-        <div style={{ flex:1, background:'#0d2137', borderRadius:14, padding:12, border:'1px solid #1a3a50', textAlign:'center' }}>
-          <div style={{ color:'#8b5cf6', fontWeight:900, fontSize:16 }}>{BRL.format(total)}</div>
-          <div style={{ color:'#64748b', fontSize:11, fontWeight:700 }}>TOTAL</div>
+      {/* Header + stats */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18 }}>Pedidos Recebidos</div>
+        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+          {pending > 0 && <div style={{ background:'#78350f', border:'1px solid #92400e', borderRadius:10, padding:'3px 10px', color:'#fcd34d', fontSize:12, fontWeight:800 }}>{pending} pendente{pending !== 1 ? 's' : ''}</div>}
+          <div style={{ color:'#64748b', fontSize:12 }}>{BRL.format(total)}</div>
         </div>
       </div>
 
-      {orders.length === 0 ? (
+      {/* Status filter pills */}
+      <div style={{ display:'flex', gap:6, marginBottom:16, overflowX:'auto', paddingBottom:4 }}>
+        {FILTERS.map(f => (
+          <button key={f.id} onClick={() => setFilter(f.id)} style={{
+            flexShrink:0, padding:'7px 14px', borderRadius:20, border:`1.5px solid ${filter === f.id ? f.color : '#1e4060'}`,
+            background: filter === f.id ? f.color + '22' : '#0d2137',
+            color: filter === f.id ? f.color : '#475569',
+            fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap',
+          }}>
+            {f.label} {f.count > 0 && <span style={{ background: filter === f.id ? f.color + '44' : '#1a3a50', borderRadius:10, padding:'1px 6px', marginLeft:3, fontSize:11 }}>{f.count}</span>}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 && orders.length > 0 ? (
+        <div style={{ background:'#0d2137', borderRadius:14, padding:24, textAlign:'center', border:'1px solid #1a3a50', color:'#475569', fontSize:14 }}>
+          Nenhum pedido com status "{FILTERS.find(f=>f.id===filter)?.label}"
+        </div>
+      ) : orders.length === 0 ? (
         <div style={{ background:'#0d2137', borderRadius:20, padding:32, textAlign:'center', border:'1px solid #1a3a50' }}>
           <ClipboardList size={32} color="#1e4060" style={{ marginBottom:8 }} />
           <div style={{ color:'#475569', fontSize:15 }}>Nenhum pedido recebido ainda</div>
           <div style={{ color:'#334155', fontSize:12, marginTop:4 }}>Quando um mercado fizer pedido, aparece aqui</div>
         </div>
-      ) : orders.map(order => {
+      ) : [...filtered].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(order => {
         const pay = payInfo(order.paymentMethod)
         return (
           <div key={order.id} style={{ background:'#0d2137', borderRadius:16, padding:'14px 16px', marginBottom:12, border:'1px solid ' + (order.status === 'pending' ? '#78350f' : '#1a3a50') }}>
@@ -2073,13 +2097,40 @@ function TabPedidos({ orders, setOrders }) {
 /* ── MarketForm ─────────────────────────────────────────────── */
 function MarketForm({ initial = {}, onSave, onCancel }) {
   const F = (k) => ({ value: form[k], onChange: e => setForm(p => ({...p, [k]: e.target.value})) })
-  const [form, setForm] = useState({ name:'', phone:'', address:'', contact:'', cnpj:'', notes:'', ...initial })
+  const [form, setForm] = useState({ name:'', phone:'', address:'', contact:'', cnpj:'', notes:'', logoUrl:'', ...initial })
   const inp = { background:'#0a1929', border:'1px solid #1e4060', borderRadius:10, padding:'10px 12px', color:'#e2e8f0', fontSize:14, boxSizing:'border-box', outline:'none', width:'100%', display:'block', marginBottom:10 }
+
+  function handleLogo(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => setForm(p => ({ ...p, logoUrl: ev.target.result }))
+    reader.readAsDataURL(file)
+  }
+
   return (
     <div style={{ background:'#0d2137', borderRadius:16, padding:16, marginBottom:16, border:'1px solid #10b981' }}>
       <div style={{ color:'#10b981', fontSize:11, fontWeight:700, textTransform:'uppercase', marginBottom:12 }}>
         {initial.id ? '✏️ Editar Mercado' : '+ Novo Mercado'}
       </div>
+
+      {/* Logo upload */}
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+        <div style={{ width:52, height:52, borderRadius:14, background:'linear-gradient(135deg,#0f3460,#1a5276)', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', flexShrink:0, border:'1px solid #1e4060' }}>
+          {form.logoUrl
+            ? <img src={form.logoUrl} alt="logo" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+            : <span style={{ color:'#93c5fd', fontSize:20, fontWeight:900 }}>{form.name?.charAt(0)?.toUpperCase() || '?'}</span>
+          }
+        </div>
+        <div>
+          <label style={{ display:'inline-flex', alignItems:'center', gap:6, background:'#0a1929', border:'1px solid #1e4060', borderRadius:8, padding:'7px 12px', cursor:'pointer', color:'#64748b', fontSize:12, fontWeight:700 }}>
+            📷 {form.logoUrl ? 'Trocar logo' : 'Adicionar logo'}
+            <input type="file" accept="image/*" onChange={handleLogo} style={{ display:'none' }} />
+          </label>
+          {form.logoUrl && <button onClick={() => setForm(p => ({...p, logoUrl:''}))} style={{ marginLeft:8, background:'none', border:'none', color:'#ef4444', fontSize:11, cursor:'pointer', fontWeight:700 }}>✕ remover</button>}
+        </div>
+      </div>
+
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:0 }}>
         <div>
           <label style={{ color:'#64748b', fontSize:10, fontWeight:700, textTransform:'uppercase' }}>Nome do Mercado *</label>
@@ -2183,8 +2234,11 @@ function TabMercados({ markets, setMarkets, orders }) {
           <div key={m.id} style={{ background:'#0d2137', borderRadius:16, marginBottom:12, border:'1px solid #1a3a50', overflow:'hidden' }}>
             {/* Header row */}
             <div style={{ padding:'14px 16px 10px', display:'flex', gap:12, alignItems:'flex-start' }}>
-              <div style={{ width:44, height:44, borderRadius:14, background:'linear-gradient(135deg,#0f3460,#1a5276)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:18, fontWeight:900, color:'#93c5fd' }}>
-                {m.name.charAt(0).toUpperCase()}
+              <div style={{ width:44, height:44, borderRadius:14, background:'linear-gradient(135deg,#0f3460,#1a5276)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:18, fontWeight:900, color:'#93c5fd', overflow:'hidden' }}>
+                {m.logoUrl
+                  ? <img src={m.logoUrl} alt={m.name} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                  : m.name.charAt(0).toUpperCase()
+                }
               </div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:15, lineHeight:1.2 }}>{m.name}</div>
@@ -2861,6 +2915,7 @@ export default function Fornecedor() {
   const saveProfile = (data) => {
     setProfile(data)
     try { localStorage.setItem(LOCAL, JSON.stringify(data)) } catch {}
+    persistKey(PROFILE_SERVER_KEY, data)   // sincroniza logo e tema em todos os dispositivos
     setEditingProfile(false)
   }
 
@@ -2899,18 +2954,26 @@ export default function Fornecedor() {
 
   const sync = useCallback(async () => {
     setSyncing(true)
-    const { estoque: e, offers: o, orders: ord, markets: mkt } = await fetchAll()
+    const { estoque: e, offers: o, orders: ord, markets: mkt, profile: srvProfile } = await fetchAll()
     setEstoque(e)
     setOffers(o.filter(of => of.supplierId === LOCAL || !of.supplierId))
     setOrders(ord)
-    // markets: merge server data with localStorage seed (localStorage has priority for seed entries)
+    // markets: merge server data with localStorage seed
     const localMkts = (() => { try { return JSON.parse(localStorage.getItem(MKTS_KEY)) || [] } catch { return [] } })()
     if (mkt !== null) {
-      // Server returned markets: merge with local (local seed IDs win)
       const serverIds = new Set(mkt.map(m => m.id))
       const merged = [...mkt, ...localMkts.filter(m => !serverIds.has(m.id))]
       setMarkets(merged)
       try { localStorage.setItem(MKTS_KEY, JSON.stringify(merged)) } catch {}
+    }
+    // profile: server wins for logoUrl (so mobile picks up logo uploaded on PC)
+    if (srvProfile) {
+      setProfile(prev => {
+        // merge: prefer server's logoUrl and themeColor if local is missing them
+        const merged = { ...prev, ...srvProfile }
+        try { localStorage.setItem(LOCAL, JSON.stringify(merged)) } catch {}
+        return merged
+      })
     }
     setSyncing(false)
     setSynced(true)

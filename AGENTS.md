@@ -245,3 +245,26 @@ Products now support: `minStock` (number), `expiryDate` (ISO date string), `unit
 - Site ID: abd4863b-ef7b-4d7c-b3f2-85547f519485
 - Deploy via: `npx netlify-cli deploy --prod --dir=dist --site=abd4863b-ef7b-4d7c-b3f2-85547f519485`
 - Login: admin / 1234 (changeable in Configurações → Acesso ao Sistema)
+
+## Fornecedor.jsx — ZAP Server (Baileys local)
+- `zap-server/server.js`: Express + Baileys, GET /status, POST /send, POST /send-all (1.5s anti-ban delay)
+- BlastScreen: `zapConnected=true` → botão "Disparar para todos" (POST /send-all), senão wa.me manual
+- Ping a cada 8s, dot verde/cinza no header; click abre modal config URL
+- Para Netlify (HTTPS): `ngrok http 3001` e colar URL HTTPS no modal
+- Para local: `npm run dev` → localhost:5173 chama localhost:3001 (ambos HTTP)
+- Constantes: `ZAP_SERVER_KEY='cp_zap_server_url'`, `ZAP_DEFAULT='http://localhost:3001'`
+- Props passadas: zapServerUrl/zapConnected → TabInicio/TabReceber/TabOfertas/BlitzModal → BlastScreen
+
+## Fornecedor.jsx — Profile sync (logo cross-device)
+- Profile (incluindo logoUrl base64) deve ser persistido no servidor via PROFILE_SERVER_KEY
+- PROFILE_SERVER_KEY = 'cp_forn_profile_v1' (Netlify Blob key)
+- sync() deve restaurar profile do servidor se localStorage vazio
+- saveProfile() deve persistir ao servidor além do localStorage
+
+## Fornecedor.jsx — Keys conhecidas
+- MKTS_KEY = LOCAL+'_markets' (localStorage)
+- MKTS_SERVER_KEY = 'cp_forn_markets_v1' (server)
+- ESTOQUE_KEY = 'cp_forn_estoque_v1' (server)
+- OFFERS_KEY = 'cp_forn_offers_v1' (server)
+- ORDERS_KEY = 'cp_forn_orders_v1' (server)
+- LOCAL = 'cp_fornecedor_v1' (localStorage profile)
