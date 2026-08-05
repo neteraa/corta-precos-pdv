@@ -2533,9 +2533,8 @@ function TabSellOut({ orders, markets }) {
       const daysToNext = g ? Math.max(0, g - daysAgo) : null
       const urgency    = daysToNext !== null && daysToNext <= 3 ? 'hot'
                        : daysToNext !== null && daysToNext <= 7 ? 'warm' : 'ok'
-      const totalVol   = p.orders.reduce((s, o) => s + (o.qty || 0), 0)
       const totalRev   = p.orders.reduce((s, o) => s + (o.total || 0), 0)
-      return { ...p, giro: g, daysAgo, daysToNext, urgency, totalVol, totalRev }
+      return { ...p, giro: g, daysAgo, daysToNext, urgency, totalRev }
     }).sort((a, b) => (a.daysToNext ?? 99) - (b.daysToNext ?? 99))
     const totalRev = prods.reduce((s, p) => s + p.totalRev, 0)
     const hotCount = prods.filter(p => p.urgency === 'hot').length
@@ -2545,7 +2544,6 @@ function TabSellOut({ orders, markets }) {
   /* ── Phase 2 stats ── */
   const today = new Date().toISOString().slice(0, 10)
   const evToday      = events.filter(e => e.soldAt?.startsWith(today))
-  const evRevToday   = evToday.reduce((s, e) => s + (e.totalRevenue || 0), 0)
   const evMarketsSet = new Set(events.map(e => e.storeName).filter(Boolean))
   const topEvProduct = (() => {
     const m = {}

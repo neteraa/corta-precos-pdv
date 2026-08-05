@@ -10,7 +10,6 @@ const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' 
 const BRAND_COLOR  = '#f97316'
 const GREEN        = '#10b981'
 const AMBER        = '#f59e0b'
-const RED          = '#ef4444'
 const BLUE         = '#3b82f6'
 const PURPLE       = '#8b5cf6'
 
@@ -76,9 +75,8 @@ function Bar({ pct, color }) {
 
 /* ═══════════════════════════════════════════════════════════════ */
 export default function PainelTV() {
-  const [data,      setData]      = useState(null)
-  const [tick,      setTick]      = useState(0)   // clock tick
-  const [timeStr,   setTimeStr]   = useState(clock())
+  const [data,    setData]    = useState(null)
+  const [timeStr, setTimeStr] = useState(clock())
   const [flashKpis, setFlashKpis] = useState(false)
   const prevEvLen = useRef(0)
 
@@ -109,7 +107,7 @@ export default function PainelTV() {
 
   /* ── Clock ── */
   useEffect(() => {
-    const t = setInterval(() => { setTimeStr(clock()); setTick(n => n + 1) }, 1000)
+    const t = setInterval(() => setTimeStr(clock()), 1000)
     return () => clearInterval(t)
   }, [])
 
