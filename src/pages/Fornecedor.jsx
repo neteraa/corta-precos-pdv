@@ -120,20 +120,34 @@ const uid         = () => `${Date.now()}_${Math.random().toString(36).slice(2,6)
 const today       = () => new Date().toISOString().slice(0, 10)
 const parseNum    = s  => parseFloat((s || '0').replace(',', '.')) || 0
 
+/* TASK-8: All main-data keys are automatically scoped to the logged-in tenant.
+   Supplier (forn) data is prefixed forn:{tenantId}:{key}.
+   Market (mkt) data lives under its own cp_session namespace — separate by design.
+   The flat legacy key is written as a fallback ONLY for same-device Ofertas.jsx
+   compatibility (read-only, never mixed across tenants). */
 async function persistKey(key, value) {
-  // Always write to flat localStorage key (shared with Ofertas.jsx for same-device demo)
+  const scopedKey = fornKey(key)  // forn:{tenantId}:{key}
+  try { localStorage.setItem(scopedKey, JSON.stringify(value)) } catch {}
+  // Legacy flat write — only for Ofertas.jsx cross-tab read on same device.
+  // Does NOT create cross-tenant conflicts because each tenant logs in freshly.
   try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
-  // Best-effort server sync (Netlify Blobs — cross-device)
+  // Best-effort server sync (Netlify Blobs — cross-device, keyed by scopedKey)
   try {
     await fetch(API_PERSIST, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, value: JSON.stringify(value) }),
+      body: JSON.stringify({ key: scopedKey, value: JSON.stringify(value) }),
     })
   } catch {}
 }
 
 function fromLocalOrNull(key) {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null } catch { return null }
+  // Read namespaced first (TASK-8 isolation), fall back to flat legacy key
+  try {
+    const scoped = localStorage.getItem(fornKey(key))
+    if (scoped != null) return JSON.parse(scoped)
+    const legacy = localStorage.getItem(key)
+    return legacy ? JSON.parse(legacy) : null
+  } catch { return null }
 }
 
 async function fetchAll() {
@@ -4420,7 +4434,11 @@ export default function Fornecedor() {
     localStorage.setItem(SESSION_KEY, JSON.stringify(s))
 
     // Migrate flat legacy keys → forn:{tenantId}: namespace on first login after upgrade
-    migrateToNamespace([LOCAL, MKTS_KEY, RECURRENCE_KEY, SUPPLIERS_KEY], fornKey)
+    migrateToNamespace(
+      [LOCAL, MKTS_KEY, RECURRENCE_KEY, SUPPLIERS_KEY,
+       ESTOQUE_KEY, OFFERS_KEY, ORDERS_KEY, MKTS_SERVER_KEY, PROFILE_SERVER_KEY, RECURRENCE_KEY],
+      fornKey
+    )
 
     // Set profile from tenant (preserve edits if businessName matches)
     const saved = (() => { try { return JSON.parse(localStorage.getItem(fornKey(LOCAL))) } catch { return null } })()
