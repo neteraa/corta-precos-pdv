@@ -97,7 +97,7 @@ const SELLOUT_KEY = 'cp_sellout_events'
 
 function captureSellOut(saleItems, currentProducts) {
   try {
-    const offers = JSON.parse(localStorage.getItem('cp_supplier_offers') || '[]')
+    const offers = JSON.parse(localStorage.getItem(mktKey('cp_supplier_offers')) || localStorage.getItem('cp_supplier_offers') || '[]')
     if (!offers.length) return
 
     const offerNames = new Set(offers.map(o => (o.productName || '').toLowerCase()))
@@ -254,7 +254,7 @@ export function StoreProvider({ children }) {
     if (data.cp_cash)     { setCashMovements(JSON.parse(data.cp_cash));   try { localStorage.setItem(mktKey('cp_cash'),      data.cp_cash)      } catch {} }
     if (data.cp_goal)     { setSalesGoalState(JSON.parse(data.cp_goal));  try { localStorage.setItem(mktKey('cp_goal'),      data.cp_goal)      } catch {} }
     if (data.cp_operators)      { setOperators(JSON.parse(data.cp_operators));           try { localStorage.setItem(mktKey('cp_operators'),       data.cp_operators)       } catch {} }
-    if (data.cp_supplier_offers){ setSupplierOffers(JSON.parse(data.cp_supplier_offers)); try { localStorage.setItem(mktKey('cp_supplier_offers'), data.cp_supplier_offers) } catch {} }
+    if (data.cp_supplier_offers){ setSupplierOffers(JSON.parse(data.cp_supplier_offers)); try { localStorage.setItem(mktKey('cp_supplier_offers'), data.cp_supplier_offers); localStorage.setItem('cp_supplier_offers', data.cp_supplier_offers) } catch {} }
 
     // Push local keys not yet on server
     if (!data.cp_customers) setCustomers(c  => { syncToServer('cp_customers', JSON.stringify(c));  return c })

@@ -1216,10 +1216,15 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
   async function carregarDemo() {
     // Mercados já gerenciados pelo auto-seed — só recarrega estoque/ofertas/pedidos
     setEstoque(DEMO_ESTOQUE); setOffers(DEMO_OFFERS)
-    setOrders(prev => { const ids = new Set(prev.map(o => o.id)); return [...DEMO_ORDERS_HIST.filter(o => !ids.has(o.id)), ...prev] })
+    // Orders: merge demo + real (real orders placed by markets are preserved)
+    setOrders(prev => {
+      const ids = new Set(prev.map(o => o.id))
+      const merged = [...DEMO_ORDERS_HIST.filter(o => !ids.has(o.id)), ...prev]
+      persistKey(ORDERS_KEY, merged)
+      return merged
+    })
     await persistKey(ESTOQUE_KEY, DEMO_ESTOQUE)
     await persistKey(OFFERS_KEY,  DEMO_OFFERS)
-    await persistKey(ORDERS_KEY,  DEMO_ORDERS_HIST)
   }
 
   if (singleBlast) return <BlastScreen offer={singleBlast} markets={markets} supplierName={profile.name} supplierPhone={profile.phone} onDone={() => setSingleBlast(null)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />
@@ -2638,7 +2643,7 @@ function parseOrderMessage(text) {
 }
 
 /* ── TabPedidos ─────────────────────────────────────────────── */
-function TabPedidos({ orders, setOrders, markets, offers = [] }) {
+function TabPedidos({ orders, setOrders, markets, offers = [], profile = {} }) {
   const [filter,    setFilter]    = useState('pending')
   const [expanded,  setExpanded]  = useState({})
   const [showWaParser, setShowWaParser] = useState(false)
@@ -2701,7 +2706,7 @@ function TabPedidos({ orders, setOrders, markets, offers = [] }) {
     if (!order?.storePhone) return
     const msgs = {
       confirmed: `✅ *PEDIDO CONFIRMADO!*\n\nOlá, ${order.storeName || 'Mercado'}!\n\nSeu pedido foi confirmado:\n📦 *${order.productName}*\n   ${order.qtyRequested} ${order.unit} · ${BRL.format(order.totalPrice)}\n\nCombine a entrega pelo chat 🚚`,
-      delivered: `📦 *ENTREGUE COM SUCESSO!*\n\nOlá, ${order.storeName || 'Mercado'}!\n\n${order.productName} foi entregue!\n   ${order.qtyRequested} ${order.unit} · ${BRL.format(order.totalPrice)}\n\nObrigado pela parceria! 🤝\n_Mega Tudo Barato_`,
+      delivered: `📦 *ENTREGUE COM SUCESSO!*\n\nOlá, ${order.storeName || 'Mercado'}!\n\n${order.productName} foi entregue!\n   ${order.qtyRequested} ${order.unit} · ${BRL.format(order.totalPrice)}\n\nObrigado pela parceria! 🤝\n_${profile.name || 'Distribuidor'}_`,
     }
     if (msgs[status]) window.open(`https://wa.me/${cleanPhone(order.storePhone)}?text=${encodeURIComponent(msgs[status])}`, '_blank')
   }
@@ -4734,7 +4739,7 @@ export default function Fornecedor() {
         {tab === 'inicio'    && <TabInicio    estoque={estoque} offers={offers} orders={orders} profile={profile} markets={markets} setEstoque={setEstoque} setOffers={setOffers} setMarkets={setMarkets} setOrders={setOrders} onNavigate={setTab} zapServerUrl={zapServerUrl} zapConnected={zapConnected} recurrences={recurrences} setRecurrences={setRecurrences} />}
         {tab === 'receber'   && <TabReceber   estoque={estoque} setEstoque={setEstoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
         {tab === 'ofertas'   && <TabOfertas   estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} orders={orders} preSelected={preSelectedForOffer} onClearPreSelected={() => setPreSelectedForOffer(null)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
-        {tab === 'pedidos'   && <TabPedidos   orders={orders} setOrders={setOrders} markets={markets} offers={offers} />}
+        {tab === 'pedidos'   && <TabPedidos   orders={orders} setOrders={setOrders} markets={markets} offers={offers} profile={profile} />}
         {tab === 'sellout'   && <TabSellOut   orders={orders} markets={markets} />}
         {tab === 'ruptura'   && <TabRuptura   orders={orders} markets={markets} estoque={estoque} />}
         {tab === 'mercados'  && <TabMercados  markets={markets} setMarkets={setMarkets} orders={orders} recurrences={recurrences} setRecurrences={setRecurrences} />}
