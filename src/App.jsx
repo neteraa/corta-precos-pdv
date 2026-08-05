@@ -23,6 +23,7 @@ import Validade from './pages/Validade.jsx'
 import Campanhas from './pages/Campanhas.jsx'
 import Fornecedor from './pages/Fornecedor.jsx'
 import Ofertas from './pages/Ofertas.jsx'
+import PainelTV from './pages/PainelTV.jsx'
 import { isLoggedIn } from './utils/auth.js'
 
 function RequireAuth({ children }) {
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/terminal" element={<RequireAuth><Terminal /></RequireAuth>} />
         <Route path="/scan"       element={<ScanMobile />} />
         <Route path="/fornecedor" element={<Fornecedor />} />
+        <Route path="/tv"         element={<PainelTV />} />
         {/* /ofertas é pública — mercados acessam sem login PDV (usa ?s=TENANT_ID) */}
         <Route path="/ofertas"    element={<Ofertas />} />
 
