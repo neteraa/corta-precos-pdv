@@ -755,6 +755,120 @@ function BlastScreen({ offer, customMsg, markets, supplierName, supplierPhone, o
   )
 }
 
+/* ── PriceChain ─────────────────────────────────────────────── */
+/* Widget de inteligência de preço: cruzamento de dados da nossa rede.
+   Custo do distribuidor → preço da oferta → preço varejo no mercado.
+   Zero API externa — 100% dados reais do sistema. */
+function PriceChain({ productName, sku }) {
+  const [data,    setData]    = useState(null)
+  const [open,    setOpen]    = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  function loadData() {
+    if (loading) return
+    if (data) { setOpen(o => !o); return }
+    setLoading(true); setOpen(true)
+    fetch(`/api/priceref?name=${encodeURIComponent(productName)}&ean=${sku || ''}`)
+      .then(r => r.json())
+      .then(d => setData(d))
+      .catch(() => setData({ error: true }))
+      .finally(() => setLoading(false))
+  }
+
+  const hasChain = data && !data.error && data.found
+  const hasCost  = data?.cost     != null
+  const hasOffer = data?.offerPrice != null
+  const hasRetail= data?.retailPrice != null
+
+  /* pill summary (collapsed) */
+  const summary = !data ? '💰 Ver cadeia de preço'
+    : !hasChain ? '💰 Sem dados suficientes'
+    : [
+        hasCost   && `custo ${BRL.format(data.cost)}`,
+        hasOffer  && `oferta ${BRL.format(data.offerPrice)}`,
+        hasRetail && `varejo ${BRL.format(data.retailPrice)}`,
+      ].filter(Boolean).join(' → ')
+
+  const arrow = (pct) => pct == null ? null : (
+    <span style={{ fontSize:11, fontWeight:800, color: pct >= 30 ? '#10b981' : pct >= 10 ? '#f59e0b' : '#ef4444' }}>
+      +{pct}%
+    </span>
+  )
+
+  return (
+    <div style={{ borderRadius:12, overflow:'hidden', border:'1px solid #1a3a50', marginBottom:8 }}>
+      {/* trigger pill */}
+      <button onClick={loadData} style={{
+        width:'100%', background:'#060e1a', border:'none', cursor:'pointer',
+        padding:'8px 12px', display:'flex', alignItems:'center', gap:8, textAlign:'left',
+      }}>
+        {loading
+          ? <span style={{ width:14, height:14, border:'2px solid #3b82f6', borderTopColor:'transparent', borderRadius:'50%', display:'inline-block', animation:'spin 0.8s linear infinite', flexShrink:0 }} />
+          : <span style={{ fontSize:13, flexShrink:0 }}>💰</span>}
+        <span style={{ color: hasChain ? '#93c5fd' : '#475569', fontSize:12, fontWeight:700, flex:1 }}>{summary}</span>
+        <span style={{ color:'#334155', fontSize:12 }}>{open ? '▲' : '▼'}</span>
+      </button>
+
+      {/* expanded view */}
+      {open && data && !data.error && (
+        <div style={{ padding:'12px 14px', background:'#0a1929', borderTop:'1px solid #0d2137' }}>
+          {!hasChain
+            ? <div style={{ color:'#334155', fontSize:12, textAlign:'center' }}>Produto não encontrado no estoque ou PDV</div>
+            : (
+              <>
+                {/* 3-step chain */}
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:10, flexWrap:'wrap' }}>
+                  {hasCost && (
+                    <div style={{ background:'#0d2137', border:'1px solid #1a3a50', borderRadius:10, padding:'6px 10px', textAlign:'center', flex:1, minWidth:80 }}>
+                      <div style={{ color:'#64748b', fontSize:9, fontWeight:700, textTransform:'uppercase', marginBottom:2 }}>Custo</div>
+                      <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:15 }}>{BRL.format(data.cost)}</div>
+                      <div style={{ color:'#334155', fontSize:10 }}>você pagou</div>
+                    </div>
+                  )}
+                  {hasCost && hasOffer && <span style={{ color:'#1e4060', fontSize:18, flexShrink:0 }}>→</span>}
+                  {hasOffer && (
+                    <div style={{ background:'#0d2137', border:'1px solid #10b98144', borderRadius:10, padding:'6px 10px', textAlign:'center', flex:1, minWidth:80 }}>
+                      <div style={{ color:'#64748b', fontSize:9, fontWeight:700, textTransform:'uppercase', marginBottom:2 }}>Sua oferta</div>
+                      <div style={{ color:'#10b981', fontWeight:900, fontSize:15 }}>{BRL.format(data.offerPrice)}</div>
+                      {arrow(data.costMarkup)}
+                    </div>
+                  )}
+                  {hasOffer && hasRetail && <span style={{ color:'#1e4060', fontSize:18, flexShrink:0 }}>→</span>}
+                  {hasRetail && (
+                    <div style={{ background:'#0d2137', border:'1px solid #f9731633', borderRadius:10, padding:'6px 10px', textAlign:'center', flex:1, minWidth:80 }}>
+                      <div style={{ color:'#64748b', fontSize:9, fontWeight:700, textTransform:'uppercase', marginBottom:2 }}>Varejo</div>
+                      <div style={{ color:'#f97316', fontWeight:900, fontSize:15 }}>{BRL.format(data.retailPrice)}</div>
+                      {arrow(data.retailMarkup)}
+                    </div>
+                  )}
+                </div>
+
+                {/* insight line */}
+                {hasOffer && hasRetail && (
+                  <div style={{ background:'#060e1a', borderRadius:8, padding:'7px 10px', fontSize:12, color:'#64748b', lineHeight:1.5 }}>
+                    📢 <strong style={{ color:'#f1f5f9' }}>Argumento de venda:</strong>{' '}
+                    <span style={{ color:'#93c5fd' }}>
+                      {`"Comprando de nós a ${BRL.format(data.offerPrice)}, você revende a ${BRL.format(data.retailPrice)} e garante ${data.retailMarkup}% de margem."`}
+                    </span>
+                  </div>
+                )}
+                {data.totalMarkup && (
+                  <div style={{ marginTop:6, color:'#334155', fontSize:11 }}>
+                    📊 Markup total (custo→varejo): <strong style={{ color:'#f59e0b' }}>+{data.totalMarkup}%</strong>
+                    {data.retailName && data.retailName !== productName && (
+                      <span style={{ color:'#1e4060', marginLeft:8 }}>PDV: "{data.retailName.slice(0,30)}"</span>
+                    )}
+                  </div>
+                )}
+              </>
+            )
+          }
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── OfferCard ──────────────────────────────────────────────── */
 function OfferCard({ offer, markets, supplierName, orders = [], onDelete, onUpdatePrice, onBlast }) {
   const [showWa,    setShowWa]    = useState(false)
@@ -849,6 +963,9 @@ function OfferCard({ offer, markets, supplierName, orders = [], onDelete, onUpda
               💬 "{offer.note}"
             </div>
           )}
+
+          {/* Price chain intelligence */}
+          <PriceChain productName={offer.productName} sku={offer.sku} />
 
           {/* Footer */}
           <div style={{ paddingTop:10, borderTop:'1px solid #1a3a50' }}>
