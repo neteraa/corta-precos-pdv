@@ -6,4 +6,8 @@ export default defineConfig({
   server: { host: '0.0.0.0', port: 8011 },
   // Single entry: OG tags dinâmicos via og-ofertas.js (Netlify Function)
   // Para /ofertas o og:title é injetado server-side baseado em ?s=TENANT_ID
+  define: {
+    // Garante hash diferente em cada build (busts browser cache)
+    '__BUILD_TS__': JSON.stringify(Date.now()),
+  }
 })
