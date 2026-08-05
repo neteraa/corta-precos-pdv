@@ -4651,7 +4651,7 @@ export default function Fornecedor() {
       )}
 
       {/* ── HEADER ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr auto 1fr', alignItems:'center', padding:'10px 14px 8px', background:'#060e1a', borderBottom:`1px solid ${(profile.themeColor||'#10b981')}22`, position:'sticky', top:0, zIndex:10 }}>
+      <div className="forn-header" style={{ display:'grid', gridTemplateColumns:'1fr auto 1fr', alignItems:'center', padding:'10px 14px 8px', background:'#060e1a', borderBottom:`1px solid ${(profile.themeColor||'#10b981')}22`, position:'sticky', top:0, zIndex:10 }}>
         <button onClick={() => setEditingProfile(true)} style={{ display:'flex', alignItems:'center', gap:10, background:'none', border:'none', cursor:'pointer', padding:0, flex:1, minWidth:0 }}>
           {/* Logo circle with initials or truck icon */}
           <div style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${profile.themeColor||'#10b981'},${(profile.themeColor||'#10b981')}aa)`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:`0 4px 12px ${(profile.themeColor||'#10b981')}44`, overflow:'hidden' }}>
@@ -4677,8 +4677,8 @@ export default function Fornecedor() {
         {/* ── center: ZatendeStock platform brand ── */}
         <ZatendeStockLogo variant="wordmark" style={{ justifyContent:'center' }} />
 
-        <div style={{ display:'flex', gap:6, alignItems:'center', justifyContent:'flex-end' }}>
-          <button onClick={sync} disabled={syncing} style={{ background:'none', border:'none', cursor:'pointer', color:'#475569', padding:4 }}>
+        <div className="fh-right" style={{ display:'flex', gap:6, alignItems:'center', justifyContent:'flex-end' }}>
+          <button onClick={sync} disabled={syncing} className="fh-sync" style={{ background:'none', border:'none', cursor:'pointer', color:'#475569', padding:4 }}>
             <RefreshCw size={16} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
           </button>
           {/* ZAP Server indicator */}
@@ -4686,10 +4686,10 @@ export default function Fornecedor() {
             <div style={{ width:6, height:6, borderRadius:3, background: zapConnected ? '#10b981' : '#334155', boxShadow: zapConnected ? '0 0 5px #10b981' : 'none', flexShrink:0 }} />
             <span style={{ color: zapConnected ? '#10b981' : '#475569', fontSize:10, fontWeight:800, letterSpacing:'0.05em' }}>ZAP</span>
           </button>
-          <a href="/guia" title="Guia do sistema" style={{ display:'flex', alignItems:'center', gap:4, background:'rgba(234,88,12,0.1)', border:'1px solid rgba(234,88,12,0.25)', borderRadius:8, padding:'5px 8px', textDecoration:'none', color:'#f97316', fontSize:11, fontWeight:800 }}>
-            📖 Guia
+          <a href="/guia" title="Guia do sistema" className="fh-guia" style={{ display:'flex', alignItems:'center', gap:4, background:'rgba(234,88,12,0.1)', border:'1px solid rgba(234,88,12,0.25)', borderRadius:8, padding:'5px 8px', textDecoration:'none', color:'#f97316', fontSize:11, fontWeight:800 }}>
+            📖 <span className="fh-guia-txt">Guia</span>
           </a>
-          <button onClick={handleLogout} title="Sair" style={{ background:'#1a1a2e', border:'1px solid #2d2d4e', borderRadius:8, padding:'5px 8px', cursor:'pointer', color:'#475569', fontSize:12, fontWeight:700 }}>
+          <button onClick={handleLogout} title="Sair" className="fh-sair" style={{ background:'#1a1a2e', border:'1px solid #2d2d4e', borderRadius:8, padding:'5px 8px', cursor:'pointer', color:'#475569', fontSize:12, fontWeight:700 }}>
             Sair
           </button>
           {pendingOrders > 0 && (
@@ -4728,6 +4728,19 @@ export default function Fornecedor() {
       <style>{`
         @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
         @keyframes badgePulse { 0%,100% { transform: translateX(10px) scale(1) } 50% { transform: translateX(10px) scale(1.35) } }
+
+        /* ── Header mobile ── */
+        @media (max-width: 480px) {
+          .forn-header { padding: 8px 10px 6px !important; }
+          .fh-right { gap: 4px !important; }
+          .fh-sair  { display: none !important; }
+          .fh-sync  { display: none !important; }
+          .fh-guia-txt { display: none !important; }
+          .fh-guia  { padding: 5px 7px !important; }
+        }
+        @media (max-width: 380px) {
+          .fh-right { gap: 3px !important; }
+        }
       `}</style>
     </div>
   )
