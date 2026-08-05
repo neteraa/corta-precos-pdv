@@ -4686,6 +4686,9 @@ export default function Fornecedor() {
             <div style={{ width:6, height:6, borderRadius:3, background: zapConnected ? '#10b981' : '#334155', boxShadow: zapConnected ? '0 0 5px #10b981' : 'none', flexShrink:0 }} />
             <span style={{ color: zapConnected ? '#10b981' : '#475569', fontSize:10, fontWeight:800, letterSpacing:'0.05em' }}>ZAP</span>
           </button>
+          <a href="/guia" title="Guia do sistema" style={{ display:'flex', alignItems:'center', gap:4, background:'rgba(234,88,12,0.1)', border:'1px solid rgba(234,88,12,0.25)', borderRadius:8, padding:'5px 8px', textDecoration:'none', color:'#f97316', fontSize:11, fontWeight:800 }}>
+            📖 Guia
+          </a>
           <button onClick={handleLogout} title="Sair" style={{ background:'#1a1a2e', border:'1px solid #2d2d4e', borderRadius:8, padding:'5px 8px', cursor:'pointer', color:'#475569', fontSize:12, fontWeight:700 }}>
             Sair
           </button>

@@ -226,6 +226,13 @@ export default function Layout() {
 
           <SyncBar />
 
+          <a href="/guia"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-orange-400/70 hover:text-orange-400 hover:bg-orange-500/10 transition-all"
+            style={{ textDecoration: 'none' }}>
+            <span className="text-[13px]">📖</span>
+            <span className="text-[11px] font-semibold">Guia do sistema</span>
+          </a>
+
           <button onClick={handleLogout}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all group">
             <LogOut className="w-3.5 h-3.5 flex-shrink-0" />

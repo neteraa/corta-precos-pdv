@@ -25,6 +25,7 @@ import Fornecedor from './pages/Fornecedor.jsx'
 import Ofertas from './pages/Ofertas.jsx'
 import PainelTV       from './pages/PainelTV.jsx'
 import VitrinaDigital from './pages/VitrinaDigital.jsx'
+import Guia from './pages/Guia.jsx'
 import { isLoggedIn } from './utils/auth.js'
 
 function RequireAuth({ children }) {
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/fornecedor"   element={<Fornecedor />} />
         <Route path="/tv"           element={<PainelTV />} />
         <Route path="/loja/:storeSlug" element={<VitrinaDigital />} />
+        <Route path="/guia"           element={<Guia />} />
         {/* /ofertas é pública — mercados acessam sem login PDV (usa ?s=TENANT_ID) */}
         <Route path="/ofertas"    element={<Ofertas />} />
 

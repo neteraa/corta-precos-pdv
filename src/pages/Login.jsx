@@ -197,8 +197,16 @@ export default function Login() {
         )}
 
         {/* Footer */}
-        <div style={{ marginTop: 28, textAlign: 'center', color: '#374151', fontSize: 11 }}>
-          ZatendeStock · by <span style={{ color: '#5462D8' }}>etc!</span> · Dubai, UAE
+        <div style={{ marginTop: 28, textAlign: 'center' }}>
+          <a href="/guia" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            background: 'rgba(234,88,12,0.1)', border: '1px solid rgba(234,88,12,0.25)',
+            color: '#f97316', borderRadius: 20, padding: '7px 16px',
+            fontSize: 12, fontWeight: 700, textDecoration: 'none', marginBottom: 12,
+          }}>📖 Ver guia completo do sistema</a>
+          <div style={{ color: '#374151', fontSize: 11 }}>
+            ZatendeStock · by <span style={{ color: '#5462D8' }}>etc!</span> · Dubai, UAE
+          </div>
         </div>
       </div>
     </div>

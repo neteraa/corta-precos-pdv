@@ -35,6 +35,10 @@ function productEmoji(name = '') {
   return CATEGORY_EMOJI.default
 }
 
+function readLocal(key) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null } catch { return null }
+}
+
 export default function VitrinaDigital() {
   const { storeSlug } = useParams()
   const [data,    setData]    = useState(null)
@@ -42,20 +46,22 @@ export default function VitrinaDigital() {
   const [error,   setError]   = useState(false)
 
   useEffect(() => {
+    function resolve(d) {
+      const offers  = d?.cp_supplier_offers       ? JSON.parse(d.cp_supplier_offers)       : (readLocal('cp_supplier_offers')       || [])
+      const markets = d?.cp_distribuidor_markets  ? JSON.parse(d.cp_distribuidor_markets)  : (readLocal('cp_distribuidor_markets')  || [])
+      const profile = d?.cp_forn_profile_v1       ? JSON.parse(d.cp_forn_profile_v1)       : (readLocal('cp_forn_profile_v1')       || {})
+      const market  = markets.find(m => slug(m.name) === storeSlug || m.id === storeSlug)
+      const activeOffers = offers.filter(o => o.qty > 0 && o.status !== 'delivered')
+      setData({ market: market || null, offers: activeOffers, profile })
+    }
+
     fetch('/api/restore')
-      .then(r => r.json())
-      .then(({ data: d }) => {
-        const offers  = d?.cp_supplier_offers  ? JSON.parse(d.cp_supplier_offers)  : []
-        const markets = d?.cp_distribuidor_markets ? JSON.parse(d.cp_distribuidor_markets) : []
-        const profile = d?.cp_forn_profile_v1  ? JSON.parse(d.cp_forn_profile_v1)  : {}
-
-        // Find market by slug
-        const market = markets.find(m => slug(m.name) === storeSlug || m.id === storeSlug)
-        const activeOffers = offers.filter(o => o.qty > 0 && o.status !== 'delivered')
-
-        setData({ market: market || null, offers: activeOffers, profile, markets })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(({ data: d }) => resolve(d || {}))
+      .catch(() => {
+        // server unavailable — try localStorage directly (same-origin)
+        resolve({})
       })
-      .catch(() => setError(true))
       .finally(() => setLoading(false))
   }, [storeSlug])
 
@@ -77,6 +83,9 @@ export default function VitrinaDigital() {
   const supplierName  = profile?.name  || 'Mega Tudo Barato'
   const supplierPhone = profile?.phone || ''
   const pageUrl = window.location.href
+  const mktName    = market?.name    || storeSlug?.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Meu Mercado'
+  const mktLogo    = market?.logoUrl || ''
+  const mktInitial = mktName.charAt(0).toUpperCase()
 
   function buildOrderMsg() {
     const lines = offers.slice(0, 5).map(o => `• ${o.productName} — ${BRL.format(o.offerPrice)}/un`)
@@ -85,21 +94,56 @@ export default function VitrinaDigital() {
 
   return (
     <div style={{ minHeight:'100dvh', background:'#050f1a', fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`}</style>
+      <style>{`
+        @keyframes spin    { to { transform: rotate(360deg) } }
+        @keyframes fadeIn  { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:none } }
+        @keyframes popIn   { from { opacity:0; transform:scale(.85) } to { opacity:1; transform:scale(1) } }
+      `}</style>
 
-      {/* Header */}
-      <div style={{ background:'linear-gradient(135deg,#0d2137,#0a1929)', borderBottom:'1px solid #1a3a50', padding:'20px 20px 16px', textAlign:'center' }}>
-        <ZatendeStockLogo variant="full" />
-        <div style={{ marginTop:12 }}>
-          <div style={{ color:'#f97316', fontWeight:900, fontSize:20 }}>{supplierName}</div>
-          <div style={{ color:'#475569', fontSize:12, marginTop:2 }}>Catálogo de Ofertas · Atacado</div>
+      {/* ── Hero do mercado ─────────────────────────── */}
+      <div style={{
+        background: 'linear-gradient(160deg,#0a1929 0%,#0d2137 60%,#0a2540 100%)',
+        borderBottom: '1px solid #1a3a50',
+        padding: '28px 20px 24px',
+        textAlign: 'center',
+      }}>
+        {/* Logo do mercado */}
+        <div style={{
+          width: 88, height: 88, borderRadius: 24,
+          background: mktLogo ? 'transparent' : 'linear-gradient(135deg,#1e40af,#0f3460)',
+          border: '3px solid #1e4060',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 14px', overflow: 'hidden',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          animation: 'popIn .5s cubic-bezier(.22,1,.36,1) both',
+        }}>
+          {mktLogo
+            ? <img src={mktLogo} alt={mktName} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+            : <span style={{ color:'#93c5fd', fontSize:38, fontWeight:900 }}>{mktInitial}</span>
+          }
         </div>
-        {market && (
-          <div style={{ marginTop:10, background:'#0a2540', borderRadius:12, padding:'8px 14px', display:'inline-flex', alignItems:'center', gap:6 }}>
-            <span style={{ color:'#64748b', fontSize:12 }}>Vitrine exclusiva para:</span>
-            <strong style={{ color:'#93c5fd', fontSize:13 }}>{market.name}</strong>
+
+        {/* Nome do mercado */}
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:22, lineHeight:1.2, animation:'fadeIn .4s ease .1s both' }}>
+          {mktName}
+        </div>
+        {market?.address && (
+          <div style={{ color:'#475569', fontSize:12, marginTop:4, animation:'fadeIn .4s ease .15s both' }}>
+            📍 {market.address}
           </div>
         )}
+
+        {/* Powered by */}
+        <div style={{
+          marginTop: 14,
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          background: 'rgba(15,25,40,0.7)', borderRadius: 20, padding: '6px 14px',
+          border: '1px solid #1a3a50',
+          animation: 'fadeIn .4s ease .2s both',
+        }}>
+          <span style={{ color:'#475569', fontSize:11 }}>ofertas de</span>
+          <span style={{ color:'#f97316', fontWeight:900, fontSize:13 }}>{supplierName}</span>
+        </div>
       </div>
 
       {/* Offer grid */}
