@@ -127,15 +127,15 @@ const parseNum    = s  => parseFloat((s || '0').replace(',', '.')) || 0
    compatibility (read-only, never mixed across tenants). */
 async function persistKey(key, value) {
   const scopedKey = fornKey(key)  // forn:{tenantId}:{key}
+  // localStorage: scoped (tenant isolation same-device) + flat (Ofertas.jsx cross-tab)
   try { localStorage.setItem(scopedKey, JSON.stringify(value)) } catch {}
-  // Legacy flat write — only for Ofertas.jsx cross-tab read on same device.
-  // Does NOT create cross-tenant conflicts because each tenant logs in freshly.
   try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
-  // Best-effort server sync (Netlify Blobs — cross-device, keyed by scopedKey)
+  // Netlify Blobs: flat key — restore.js KEYS list + fetchAll() + Ofertas.jsx all read flat keys.
+  // Tenant isolation on Blobs is not needed while only one distributor is active per site.
   try {
     await fetch(API_PERSIST, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: scopedKey, value: JSON.stringify(value) }),
+      body: JSON.stringify({ key, value: JSON.stringify(value) }),
     })
   } catch {}
 }
