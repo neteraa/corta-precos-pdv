@@ -241,7 +241,7 @@ export default function Layout() {
 
           <div className="pt-1 text-center">
             <div className="text-gray-600 text-[9px] font-bold tracking-widest uppercase">🙏 Deus é bom o tempo todo</div>
-            <div className="text-gray-700 text-[9px] mt-0.5">PDV v3.0 · Corta Preços</div>
+            <div className="text-gray-700 text-[9px] mt-0.5">PDV v3.1 · Corta Preços</div>
           </div>
         </div>
 
