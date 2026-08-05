@@ -24,6 +24,30 @@
     @page { margin: 0.5cm; size: A4; }
   }
 
+  /* MOBILE */
+  @media (max-width: 600px) {
+    body { font-size: 12px; }
+    .page { margin: 0; border-radius: 0; }
+    .header { padding: 18px 16px 16px; flex-direction: column; gap: 10px; }
+    .header-right { text-align: left; }
+    .alert-bar { padding: 10px 16px; }
+    .body { padding: 16px 14px; }
+    .header-left h1 { font-size: 16px; }
+    .section-title h2 { font-size: 13px; }
+    .two-col { grid-template-columns: 1fr; }
+    .objection-row { grid-template-columns: 1fr; }
+    .demo-sequence { padding: 12px; }
+    .price-script { font-size: 13px; }
+    .math-row .value.big { font-size: 13px; }
+    .footer { flex-direction: column; gap: 6px; padding: 12px 16px; text-align: center; }
+    .no-print { padding: 12px 16px; font-size: 12px; }
+    .no-print button { display: block; width: 100%; margin: 8px 0 0 0; padding: 12px; font-size: 14px; }
+    .persuasion-box { padding: 12px; }
+    .price-box { padding: 14px; }
+    .mindset-box { padding: 12px; }
+    .step-card { padding: 12px; }
+  }
+
   .no-print {
     text-align: center;
     padding: 20px;
@@ -437,7 +461,22 @@
 <body>
 
 <div class="no-print">
-  🗂️ Roteiro de Apresentação — ZatendeStock
+  <span style="display:inline-flex;align-items:center;gap:8px;vertical-align:middle;">
+    <svg width="22" height="26" viewBox="0 0 100 115" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M18,46 C18,22 34,10 50,10 C66,10 82,22 82,46" fill="#5462D8"/>
+      <rect x="10" y="44" width="80" height="30" fill="#5462D8" rx="2"/>
+      <polyline points="18,70 34,54 52,64 72,42" stroke="#4ade80" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+      <polygon points="64,36 77,42 70,55" fill="#4ade80"/>
+      <line x1="8"  y1="82"  x2="92" y2="82"  stroke="#5462D8" stroke-width="7.5" stroke-linecap="round"/>
+      <line x1="15" y1="93"  x2="85" y2="93"  stroke="#5462D8" stroke-width="6.5" stroke-linecap="round"/>
+      <line x1="24" y1="103" x2="76" y2="103" stroke="#5462D8" stroke-width="5.5" stroke-linecap="round"/>
+      <line x1="33" y1="112" x2="67" y2="112" stroke="#5462D8" stroke-width="4.5" stroke-linecap="round"/>
+    </svg>
+    <span style="font-weight:900;font-size:16px;letter-spacing:-0.03em;">
+      <span style="color:#5462D8;">Zatende</span><span style="color:#4ade80;">Stock</span>
+    </span>
+  </span>
+  &nbsp;· Roteiro de Apresentação
   <button onclick="window.print()">🖨️ Salvar como PDF / Imprimir</button>
 </div>
 
@@ -447,7 +486,22 @@
   <div class="header">
     <div class="header-left">
       <h1>⚡ ROTEIRO DE APRESENTAÇÃO</h1>
-      <p>ZatendeStock — Portal do Distribuidor · Guia de reunião</p>
+      <div style="display:flex;align-items:center;gap:7px;margin-top:5px;">
+        <svg width="18" height="21" viewBox="0 0 100 115" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18,46 C18,22 34,10 50,10 C66,10 82,22 82,46" fill="#5462D8"/>
+          <rect x="10" y="44" width="80" height="30" fill="#5462D8" rx="2"/>
+          <polyline points="18,70 34,54 52,64 72,42" stroke="#4ade80" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+          <polygon points="64,36 77,42 70,55" fill="#4ade80"/>
+          <line x1="8"  y1="82"  x2="92" y2="82"  stroke="#5462D8" stroke-width="7.5" stroke-linecap="round"/>
+          <line x1="15" y1="93"  x2="85" y2="93"  stroke="#5462D8" stroke-width="6.5" stroke-linecap="round"/>
+          <line x1="24" y1="103" x2="76" y2="103" stroke="#5462D8" stroke-width="5.5" stroke-linecap="round"/>
+          <line x1="33" y1="112" x2="67" y2="112" stroke="#5462D8" stroke-width="4.5" stroke-linecap="round"/>
+        </svg>
+        <span style="font-weight:900;font-size:13px;letter-spacing:-0.03em;">
+          <span style="color:#5462D8;">Zatende</span><span style="color:#4ade80;">Stock</span>
+        </span>
+        <span style="color:#334155;font-size:11px;">— Portal do Distribuidor · Guia de reunião</span>
+      </div>
     </div>
     <div class="header-right">
       <span class="badge">CONFIDENCIAL</span>
@@ -722,7 +776,20 @@
 
   <!-- FOOTER -->
   <div class="footer">
-    <div class="f-left">ZatendeStock · Roteiro Interno · Não compartilhar com o cliente</div>
+    <div class="f-left" style="display:flex;align-items:center;gap:6px;">
+      <svg width="14" height="16" viewBox="0 0 100 115" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18,46 C18,22 34,10 50,10 C66,10 82,22 82,46" fill="#5462D8"/>
+        <rect x="10" y="44" width="80" height="30" fill="#5462D8" rx="2"/>
+        <polyline points="18,70 34,54 52,64 72,42" stroke="#4ade80" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        <polygon points="64,36 77,42 70,55" fill="#4ade80"/>
+        <line x1="8"  y1="82"  x2="92" y2="82"  stroke="#5462D8" stroke-width="7.5" stroke-linecap="round"/>
+        <line x1="15" y1="93"  x2="85" y2="93"  stroke="#5462D8" stroke-width="6.5" stroke-linecap="round"/>
+        <line x1="24" y1="103" x2="76" y2="103" stroke="#5462D8" stroke-width="5.5" stroke-linecap="round"/>
+        <line x1="33" y1="112" x2="67" y2="112" stroke="#5462D8" stroke-width="4.5" stroke-linecap="round"/>
+      </svg>
+      <span style="font-weight:800;font-size:10px;"><span style="color:#5462D8;">Zatende</span><span style="color:#4ade80;">Stock</span></span>
+      <span style="color:#334155;font-size:10px;">· Roteiro Interno · Não compartilhar com o cliente</span>
+    </div>
     <div class="f-right">🔥 Confia. O produto é real. O valor é real. Vai lá.</div>
   </div>
 
