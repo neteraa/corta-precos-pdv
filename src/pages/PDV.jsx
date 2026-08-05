@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
   ShoppingCart, Search, Barcode, Trash2, Plus, Minus,
-  Check, X, CreditCard, Banknote, Smartphone, Printer, PlugZap, Monitor, SplitSquareHorizontal
+  Check, X, CreditCard, Banknote, Smartphone, Printer, PlugZap, Monitor, SplitSquareHorizontal, Mic, MicOff
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useStore, BRL } from '../store.jsx'
@@ -158,6 +158,38 @@ function useHIDScanner(onScan) {
   }, []) // listener registrado UMA VEZ — callback sempre atualizado via ref
 }
 
+/* ── useVoice ─────────────────────────────────────────────────
+   Web Speech API (pt-BR). Retorna texto falado para o campo de busca.
+   Funciona no Chrome/Edge/Android sem nenhuma API key ou registro. */
+function useVoice(onResult) {
+  const [listening, setListening] = useState(false)
+  const recogRef = useRef(null)
+  const supported = typeof window !== 'undefined' &&
+    !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+
+  function toggle() {
+    if (!supported) return
+    if (listening) { recogRef.current?.stop(); return }
+    const SR   = window.SpeechRecognition || window.webkitSpeechRecognition
+    const recog = new SR()
+    recog.lang            = 'pt-BR'
+    recog.continuous      = false
+    recog.interimResults  = false
+    recog.onresult = e => {
+      const text = e.results[0]?.[0]?.transcript?.trim()
+      if (text) onResult(text)
+    }
+    recog.onerror = () => setListening(false)
+    recog.onend   = () => setListening(false)
+    recog.start()
+    recogRef.current = recog
+    setListening(true)
+  }
+
+  useEffect(() => () => recogRef.current?.stop(), [])
+  return { listening, toggle, supported }
+}
+
 export default function PDV() {
   const { products, promos, registerSale, photos } = useStore()
   const printer   = usePrinter()
@@ -308,9 +340,10 @@ export default function PDV() {
   }, [findProduct, addToCart])
 
   useHIDScanner(handleScan)
-
-  // ── Mobile scan relay (WebSocket + localStorage) — placed here after handleScan ──
   useScanReceiver(handleScan)
+
+  // ── Voice search (Web Speech API, pt-BR, zero API key) ──────
+  const voice = useVoice(text => { setQuery(text); searchRef.current?.focus() })
 
   // Arrow navigation + Enter for search results
   const handleSearchKey = (e) => {
@@ -556,10 +589,22 @@ export default function PDV() {
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={handleSearchKey}
-              placeholder="Buscar por nome ou digitar código (F2) — ou scaneie direto..."
-              className="input pl-9 pr-4 text-sm"
+              placeholder="Buscar por nome, código ou falar 🎤…"
+              className="input pl-9 pr-10 text-sm"
               autoFocus
             />
+            {/* Mic button — Web Speech API, zero custo */}
+            <button
+              onClick={voice.toggle}
+              title={voice.supported ? (voice.listening ? 'Parar gravação' : 'Buscar por voz (pt-BR)') : 'Voz não suportada neste browser'}
+              className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-colors
+                ${!voice.supported ? 'opacity-30 cursor-not-allowed' : ''}
+                ${voice.listening
+                  ? 'bg-red-100 text-red-500 animate-pulse'
+                  : 'text-gray-400 hover:text-brand-500 hover:bg-brand-50'}`}
+            >
+              {voice.listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
             {results.length > 0 && (
               <div ref={resultsRef} className="absolute top-full left-0 right-0 z-20 bg-white border border-gray-200 rounded-xl shadow-xl mt-1 divide-y divide-gray-100 max-h-80 overflow-y-auto">
                 {/* navigation hint */}

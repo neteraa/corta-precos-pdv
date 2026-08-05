@@ -9,6 +9,7 @@ import {
   MessageCircle, LayoutDashboard, ClipboardList, ArrowDownToLine,
   ShoppingCart, TrendingUp, Boxes, CircleDollarSign, CheckCircle,
   RefreshCw, Phone, Send, MapPin, Zap, ChevronDown, ChevronUp, BarChart2,
+  AlertTriangle, Star, Store, Mic, MicOff, FileText,
 } from 'lucide-react'
 import CameraScanner from '../components/CameraScanner.jsx'
 import PRODUCTS_SEED from '../utils/products_seed.json'
@@ -18,6 +19,12 @@ import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
 
 const BRL         = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const LOCAL       = 'cp_fornecedor_v1'
+
+/* Converte nome de mercado em slug URL-friendly para a Vitrine Digital */
+const slug = (name = '') =>
+  name.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
 /* URL do portal de mercados com ID do tenant (para WhatsApp link preview correto) */
 function ofertasUrl() {
@@ -1548,8 +1555,183 @@ function TabInicio({ estoque, offers, orders, profile, markets, setEstoque, setO
 
 const SUPPLIERS_KEY = 'cp_fornecedor_suppliers'
 
+/* ── NfeScannerModal ─────────────────────────────────────────── */
+/* Escaneia o QR code da NF-e e extrai CNPJ, valor e chave de acesso.
+   Permite ao distribuidor registrar preços de concorrentes como
+   inteligência de mercado.                                         */
+const NFE_INTEL_KEY = 'cp_nfe_intel'
+
+function parseNfeQr(rawUrl) {
+  if (!rawUrl) return null
+  try {
+    // NFCe: ?p=CHAVE|... or ?nQRCode=...
+    const qs = rawUrl.includes('?') ? rawUrl.split('?')[1] : rawUrl
+    const params = {}
+    for (const part of qs.split('&')) {
+      const [k, v] = part.split('=')
+      if (k && v) params[decodeURIComponent(k)] = decodeURIComponent(v)
+    }
+
+    const rawKey = params.p || params.nQRCode || params.chNFe || ''
+    const chave  = rawKey.split('|')[0].replace(/\D/g, '').slice(0, 44)
+
+    if (chave.length < 30) return { raw: rawUrl, chave: null, cnpj: null, valor: null, data: null }
+
+    const cnpj   = chave.slice(6, 20)
+    const yyMM   = chave.slice(2, 6)
+    const ano    = '20' + yyMM.slice(0, 2)
+    const mes    = yyMM.slice(2, 4)
+    const modelo = chave.slice(20, 22) // 55=NF-e, 65=NFC-e
+    const nNF    = parseInt(chave.slice(25, 34)) || null
+
+    return {
+      raw:   rawUrl,
+      chave,
+      cnpj:  cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5'),
+      data:  `${mes}/${ano}`,
+      modelo: modelo === '65' ? 'NFC-e' : 'NF-e',
+      nNF,
+      valor: params.vNF || null,
+    }
+  } catch {
+    return { raw: rawUrl, chave: null, cnpj: null, valor: null, data: null }
+  }
+}
+
+function NfeScannerModal({ onClose }) {
+  const [scanning,  setScanning]  = useState(true)
+  const [nfeData,   setNfeData]   = useState(null)
+  const [supplier,  setSupplier]  = useState('')
+  const [products,  setProducts]  = useState([{ name:'', price:'' }])
+  const [saved,     setSaved]     = useState(false)
+
+  function handleScan(code) {
+    setScanning(false)
+    const parsed = parseNfeQr(code)
+    setNfeData(parsed)
+    if (parsed?.cnpj) setSupplier(parsed.cnpj)
+  }
+
+  function addProductLine() {
+    setProducts(p => [...p, { name:'', price:'' }])
+  }
+
+  function updateProduct(i, field, val) {
+    setProducts(p => p.map((x, idx) => idx === i ? { ...x, [field]: val } : x))
+  }
+
+  function removeProduct(i) {
+    setProducts(p => p.filter((_, idx) => idx !== i))
+  }
+
+  function handleSave() {
+    const items = products.filter(p => p.name.trim() && p.price)
+    if (!items.length) return
+    try {
+      const existing = JSON.parse(localStorage.getItem(NFE_INTEL_KEY) || '[]')
+      const entry = {
+        id: uid(), scannedAt: new Date().toISOString(),
+        supplier, chave: nfeData?.chave, modelo: nfeData?.modelo,
+        data: nfeData?.data, valorTotal: nfeData?.valor,
+        items: items.map(p => ({ name: p.name.trim(), price: parseFloat(p.price) || 0 }))
+      }
+      localStorage.setItem(NFE_INTEL_KEY, JSON.stringify([entry, ...existing].slice(0, 100)))
+      persistKey(NFE_INTEL_KEY, [entry, ...existing].slice(0, 100))
+      setSaved(true)
+      setTimeout(onClose, 1200)
+    } catch {}
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(5,15,26,0.96)', zIndex:200, display:'flex', flexDirection:'column' }}>
+      <div style={{ background:'#0d2137', borderBottom:'1px solid #1a3a50', padding:'16px 20px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div>
+          <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:17 }}>📸 Scanner NF-e</div>
+          <div style={{ color:'#475569', fontSize:12, marginTop:1 }}>Aponte a câmera para o QR code da nota fiscal</div>
+        </div>
+        <button onClick={onClose} style={{ background:'none', border:'none', color:'#64748b', cursor:'pointer', fontSize:22 }}>✕</button>
+      </div>
+
+      <div style={{ flex:1, overflowY:'auto', padding:'16px 20px 40px' }}>
+        {saved ? (
+          <div style={{ textAlign:'center', padding:'60px 20px' }}>
+            <div style={{ fontSize:52, marginBottom:12 }}>✅</div>
+            <div style={{ color:'#10b981', fontWeight:900, fontSize:18 }}>Inteligência salva!</div>
+            <div style={{ color:'#475569', fontSize:13, marginTop:4 }}>Os preços foram registrados na base de dados.</div>
+          </div>
+        ) : scanning ? (
+          <div style={{ borderRadius:16, overflow:'hidden', border:'1px solid #1a3a50' }}>
+            <CameraScanner onScan={handleScan} onClose={() => { setScanning(false); if (!nfeData) onClose() }} />
+          </div>
+        ) : (
+          <>
+            {/* NF-e info extracted */}
+            {nfeData && (
+              <div style={{ background:'#0a2540', borderRadius:14, padding:'14px 16px', marginBottom:16, border:'1px solid #1e4060' }}>
+                <div style={{ color:'#93c5fd', fontWeight:800, fontSize:13, marginBottom:8 }}>
+                  ✅ {nfeData.modelo || 'NF-e'} lida
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                  {nfeData.cnpj && <div style={{ color:'#f1f5f9', fontSize:12 }}>CNPJ: <strong>{nfeData.cnpj}</strong></div>}
+                  {nfeData.data && <div style={{ color:'#f1f5f9', fontSize:12 }}>Data: <strong>{nfeData.data}</strong></div>}
+                  {nfeData.valor && <div style={{ color:'#10b981', fontSize:12 }}>Total: <strong>R$ {nfeData.valor}</strong></div>}
+                  {nfeData.nNF  && <div style={{ color:'#f1f5f9', fontSize:12 }}>NF nº: <strong>{nfeData.nNF}</strong></div>}
+                </div>
+                {!nfeData.chave && (
+                  <div style={{ color:'#f97316', fontSize:11, marginTop:6 }}>QR code não reconhecido como NF-e. Insira o fornecedor manualmente abaixo.</div>
+                )}
+              </div>
+            )}
+
+            {/* Supplier */}
+            <div style={{ marginBottom:14 }}>
+              <label style={{ color:'#64748b', fontSize:12, display:'block', marginBottom:6 }}>Fornecedor / Empresa</label>
+              <input value={supplier} onChange={e => setSupplier(e.target.value)}
+                placeholder="Nome ou CNPJ do fornecedor"
+                style={{ width:'100%', background:'#050f1a', border:'1px solid #1e4060', borderRadius:10, color:'#f1f5f9', padding:'10px 12px', fontSize:13, boxSizing:'border-box' }} />
+            </div>
+
+            {/* Product prices */}
+            <div style={{ marginBottom:16 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <label style={{ color:'#64748b', fontSize:12 }}>Produtos e preços (da nota fiscal)</label>
+                <button onClick={addProductLine}
+                  style={{ background:'#1e4060', color:'#93c5fd', border:'none', borderRadius:8, padding:'4px 10px', fontSize:11, fontWeight:700, cursor:'pointer' }}>
+                  + Adicionar
+                </button>
+              </div>
+              {products.map((p, i) => (
+                <div key={i} style={{ display:'flex', gap:6, marginBottom:6 }}>
+                  <input value={p.name} onChange={e => updateProduct(i, 'name', e.target.value)}
+                    placeholder="Nome do produto" style={{ flex:2, background:'#050f1a', border:'1px solid #1e4060', borderRadius:10, color:'#f1f5f9', padding:'9px 10px', fontSize:12, minWidth:0 }} />
+                  <input value={p.price} onChange={e => updateProduct(i, 'price', e.target.value)}
+                    placeholder="R$" type="number" step="0.01" style={{ flex:1, background:'#050f1a', border:'1px solid #1e4060', borderRadius:10, color:'#10b981', padding:'9px 10px', fontSize:12, minWidth:0 }} />
+                  {products.length > 1 && (
+                    <button onClick={() => removeProduct(i)} style={{ background:'#1a0a0a', border:'none', borderRadius:8, padding:'0 8px', cursor:'pointer', color:'#ef4444' }}>✕</button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button onClick={handleSave} disabled={!products.some(p => p.name.trim() && p.price)}
+              style={{ width:'100%', background:'#0f3460', color:'#93c5fd', fontWeight:900, fontSize:15, border:'1px solid #3b82f666', borderRadius:14, padding:'14px', cursor:'pointer' }}>
+              💾 Salvar inteligência de preço
+            </button>
+
+            <button onClick={() => setScanning(true)}
+              style={{ width:'100%', background:'transparent', color:'#475569', fontWeight:700, fontSize:12, border:'none', padding:'12px', cursor:'pointer', marginTop:4 }}>
+              ↩ Escanear outra nota
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ── TabReceber ─────────────────────────────────────────────── */
 function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, zapServerUrl, zapConnected }) {
+  const [showNFe,     setShowNFe]    = useState(false)
   const [selected,    setSelected]   = useState(null)  // { name, sku, price }
   const [sourceType,  setSourceType] = useState('leilao')
   const [sourceName,  setSourceName] = useState('')
@@ -1702,13 +1884,22 @@ function TabReceber({ estoque, setEstoque, offers, setOffers, markets, profile, 
   return (
     <div style={{ padding:'16px 16px 100px' }}>
 
-      {/* ── Segmented control: Entrada vs Estoque ── */}
-      <div style={{ display:'flex', background:'#0a1929', borderRadius:14, padding:4, marginBottom:16, border:'1px solid #1e4060' }}>
-        <button onClick={() => setViewMode('entry')} style={{ flex:1, padding:'10px 0', borderRadius:10, border:'none', background: viewMode === 'entry' ? 'linear-gradient(135deg,#10b981,#059669)' : 'transparent', color: viewMode === 'entry' ? '#fff' : '#475569', fontWeight:800, fontSize:13, cursor:'pointer', transition:'all 0.2s' }}>
-          📥 Dar Entrada
-        </button>
-        <button onClick={() => setViewMode('stock')} style={{ flex:1, padding:'10px 0', borderRadius:10, border:'none', background: viewMode === 'stock' ? '#1e3a5f' : 'transparent', color: viewMode === 'stock' ? '#93c5fd' : '#475569', fontWeight:800, fontSize:13, cursor:'pointer', transition:'all 0.2s', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-          📦 Estoque {estoque.length > 0 && <span style={{ background: viewMode === 'stock' ? '#2563eb44' : '#1a3a50', borderRadius:10, padding:'1px 6px', fontSize:11 }}>{estoque.length}</span>}
+      {showNFe && <NfeScannerModal onClose={() => setShowNFe(false)} />}
+
+      {/* ── Header: Segmented control + NF-e scanner button ── */}
+      <div style={{ display:'flex', gap:8, marginBottom:16, alignItems:'center' }}>
+        <div style={{ display:'flex', flex:1, background:'#0a1929', borderRadius:14, padding:4, border:'1px solid #1e4060' }}>
+          <button onClick={() => setViewMode('entry')} style={{ flex:1, padding:'10px 0', borderRadius:10, border:'none', background: viewMode === 'entry' ? 'linear-gradient(135deg,#10b981,#059669)' : 'transparent', color: viewMode === 'entry' ? '#fff' : '#475569', fontWeight:800, fontSize:13, cursor:'pointer', transition:'all 0.2s' }}>
+            📥 Dar Entrada
+          </button>
+          <button onClick={() => setViewMode('stock')} style={{ flex:1, padding:'10px 0', borderRadius:10, border:'none', background: viewMode === 'stock' ? '#1e3a5f' : 'transparent', color: viewMode === 'stock' ? '#93c5fd' : '#475569', fontWeight:800, fontSize:13, cursor:'pointer', transition:'all 0.2s', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+            📦 Estoque {estoque.length > 0 && <span style={{ background: viewMode === 'stock' ? '#2563eb44' : '#1a3a50', borderRadius:10, padding:'1px 6px', fontSize:11 }}>{estoque.length}</span>}
+          </button>
+        </div>
+        {/* NF-e scanner: escaneia QR code da nota e registra preços do fornecedor */}
+        <button onClick={() => setShowNFe(true)} title="Escanear QR code de NF-e para capturar preços do fornecedor"
+          style={{ background:'#0a2540', border:'1px solid #3b82f655', borderRadius:12, padding:'10px 12px', cursor:'pointer', color:'#93c5fd', display:'flex', alignItems:'center', gap:4, flexShrink:0, fontSize:11, fontWeight:800, whiteSpace:'nowrap' }}>
+          <Camera size={14} /> NF-e
         </button>
       </div>
 
@@ -2282,10 +2473,161 @@ function TabOfertas({ estoque, offers, setOffers, markets, profile, orders, preS
   )
 }
 
+/* ── WaParserModal ───────────────────────────────────────────── */
+/* Modal para importar pedido colando uma mensagem WhatsApp.
+   O parser extrai qty + produto e faz fuzzy match com as ofertas ativas. */
+function WaParserModal({ markets, offers, orders, setOrders, onClose }) {
+  const [waText,    setWaText]    = useState('')
+  const [storeId,   setStoreId]   = useState(markets[0]?.id || '')
+  const [parsed,    setParsed]    = useState(null)
+  const [importing, setImporting] = useState(false)
+
+  function handleParse() {
+    const items = parseOrderMessage(waText)
+    const enriched = items.map(it => {
+      const norm  = it.productName.toLowerCase()
+      const match = offers.find(o =>
+        o.productName?.toLowerCase().includes(norm) ||
+        norm.includes(o.productName?.toLowerCase().split(' ')[0] || '__')
+      )
+      return {
+        ...it,
+        productName: match?.productName || it.productName,
+        unit:        match?.unit        || 'UND',
+        offerPrice:  match?.offerPrice  || 0,
+        totalPrice:  (match?.offerPrice || 0) * it.qty,
+        offerId:     match?.id          || null,
+      }
+    })
+    setParsed(enriched)
+  }
+
+  async function handleImport() {
+    if (!parsed?.length) return
+    setImporting(true)
+    const mkt = markets.find(m => m.id === storeId)
+    const now  = new Date().toISOString()
+    const newOrders = parsed.map(it => ({
+      id: uid(), storeName: mkt?.name || storeId, storePhone: mkt?.phone || '',
+      productName: it.productName, qtyRequested: it.qty, unit: it.unit,
+      offerPrice: it.offerPrice, totalPrice: it.totalPrice,
+      status: 'pending', createdAt: now, source: 'whatsapp-parser',
+    }))
+    const next = [...orders, ...newOrders]
+    setOrders(next)
+    await persistKey(ORDERS_KEY, next)
+    setImporting(false)
+    onClose()
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(5,15,26,0.92)', zIndex:100, display:'flex', alignItems:'flex-end' }}>
+      <div style={{ background:'#0d2137', borderRadius:'20px 20px 0 0', padding:'24px 20px 40px', width:'100%', maxHeight:'85dvh', overflowY:'auto', border:'1px solid #1a3a50' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+          <div>
+            <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:17 }}>📱 Importar Pedido</div>
+            <div style={{ color:'#475569', fontSize:12, marginTop:2 }}>Cole a mensagem que o mercado te mandou</div>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'#64748b', cursor:'pointer', fontSize:20 }}>✕</button>
+        </div>
+
+        <div style={{ marginBottom:14 }}>
+          <label style={{ color:'#64748b', fontSize:12, display:'block', marginBottom:6 }}>De qual mercado?</label>
+          <select value={storeId} onChange={e => setStoreId(e.target.value)}
+            style={{ width:'100%', background:'#050f1a', border:'1px solid #1e4060', borderRadius:10, color:'#f1f5f9', padding:'10px 12px', fontSize:13 }}>
+            {markets.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            <option value="__new">➕ Novo mercado (digitar depois)</option>
+          </select>
+        </div>
+
+        <div style={{ marginBottom:14 }}>
+          <label style={{ color:'#64748b', fontSize:12, display:'block', marginBottom:6 }}>Mensagem recebida</label>
+          <textarea
+            value={waText} onChange={e => { setWaText(e.target.value); setParsed(null) }}
+            placeholder={'Ex:\nQuero 24 Heineken, 6 Coca-Cola 2L\ne 12 Leite Itambé'}
+            rows={5}
+            style={{ width:'100%', background:'#050f1a', border:'1px solid #1e4060', borderRadius:10, color:'#f1f5f9', padding:'10px 12px', fontSize:13, resize:'vertical', boxSizing:'border-box' }}
+          />
+        </div>
+
+        <button onClick={handleParse} disabled={!waText.trim()}
+          style={{ width:'100%', background:'#1e4060', color:'#93c5fd', fontWeight:800, fontSize:14, border:'none', borderRadius:12, padding:'12px', cursor:'pointer', marginBottom:16, opacity: waText.trim() ? 1 : 0.5 }}>
+          🔍 Interpretar mensagem
+        </button>
+
+        {parsed && (
+          <div style={{ marginBottom:16 }}>
+            <div style={{ color:'#64748b', fontSize:12, marginBottom:8 }}>Itens identificados ({parsed.length}):</div>
+            {parsed.length === 0 ? (
+              <div style={{ color:'#ef4444', fontSize:13, textAlign:'center', padding:16 }}>Nenhum produto identificado. Tente reformatar a mensagem.</div>
+            ) : (
+              <>
+                {parsed.map((it, i) => (
+                  <div key={i} style={{ background:'#050f1a', borderRadius:10, padding:'10px 14px', marginBottom:6, border:'1px solid #1e4060', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                    <div>
+                      <div style={{ color:'#f1f5f9', fontWeight:700, fontSize:13 }}>{it.productName}</div>
+                      <div style={{ color:'#64748b', fontSize:11, marginTop:1 }}>
+                        {it.qty} {it.unit}{it.offerPrice > 0 ? ` · ${BRL.format(it.offerPrice)}/un` : ' · preço a confirmar'}
+                      </div>
+                    </div>
+                    {it.totalPrice > 0 && <div style={{ color:'#10b981', fontWeight:900, fontSize:14, flexShrink:0 }}>{BRL.format(it.totalPrice)}</div>}
+                  </div>
+                ))}
+                <div style={{ textAlign:'right', color:'#f59e0b', fontWeight:800, fontSize:14, marginTop:4 }}>
+                  Total estimado: {BRL.format(parsed.reduce((s,it) => s + it.totalPrice, 0))}
+                </div>
+                <button onClick={handleImport} disabled={importing}
+                  style={{ width:'100%', background:'#14532d', color:'#4ade80', fontWeight:900, fontSize:15, border:'none', borderRadius:12, padding:'14px', cursor:'pointer', marginTop:12 }}>
+                  {importing ? '⏳ Importando…' : `✅ Criar ${parsed.length} pedido${parsed.length !== 1 ? 's' : ''}`}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ── parseOrderMessage ───────────────────────────────────────── */
+/* Transforma mensagem WhatsApp em lista de { qty, productName }.
+   Suporta: "24 heineken", "heineken 24", "24x heineken", listas
+   separadas por vírgula, "e", ou quebra de linha.               */
+function parseOrderMessage(text) {
+  const items = []
+  const clean = text
+    .replace(/quero|preciso|manda|me manda|favor|por favor|pedido|olá[^,\n]*/gi, '')
+    .trim()
+
+  // split by comma, "e " (word boundary), or newline
+  const parts = clean.split(/[,\n]|\s+e\s+/i).map(s => s.trim()).filter(Boolean)
+
+  for (const part of parts) {
+    let qty = null, name = null
+
+    // "24 heineken" or "24x heineken" or "24 un heineken"
+    let m = part.match(/^(\d+)\s*(?:x|un(?:idades?)?|cxs?|cx|kg)?\s*[·\-–]?\s*(.+)$/i)
+    if (m) { qty = parseInt(m[1]); name = m[2] }
+
+    // "heineken 24" or "heineken 24un"
+    if (!qty) {
+      m = part.match(/^(.+?)\s+(\d+)\s*(?:x|un(?:idades?)?|cxs?|cx|kg)?$/i)
+      if (m) { qty = parseInt(m[2]); name = m[1] }
+    }
+
+    if (qty && qty > 0 && name) {
+      name = name.trim().replace(/^[-·–]\s*/, '').replace(/\s+/g, ' ')
+      if (name.length >= 3) items.push({ qty, productName: name })
+    }
+  }
+  return items
+}
+
 /* ── TabPedidos ─────────────────────────────────────────────── */
-function TabPedidos({ orders, setOrders, markets }) {
+function TabPedidos({ orders, setOrders, markets, offers = [] }) {
   const [filter,    setFilter]    = useState('pending')
   const [expanded,  setExpanded]  = useState({})
+  const [showWaParser, setShowWaParser] = useState(false)
 
   const payInfo = id => PAYMENT_INFO[id] || { emoji: '💰', label: id || 'N/A', color: '#94a3b8' }
 
@@ -2367,18 +2709,28 @@ function TabPedidos({ orders, setOrders, markets }) {
   return (
     <div style={{ padding:'16px 16px 100px' }}>
 
+      {showWaParser && <WaParserModal markets={markets} offers={offers} orders={orders} setOrders={setOrders} onClose={() => setShowWaParser(false)} />}
+
       {/* ── Header stats ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:16 }}>
-        {[
-          { label:'Pendentes', value: pendingCount,            color:'#f59e0b', bg:'#78350f' },
-          { label:'Confirmados',value: confirmedCount,         color:'#3b82f6', bg:'#1e3a5f' },
-          { label:'Faturado',  value: BRL.format(totalRevenue),color:'#10b981', bg:'#14532d' },
-        ].map(s => (
-          <div key={s.label} style={{ background: s.bg + '33', border:`1px solid ${s.color}33`, borderRadius:12, padding:'10px 12px', textAlign:'center' }}>
-            <div style={{ color: s.color, fontWeight:900, fontSize:15 }}>{s.value}</div>
-            <div style={{ color:'#475569', fontSize:10, marginTop:2 }}>{s.label}</div>
-          </div>
-        ))}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, flex:1, marginRight:8 }}>
+          {[
+            { label:'Pendentes', value: pendingCount,            color:'#f59e0b', bg:'#78350f' },
+            { label:'Confirmados',value: confirmedCount,         color:'#3b82f6', bg:'#1e3a5f' },
+            { label:'Faturado',  value: BRL.format(totalRevenue),color:'#10b981', bg:'#14532d' },
+          ].map(s => (
+            <div key={s.label} style={{ background: s.bg + '33', border:`1px solid ${s.color}33`, borderRadius:12, padding:'10px 12px', textAlign:'center' }}>
+              <div style={{ color: s.color, fontWeight:900, fontSize:15 }}>{s.value}</div>
+              <div style={{ color:'#475569', fontSize:10, marginTop:2 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+        {/* Importar via WhatsApp */}
+        <button onClick={() => setShowWaParser(true)}
+          title="Importar pedido a partir de uma mensagem WhatsApp"
+          style={{ background:'#14532d', border:'1px solid #16a34a55', borderRadius:12, padding:'10px 12px', cursor:'pointer', color:'#4ade80', display:'flex', alignItems:'center', gap:5, flexShrink:0, fontSize:12, fontWeight:800 }}>
+          <FileText size={14} /> ZAP
+        </button>
       </div>
 
       {/* ── Filter pills ── */}
@@ -2949,6 +3301,242 @@ function RecurrenceForm({ onSave, onCancel }) {
   )
 }
 
+/* ── TabRuptura ─────────────────────────────────────────────── */
+/* Prevê quando cada produto vai zerar no estoque do mercado cliente.
+   Cruza: último pedido (qty) + sell-out registrado → dias restantes.
+   Alerta automático + mensagem WhatsApp pronta.                    */
+function TabRuptura({ orders, markets, estoque }) {
+  const [events,  setEvents]  = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/restore')
+      .then(r => r.json())
+      .then(({ data }) => {
+        const ev = data?.cp_sellout_events ? JSON.parse(data.cp_sellout_events) : []
+        setEvents(ev)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  /* ── Build rupture predictions ── */
+  const alerts = useMemo(() => {
+    if (!orders.length) return []
+    const results = []
+
+    // Group orders by (storeName, productName) → get latest order per combo
+    const map = {}
+    for (const o of orders) {
+      const key = `${o.storeName}|||${o.productName}`
+      if (!map[key] || new Date(o.createdAt) > new Date(map[key].createdAt)) map[key] = o
+    }
+
+    for (const [key, lastOrder] of Object.entries(map)) {
+      const [storeName, productName] = key.split('|||')
+      const orderDate = new Date(lastOrder.createdAt)
+      const daysSinceOrder = Math.max(1, (Date.now() - orderDate) / 86400000)
+
+      // Sell-out events for this market+product AFTER last order
+      const ev = events.filter(e =>
+        e.storeName?.toLowerCase() === storeName?.toLowerCase() &&
+        e.productName?.toLowerCase() === productName?.toLowerCase() &&
+        new Date(e.soldAt) >= orderDate
+      )
+      const soldSince   = ev.reduce((s, e) => s + (e.qtySold || 0), 0)
+      if (!soldSince) continue  // no sell-out data → can't predict
+
+      const dailyRate   = soldSince / daysSinceOrder
+      const orderedQty  = lastOrder.qtyRequested || lastOrder.qty || 0
+      const estimated   = Math.max(0, orderedQty - soldSince)
+      const daysToZero  = dailyRate > 0 ? estimated / dailyRate : null
+      if (daysToZero === null || daysToZero > 14) continue  // only show < 14 days
+
+      const mkt = markets.find(m => m.name?.toLowerCase() === storeName?.toLowerCase())
+
+      results.push({
+        storeName, productName,
+        estimated: Math.round(estimated),
+        dailyRate: +dailyRate.toFixed(1),
+        daysToZero: Math.round(daysToZero),
+        phone: mkt?.phone || lastOrder.storePhone || '',
+        contact: mkt?.contact || storeName,
+        lastOrderQty: orderedQty,
+        soldSince,
+      })
+    }
+    return results.sort((a, b) => a.daysToZero - b.daysToZero)
+  }, [orders, events, markets])
+
+  const critical = alerts.filter(a => a.daysToZero <= 3)
+  const warning  = alerts.filter(a => a.daysToZero > 3 && a.daysToZero <= 7)
+  const watch    = alerts.filter(a => a.daysToZero > 7)
+
+  function buildWaMsg(a) {
+    const d = a.daysToZero <= 0 ? 'ZEROU hoje' : `vai zerar em ~${a.daysToZero} dia${a.daysToZero !== 1 ? 's' : ''}`
+    return `Oi ${a.contact.split(' ')[0]}! 👋\n\nPassei pra avisar: *${a.productName}* ${d} no seu estoque (vendendo ~${a.dailyRate}/dia).\n\nQuer garantir mais um lote antes de acabar?\n\n✅ Responde aqui que a gente resolve!`
+  }
+
+  function AlertCard({ a }) {
+    const isZero  = a.daysToZero <= 0
+    const isCrit  = a.daysToZero <= 3
+    const isWarn  = a.daysToZero <= 7
+    const bColor  = isZero ? '#ef4444' : isCrit ? '#f97316' : isWarn ? '#f59e0b' : '#3b82f6'
+    const bgColor = isZero ? '#2d0a0a' : isCrit ? '#2d1300' : isWarn ? '#2d2000' : '#0d2137'
+
+    return (
+      <div style={{ background:bgColor, border:`1px solid ${bColor}44`, borderRadius:16, padding:'14px 16px', marginBottom:10 }}>
+        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8 }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            {/* urgency badge */}
+            <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
+              <span style={{ background:bColor+'33', color:bColor, fontSize:11, fontWeight:900, padding:'2px 8px', borderRadius:8 }}>
+                {isZero ? '🔴 ZEROU' : isCrit ? '🚨 CRÍTICO' : isWarn ? '⚠️ ALERTA' : '👀 ATENÇÃO'}
+              </span>
+              <span style={{ color:'#475569', fontSize:11 }}>
+                {isZero ? 'sem estoque' : `~${a.daysToZero} dia${a.daysToZero !== 1 ? 's' : ''}`}
+              </span>
+            </div>
+            <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:14 }}>{a.productName}</div>
+            <div style={{ color:'#64748b', fontSize:12, marginTop:2 }}>📍 {a.storeName}</div>
+            <div style={{ display:'flex', gap:12, marginTop:6, flexWrap:'wrap' }}>
+              <span style={{ color:'#475569', fontSize:11 }}>
+                📦 Estoque estimado: <strong style={{ color:bColor }}>{a.estimated} un</strong>
+              </span>
+              <span style={{ color:'#475569', fontSize:11 }}>
+                📉 Saída: <strong style={{ color:'#93c5fd' }}>{a.dailyRate}/dia</strong>
+              </span>
+            </div>
+          </div>
+          {a.phone && (
+            <a href={`https://wa.me/55${a.phone.replace(/\D/g,'')}?text=${encodeURIComponent(buildWaMsg(a))}`}
+              target="_blank" rel="noreferrer"
+              style={{ background:'#14532d', color:'#4ade80', border:'none', borderRadius:10, padding:'8px 10px', fontSize:12, fontWeight:700, cursor:'pointer', textDecoration:'none', display:'flex', alignItems:'center', gap:4, flexShrink:0, whiteSpace:'nowrap' }}>
+              <MessageCircle size={13} /> Avisar
+            </a>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) return (
+    <div style={{ padding:32, textAlign:'center' }}>
+      <div style={{ width:28, height:28, border:'3px solid #1e4060', borderTopColor:'#3b82f6', borderRadius:'50%', animation:'spin 0.8s linear infinite', margin:'0 auto 12px' }} />
+      <div style={{ color:'#475569', fontSize:13 }}>Calculando previsões…</div>
+    </div>
+  )
+
+  return (
+    <div style={{ padding:'16px 16px 100px' }}>
+      {/* Header KPIs */}
+      <div style={{ marginBottom:20 }}>
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18, marginBottom:4 }}>⚠️ Alertas de Ruptura</div>
+        <div style={{ color:'#475569', fontSize:12 }}>Previsão baseada no sell-out real da sua rede</div>
+      </div>
+
+      {alerts.length === 0 ? (
+        <div style={{ background:'#0d2137', borderRadius:20, padding:32, textAlign:'center', border:'1px solid #1a3a50' }}>
+          <AlertTriangle size={32} color="#1e4060" style={{ marginBottom:8 }} />
+          <div style={{ color:'#475569', fontSize:15, marginBottom:4 }}>Nenhuma ruptura iminente</div>
+          <div style={{ color:'#334155', fontSize:12 }}>Os estoques dos seus mercados parecem OK nos próximos 14 dias</div>
+        </div>
+      ) : (
+        <>
+          {/* Summary pills */}
+          <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
+            {critical.length > 0 && (
+              <div style={{ background:'#2d0a0a', border:'1px solid #ef444455', borderRadius:12, padding:'8px 14px', flex:1, minWidth:80, textAlign:'center' }}>
+                <div style={{ color:'#ef4444', fontWeight:900, fontSize:22 }}>{critical.length}</div>
+                <div style={{ color:'#ef4444', fontSize:10, fontWeight:700 }}>🔴 CRÍTICO ≤3d</div>
+              </div>
+            )}
+            {warning.length > 0 && (
+              <div style={{ background:'#2d1300', border:'1px solid #f9731655', borderRadius:12, padding:'8px 14px', flex:1, minWidth:80, textAlign:'center' }}>
+                <div style={{ color:'#f97316', fontWeight:900, fontSize:22 }}>{warning.length}</div>
+                <div style={{ color:'#f97316', fontSize:10, fontWeight:700 }}>🚨 ALERTA ≤7d</div>
+              </div>
+            )}
+            {watch.length > 0 && (
+              <div style={{ background:'#0d2137', border:'1px solid #f59e0b55', borderRadius:12, padding:'8px 14px', flex:1, minWidth:80, textAlign:'center' }}>
+                <div style={{ color:'#f59e0b', fontWeight:900, fontSize:22 }}>{watch.length}</div>
+                <div style={{ color:'#f59e0b', fontSize:10, fontWeight:700 }}>👀 ATENÇÃO ≤14d</div>
+              </div>
+            )}
+          </div>
+
+          {critical.length > 0 && (
+            <>
+              <div style={{ color:'#ef4444', fontWeight:800, fontSize:12, marginBottom:8, textTransform:'uppercase', letterSpacing:1 }}>🔴 Crítico — zera em até 3 dias</div>
+              {critical.map((a,i) => <AlertCard key={i} a={a} />)}
+            </>
+          )}
+          {warning.length > 0 && (
+            <>
+              <div style={{ color:'#f97316', fontWeight:800, fontSize:12, margin:'16px 0 8px', textTransform:'uppercase', letterSpacing:1 }}>🚨 Alerta — zera em 4–7 dias</div>
+              {warning.map((a,i) => <AlertCard key={i} a={a} />)}
+            </>
+          )}
+          {watch.length > 0 && (
+            <>
+              <div style={{ color:'#f59e0b', fontWeight:800, fontSize:12, margin:'16px 0 8px', textTransform:'uppercase', letterSpacing:1 }}>👀 Atenção — zera em 8–14 dias</div>
+              {watch.map((a,i) => <AlertCard key={i} a={a} />)}
+            </>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+/* ── clientScore ────────────────────────────────────────────── */
+/* Calcula nota A/B/C/D para cada mercado com base em frequência,
+   recência e volume de pedidos. 100% dados internos, zero API. */
+function clientScore(market, orders) {
+  const mOrders = (orders || []).filter(o =>
+    o.storeName?.toLowerCase() === market.name?.toLowerCase()
+  )
+  if (!mOrders.length) return { grade:'D', stars:0, pct:0, recentCount:0, daysSince:null, totalValue:0 }
+
+  const now     = Date.now()
+  const last    = [...mOrders].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))[0]
+  const daysSince    = Math.floor((now - new Date(last.createdAt)) / 86400000)
+  const recentCount  = mOrders.filter(o => now - new Date(o.createdAt) < 30 * 86400000).length
+  const totalValue   = mOrders.reduce((s,o) => s + (o.totalPrice || 0), 0)
+
+  const freqScore  = Math.min(recentCount / 4, 1)                                               // 4 pedidos/mês = 100%
+  const recScore   = daysSince < 7 ? 1 : daysSince < 14 ? 0.75 : daysSince < 30 ? 0.45 : daysSince < 60 ? 0.15 : 0
+  const volScore   = Math.min(totalValue / 2000, 1)                                              // R$2.000 total = 100%
+
+  const pct   = Math.round((freqScore * 0.40 + recScore * 0.35 + volScore * 0.25) * 100)
+  const grade = pct >= 75 ? 'A' : pct >= 50 ? 'B' : pct >= 25 ? 'C' : 'D'
+  const stars = pct >= 75 ? 3   : pct >= 50 ? 2   : pct >= 25 ? 1   : 0
+  return { grade, stars, pct, recentCount, daysSince, totalValue }
+}
+
+/* ── ScoreBadge ─────────────────────────────────────────────── */
+function ScoreBadge({ score }) {
+  const { grade, stars, pct, daysSince } = score
+  const color = { A:'#10b981', B:'#3b82f6', C:'#f59e0b', D:'#64748b' }[grade]
+  const emoji = { A:'⭐', B:'🔵', C:'🟡', D:'💀' }[grade]
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:3 }}>
+      <span style={{
+        background: color + '22', color, fontWeight:900, fontSize:11,
+        padding:'2px 8px', borderRadius:8, border:`1px solid ${color}55`,
+        display:'flex', alignItems:'center', gap:3,
+      }}>
+        {emoji} {grade} <span style={{ opacity:0.7, fontWeight:600 }}>({pct}%)</span>
+      </span>
+      <span style={{ color:'#475569', fontSize:10 }}>
+        {daysSince === null ? 'sem pedidos'
+          : daysSince === 0  ? 'pedido hoje'
+          : `último: ${daysSince}d atrás`}
+      </span>
+    </div>
+  )
+}
+
 /* ── TabMercados ────────────────────────────────────────────── */
 function TabMercados({ markets, setMarkets, orders, recurrences, setRecurrences }) {
   const [adding,    setAdding]    = useState(false)
@@ -3055,13 +3643,20 @@ function TabMercados({ markets, setMarkets, orders, recurrences, setRecurrences 
               </div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:15, lineHeight:1.2 }}>{m.name}</div>
-                {m.contact && <div style={{ color:'#64748b', fontSize:12, marginTop:1 }}>👤 {m.contact}</div>}
+                <ScoreBadge score={clientScore(m, orders)} />
+                {m.contact && <div style={{ color:'#64748b', fontSize:12, marginTop:3 }}>👤 {m.contact}</div>}
                 <a href={'https://wa.me/' + cleanPhone(m.phone)} target="_blank" rel="noreferrer"
                   style={{ color:'#4ade80', fontSize:12, fontWeight:700, display:'inline-flex', alignItems:'center', gap:4, marginTop:3, textDecoration:'none' }}>
                   <Phone size={11} /> {m.phone || 'sem número'}
                 </a>
               </div>
               <div style={{ display:'flex', gap:6 }}>
+                {/* Vitrine digital — página pública por mercado */}
+                <a href={`/loja/${slug(m.name)}`} target="_blank" rel="noreferrer"
+                  title="Abrir vitrine digital deste mercado"
+                  style={{ background:'#0a2540', border:'1px solid #1e4060', borderRadius:8, padding:'6px 8px', cursor:'pointer', color:'#f97316', textDecoration:'none', display:'flex', alignItems:'center' }}>
+                  <Store size={13} />
+                </a>
                 <button onClick={() => setEditing(m.id)} style={{ background:'#0a2540', border:'1px solid #1e4060', borderRadius:8, padding:'6px 8px', cursor:'pointer', color:'#64748b' }}>✏️</button>
                 <button onClick={() => handleDelete(m.id)} style={{ background:'#1a0a0a', border:'none', borderRadius:8, padding:'6px 8px', cursor:'pointer', color:'#ef4444' }}><Trash2 size={13} /></button>
               </div>
@@ -3974,6 +4569,7 @@ export default function Fornecedor() {
     { id:'ofertas',   icon: Send,            label:'Ofertas',   badge: offers.filter(o=>o.status==='pending').length },
     { id:'pedidos',   icon: ClipboardList,   label:'Pedidos',   badge: pendingOrders },
     { id:'sellout',   icon: TrendingUp,      label:'Sell-Out',  badge: 0 },
+    { id:'ruptura',   icon: AlertTriangle,   label:'Rupturas',  badge: 0, badgeColor:'#ef4444' },
     { id:'mercados',  icon: Users,           label:'Mercados',  badge: 0 },
     { id:'relatorio', icon: BarChart2,       label:'Resultado', badge: 0 },
   ]
@@ -4087,8 +4683,9 @@ export default function Fornecedor() {
         {tab === 'inicio'    && <TabInicio    estoque={estoque} offers={offers} orders={orders} profile={profile} markets={markets} setEstoque={setEstoque} setOffers={setOffers} setMarkets={setMarkets} setOrders={setOrders} onNavigate={setTab} zapServerUrl={zapServerUrl} zapConnected={zapConnected} recurrences={recurrences} setRecurrences={setRecurrences} />}
         {tab === 'receber'   && <TabReceber   estoque={estoque} setEstoque={setEstoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
         {tab === 'ofertas'   && <TabOfertas   estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} orders={orders} preSelected={preSelectedForOffer} onClearPreSelected={() => setPreSelectedForOffer(null)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
-        {tab === 'pedidos'   && <TabPedidos   orders={orders} setOrders={setOrders} markets={markets} />}
+        {tab === 'pedidos'   && <TabPedidos   orders={orders} setOrders={setOrders} markets={markets} offers={offers} />}
         {tab === 'sellout'   && <TabSellOut   orders={orders} markets={markets} />}
+        {tab === 'ruptura'   && <TabRuptura   orders={orders} markets={markets} estoque={estoque} />}
         {tab === 'mercados'  && <TabMercados  markets={markets} setMarkets={setMarkets} orders={orders} recurrences={recurrences} setRecurrences={setRecurrences} />}
         {tab === 'relatorio' && <TabRelatorio estoque={estoque} offers={offers} orders={orders} markets={markets} />}
       </div>
