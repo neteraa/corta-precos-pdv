@@ -92,6 +92,48 @@ function mergeWithSeed(stored) {
   })
 }
 
+/* ── Sell-Out Tracking — fire-and-forget, never blocks PDV ── */
+const SELLOUT_KEY = 'cp_sellout_events'
+
+function captureSellOut(saleItems, currentProducts) {
+  try {
+    const offers = JSON.parse(localStorage.getItem('cp_supplier_offers') || '[]')
+    if (!offers.length) return
+
+    const offerNames = new Set(offers.map(o => (o.productName || '').toLowerCase()))
+    const identity = (() => { try { return JSON.parse(localStorage.getItem('cp_market_session_v1')) } catch { return null } })()
+    const session  = (() => { try { return JSON.parse(localStorage.getItem('cp_session'))         } catch { return null } })()
+    const storeName  = identity?.name  || session?.user || 'Corta Preço'
+    const storePhone = identity?.phone || ''
+    const storeId    = session?.storeId || 'default'
+
+    const newEvents = saleItems
+      .map(item => currentProducts.find(p => p.id === item.productId) && { item, prod: currentProducts.find(p => p.id === item.productId) })
+      .filter(x => x && offerNames.has((x.prod.name || '').toLowerCase()))
+      .map(({ item, prod }) => ({
+        id:           `so${Date.now()}${Math.random().toString(36).slice(2, 5)}`,
+        storeName, storePhone, storeId,
+        productName:  prod.name,
+        sku:          prod.sku || prod.barcode || '',
+        qtySold:      item.qty,
+        unitPrice:    prod.price,
+        totalRevenue: +(item.qty * prod.price).toFixed(2),
+        soldAt:       new Date().toISOString(),
+      }))
+
+    if (!newEvents.length) return
+
+    const existing = JSON.parse(localStorage.getItem(SELLOUT_KEY) || '[]')
+    const merged   = [...newEvents, ...existing].slice(0, 300)
+    localStorage.setItem(SELLOUT_KEY, JSON.stringify(merged))
+
+    fetch('/api/persist', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: SELLOUT_KEY, value: JSON.stringify(merged) }),
+    }).catch(() => {})
+  } catch {}
+}
+
 export function StoreProvider({ children }) {
   const [products, setProducts] = useState(() => {
     try {
@@ -272,7 +314,6 @@ export function StoreProvider({ children }) {
   const registerSale = useCallback((sale) => {
     const s = { ...sale, id: `s${Date.now()}`, date: sale.date || new Date().toISOString() }
     setSales(prev => { const next = [s, ...prev]; persist('cp_sales', next); return next })
-    // decrement stock
     setProducts(prev => {
       const next = prev.map(p => {
         const item = sale.items.find(i => i.productId === p.id)
@@ -280,8 +321,10 @@ export function StoreProvider({ children }) {
       })
       persist('cp_products', next); return next
     })
+    // Sell-out tracking: fire-and-forget, never blocks the sale
+    captureSellOut(sale.items, products)
     return s
-  }, [persist])
+  }, [persist, products])
 
   const upsertPromo = useCallback((p) => {
     setPromos(prev => {

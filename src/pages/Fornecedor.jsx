@@ -2480,6 +2480,251 @@ function TabPedidos({ orders, setOrders, markets }) {
   )
 }
 
+/* ── TabSellOut ─────────────────────────────────────────────── */
+/* Fase 1: análise de recompra a partir de pedidos existentes
+   Fase 2: eventos reais do PDV Corta Preço (se mercado adotou) */
+function TabSellOut({ orders, markets }) {
+  const [events,    setEvents]    = useState([])
+  const [loadingEv, setLoadingEv] = useState(true)
+
+  /* fetch sell-out events from server + poll 30s */
+  useEffect(() => {
+    async function load() {
+      try {
+        const r = await fetch(API_RESTORE)
+        if (!r.ok) throw new Error()
+        const { data } = await r.json()
+        const raw = data?.cp_sellout_events
+        if (raw) setEvents(JSON.parse(raw))
+      } catch {} finally { setLoadingEv(false) }
+    }
+    load()
+    const t = setInterval(load, 30_000)
+    return () => clearInterval(t)
+  }, [])
+
+  /* ── Phase 1: reorder analysis from orders ── */
+  const delivered = orders.filter(o => o.status === 'delivered' || o.status === 'confirmed')
+
+  /* group by (market, product) → list of order dates */
+  const marketMap = {}
+  for (const o of delivered) {
+    const mk = o.storeName || o.storePhone || 'Desconhecido'
+    if (!marketMap[mk]) marketMap[mk] = { name: mk, phone: o.storePhone, products: {} }
+    const pk = (o.productName || '').toLowerCase()
+    if (!marketMap[mk].products[pk]) marketMap[mk].products[pk] = { name: o.productName, orders: [] }
+    marketMap[mk].products[pk].orders.push({ date: new Date(o.createdAt), qty: o.qtyRequested, total: o.totalPrice })
+  }
+
+  /* giro médio = avg days between consecutive orders */
+  function giro(productOrders) {
+    if (productOrders.length < 2) return null
+    const sorted = [...productOrders].sort((a, b) => a.date - b.date)
+    let gaps = 0
+    for (let i = 1; i < sorted.length; i++) gaps += (sorted[i].date - sorted[i-1].date) / 86400000
+    return Math.round(gaps / (sorted.length - 1))
+  }
+
+  const marketList = Object.values(marketMap).map(m => {
+    const prods = Object.values(m.products).map(p => {
+      const g    = giro(p.orders)
+      const last = [...p.orders].sort((a,b) => b.date - a.date)[0]
+      const daysAgo    = Math.floor((Date.now() - last.date) / 86400000)
+      const daysToNext = g ? Math.max(0, g - daysAgo) : null
+      const urgency    = daysToNext !== null && daysToNext <= 3 ? 'hot'
+                       : daysToNext !== null && daysToNext <= 7 ? 'warm' : 'ok'
+      const totalVol   = p.orders.reduce((s, o) => s + (o.qty || 0), 0)
+      const totalRev   = p.orders.reduce((s, o) => s + (o.total || 0), 0)
+      return { ...p, giro: g, daysAgo, daysToNext, urgency, totalVol, totalRev }
+    }).sort((a, b) => (a.daysToNext ?? 99) - (b.daysToNext ?? 99))
+    const totalRev = prods.reduce((s, p) => s + p.totalRev, 0)
+    const hotCount = prods.filter(p => p.urgency === 'hot').length
+    return { ...m, prods, totalRev, hotCount }
+  }).sort((a, b) => b.totalRev - a.totalRev)
+
+  /* ── Phase 2 stats ── */
+  const today = new Date().toISOString().slice(0, 10)
+  const evToday      = events.filter(e => e.soldAt?.startsWith(today))
+  const evRevToday   = evToday.reduce((s, e) => s + (e.totalRevenue || 0), 0)
+  const evMarketsSet = new Set(events.map(e => e.storeName).filter(Boolean))
+  const topEvProduct = (() => {
+    const m = {}
+    for (const e of events) m[e.productName] = (m[e.productName] || 0) + (e.qtySold || 0)
+    return Object.entries(m).sort((a,b) => b[1]-a[1])[0]
+  })()
+
+  /* urgency colors */
+  const uColor = { hot: '#ef4444', warm: '#f59e0b', ok: '#10b981' }
+  const uBg    = { hot: '#7f1d1d22', warm: '#78350f22', ok: '#14532d22' }
+  const uLabel = { hot: 'PEDIR HOJE', warm: 'Em breve', ok: 'No prazo' }
+
+  return (
+    <div style={{ padding:'16px 16px 100px' }}>
+
+      {/* ── Header ── */}
+      <div style={{ marginBottom:16 }}>
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:18 }}>📡 Sell-Out Tracker</div>
+        <div style={{ color:'#475569', fontSize:12, marginTop:2 }}>
+          O que seus mercados estão vendendo — previsão de recompra em tempo real
+        </div>
+      </div>
+
+      {/* ── Stats (Phase 1 + 2) ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16 }}>
+        {[
+          { label:'Mercados ativos',   value: marketList.length,           color:'#3b82f6', icon:'🏪' },
+          { label:'🔥 Pedir hoje',     value: marketList.reduce((s,m)=>s+m.hotCount,0), color:'#ef4444', icon:'🔥' },
+          { label:'Sell-out hoje',     value: evToday.length ? `${evToday.length} vendas` : events.length ? `${evMarketsSet.size} mkt` : 'Ativar PDV', color: events.length ? '#10b981' : '#334155', icon:'📊' },
+          { label:'Top produto',       value: topEvProduct ? topEvProduct[0].split(' ').slice(0,2).join(' ') : (orders[0]?.productName?.split(' ').slice(0,2).join(' ') || '—'), color:'#f97316', icon:'🏆' },
+        ].map(s => (
+          <div key={s.label} style={{ background:'#0d2137', border:`1px solid ${s.color}33`, borderRadius:14, padding:'12px 14px' }}>
+            <div style={{ color: s.color, fontWeight:900, fontSize:16, lineHeight:1.2 }}>{s.icon} {s.value}</div>
+            <div style={{ color:'#475569', fontSize:10, marginTop:3 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Phase 2: Live sell-out feed ── */}
+      <div style={{ background:'#0d2137', borderRadius:16, border:'1px solid #1a3a50', marginBottom:16, overflow:'hidden' }}>
+        <div style={{ padding:'12px 16px', borderBottom:'1px solid #0a2540', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:14 }}>
+              📡 Sell-out ao vivo
+              {events.length > 0 && <span style={{ marginLeft:8, background:'#10b98122', border:'1px solid #10b98144', color:'#10b981', fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20 }}>● {events.length} eventos</span>}
+            </div>
+            <div style={{ color:'#334155', fontSize:11, marginTop:2 }}>Vendas capturadas direto do PDV Corta Preço</div>
+          </div>
+          {loadingEv && <div style={{ width:16, height:16, border:'2px solid #10b981', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 1s linear infinite' }} />}
+        </div>
+
+        {events.length === 0 ? (
+          <div style={{ padding:'24px 20px', textAlign:'center' }}>
+            <div style={{ fontSize:32, marginBottom:8 }}>📲</div>
+            <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:14, marginBottom:6 }}>
+              Ative nos seus mercados
+            </div>
+            <div style={{ color:'#475569', fontSize:12, lineHeight:1.6, marginBottom:16 }}>
+              Quando o mercado usa o <strong style={{ color:'#f97316' }}>PDV Corta Preço</strong> e vende um
+              produto que comprou de você, o evento aparece aqui automaticamente.
+            </div>
+            {/* CTA */}
+            <div style={{ background:'#060e1a', borderRadius:12, padding:'12px 14px', border:'1px solid #10b98133' }}>
+              <div style={{ color:'#10b981', fontWeight:800, fontSize:12, marginBottom:4 }}>💡 Como ativar</div>
+              <div style={{ color:'#475569', fontSize:11, lineHeight:1.5 }}>
+                1. Envie o link do PDV pro mercado<br/>
+                2. Eles fazem login e escaneiam as vendas<br/>
+                3. Dados chegam aqui em tempo real
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ maxHeight:280, overflowY:'auto' }}>
+            {events.slice(0, 20).map((e, i) => {
+              const mins = Math.floor((Date.now() - new Date(e.soldAt)) / 60000)
+              const when = mins < 1 ? 'agora' : mins < 60 ? `${mins}min` : mins < 1440 ? `${Math.floor(mins/60)}h` : `${Math.floor(mins/1440)}d`
+              return (
+                <div key={e.id || i} style={{ padding:'10px 16px', borderTop: i ? '1px solid #0a2540' : 'none', display:'flex', alignItems:'center', gap:10 }}>
+                  <div style={{ width:8, height:8, borderRadius:'50%', background:'#10b981', flexShrink:0, boxShadow:'0 0 6px #10b981' }} />
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ color:'#f1f5f9', fontWeight:700, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                      {e.storeName || 'Mercado'} <span style={{ color:'#475569', fontWeight:400 }}>vendeu</span> {e.productName}
+                    </div>
+                    <div style={{ color:'#475569', fontSize:11, marginTop:1 }}>{e.qtySold} {e.unit || 'un'} · {BRL.format(e.totalRevenue || 0)}</div>
+                  </div>
+                  <div style={{ color:'#334155', fontSize:11, flexShrink:0 }}>{when}</div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Phase 1: Previsão de Recompra por Mercado ── */}
+      <div style={{ color:'#475569', fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:10 }}>
+        🔄 Previsão de recompra — baseado no histórico de pedidos
+      </div>
+
+      {marketList.length === 0 ? (
+        <div style={{ background:'#0d2137', borderRadius:14, padding:24, textAlign:'center', border:'1px solid #1a3a50', color:'#475569' }}>
+          Nenhum pedido entregue ainda
+        </div>
+      ) : marketList.map(m => (
+        <div key={m.name} style={{ background:'#0a1929', borderRadius:16, marginBottom:12, border:'1px solid #1a3a50', overflow:'hidden' }}>
+          {/* Market header */}
+          <div style={{ padding:'12px 16px', background:'#0d2137', display:'flex', alignItems:'center', gap:10, borderBottom:'1px solid #0a2540' }}>
+            <div style={{
+              width:36, height:36, borderRadius:10, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
+              background: `linear-gradient(135deg,${['#3b82f6','#10b981','#f97316','#8b5cf6','#f59e0b'][Math.abs([...m.name].reduce((h,c)=>h*31+c.charCodeAt(0),0)) % 5]},#0d2137)`,
+            }}>
+              <span style={{ color:'#fff', fontWeight:900, fontSize:14 }}>{(m.name||'?')[0].toUpperCase()}</span>
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ color:'#f1f5f9', fontWeight:800, fontSize:14, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{m.name}</div>
+              <div style={{ color:'#475569', fontSize:11 }}>{m.prods.length} produto{m.prods.length !== 1 ? 's' : ''} · {BRL.format(m.totalRev)} total</div>
+            </div>
+            {m.hotCount > 0 && (
+              <div style={{ background:'#7f1d1d', border:'1px solid #ef444466', borderRadius:10, padding:'3px 10px', color:'#fca5a5', fontSize:11, fontWeight:800, flexShrink:0 }}>
+                🔥 {m.hotCount} URGENTE{m.hotCount > 1 ? 'S' : ''}
+              </div>
+            )}
+            {m.phone && (
+              <a href={`https://wa.me/${m.phone.replace(/\D/g,'').replace(/^0/,'').length < 11 ? '55' + m.phone.replace(/\D/g,'') : m.phone.replace(/\D/g,'')}`}
+                target="_blank" rel="noreferrer"
+                style={{ background:'#14532d', border:'1px solid #166534', borderRadius:10, padding:'5px 10px', color:'#4ade80', fontSize:11, fontWeight:700, textDecoration:'none', flexShrink:0 }}>
+                📱
+              </a>
+            )}
+          </div>
+
+          {/* Products restock grid */}
+          <div style={{ padding:'10px 12px', display:'flex', flexDirection:'column', gap:6 }}>
+            {m.prods.map(p => (
+              <div key={p.name} style={{ background: uBg[p.urgency], border:`1px solid ${uColor[p.urgency]}33`, borderRadius:10, padding:'8px 12px', display:'flex', alignItems:'center', gap:10 }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ color:'#f1f5f9', fontWeight:700, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.name}</div>
+                  <div style={{ display:'flex', gap:8, marginTop:3, flexWrap:'wrap' }}>
+                    {p.giro && <span style={{ color:'#64748b', fontSize:11 }}>🔄 giro ~{p.giro}d</span>}
+                    <span style={{ color:'#475569', fontSize:11 }}>{p.orders.length}x pedido{p.orders.length !== 1 ? 's' : ''}</span>
+                    <span style={{ color:'#475569', fontSize:11 }}>{BRL.format(p.totalRev)}</span>
+                  </div>
+                </div>
+                <div style={{ textAlign:'right', flexShrink:0 }}>
+                  {p.daysToNext !== null ? (
+                    <>
+                      <div style={{ color: uColor[p.urgency], fontWeight:900, fontSize:14 }}>
+                        {p.daysToNext === 0 ? 'HOJE' : `${p.daysToNext}d`}
+                      </div>
+                      <div style={{ color: uColor[p.urgency], fontSize:9, fontWeight:700, textTransform:'uppercase' }}>{uLabel[p.urgency]}</div>
+                    </>
+                  ) : (
+                    <div style={{ color:'#334155', fontSize:11 }}>1 pedido</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* ── CTA vender o PDV ── */}
+      <div style={{ background:'linear-gradient(135deg,#0f3460,#1a1a2e)', borderRadius:18, padding:'20px 16px', border:'1px solid #3b82f633', marginTop:8 }}>
+        <div style={{ color:'#93c5fd', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:6 }}>💡 Ative o sell-out em tempo real</div>
+        <div style={{ color:'#f1f5f9', fontWeight:900, fontSize:16, marginBottom:8 }}>
+          Seus mercados usando o Corta Preço PDV = você enxerga cada venda na prateleira deles
+        </div>
+        <div style={{ color:'#64748b', fontSize:12, lineHeight:1.6, marginBottom:14 }}>
+          Ofereça desconto de 10–15% pra quem adotar. É como a Cimed faz com as farmácias — e vira diferencial competitivo no seu nicho.
+        </div>
+        <a href="https://zatendestock.netlify.app/qr.html" target="_blank" rel="noreferrer"
+          style={{ display:'inline-flex', alignItems:'center', gap:6, background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'#fff', borderRadius:12, padding:'10px 18px', fontSize:13, fontWeight:800, textDecoration:'none' }}>
+          📱 Ver QR codes para os mercados
+        </a>
+      </div>
+
+    </div>
+  )
+}
+
 /* ── MarketForm ─────────────────────────────────────────────── */
 function MarketForm({ initial = {}, onSave, onCancel }) {
   const F = (k) => ({ value: form[k], onChange: e => setForm(p => ({...p, [k]: e.target.value})) })
@@ -3613,6 +3858,7 @@ export default function Fornecedor() {
     { id:'receber',   icon: ArrowDownToLine, label:'Receber',   badge: 0 },
     { id:'ofertas',   icon: Send,            label:'Ofertas',   badge: offers.filter(o=>o.status==='pending').length },
     { id:'pedidos',   icon: ClipboardList,   label:'Pedidos',   badge: pendingOrders },
+    { id:'sellout',   icon: TrendingUp,      label:'Sell-Out',  badge: 0 },
     { id:'mercados',  icon: Users,           label:'Mercados',  badge: 0 },
     { id:'relatorio', icon: BarChart2,       label:'Resultado', badge: 0 },
   ]
@@ -3727,6 +3973,7 @@ export default function Fornecedor() {
         {tab === 'receber'   && <TabReceber   estoque={estoque} setEstoque={setEstoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
         {tab === 'ofertas'   && <TabOfertas   estoque={estoque} offers={offers} setOffers={setOffers} markets={markets} profile={profile} orders={orders} preSelected={preSelectedForOffer} onClearPreSelected={() => setPreSelectedForOffer(null)} zapServerUrl={zapServerUrl} zapConnected={zapConnected} />}
         {tab === 'pedidos'   && <TabPedidos   orders={orders} setOrders={setOrders} markets={markets} />}
+        {tab === 'sellout'   && <TabSellOut   orders={orders} markets={markets} />}
         {tab === 'mercados'  && <TabMercados  markets={markets} setMarkets={setMarkets} orders={orders} recurrences={recurrences} setRecurrences={setRecurrences} />}
         {tab === 'relatorio' && <TabRelatorio estoque={estoque} offers={offers} orders={orders} markets={markets} />}
       </div>
