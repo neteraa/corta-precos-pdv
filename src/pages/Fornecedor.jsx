@@ -4362,6 +4362,17 @@ function EditProfileModal({ profile, onSave, onClose }) {
           </Btn>
           <Btn secondary full onClick={onClose}>Cancelar</Btn>
         </div>
+
+        {/* Logout — aparece só no mobile (desktop tem o botão no header) */}
+        {onLogout && (
+          <button onClick={onLogout} className="profile-logout-btn" style={{
+            display:'none', marginTop:14, width:'100%', padding:'11px', background:'transparent',
+            border:'1px solid #2d2d4e', borderRadius:12, color:'#475569', fontSize:13,
+            fontWeight:700, cursor:'pointer', letterSpacing:'0.02em',
+          }}>
+            🚪 Sair do sistema
+          </button>
+        )}
       </div>
     </div>
   )
@@ -4597,7 +4608,7 @@ export default function Fornecedor() {
 
       {/* Edit profile modal */}
       {editingProfile && (
-        <EditProfileModal profile={profile} onSave={saveProfile} onClose={() => setEditingProfile(false)} />
+        <EditProfileModal profile={profile} onSave={saveProfile} onClose={() => setEditingProfile(false)} onLogout={handleLogout} />
       )}
 
       {/* ZAP Server config modal */}
@@ -4731,12 +4742,13 @@ export default function Fornecedor() {
 
         /* ── Header mobile ── */
         @media (max-width: 480px) {
-          .forn-header { padding: 8px 10px 6px !important; }
-          .fh-right { gap: 4px !important; }
-          .fh-sair  { display: none !important; }
-          .fh-sync  { display: none !important; }
-          .fh-guia-txt { display: none !important; }
-          .fh-guia  { padding: 5px 7px !important; }
+          .forn-header          { padding: 8px 10px 6px !important; }
+          .fh-right             { gap: 4px !important; }
+          .fh-sair              { display: none !important; }
+          .fh-sync              { display: none !important; }
+          .fh-guia-txt          { display: none !important; }
+          .fh-guia              { padding: 5px 7px !important; }
+          .profile-logout-btn   { display: block !important; }
         }
         @media (max-width: 380px) {
           .fh-right { gap: 3px !important; }
