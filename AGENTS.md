@@ -12,11 +12,15 @@ Branch: `master`
 git clone https://github.com/neteraa/corta-precos-pdv.git /workspace/project
 cd /workspace/project
 npm install
+# Restaurar token Netlify (não vai no git — está no .gitignore):
+echo "NETLIFY_AUTH_TOKEN=nfp_wuQ15ioS6isEZF3V3kPVL7LixCrPpUMY1ca2" > .env
+echo "NETLIFY_SITE_ID=abd4863b-ef7b-4d7c-b3f2-85547f519485" >> .env
 ```
 
 ## Deploy command (always use this)
 ```bash
-npm run build && npx netlify-cli deploy --prod --dir=dist --site=abd4863b-ef7b-4d7c-b3f2-85547f519485
+source .env  # ou: export $(cat .env | xargs)
+npm run build && ./node_modules/.bin/netlify deploy --prod --dir=dist --functions=netlify/functions --site=$NETLIFY_SITE_ID --auth=$NETLIFY_AUTH_TOKEN
 ```
 
 ---
