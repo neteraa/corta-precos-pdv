@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roteiro de Apresentação — ZatendeStock</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #f8f9fa;
+    color: #1a1a2e;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  @media print {
+    body { background: white; }
+    .page { box-shadow: none !important; margin: 0 !important; border-radius: 0 !important; }
+    .no-print { display: none !important; }
+    @page { margin: 0.5cm; size: A4; }
+  }
+
+  .no-print {
+    text-align: center;
+    padding: 20px;
+    background: #1a1a2e;
+    color: white;
+    font-size: 14px;
+  }
+  .no-print button {
+    margin-left: 12px;
+    background: #f97316;
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .page {
+    max-width: 794px;
+    margin: 20px auto;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.12);
+    overflow: hidden;
+  }
+
+  /* HEADER */
+  .header {
+    background: linear-gradient(135deg, #0a1929 0%, #0d2137 60%, #0a2540 100%);
+    padding: 28px 32px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .header-left h1 {
+    color: #f97316;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+  }
+  .header-left p {
+    color: #475569;
+    font-size: 12px;
+    margin-top: 3px;
+  }
+  .header-right {
+    text-align: right;
+  }
+  .header-right .badge {
+    background: rgba(249,115,22,0.15);
+    border: 1px solid rgba(249,115,22,0.3);
+    color: #f97316;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .header-right .date {
+    color: #334155;
+    font-size: 11px;
+  }
+
+  /* ALERTA TOPO */
+  .alert-bar {
+    background: linear-gradient(90deg, #7c3aed, #6d28d9);
+    padding: 10px 32px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .alert-bar span {
+    color: #e9d5ff;
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+  .alert-bar strong {
+    color: #ffffff;
+  }
+
+  /* BODY */
+  .body {
+    padding: 24px 32px;
+  }
+
+  /* SECTION TITLE */
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    margin-top: 20px;
+  }
+  .section-title:first-child { margin-top: 0; }
+  .section-num {
+    width: 26px;
+    height: 26px;
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 900;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .section-title h2 {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+  .section-title .tag {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 4px;
+  }
+  .tag-time { background: #fef3c7; color: #92400e; }
+  .tag-demo { background: #d1fae5; color: #065f46; }
+  .tag-price { background: #fee2e2; color: #991b1b; }
+  .tag-close { background: #e0e7ff; color: #3730a3; }
+
+  /* STEP CARD */
+  .step-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    border-left: 3px solid #e2e8f0;
+  }
+  .step-card.orange { border-left-color: #f97316; }
+  .step-card.green  { border-left-color: #10b981; }
+  .step-card.red    { border-left-color: #ef4444; }
+  .step-card.purple { border-left-color: #8b5cf6; }
+  .step-card.blue   { border-left-color: #3b82f6; }
+
+  .step-card .action {
+    font-weight: 700;
+    font-size: 13px;
+    color: #0f172a;
+    margin-bottom: 4px;
+  }
+  .step-card .detail {
+    color: #475569;
+    font-size: 12px;
+  }
+  .step-card .script {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-top: 8px;
+    color: #1e293b;
+    font-size: 12px;
+    font-style: italic;
+  }
+  .step-card .script::before {
+    content: '💬 ';
+    font-style: normal;
+  }
+  .step-card .tip {
+    background: #fffbeb;
+    border-left: 2px solid #f59e0b;
+    padding: 6px 10px;
+    margin-top: 8px;
+    border-radius: 0 6px 6px 0;
+    color: #78350f;
+    font-size: 11px;
+  }
+  .step-card .tip::before {
+    content: '⚡ ';
+  }
+
+  /* TWO COLUMNS */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  /* DEMO SEQUENCE */
+  .demo-sequence {
+    background: #0a1929;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+  }
+  .demo-sequence .demo-title {
+    color: #10b981;
+    font-weight: 800;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+  .demo-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .demo-item:last-child { margin-bottom: 0; }
+  .demo-num {
+    min-width: 22px;
+    height: 22px;
+    background: rgba(249,115,22,0.2);
+    border: 1px solid rgba(249,115,22,0.4);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f97316;
+    font-weight: 900;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .demo-text {
+    color: #94a3b8;
+    font-size: 12px;
+  }
+  .demo-text strong { color: #f1f5f9; }
+  .demo-text .wow {
+    color: #10b981;
+    font-weight: 700;
+    font-size: 10px;
+    background: rgba(16,185,129,0.1);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+  }
+
+  /* PRICE BOX */
+  .price-box {
+    background: linear-gradient(135deg, #0a1929, #0d2137);
+    border: 2px solid #f97316;
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 8px;
+  }
+  .price-box .price-title {
+    color: #f97316;
+    font-weight: 900;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+  .price-script {
+    color: white;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.6;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 12px 14px;
+    border-left: 3px solid #f97316;
+  }
+  .price-script .highlight { color: #f97316; }
+  .price-box .after {
+    margin-top: 10px;
+    color: #475569;
+    font-size: 11px;
+    font-style: italic;
+  }
+  .price-box .after strong { color: #10b981; }
+
+  /* OBJECTION BOX */
+  .objection-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .objection-card {
+    background: #fff1f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .objection-card .obj {
+    color: #dc2626;
+    font-weight: 700;
+    font-size: 11px;
+    margin-bottom: 5px;
+  }
+  .objection-card .resp {
+    color: #374151;
+    font-size: 11.5px;
+    line-height: 1.4;
+  }
+  .objection-card .resp em {
+    font-style: italic;
+    color: #1e293b;
+  }
+
+  /* PERSUASION SIDEBAR */
+  .persuasion-box {
+    background: linear-gradient(135deg, #1e1b4b, #312e81);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+  }
+  .persuasion-box .p-title {
+    color: #a5b4fc;
+    font-weight: 800;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+  .p-item {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: flex-start;
+  }
+  .p-item:last-child { margin-bottom: 0; }
+  .p-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .p-item .p-name {
+    color: #e0e7ff;
+    font-weight: 700;
+    font-size: 11.5px;
+  }
+  .p-item .p-desc {
+    color: #818cf8;
+    font-size: 11px;
+    margin-top: 1px;
+  }
+
+  /* MATH BOX */
+  .math-box {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+  }
+  .math-box .m-title {
+    color: #065f46;
+    font-weight: 800;
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+  .math-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid #d1fae5;
+    font-size: 12px;
+  }
+  .math-row:last-child { border-bottom: none; }
+  .math-row .label { color: #374151; }
+  .math-row .value { font-weight: 700; }
+  .math-row .value.neg { color: #dc2626; }
+  .math-row .value.pos { color: #059669; }
+  .math-row .value.big { color: #059669; font-size: 15px; }
+
+  /* FOOTER */
+  .footer {
+    background: #0a1929;
+    padding: 14px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer .f-left {
+    color: #334155;
+    font-size: 10px;
+  }
+  .footer .f-right {
+    color: #f97316;
+    font-weight: 800;
+    font-size: 11px;
+  }
+
+  /* DIVIDER */
+  .divider {
+    height: 1px;
+    background: #f1f5f9;
+    margin: 16px 0;
+  }
+
+  /* MINDSET BOX */
+  .mindset-box {
+    background: linear-gradient(135deg, #fffbeb, #fef3c7);
+    border: 1px solid #fcd34d;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .mindset-box .m-icon { font-size: 22px; flex-shrink: 0; }
+  .mindset-box .m-text { color: #78350f; font-size: 12px; line-height: 1.5; }
+  .mindset-box .m-text strong { font-weight: 800; }
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  🗂️ Roteiro de Apresentação — ZatendeStock
+  <button onclick="window.print()">🖨️ Salvar como PDF / Imprimir</button>
+</div>
+
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <h1>⚡ ROTEIRO DE APRESENTAÇÃO</h1>
+      <p>ZatendeStock — Portal do Distribuidor · Guia de reunião</p>
+    </div>
+    <div class="header-right">
+      <span class="badge">CONFIDENCIAL</span>
+      <span class="date">Agosto 2026</span>
+    </div>
+  </div>
+
+  <!-- ALERT BAR -->
+  <div class="alert-bar">
+    <span>🧠</span>
+    <span><strong>Lembra:</strong> você não está pedindo dinheiro. Está oferecendo algo que vale mais do que custa. Fala com calma. Para após o preço. Não preenche o silêncio.</span>
+  </div>
+
+  <div class="body">
+
+    <!-- MINDSET -->
+    <div class="mindset-box">
+      <div class="m-icon">🙏</div>
+      <div class="m-text">
+        <strong>Antes de entrar na sala:</strong> respira fundo. Você construiu algo real que está em produção hoje. Ele vai ver isso. Sua única função aqui é mostrar o que resolve o problema DELE — não vender, não convencer. <strong>Mostrar.</strong>
+      </div>
+    </div>
+
+    <!-- FASE 1 -->
+    <div class="section-title">
+      <div class="section-num">1</div>
+      <h2>ABERTURA — Faz ele falar primeiro</h2>
+      <span class="tag tag-time">5 min</span>
+    </div>
+
+    <div class="step-card orange">
+      <div class="action">NÃO abre o computador ainda. Faz a pergunta matadora:</div>
+      <div class="script">Me conta como funciona hoje quando você recebe um lote. Desde que a mercadoria chega até o momento que o mercado compra.</div>
+      <div class="tip">Ouve sem interromper. Enquanto ele fala, você vai reconhecer exatamente o que o sistema resolve. Anota mentalmente os pontos de dor.</div>
+    </div>
+
+    <div class="two-col">
+      <div class="step-card green">
+        <div class="action">Pergunta de dor #1</div>
+        <div class="script">Você perde quanto de produto por mês com vencimento?</div>
+      </div>
+      <div class="step-card green">
+        <div class="action">Pergunta de dor #2</div>
+        <div class="script">Quantas horas por dia sua equipe gasta mandando WhatsApp pro mercado?</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- FASE 2 - DEMO -->
+    <div class="section-title">
+      <div class="section-num">2</div>
+      <h2>DEMO AO VIVO — Segue essa ordem, não pula</h2>
+      <span class="tag tag-demo">15 min</span>
+    </div>
+
+    <div class="demo-sequence">
+      <div class="demo-title">🖥️ Sequência de telas — acessa zatendestock.netlify.app/fornecedor</div>
+      <div class="demo-item">
+        <div class="demo-num">1</div>
+        <div class="demo-text"><strong>Login</strong> — megatudo / mega2024 — mostra que é simples, sem instalação, funciona no celular</div>
+      </div>
+      <div class="demo-item">
+        <div class="demo-num">2</div>
+        <div class="demo-text"><strong>Painel FIFO</strong> — "Esse é o coração. Mostra o que você comprou, o que foi vendido, o que está parado. Em ordem de quem vence primeiro." <span class="wow">faz ele pensar no estoque dele</span></div>
+      </div>
+      <div class="demo-item">
+        <div class="demo-num">3</div>
+        <div class="demo-text"><strong>Receber → digita produto</strong> — texto livre, sem código de barras obrigatório. Define custo, validade e preço pro mercado. Mostra a margem ao vivo.</div>
+      </div>
+      <div class="demo-item">
+        <div class="demo-num">4</div>
+        <div class="demo-text"><strong>Disparar ZAP</strong> — clica em "Disparar" e mostra o WhatsApp abrindo já com a mensagem pronta pra cada mercado. <span class="wow">momento UAU</span></div>
+      </div>
+      <div class="demo-item">
+        <div class="demo-num">5</div>
+        <div class="demo-text"><strong>Abre /ofertas no celular</strong> — "É assim que o comprador do mercado vê as ofertas. Ele clica aqui e o pedido já vai pra você."</div>
+      </div>
+      <div class="demo-item">
+        <div class="demo-num">6</div>
+        <div class="demo-text"><strong>Faz um pedido demo</strong> → mostra chegando na aba Pedidos em tempo real. Botão "Confirmar + Avisar" já abre o ZAP.</div>
+      </div>
+      <div class="demo-item">
+        <div class="demo-num">7</div>
+        <div class="demo-text"><strong>Aba Rupturas</strong> — "Esse aqui avisa antes do mercado ligar pra reclamar. Saída por dia calculada, link pra avisar já pronto." <span class="wow">silêncio estratégico aqui</span></div>
+      </div>
+      <div class="demo-item">
+        <div class="demo-num">8</div>
+        <div class="demo-text"><strong>Aba Mercados → Score A/B/C/D</strong> — "Você sabe qual dos seus clientes vai sumir?" Mostra o D em vermelho.</div>
+      </div>
+      <div class="demo-item">
+        <div class="demo-num">9</div>
+        <div class="demo-text"><strong>Vitrine Digital</strong> — abre /loja/supermercado-sao-jorge no celular. "Cada mercado seu tem uma página personalizada com suas ofertas. Com o link que você manda no ZAP." <span class="wow">última tela — fecha com impacto</span></div>
+      </div>
+    </div>
+
+    <div class="step-card blue">
+      <div class="action">Depois da demo, faz essa pergunta antes de falar qualquer preço:</div>
+      <div class="script">O que você viu aqui resolve o que você vive todo dia?</div>
+      <div class="tip">Para. Deixa ele responder. Se ele disser "sim" ou acenar, vai pro preço. Se tiver dúvida, responde a dúvida específica.</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- FASE 3 - PREÇO -->
+    <div class="section-title">
+      <div class="section-num">3</div>
+      <h2>O MOMENTO DO PREÇO — Sem pressa, sem desculpa</h2>
+      <span class="tag tag-price">2 min</span>
+    </div>
+
+    <div class="price-box">
+      <div class="price-title">📢 Fala exatamente isso — devagar — olhando pra ele</div>
+      <div class="price-script">
+        "A implantação completa, com o sistema exclusivo na sua região, é <span class="highlight">duzentos mil reais.</span><br><br>
+        A mensalidade de suporte e evolução contínua é <span class="highlight">dez mil por mês.</span><br><br>
+        E os mercados parceiros seus entram sem custo adicional até dez unidades."
+      </div>
+      <div class="after"><strong>⛔ Para aqui. Bebe água. Olha pra ele. Não fala mais nada.</strong> O primeiro que falar perde a negociação. Não precisa ser você.</div>
+    </div>
+
+    <!-- ROI MATH -->
+    <div class="math-box">
+      <div class="m-title">📊 A conta que você mostra SE ele questionar o preço</div>
+      <div class="math-row">
+        <span class="label">Perda mensal estimada em vencimento (1,5% de R$ 2M)</span>
+        <span class="value neg">- R$ 30.000/mês</span>
+      </div>
+      <div class="math-row">
+        <span class="label">Custo do sistema (mensalidade)</span>
+        <span class="value neg">- R$ 10.000/mês</span>
+      </div>
+      <div class="math-row">
+        <span class="label">Implantação diluída em 12 meses</span>
+        <span class="value neg">- R$ 16.666/mês</span>
+      </div>
+      <div class="math-row">
+        <span class="label" style="font-weight:700">Economia líquida mínima no 1º ano</span>
+        <span class="value big">+ R$ 40.000</span>
+      </div>
+      <div class="math-row">
+        <span class="label" style="font-weight:700; color: #059669;">A partir do 2º ano (custo só R$ 10k/mês)</span>
+        <span class="value big">+ R$ 240.000/ano</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- OBJEÇÕES -->
+    <div class="section-title">
+      <div class="section-num">4</div>
+      <h2>SE ELE OBJETAR — Respostas prontas</h2>
+    </div>
+
+    <div class="objection-row">
+      <div class="objection-card">
+        <div class="obj">❌ "Tá caro."</div>
+        <div class="resp">Não abaixa. Pergunta: <em>"O que te preocupa nisso — o valor total ou o momento do pagamento?"</em> Deixa ele especificar. 80% das vezes é sobre parcelamento, não sobre valor.</div>
+      </div>
+      <div class="objection-card">
+        <div class="obj">❌ "Preciso pensar."</div>
+        <div class="resp">Pergunta: <em>"O que faltou ver pra você se sentir seguro em fechar hoje?"</em> Existe uma dúvida específica escondida aí. Descobre qual é.</div>
+      </div>
+      <div class="objection-card">
+        <div class="obj">❌ "Tenho outros sistemas."</div>
+        <div class="resp">Pergunta: <em>"Esse sistema seu hoje te dá o alerta quando um mercado vai zerar? Te mostra o score de cada cliente?"</em> Ele vai dizer não.</div>
+      </div>
+      <div class="objection-card">
+        <div class="obj">❌ "Posso pagar menos?"</div>
+        <div class="resp">Não abaixa o preço. Oferece: <em>"Se você fechar 24 meses agora, trava em R$ 8.500/mês. Mas o valor da implantação é esse mesmo."</em></div>
+      </div>
+    </div>
+
+    <!-- PARCELAMENTO SE PRECISAR -->
+    <div class="step-card purple">
+      <div class="action">Se ele travar nos R$ 200k — ofereça o parcelamento estratégico:</div>
+      <div class="detail" style="margin-top:6px;">
+        <strong>R$ 80k</strong> na assinatura do contrato &nbsp;·&nbsp;
+        <strong>R$ 70k</strong> na entrada em produção (30 dias) &nbsp;·&nbsp;
+        <strong>R$ 50k</strong> após 90 dias rodando
+      </div>
+      <div class="tip">Isso reduz o risco percebido sem você abrir mão de nada. Mantém o valor total.</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- FASE 4 - FECHAMENTO -->
+    <div class="section-title">
+      <div class="section-num">5</div>
+      <h2>FECHAMENTO — Se estiver caminhando bem</h2>
+      <span class="tag tag-close">5 min</span>
+    </div>
+
+    <div class="step-card green">
+      <div class="action">A frase que fecha — diz assim, com calma:</div>
+      <div class="script">Você vai gastar R$ 200k uma vez. Todo mês o sistema te devolve uma parte disso em produto que não vai mais pro lixo. No segundo ano, você já não sente o investimento — só o resultado.</div>
+    </div>
+
+    <div class="step-card green">
+      <div class="action">O ângulo dos mercados brothers — planta essa ideia:</div>
+      <div class="script">Os mercados que você atende também entram no sistema. Eles veem suas ofertas, fazem pedido por aqui. Você controla quem recebe o quê. Seu concorrente não recebe nada.</div>
+      <div class="tip">Isso cria exclusividade no ecossistema dele. Quanto mais mercados dele entram, mais ele depende do sistema — no bom sentido.</div>
+    </div>
+
+    <div class="step-card blue">
+      <div class="action">Pergunta de fechamento — simples e direta:</div>
+      <div class="script">Faz sentido pra você começar em setembro? Assim a gente já entra no último trimestre do ano com tudo rodando.</div>
+      <div class="tip">Oferece uma data concreta. Tira o "pensar" do abstrato e coloca no cronograma real.</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- PERSUASÃO -->
+    <div class="section-title">
+      <div class="section-num">6</div>
+      <h2>GATILHOS DE PERSUASÃO — Usa naturalmente</h2>
+    </div>
+
+    <div class="persuasion-box">
+      <div class="p-title">🧲 Gatilhos que funcionam nessa situação</div>
+
+      <div class="p-item">
+        <div class="p-icon">🥇</div>
+        <div>
+          <div class="p-name">Exclusividade</div>
+          <div class="p-desc">"Esse sistema não existe no mercado. Nenhum outro distribuidor da sua região vai ter isso."</div>
+        </div>
+      </div>
+
+      <div class="p-item">
+        <div class="p-icon">⏳</div>
+        <div>
+          <div class="p-name">Escassez real</div>
+          <div class="p-desc">"A exclusividade de região é por 24 meses. Se outro distribuidor chegar antes, a janela fecha."</div>
+        </div>
+      </div>
+
+      <div class="p-item">
+        <div class="p-icon">🤝</div>
+        <div>
+          <div class="p-name">Prova social futura</div>
+          <div class="p-desc">"Você vai ser o case que a gente usa pra apresentar pro restante do Brasil. Seu nome vai junto com o sistema."</div>
+        </div>
+      </div>
+
+      <div class="p-item">
+        <div class="p-icon">🔨</div>
+        <div>
+          <div class="p-name">Origem real</div>
+          <div class="p-desc">"Quando a gente conversou, eu fui pra casa e construí. Isso aqui é o resultado de entender o seu problema de verdade."</div>
+        </div>
+      </div>
+
+      <div class="p-item">
+        <div class="p-icon">🏗️</div>
+        <div>
+          <div class="p-name">Co-criação</div>
+          <div class="p-desc">"Você não tá comprando um sistema pronto engessado. Tá construindo com a gente o padrão do setor."</div>
+        </div>
+      </div>
+
+      <div class="p-item">
+        <div class="p-icon">📊</div>
+        <div>
+          <div class="p-name">Âncora de preço</div>
+          <div class="p-desc">"TOTVS cobra de R$ 8k a R$ 20k por mês e não faz metade disso pro seu modelo de negócio."</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end body -->
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="f-left">ZatendeStock · Roteiro Interno · Não compartilhar com o cliente</div>
+    <div class="f-right">🔥 Confia. O produto é real. O valor é real. Vai lá.</div>
+  </div>
+
+</div><!-- end page -->
+
+</body>
+</html>
