@@ -4543,27 +4543,46 @@ export default function Fornecedor() {
     return () => { document.title = prev }
   }, [])
 
-  // Auto-detect new orders written by Ofertas.jsx (same browser, cross-tab)
+  // Auto-detect new orders — localStorage poll (same device) + Blobs poll (cross-device)
   useEffect(() => {
     if (!session) return
-    function checkOrders() {
+
+    function mergeOrders(fresh) {
+      setOrders(prev => {
+        const prevIds = new Set(prev.map(o => o.id))
+        if (!fresh.some(o => !prevIds.has(o.id)) && fresh.length === prev.length) return prev
+        // also update localStorage so same-device poll stays in sync
+        try { localStorage.setItem(ORDERS_KEY, JSON.stringify(fresh)) } catch {}
+        return fresh
+      })
+    }
+
+    // Same-device / cross-tab: read localStorage
+    function checkOrdersLocal() {
       const raw = localStorage.getItem(ORDERS_KEY)
       if (!raw) return
+      try { mergeOrders(JSON.parse(raw)) } catch {}
+    }
+
+    // Cross-device: poll Netlify Blobs for orders placed by market on another device
+    async function checkOrdersBlobs() {
       try {
-        const fresh = JSON.parse(raw)
-        setOrders(prev => {
-          const prevIds = new Set(prev.map(o => o.id))
-          return fresh.some(o => !prevIds.has(o.id)) || fresh.length !== prev.length ? fresh : prev
-        })
+        const r  = await fetch(API_RESTORE)
+        const ct = r.headers.get('content-type') || ''
+        if (!ct.includes('application/json')) return
+        const { data } = await r.json()
+        if (data?.[ORDERS_KEY]) mergeOrders(JSON.parse(data[ORDERS_KEY]))
       } catch {}
     }
-    function onStorageOrders(e) {
-      if (e.key === ORDERS_KEY) checkOrders()
-    }
-    const iv = setInterval(checkOrders, 10_000)
+
+    function onStorageOrders(e) { if (e.key === ORDERS_KEY) checkOrdersLocal() }
+
+    const ivLocal = setInterval(checkOrdersLocal, 10_000)
+    const ivBlobs = setInterval(checkOrdersBlobs, 30_000)
     window.addEventListener('storage', onStorageOrders)
     return () => {
-      clearInterval(iv)
+      clearInterval(ivLocal)
+      clearInterval(ivBlobs)
       window.removeEventListener('storage', onStorageOrders)
     }
   }, [session])
