@@ -702,6 +702,11 @@ export default function Ofertas() {
 
   /* place order → save to cp_supplier_orders + WhatsApp to supplier */
   async function handlePedido(orderData) {
+    if (!storeName.trim()) {
+      setPedidoOffer(null)
+      setShowIdentity(true)
+      return
+    }
     const order = { id: uid(), storeName, storePhone, ...orderData }
     try {
       let existing = []
