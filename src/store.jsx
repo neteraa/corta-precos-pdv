@@ -229,32 +229,32 @@ export function StoreProvider({ children }) {
         body: JSON.stringify({ key, value }),
       }).catch(() => {})
 
-    if (data.cp_products) {
+    if (data.cp_products) try {
       const parsed = JSON.parse(data.cp_products)
       setProducts(mergeWithSeed(parsed))
       try { localStorage.setItem(mktKey('cp_products'), data.cp_products) } catch {}
-    }
-    if (data.cp_sales) {
+    } catch {}
+    if (data.cp_sales) try {
       setSales(JSON.parse(data.cp_sales))
       try { localStorage.setItem(mktKey('cp_sales'), data.cp_sales) } catch {}
-    }
-    if (data.cp_customers) {
+    } catch {}
+    if (data.cp_customers) try {
       setCustomers(JSON.parse(data.cp_customers))
       try { localStorage.setItem(mktKey('cp_customers'), data.cp_customers) } catch {}
-    }
-    if (data.cp_promos) {
+    } catch {}
+    if (data.cp_promos) try {
       try { localStorage.setItem(mktKey('cp_promos'), data.cp_promos) } catch {}
       const stored = JSON.parse(data.cp_promos)
       const seedById = Object.fromEntries(SEED_PROMOS.map(p => [p.id, p]))
       const merged = stored.map(p => seedById[p.id] ?? p)
       const storedIds = new Set(stored.map(p => p.id))
       setPromos([...merged, ...SEED_PROMOS.filter(p => !storedIds.has(p.id))])
-    }
+    } catch {}
     if (data.cp_fiado)    { try { localStorage.setItem(mktKey('cp_fiado'), data.cp_fiado) } catch {} }
-    if (data.cp_cash)     { setCashMovements(JSON.parse(data.cp_cash));   try { localStorage.setItem(mktKey('cp_cash'),      data.cp_cash)      } catch {} }
-    if (data.cp_goal)     { setSalesGoalState(JSON.parse(data.cp_goal));  try { localStorage.setItem(mktKey('cp_goal'),      data.cp_goal)      } catch {} }
-    if (data.cp_operators)      { setOperators(JSON.parse(data.cp_operators));           try { localStorage.setItem(mktKey('cp_operators'),       data.cp_operators)       } catch {} }
-    if (data.cp_supplier_offers){ setSupplierOffers(JSON.parse(data.cp_supplier_offers)); try { localStorage.setItem(mktKey('cp_supplier_offers'), data.cp_supplier_offers); localStorage.setItem('cp_supplier_offers', data.cp_supplier_offers) } catch {} }
+    if (data.cp_cash)     try { setCashMovements(JSON.parse(data.cp_cash));   try { localStorage.setItem(mktKey('cp_cash'),      data.cp_cash)      } catch {} } catch {}
+    if (data.cp_goal)     try { setSalesGoalState(JSON.parse(data.cp_goal));  try { localStorage.setItem(mktKey('cp_goal'),      data.cp_goal)      } catch {} } catch {}
+    if (data.cp_operators)       try { setOperators(JSON.parse(data.cp_operators));            try { localStorage.setItem(mktKey('cp_operators'),       data.cp_operators)       } catch {} } catch {}
+    if (data.cp_supplier_offers) try { setSupplierOffers(JSON.parse(data.cp_supplier_offers)); try { localStorage.setItem(mktKey('cp_supplier_offers'), data.cp_supplier_offers); localStorage.setItem('cp_supplier_offers', data.cp_supplier_offers) } catch {} } catch {}
 
     // Push local keys not yet on server
     if (!data.cp_customers) setCustomers(c  => { syncToServer('cp_customers', JSON.stringify(c));  return c })
