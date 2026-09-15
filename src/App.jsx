@@ -30,6 +30,7 @@ const PainelTV       = lazy(() => import('./pages/PainelTV.jsx'))
 const VitrinaDigital = lazy(() => import('./pages/VitrinaDigital.jsx'))
 const Guia           = lazy(() => import('./pages/Guia.jsx'))
 const MasterPainel   = lazy(() => import('./pages/MasterPainel.jsx'))
+const CaixaLogin     = lazy(() => import('./pages/CaixaLogin.jsx'))
 
 function PageSpinner() {
   return (
@@ -77,6 +78,7 @@ export default function App() {
           <Route path="/loja/:storeSlug" element={<VitrinaDigital />} />
           <Route path="/guia"         element={<Guia />} />
           <Route path="/painel"       element={<MasterPainel />} />
+          <Route path="/caixa"        element={<CaixaLogin />} />
           {/* /ofertas — pública, mercados acessam sem login PDV */}
           <Route path="/ofertas"      element={<Ofertas />} />
 
