@@ -96,13 +96,7 @@ export default function Login() {
         navigate(from, { replace: true })
         return
       }
-
-      if (res.status === 401) {
-        // Server explicitly rejected → don't fall through to local check
-        setErr('Usuário ou senha incorretos.')
-        setLoading(false)
-        return
-      }
+      // Server said no (user not registered yet or wrong pass) → fall through to local
     } catch {
       // Network/server error → fall back to local credentials (offline support)
     }
