@@ -1,4 +1,4 @@
-# Corta Preços MVP — Project Notes (v4.0 — 2026-08)
+# Corta Preços MVP — Project Notes (v5.0 — 2026-08)
 
 ## What this is
 React + Vite + Tailwind MVP platform for retail management (PDV/automação comercial), Brazilian supermarket.
@@ -400,3 +400,170 @@ NÃO use deploy via ZIP API — não inclui funções!
 - **INDIVIDUAL**: TabOfertas → clicar 📤 ao lado da oferta → BlastScreen → envia essa oferta específica
 - **TODAS DE UMA VEZ**: TabInicio → "📣 Disparar para todos" → usa buildDailyBlastMsg() → envia todas as offers ativas
 - **Preview do link**: compartilhar `https://zatendestock.netlify.app/ofertas?s=mega` → mostra "Mega Tudo Barato" + og-mega.png
+
+
+---
+
+## SESSION v5.0 — Performance + Roles + Operator Login (2026-08)
+
+### Commits desta sessão
+```
+5f4548d  fix: scroll-to-top ao digitar em Configuracoes
+06456ba  feat: role-based access + operator login (PIN) + multi-terminal
+06236e2  perf+fix: lazy routes + manual chunks + upsertProduct new-id bug
+```
+
+### Deploy rápido (sem git push)
+```bash
+cd /workspace/project
+npm run build && npx netlify deploy --prod --dir=dist --no-build
+# Netlify CLI já autenticado como agn.girardi@gmail.com (nfp_wuQ15ioS6isEZF3V3kPVL7LixCrPpUMY1ca2)
+```
+
+### Git push para GitHub
+O remote já tem o token embutido mas ele expirou. Para empurrar:
+```bash
+# Gerar novo token em github.com → Settings → Developer settings → Personal access tokens
+# Escopo mínimo: repo (Contents: Write) no repo neteraa/corta-precos-pdv
+git remote set-url origin https://SEU_TOKEN@github.com/neteraa/corta-precos-pdv.git
+git push origin master
+```
+
+---
+
+## Auth & Role System (`src/utils/auth.js`) — v5.0
+
+### Session object (`cp_session` no localStorage)
+```js
+{
+  loggedIn:     true,
+  user:         'admin',     // username do login admin
+  storeId:      'default',   // namespace do tenant
+  role:         'admin',     // 'admin' | 'gerente' | 'caixa'
+  operatorId:   'op_xxx',    // preenchido por loginAsOperator()
+  operatorName: 'João',      // preenchido por loginAsOperator()
+  terminalId:   1,           // preenchido por loginAsOperator()
+}
+```
+
+### Funções exportadas
+| Função | Descrição |
+|--------|-----------|
+| `getSession()` | Retorna objeto session completo |
+| `getRole()` | `'admin'` por padrão (sessões legadas sem role = admin) |
+| `getOperatorName()` | Nome do operador ou username |
+| `getTerminalId()` | Número do terminal (default 1) |
+| `loginAsOperator(op)` | Grava session preservando storeId, adiciona role/terminalId |
+| `isLoggedIn()` | `session.loggedIn === true` |
+| `logout()` | Remove `cp_session` |
+
+### Permissões por role
+| Role | Acesso |
+|------|--------|
+| `admin` | Tudo |
+| `gerente` | Tudo exceto `/produtos` e `/configuracoes` |
+| `caixa` | Só `/pdv` e `/fiado`; qualquer outra rota → redirect automático para `/pdv` |
+
+`RequireRole` em App.jsx intercepta antes de renderizar o Layout.
+
+---
+
+## Login (`src/pages/Login.jsx`) — v5.0
+
+### Com operadores cadastrados (fluxo normal)
+1. Tab "Acesso ao sistema" → mostra tiles de operadores ("Quem está no caixa?")
+2. Clicar no nome → PIN keypad (6 dígitos, pontos coloridos por role)
+3. PIN certo → `loginAsOperator(op)` → caixa vai para /pdv, gerente/admin vai para /dashboard
+4. Botão "Acesso Admin / Sistema" (collapsível) revela o form usuário+senha clássico
+
+### readOperators() — lê localStorage sem useStore()
+```js
+const storeId = JSON.parse(localStorage.getItem('cp_session'))?.storeId ?? 'default'
+const raw = localStorage.getItem(`mkt:${storeId}:cp_operators`)
+         ?? localStorage.getItem('cp_operators')
+```
+
+### Sem operadores cadastrados
+Mostra direto o formulário admin/senha (retrocompatível).
+
+---
+
+## Layout (`src/components/Layout.jsx`) — v5.0
+
+### Operator badge (sidebar, entre o logo e o menu)
+Mostra avatar (primeira letra), nome e role/terminal. Cores: admin=laranja, gerente=roxo, caixa=verde.
+
+### Nav filtering por role
+```js
+// cada item tem roles?: string[]  (ausente = todos veem)
+const ROLE_META = {
+  '/pdv':          { /* sem roles — todos */ },
+  '/fiado':        { /* sem roles — todos */ },
+  '/produtos':     roles: ['admin'],
+  '/configuracoes':roles: ['admin'],
+  // gerente vê tudo menos os dois acima
+}
+filterByRole(items, role)  // filtra antes do render
+```
+
+---
+
+## Configuracoes (`src/pages/Configuracoes.jsx`) — v5.0
+
+### BUG RESOLVIDO: scroll-to-top ao digitar
+**Causa raiz:** `Field` e `Section` definidos DENTRO de `Configuracoes()` → nova referência de componente a cada render → React unmount/remount → browser scroll pro topo.
+**Fix:** todos os sub-componentes movidos para escopo de módulo.
+**Regra:** NUNCA definir componentes React dentro de outro componente. Sempre fora da função.
+
+### Sub-componentes (escopo de módulo — não mover para dentro da função)
+- `Field` — wrapper label + input
+- `Section` — card com header
+- `ROLE_META` — metadados de role (label, color, bg, border, desc)
+- `OperatorCard` — card com avatar, badge role colorido, terminal, pontos PIN
+- `AddOperatorForm` — form auto-contido; estado interno próprio, pai não re-renderiza
+
+### Operator object
+```js
+{ id, name, role: 'admin'|'gerente'|'caixa', pin: '1234', terminalId: 1 }
+```
+`terminalId` só relevante para role `caixa`.
+
+---
+
+## Performance — Bundle Split (v5.0)
+
+| Chunk | Conteúdo | Download inicial |
+|-------|----------|-----------------|
+| `index.js` | App shell + React + Router | ~86 KB gzip |
+| `vendor-charts` | Recharts | lazy (só /relatorio, /dashboard) |
+| `vendor-pdf` | jsPDF (177 KB) | lazy (só /etiquetas) |
+| `vendor-qr` | qrcode | lazy (só /fidelidade) |
+| `[page].js` | Cada página | lazy (só quando visitada) |
+
+Redução: 1990 KB → 430 KB JS inicial (gzip: 519 KB → 86 KB, **-83%**).
+
+---
+
+## Fechamento de Caixa (`src/pages/Dashboard.jsx`)
+
+Botão "Fechar Caixa" no header. Modal `showCaixa` com:
+- KPIs do dia: vendas, faturamento, ticket médio, margem estimada
+- Breakdown por forma de pagamento com barra de progresso
+- Top produtos do dia
+- Descontos dados no dia
+- Sangria (retirada) / Suprimento (entrada) com histórico e saldo atual
+- Botão Imprimir → janela nova com cupom formatado em monospace
+
+`cashMovements[]` → store.jsx → persistido em `cp_cashMovements` (namespaced).
+`caixaStats` → `useMemo` filtrando sales + cashMovements de hoje.
+
+---
+
+## Credenciais rápidas
+
+| Sistema | User | Senha | URL |
+|---------|------|-------|-----|
+| Mercado (admin) | `admin` | `1234` | /login |
+| Distribuidor | `megatudo` | `mega2024` | /fornecedor |
+| Caixas | tile → PIN | configurado em /configuracoes | /login |
+
