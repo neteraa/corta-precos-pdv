@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import PRODUCTS_SEED from './utils/products_seed.json'
 import { getAllPhotos, savePhoto as dbSavePhoto, deletePhoto as dbDeletePhoto } from './utils/photoDb.js'
-import { mktKey, migrateAndGet } from './utils/tenantStorage.js'
+import { mktKey, migrateAndGet, getMktStoreId } from './utils/tenantStorage.js'
 
 /* ── formatting helpers ─────────────────────────────────────── */
 export const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -129,7 +129,7 @@ function captureSellOut(saleItems, currentProducts) {
 
     fetch('/api/persist', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: SELLOUT_KEY, value: JSON.stringify(merged) }),
+      body: JSON.stringify({ key: SELLOUT_KEY, value: JSON.stringify(merged), storeId }),
     }).catch(() => {})
   } catch {}
 }
@@ -205,14 +205,15 @@ export function StoreProvider({ children }) {
     try { localStorage.setItem(mktKey('cp_expiry_days'), String(n)) } catch {}
   }, [])
 
-  // ── Persist: namespaced localStorage + flat server key (fire-and-forget) ──
+  // ── Persist: namespaced localStorage + storeId-prefixed server key ──
   const persist = useCallback((baseKey, val) => {
-    const str = JSON.stringify(val)
+    const str     = JSON.stringify(val)
+    const storeId = getMktStoreId()
     try { localStorage.setItem(mktKey(baseKey), str) } catch {}
     fetch('/api/persist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: baseKey, value: str }),  // server key stays flat (Netlify Blobs compat)
+      body: JSON.stringify({ key: baseKey, value: str, storeId }),
     }).catch(() => {})
   }, [])
 
@@ -223,10 +224,11 @@ export function StoreProvider({ children }) {
   // ── Core restore function — called on mount and on interval ──
   const applyServerData = useCallback((data) => {
     if (!data) return
+    const storeId = getMktStoreId()
     const syncToServer = (key, value) =>
       fetch('/api/persist', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value }),
+        body: JSON.stringify({ key, value, storeId }),
       }).catch(() => {})
 
     if (data.cp_products) try {
@@ -268,7 +270,8 @@ export function StoreProvider({ children }) {
   // ── Manual sync (exposed to UI) ──────────────────────────────
   const syncNow = useCallback(() => {
     setSyncing(true)
-    fetch('/api/restore')
+    const storeId = getMktStoreId()
+    fetch(`/api/restore?storeId=${storeId}`)
       .then(r => r.json())
       .then(({ ok, data }) => { if (ok) applyServerData(data) })
       .catch(() => {})

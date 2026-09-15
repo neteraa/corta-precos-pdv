@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
-import { Database, RotateCcw, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2 } from 'lucide-react'
+import { Database, RotateCcw, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, Fingerprint, Copy, Check } from 'lucide-react'
 import { useStore } from '../store.jsx'
 import { parseGdoorCsv } from '../utils/importCsv.js'
 import { usePrinter, savePrinterSettings } from '../hooks/usePrinter.js'
 import PixQR from '../components/PixQR.jsx'
-import { getCredentials, saveCredentials } from '../utils/auth.js'
+import { getCredentials, saveCredentials, getConfiguredStoreId, saveStoreId, slugify } from '../utils/auth.js'
 
 /* ── Stable sub-components (MUST be outside the page fn to avoid remount-on-type) ── */
 const Field = ({ label, hint, children }) => (
@@ -193,6 +193,26 @@ export default function Configuracoes() {
   const [showPass, setShowPass]   = useState(false)
   const [authMsg,  setAuthMsg]    = useState(null) // {type:'ok'|'err', text}
 
+  // ── Store ID (installation identity) ─────────────────────
+  const [storeIdInput, setStoreIdInput] = useState(getConfiguredStoreId)
+  const [storeIdMsg,   setStoreIdMsg]   = useState(null)
+  const [copied,       setCopied]       = useState(false)
+  const storeIdPreview = slugify(storeIdInput)
+
+  const saveStore = () => {
+    if (!storeIdInput.trim()) return
+    const saved = saveStoreId(storeIdInput.trim())
+    setStoreIdInput(saved)
+    setStoreIdMsg({ type: 'ok', text: `✅ ID salvo: ${saved}` })
+    setTimeout(() => setStoreIdMsg(null), 3000)
+  }
+
+  const copyId = () => {
+    navigator.clipboard.writeText(storeIdPreview).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
   const saveAuth = () => {
     setAuthMsg(null)
     if (!authForm.username.trim()) return setAuthMsg({ type: 'err', text: 'Usuário não pode ser vazio.' })
@@ -366,6 +386,68 @@ export default function Configuracoes() {
             </div>
           ))}
         </div>
+      </Section>
+
+      {/* ── Identificação da Instalação ────────────────────────── */}
+      <Section icon={Fingerprint} title="Identificação desta Instalação">
+        <p className="text-sm text-gray-500 mb-4">
+          Cada mercado precisa de um <strong>ID único</strong> para que os dados fiquem completamente separados no servidor.
+          Configure uma vez e nunca mais mude.
+        </p>
+
+        <div className="mb-3">
+          <label className="label">Nome do mercado (gera o ID automaticamente)</label>
+          <input
+            className="input"
+            value={storeIdInput}
+            onChange={e => setStoreIdInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && saveStore()}
+            placeholder="ex: cortaprecos, mercadoxpto"
+          />
+        </div>
+
+        {/* Preview do ID gerado */}
+        <div className="flex items-center gap-3 bg-gray-900 rounded-xl px-4 py-3 mb-4">
+          <div className="flex-1">
+            <div className="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">ID gerado</div>
+            <div className="font-mono font-black text-green-400 text-lg tracking-wider">
+              {storeIdPreview || '—'}
+            </div>
+          </div>
+          <button onClick={copyId}
+            className="flex items-center gap-1.5 text-xs text-gray-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-gray-700">
+            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+            {copied ? 'Copiado!' : 'Copiar'}
+          </button>
+        </div>
+
+        {storeIdPreview === 'default' && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-sm text-yellow-700 mb-3 flex gap-2">
+            <span className="text-lg">⚠️</span>
+            <div>
+              <strong>ID padrão detectado.</strong> Se este é um mercado novo, troca o ID para algo único
+              (ex: o nome do mercado). Do contrário, os dados podem se misturar com outros mercados que usam o padrão.
+            </div>
+          </div>
+        )}
+
+        {storeIdMsg && (
+          <div className={`mb-3 px-4 py-2.5 rounded-xl text-sm font-medium ${
+            storeIdMsg.type === 'ok'
+              ? 'bg-green-500/10 text-green-700 border border-green-200'
+              : 'bg-red-500/10 text-red-600 border border-red-200'
+          }`}>{storeIdMsg.text}</div>
+        )}
+
+        <button onClick={saveStore} disabled={!storeIdPreview || storeIdPreview === getConfiguredStoreId()}
+          className="btn-primary disabled:opacity-40">
+          <Save className="w-4 h-4" /> Salvar ID do mercado
+        </button>
+
+        <p className="text-xs text-gray-400 mt-3">
+          💡 Cada computador de caixa deste mercado deve ter o mesmo ID configurado aqui.
+          Mercados diferentes = IDs diferentes = dados 100% separados no servidor.
+        </p>
       </Section>
 
       {/* ── Acesso / Login ─────────────────────────────────────── */}

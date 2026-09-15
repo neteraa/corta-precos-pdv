@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User, MessageCircle, CheckCircle2, Package, TrendingUp, Users, ChevronDown } from 'lucide-react'
-import { getCredentials, loginAsOperator } from '../utils/auth.js'
+import { getCredentials, loginAsOperator, getConfiguredStoreId } from '../utils/auth.js'
 import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
 
 const WHATSAPP = '5511985950956'
@@ -76,7 +76,7 @@ export default function Login() {
     setTimeout(() => {
       const { username, password } = getCredentials()
       if (user.trim() === username && pass === password) {
-        localStorage.setItem('cp_session', JSON.stringify({ loggedIn: true, user: user.trim(), storeId: 'default', role: 'admin' }))
+        localStorage.setItem('cp_session', JSON.stringify({ loggedIn: true, user: user.trim(), storeId: getConfiguredStoreId(), role: 'admin' }))
         navigate(from, { replace: true })
       } else {
         setErr('Usuário ou senha incorretos.')

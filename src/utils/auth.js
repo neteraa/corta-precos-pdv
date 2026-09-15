@@ -1,7 +1,33 @@
-const DEFAULT_USER = 'admin'
-const DEFAULT_PASS = '1234'
-const CREDS_KEY    = 'cp_creds'
-const SESSION_KEY  = 'cp_session'
+const DEFAULT_USER  = 'admin'
+const DEFAULT_PASS  = '1234'
+const CREDS_KEY     = 'cp_creds'
+const SESSION_KEY   = 'cp_session'
+const STORE_ID_KEY  = 'cp_store_id'   // flat — set once per installation
+
+/** Slug a store name into a safe storeId. e.g. "Corta Preços" → "cortaprecos" */
+export function slugify(name = '') {
+  return name.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // strip accents
+    .replace(/[^a-z0-9]+/g, '')                         // keep alphanumeric only
+    .slice(0, 32) || 'default'
+}
+
+/** Returns the storeId configured for THIS browser installation. */
+export function getConfiguredStoreId() {
+  return localStorage.getItem(STORE_ID_KEY) || 'default'
+}
+
+/** Persist a new storeId for this installation and patch the active session. */
+export function saveStoreId(id) {
+  const safe = slugify(id) || 'default'
+  localStorage.setItem(STORE_ID_KEY, safe)
+  // patch current session so everything picks it up immediately
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY)) ?? {}
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ ...s, storeId: safe }))
+  } catch {}
+  return safe
+}
 
 export function getCredentials() {
   try {

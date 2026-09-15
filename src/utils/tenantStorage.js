@@ -12,7 +12,7 @@
 const MKT_SESSION_KEY  = 'cp_session'
 const FORN_SESSION_KEY = 'cp_session_v1'
 
-function getMktStoreId() {
+export function getMktStoreId() {
   try { return JSON.parse(localStorage.getItem(MKT_SESSION_KEY))?.storeId ?? 'default' }
   catch { return 'default' }
 }
