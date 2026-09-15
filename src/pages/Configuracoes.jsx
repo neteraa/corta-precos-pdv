@@ -1,10 +1,176 @@
 import React, { useState } from 'react'
-import { Database, RotateCcw, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, ShieldCheck } from 'lucide-react'
+import { Database, RotateCcw, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2 } from 'lucide-react'
 import { useStore } from '../store.jsx'
 import { parseGdoorCsv } from '../utils/importCsv.js'
 import { usePrinter, savePrinterSettings } from '../hooks/usePrinter.js'
 import PixQR from '../components/PixQR.jsx'
 import { getCredentials, saveCredentials } from '../utils/auth.js'
+
+/* ── Stable sub-components (MUST be outside the page fn to avoid remount-on-type) ── */
+const Field = ({ label, hint, children }) => (
+  <div>
+    <label className="label">{label}</label>
+    {children}
+    {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
+  </div>
+)
+
+const Section = ({ icon: Icon, title, children }) => (
+  <div className="card p-5">
+    <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+      <Icon className="w-4 h-4 text-brand-600" />
+      <h2 className="font-bold text-gray-800">{title}</h2>
+    </div>
+    {children}
+  </div>
+)
+
+const ROLE_META = {
+  admin:   { label: 'Admin',   color: '#f97316', bg: '#fff7ed', border: '#fed7aa', desc: 'Acesso total ao sistema' },
+  gerente: { label: 'Gerente', color: '#8b5cf6', bg: '#faf5ff', border: '#ddd6fe', desc: 'Tudo exceto configurações' },
+  caixa:   { label: 'Caixa',   color: '#22c55e', bg: '#f0fdf4', border: '#bbf7d0', desc: 'PDV + Fiado' },
+}
+
+function OperatorCard({ op, onDelete }) {
+  const meta = ROLE_META[op.role] ?? ROLE_META.caixa
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all hover:shadow-sm"
+      style={{ background: meta.bg, borderColor: meta.border }}>
+      {/* Avatar */}
+      <div className="w-10 h-10 rounded-full flex items-center justify-center font-black text-lg flex-shrink-0"
+        style={{ background: meta.color + '22', color: meta.color, border: `2px solid ${meta.color}` }}>
+        {op.name[0]?.toUpperCase()}
+      </div>
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="font-bold text-gray-800 text-sm leading-tight">{op.name}</div>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full"
+            style={{ background: meta.color + '18', color: meta.color }}>
+            {meta.label}
+          </span>
+          {op.terminalId && (
+            <span className="text-[10px] text-gray-500 font-semibold">📟 Terminal {op.terminalId}</span>
+          )}
+          {op.pin && (
+            <span className="text-[10px] text-gray-400 font-mono tracking-widest">
+              {'•'.repeat(op.pin.length)}
+            </span>
+          )}
+        </div>
+      </div>
+      {/* Delete */}
+      <button onClick={() => onDelete(op)}
+        className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0">
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
+  )
+}
+
+function AddOperatorForm({ onAdd }) {
+  const [form, setForm] = useState({ name: '', role: 'caixa', pin: '', terminalId: '1' })
+  const [pinFocus, setPinFocus] = useState(false)
+  const meta = ROLE_META[form.role] ?? ROLE_META.caixa
+
+  const submit = () => {
+    if (!form.name.trim()) return
+    onAdd({
+      name:       form.name.trim(),
+      role:       form.role,
+      pin:        form.pin,
+      terminalId: form.role === 'caixa' ? (parseInt(form.terminalId) || 1) : undefined,
+    })
+    setForm({ name: '', role: 'caixa', pin: '', terminalId: '1' })
+  }
+
+  return (
+    <div className="rounded-2xl border-2 border-dashed p-4 space-y-3 transition-all"
+      style={{ borderColor: meta.color + '55', background: meta.bg }}>
+
+      {/* Role selector — big pill tabs */}
+      <div className="flex gap-2">
+        {Object.entries(ROLE_META).map(([key, m]) => (
+          <button key={key} type="button"
+            onClick={() => setForm(f => ({ ...f, role: key }))}
+            className="flex-1 py-2 rounded-xl text-xs font-black transition-all border-2"
+            style={{
+              borderColor:  form.role === key ? m.color : 'transparent',
+              background:   form.role === key ? m.color + '18' : '#f9fafb',
+              color:        form.role === key ? m.color : '#9ca3af',
+            }}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      <p className="text-xs text-gray-500 text-center -mt-1">{meta.desc}</p>
+
+      {/* Name + Terminal row */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="col-span-2">
+          <label className="label text-xs">Nome do funcionário</label>
+          <input
+            className="input"
+            value={form.name}
+            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+            onKeyDown={e => e.key === 'Enter' && submit()}
+            placeholder="Ex: João Silva"
+          />
+        </div>
+        <div>
+          <label className="label text-xs">{form.role === 'caixa' ? '📟 Terminal' : 'Terminal'}</label>
+          <input
+            type="number" min={1} max={20}
+            className="input text-center font-bold"
+            value={form.terminalId}
+            onChange={e => setForm(f => ({ ...f, terminalId: e.target.value }))}
+            disabled={form.role !== 'caixa'}
+            style={{ opacity: form.role !== 'caixa' ? 0.35 : 1 }}
+          />
+        </div>
+      </div>
+
+      {/* PIN field with dot preview */}
+      <div>
+        <label className="label text-xs">PIN de acesso (opcional)</label>
+        <div className="relative">
+          <input
+            className="input pr-24 font-mono tracking-widest"
+            maxLength={6}
+            value={form.pin}
+            onChange={e => setForm(f => ({ ...f, pin: e.target.value.replace(/\D/g, '') }))}
+            onFocus={() => setPinFocus(true)}
+            onBlur={() => setPinFocus(false)}
+            placeholder="Ex: 1234"
+            type={pinFocus ? 'text' : 'password'}
+          />
+          {/* dot preview */}
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1.5">
+            {[0,1,2,3,4,5].map(i => (
+              <div key={i} className="w-2 h-2 rounded-full transition-all duration-150"
+                style={{ background: form.pin.length > i ? meta.color : '#e5e7eb' }} />
+            ))}
+          </div>
+        </div>
+        {!form.pin && <p className="text-[10px] text-gray-400 mt-1">Sem PIN = funcionário entra sem senha</p>}
+      </div>
+
+      {/* Submit */}
+      <button type="button" onClick={submit}
+        disabled={!form.name.trim()}
+        className="w-full py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2"
+        style={{
+          background: form.name.trim() ? meta.color : '#f3f4f6',
+          color:      form.name.trim() ? '#fff' : '#9ca3af',
+          boxShadow:  form.name.trim() ? `0 4px 16px ${meta.color}40` : 'none',
+        }}>
+        <Plus className="w-4 h-4" />
+        Adicionar {meta.label}
+      </button>
+    </div>
+  )
+}
 
 export default function Configuracoes() {
   const { products, sales, customers, importProducts, resetAll, operators, upsertOperator, deleteOperator } = useStore()
@@ -26,9 +192,6 @@ export default function Configuracoes() {
   })
   const [showPass, setShowPass]   = useState(false)
   const [authMsg,  setAuthMsg]    = useState(null) // {type:'ok'|'err', text}
-
-  // Operators
-  const [opForm,   setOpForm]     = useState({ name: '', role: 'caixa', pin: '', terminalId: 1 })
 
   const saveAuth = () => {
     setAuthMsg(null)
@@ -103,24 +266,6 @@ export default function Configuracoes() {
     } catch (err) { alert('Erro ao ler NF-e: ' + err.message) }
     e.target.value = ''
   }
-
-  const Field = ({ label, hint, children }) => (
-    <div>
-      <label className="label">{label}</label>
-      {children}
-      {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
-    </div>
-  )
-
-  const Section = ({ icon: Icon, title, children }) => (
-    <div className="card p-5">
-      <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-        <Icon className="w-4 h-4 text-brand-600" />
-        <h2 className="font-bold text-gray-800">{title}</h2>
-      </div>
-      {children}
-    </div>
-  )
 
   return (
     <div className="space-y-4 max-w-2xl animate-pop">
@@ -279,65 +424,22 @@ export default function Configuracoes() {
 
       {/* ── Operadores ──────────────────────────────────────────── */}
       <Section icon={Users} title="Operadores de Caixa">
-        <p className="text-sm text-gray-500 mb-3">
-          Cadastre os funcionários que usam o PDV. O operador aparece no histórico de vendas.
+        <p className="text-sm text-gray-500 mb-4">
+          Cada funcionário entra com seu nome + PIN. O caixa só vê o PDV; o gerente vê tudo exceto configurações.
         </p>
-        <div className="space-y-2 mb-3">
-          {operators.length === 0 && <p className="text-sm text-gray-400">Nenhum operador cadastrado.</p>}
-          {operators.map(op => (
-            <div key={op.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2.5 border border-gray-200">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className={`w-4 h-4 ${op.role === 'admin' ? 'text-orange-500' : op.role === 'gerente' ? 'text-purple-500' : 'text-blue-500'}`} />
-                <div>
-                  <div className="font-semibold text-sm text-gray-800">{op.name}</div>
-                  <div className="text-xs text-gray-400">
-                    {op.role === 'admin' ? 'Admin (acesso total)' : op.role === 'gerente' ? 'Gerente (sem config)' : 'Caixa (PDV + Fiado)'}
-                    {op.terminalId ? ` · Terminal ${op.terminalId}` : ''}
-                    {op.pin ? ` · PIN: ${op.pin}` : ''}
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => { if (confirm(`Remover ${op.name}?`)) deleteOperator(op.id) }}
-                className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50">
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <Field label="Nome do operador">
-            <input value={opForm.name} onChange={e => setOpForm(f => ({ ...f, name: e.target.value }))}
-              placeholder="Ex: João" className="input" />
-          </Field>
-          <Field label="Perfil">
-            <select value={opForm.role} onChange={e => setOpForm(f => ({ ...f, role: e.target.value }))} className="input">
-              <option value="caixa">Caixa (PDV + Fiado)</option>
-              <option value="gerente">Gerente (sem config)</option>
-              <option value="admin">Admin (acesso total)</option>
-            </select>
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="PIN (opcional)">
-            <input value={opForm.pin} onChange={e => setOpForm(f => ({ ...f, pin: e.target.value }))}
-              placeholder="Ex: 1234" maxLength={6} className="input" />
-          </Field>
-          <Field label={opForm.role === 'caixa' ? 'Nº Terminal' : 'Terminal (N/A)'}>
-            <input type="number" min={1} max={99} value={opForm.terminalId}
-              onChange={e => setOpForm(f => ({ ...f, terminalId: Number(e.target.value) || 1 }))}
-              disabled={opForm.role !== 'caixa'}
-              placeholder="1" className="input" />
-          </Field>
-        </div>
-        <button
-          onClick={() => {
-            if (!opForm.name.trim()) return
-            upsertOperator({ name: opForm.name.trim(), role: opForm.role, pin: opForm.pin, terminalId: opForm.role === 'caixa' ? (opForm.terminalId || 1) : undefined })
-            setOpForm({ name: '', role: 'caixa', pin: '', terminalId: 1 })
-          }}
-          className="btn-primary mt-3">
-          <Plus className="w-4 h-4" /> Adicionar Operador
-        </button>
+
+        {/* Operator cards */}
+        {operators.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {operators.map(op => (
+              <OperatorCard key={op.id} op={op}
+                onDelete={op => { if (confirm(`Remover ${op.name}?`)) deleteOperator(op.id) }} />
+            ))}
+          </div>
+        )}
+
+        {/* Add form — self-contained, no state in parent → no scroll jump */}
+        <AddOperatorForm onAdd={op => upsertOperator(op)} />
       </Section>
 
       {/* ── Reset ──────────────────────────────────────────────── */}
