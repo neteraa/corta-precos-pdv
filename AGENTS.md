@@ -421,12 +421,11 @@ npm run build && npx netlify deploy --prod --dir=dist --no-build
 ```
 
 ### Git push para GitHub
-O remote já tem o token embutido mas ele expirou. Para empurrar:
 ```bash
-# Gerar novo token em github.com → Settings → Developer settings → Personal access tokens
-# Escopo mínimo: repo (Contents: Write) no repo neteraa/corta-precos-pdv
-git remote set-url origin https://SEU_TOKEN@github.com/neteraa/corta-precos-pdv.git
+# Token: pedir ao usuário (GitHub → Settings → Developer settings → Tokens → corta-precos-push1, expira ~Nov 2026)
+git remote set-url origin https://TOKEN@github.com/neteraa/corta-precos-pdv.git
 git push origin master
+git remote set-url origin https://github.com/neteraa/corta-precos-pdv.git  # limpar token após push
 ```
 
 ---
