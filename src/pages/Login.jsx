@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User, MessageCircle, CheckCircle2, Package, TrendingUp, Users, ChevronDown } from 'lucide-react'
 import { getCredentials, loginAsOperator, getConfiguredStoreId } from '../utils/auth.js'
@@ -46,10 +46,31 @@ export default function Login() {
   const [showAdminForm, setShowAdminForm] = useState(false)
 
   /* ── operator PIN state ── */
-  const operators = useMemo(readOperators, [])
+  const localOps = useMemo(readOperators, [])
+  const [remoteOps, setRemoteOps] = useState([])
+  const operators = localOps.length > 0 ? localOps : remoteOps
+
   const [selectedOp, setSelectedOp] = useState(null)
   const [pin, setPin]               = useState('')
   const [pinErr, setPinErr]         = useState(false)
+
+  // Fetch operators from server if localStorage is empty (cross-device support)
+  useEffect(() => {
+    if (localOps.length > 0) return
+    const storeId = getConfiguredStoreId()
+    fetch(`/api/restore?storeId=${storeId}`)
+      .then(r => r.json())
+      .then(({ ok, data }) => {
+        if (!ok || !data?.cp_operators) return
+        const ops = JSON.parse(data.cp_operators)
+        if (ops.length > 0) {
+          // Cache locally so next load is instant
+          try { localStorage.setItem(`mkt:${storeId}:cp_operators`, data.cp_operators) } catch {}
+          setRemoteOps(ops)
+        }
+      })
+      .catch(() => {})
+  }, [localOps.length])
 
   const handlePin = (k) => {
     if (k === '⌫') { setPin(p => p.slice(0, -1)); setPinErr(false); return }
