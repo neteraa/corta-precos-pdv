@@ -69,20 +69,58 @@ export default function Login() {
     }
   }
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     setErr('')
     setLoading(true)
-    setTimeout(() => {
-      const { username, password } = getCredentials()
-      if (user.trim() === username && pass === password) {
-        localStorage.setItem('cp_session', JSON.stringify({ loggedIn: true, user: user.trim(), storeId: getConfiguredStoreId(), role: 'admin' }))
+
+    try {
+      // 1️⃣  Try server-side auth (registered markets)
+      const res = await fetch('/api/auth', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username: user.trim(), password: pass }),
+      })
+      const data = await res.json()
+
+      if (data.ok) {
+        // Server validated → use the storeId the server returned
+        import('../utils/auth.js').then(({ saveStoreId }) => saveStoreId(data.storeId))
+        localStorage.setItem('cp_session', JSON.stringify({
+          loggedIn:  true,
+          user:      user.trim(),
+          storeId:   data.storeId,
+          storeName: data.storeName,
+          role:      'admin',
+        }))
         navigate(from, { replace: true })
-      } else {
+        return
+      }
+
+      if (res.status === 401) {
+        // Server explicitly rejected → don't fall through to local check
         setErr('Usuário ou senha incorretos.')
         setLoading(false)
+        return
       }
-    }, 400)
+    } catch {
+      // Network/server error → fall back to local credentials (offline support)
+    }
+
+    // 2️⃣  Fallback: localStorage credentials (offline / unregistered markets)
+    const { username: storedUser, password: storedPass } = getCredentials()
+    if (user.trim() === storedUser && pass === storedPass) {
+      localStorage.setItem('cp_session', JSON.stringify({
+        loggedIn: true,
+        user:     user.trim(),
+        storeId:  getConfiguredStoreId(),
+        role:     'admin',
+      }))
+      navigate(from, { replace: true })
+    } else {
+      setErr('Usuário ou senha incorretos.')
+      setLoading(false)
+    }
   }
 
   const openWhatsApp = (msg) => {
