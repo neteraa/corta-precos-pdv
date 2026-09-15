@@ -173,7 +173,7 @@ function AddOperatorForm({ onAdd }) {
 }
 
 export default function Configuracoes() {
-  const { products, sales, customers, importProducts, resetAll, operators, upsertOperator, deleteOperator } = useStore()
+  const { products, sales, customers, importProducts, resetAll, operators, upsertOperator, deleteOperator, syncOperators } = useStore()
   const { settings, setSettings } = usePrinter()
   const [form, setForm] = useState(() => ({
     storeName:  settings.storeName  || 'CORTA PRECOS',
@@ -534,6 +534,15 @@ export default function Configuracoes() {
                 onDelete={op => { if (confirm(`Remover ${op.name}?`)) deleteOperator(op.id) }} />
             ))}
           </div>
+        )}
+
+        {/* Force-sync button */}
+        {operators.length > 0 && (
+          <button
+            onClick={() => { syncOperators(); alert('Operadores sincronizados! O link /caixa já vai funcionar em qualquer dispositivo.') }}
+            className="w-full mb-3 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-orange-500/40 text-orange-400 hover:bg-orange-500/10 text-sm font-semibold transition-colors">
+            🔄 Sincronizar operadores com o servidor
+          </button>
         )}
 
         {/* Add form — self-contained, no state in parent → no scroll jump */}

@@ -449,6 +449,10 @@ export function StoreProvider({ children }) {
     setOperators(prev => { const next = prev.filter(x => x.id !== id); persist('cp_operators', next); return next })
   }, [persist])
 
+  const syncOperators = useCallback(() => {
+    setOperators(prev => { persist('cp_operators', prev); return prev })
+  }, [persist])
+
   const resetAll = useCallback(() => {
     setProducts(SEED_PRODUCTS); setSales(SEED_SALES); setCustomers(SEED_CUSTOMERS); setPromos(SEED_PROMOS)
     ;['cp_products','cp_sales','cp_customers','cp_promos'].forEach(k => localStorage.removeItem(mktKey(k)))
@@ -464,7 +468,7 @@ export function StoreProvider({ children }) {
       upsertPromo, deletePromo, assignPromoGroup,
       addFiado, payFiado,
       addCashMovement, setSalesGoal,
-      upsertOperator, deleteOperator,
+      upsertOperator, deleteOperator, syncOperators,
       resetAll,
       syncNow, lastSync, syncing,
       expiryAlertDays, setExpiryAlertDays,
