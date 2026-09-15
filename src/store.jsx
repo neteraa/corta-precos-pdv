@@ -300,9 +300,10 @@ export function StoreProvider({ children }) {
 
   const upsertProduct = useCallback((p) => {
     setProducts(prev => {
-      const next = p.id
+      const exists = p.id && prev.some(x => x.id === p.id)
+      const next = exists
         ? prev.map(x => x.id === p.id ? { ...x, ...p } : x)
-        : [...prev, { ...p, id: `p${Date.now()}` }]
+        : [...prev, { ...p, id: p.id ?? `p${Date.now()}` }]
       persist('cp_products', next); return next
     })
   }, [persist])
