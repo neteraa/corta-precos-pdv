@@ -2,7 +2,7 @@ import React, { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { StoreProvider } from './store.jsx'
 import Layout from './components/Layout.jsx'
-import { isLoggedIn } from './utils/auth.js'
+import { isLoggedIn, getRole } from './utils/auth.js'
 
 /* ── Lazy page chunks — each page loads only when first visited ── */
 const Login          = lazy(() => import('./pages/Login.jsx'))
@@ -47,6 +47,18 @@ function RequireAuth({ children }) {
   return children
 }
 
+/* Routes only admin/gerente can access — caixa goes to /pdv */
+const ADMIN_ONLY = new Set(['/dashboard','/produtos','/vendas','/estoque','/clientes','/relatorio','/etiquetas','/validade','/campanhas','/fidelidade','/flyer','/configuracoes','/promocoes','/ofertas'])
+
+function RequireRole({ children }) {
+  const location = useLocation()
+  const role = getRole()
+  if (role === 'caixa' && ADMIN_ONLY.has(location.pathname)) {
+    return <Navigate to="/pdv" replace />
+  }
+  return children
+}
+
 export default function App() {
   return (
     <StoreProvider>
@@ -66,7 +78,7 @@ export default function App() {
           {/* /ofertas — pública, mercados acessam sem login PDV */}
           <Route path="/ofertas"      element={<Ofertas />} />
 
-          <Route element={<RequireAuth><Layout /></RequireAuth>}>
+          <Route element={<RequireAuth><RequireRole><Layout /></RequireRole></RequireAuth>}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard"    element={<Dashboard />} />
             <Route path="/pdv"          element={<PDV />} />

@@ -28,7 +28,7 @@ export default function Configuracoes() {
   const [authMsg,  setAuthMsg]    = useState(null) // {type:'ok'|'err', text}
 
   // Operators
-  const [opForm,   setOpForm]     = useState({ name: '', role: 'caixa', pin: '' })
+  const [opForm,   setOpForm]     = useState({ name: '', role: 'caixa', pin: '', terminalId: 1 })
 
   const saveAuth = () => {
     setAuthMsg(null)
@@ -287,10 +287,14 @@ export default function Configuracoes() {
           {operators.map(op => (
             <div key={op.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2.5 border border-gray-200">
               <div className="flex items-center gap-2">
-                <ShieldCheck className={`w-4 h-4 ${op.role === 'admin' ? 'text-orange-500' : 'text-blue-500'}`} />
+                <ShieldCheck className={`w-4 h-4 ${op.role === 'admin' ? 'text-orange-500' : op.role === 'gerente' ? 'text-purple-500' : 'text-blue-500'}`} />
                 <div>
                   <div className="font-semibold text-sm text-gray-800">{op.name}</div>
-                  <div className="text-xs text-gray-400">{op.role === 'admin' ? 'Gerente (acesso total)' : 'Caixa (somente PDV)'} {op.pin ? `· PIN: ${op.pin}` : ''}</div>
+                  <div className="text-xs text-gray-400">
+                    {op.role === 'admin' ? 'Admin (acesso total)' : op.role === 'gerente' ? 'Gerente (sem config)' : 'Caixa (PDV + Fiado)'}
+                    {op.terminalId ? ` · Terminal ${op.terminalId}` : ''}
+                    {op.pin ? ` · PIN: ${op.pin}` : ''}
+                  </div>
                 </div>
               </div>
               <button onClick={() => { if (confirm(`Remover ${op.name}?`)) deleteOperator(op.id) }}
@@ -300,27 +304,36 @@ export default function Configuracoes() {
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 mb-2">
           <Field label="Nome do operador">
             <input value={opForm.name} onChange={e => setOpForm(f => ({ ...f, name: e.target.value }))}
               placeholder="Ex: João" className="input" />
           </Field>
           <Field label="Perfil">
             <select value={opForm.role} onChange={e => setOpForm(f => ({ ...f, role: e.target.value }))} className="input">
-              <option value="caixa">Caixa</option>
-              <option value="admin">Gerente</option>
+              <option value="caixa">Caixa (PDV + Fiado)</option>
+              <option value="gerente">Gerente (sem config)</option>
+              <option value="admin">Admin (acesso total)</option>
             </select>
           </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
           <Field label="PIN (opcional)">
             <input value={opForm.pin} onChange={e => setOpForm(f => ({ ...f, pin: e.target.value }))}
-              placeholder="1234" maxLength={6} className="input" />
+              placeholder="Ex: 1234" maxLength={6} className="input" />
+          </Field>
+          <Field label={opForm.role === 'caixa' ? 'Nº Terminal' : 'Terminal (N/A)'}>
+            <input type="number" min={1} max={99} value={opForm.terminalId}
+              onChange={e => setOpForm(f => ({ ...f, terminalId: Number(e.target.value) || 1 }))}
+              disabled={opForm.role !== 'caixa'}
+              placeholder="1" className="input" />
           </Field>
         </div>
         <button
           onClick={() => {
             if (!opForm.name.trim()) return
-            upsertOperator({ name: opForm.name.trim(), role: opForm.role, pin: opForm.pin })
-            setOpForm({ name: '', role: 'caixa', pin: '' })
+            upsertOperator({ name: opForm.name.trim(), role: opForm.role, pin: opForm.pin, terminalId: opForm.role === 'caixa' ? (opForm.terminalId || 1) : undefined })
+            setOpForm({ name: '', role: 'caixa', pin: '', terminalId: 1 })
           }}
           className="btn-primary mt-3">
           <Plus className="w-4 h-4" /> Adicionar Operador

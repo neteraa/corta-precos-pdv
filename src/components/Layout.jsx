@@ -9,7 +9,7 @@ import {
   BarChart2, Printer, CalendarClock, Megaphone, RefreshCw, Truck
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
-import { logout } from '../utils/auth.js'
+import { logout, getRole, getOperatorName, getTerminalId } from '../utils/auth.js'
 import { useStore } from '../store.jsx'
 
 function SyncBar() {
@@ -45,27 +45,32 @@ function SyncBar() {
 }
 
 /* ── nav sections ─────────────────────────────────────────── */
+// roles: which roles can see this item. Omit = everyone sees it.
 const CAIXA = [
   { to: '/pdv',       icon: ShoppingCart, label: 'PDV / Caixa',   hot: true },
-  { to: '/promocoes', icon: Tag,          label: 'Promoções' },
+  { to: '/promocoes', icon: Tag,          label: 'Promoções',     roles: ['admin','gerente'] },
 ]
 const GESTAO = [
-  { to: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/produtos',      icon: Package,         label: 'Produtos' },
-  { to: '/vendas',        icon: Receipt,         label: 'Vendas' },
-  { to: '/estoque',       icon: Warehouse,       label: 'Estoque' },
-  { to: '/clientes',      icon: Users,           label: 'Clientes' },
-  { to: '/fiado',         icon: HandCoins,       label: 'Fiado' },
-  { to: '/relatorio',     icon: BarChart2,        label: 'Relatório' },
+  { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',  roles: ['admin','gerente'] },
+  { to: '/produtos',   icon: Package,         label: 'Produtos',   roles: ['admin'] },
+  { to: '/vendas',     icon: Receipt,         label: 'Vendas',     roles: ['admin','gerente'] },
+  { to: '/estoque',    icon: Warehouse,       label: 'Estoque',    roles: ['admin','gerente'] },
+  { to: '/clientes',   icon: Users,           label: 'Clientes',   roles: ['admin','gerente'] },
+  { to: '/fiado',      icon: HandCoins,       label: 'Fiado' },
+  { to: '/relatorio',  icon: BarChart2,       label: 'Relatório',  roles: ['admin','gerente'] },
 ]
 const EXTRAS = [
-  { to: '/etiquetas',     icon: Printer,         label: 'Etiquetas' },
-  { to: '/validade',      icon: CalendarClock,   label: 'Validade' },
-  { to: '/campanhas',     icon: Megaphone,       label: 'Campanhas / ZAP', badge: 'NOVO' },
-  { to: '/fidelidade',    icon: QrCode,          label: 'Fidelidade / ZAP' },
-  { to: '/flyer',         icon: Star,            label: 'Flyer Sorteio' },
-  { to: '/configuracoes', icon: Settings,        label: 'Configurações' },
+  { to: '/etiquetas',     icon: Printer,      label: 'Etiquetas',       roles: ['admin','gerente'] },
+  { to: '/validade',      icon: CalendarClock,label: 'Validade',        roles: ['admin','gerente'] },
+  { to: '/campanhas',     icon: Megaphone,    label: 'Campanhas / ZAP', badge: 'NOVO', roles: ['admin','gerente'] },
+  { to: '/fidelidade',    icon: QrCode,       label: 'Fidelidade / ZAP',roles: ['admin','gerente'] },
+  { to: '/flyer',         icon: Star,         label: 'Flyer Sorteio',   roles: ['admin','gerente'] },
+  { to: '/configuracoes', icon: Settings,     label: 'Configurações',   roles: ['admin'] },
 ]
+
+function filterByRole(items, role) {
+  return items.filter(item => !item.roles || item.roles.includes(role))
+}
 
 /* ── logo ─────────────────────────────────────────────────── */
 function SidebarLogo() {
@@ -152,23 +157,31 @@ function NavSection({ title, items, onClose }) {
   )
 }
 
+const ROLE_LABEL = { admin: 'Admin', gerente: 'Gerente', caixa: 'Caixa' }
+const ROLE_COLOR = { admin: '#f97316', gerente: '#818cf8', caixa: '#22c55e' }
+
 export default function Layout() {
   const [open, setOpen]   = useState(false)
   const { canInstall, install } = useInstallPWA()
   const { supplierOffers } = useStore()
   const navigate          = useNavigate()
 
+  const role         = getRole()
+  const operatorName = getOperatorName()
+  const terminalId   = getTerminalId()
+
   const pendingOffersCount = (supplierOffers || []).filter(o => o.status === 'pending').length
 
-  const dynamicExtras = [
+  const dynamicExtras = filterByRole([
     ...EXTRAS,
     {
       to: '/ofertas',
       icon: Truck,
       label: 'Ofertas Distribuidor',
       badge: pendingOffersCount > 0 ? String(pendingOffersCount) : undefined,
+      roles: ['admin', 'gerente'],
     },
-  ]
+  ], role)
 
   const handleLogout = () => {
     logout()
@@ -187,14 +200,27 @@ export default function Layout() {
 
         <SidebarLogo />
 
+        {/* ── Operator badge ── */}
+        <div className="mx-3 mb-2 px-3 py-2 rounded-xl flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: (ROLE_COLOR[role] ?? '#9ca3af') + '22', border: `1.5px solid ${ROLE_COLOR[role] ?? '#9ca3af'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, color: ROLE_COLOR[role] ?? '#9ca3af', flexShrink: 0 }}>
+            {operatorName[0]?.toUpperCase() ?? '?'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[12px] font-bold text-gray-200 truncate">{operatorName}</div>
+            <div className="text-[10px] font-semibold" style={{ color: ROLE_COLOR[role] ?? '#9ca3af' }}>
+              {ROLE_LABEL[role] ?? role}{role === 'caixa' ? ` · Terminal ${terminalId}` : ''}
+            </div>
+          </div>
+        </div>
+
         {/* divider */}
         <div className="mx-4 mb-3 h-px bg-white/5" />
 
         {/* nav */}
         <nav className="flex-1 overflow-y-auto pb-2 space-y-3">
-          <NavSection title="Caixa"   items={CAIXA}         onClose={() => setOpen(false)} />
-          <NavSection title="Gestão"  items={GESTAO}        onClose={() => setOpen(false)} />
-          <NavSection title="Extras"  items={dynamicExtras} onClose={() => setOpen(false)} />
+          <NavSection title="Caixa"   items={filterByRole(CAIXA, role)}   onClose={() => setOpen(false)} />
+          <NavSection title="Gestão"  items={filterByRole(GESTAO, role)}  onClose={() => setOpen(false)} />
+          {dynamicExtras.length > 0 && <NavSection title="Extras" items={dynamicExtras} onClose={() => setOpen(false)} />}
         </nav>
 
         {/* ── bottom shortcuts ──────────────────────────── */}

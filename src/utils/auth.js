@@ -15,12 +15,39 @@ export function saveCredentials(username, password) {
   localStorage.setItem(CREDS_KEY, JSON.stringify({ username, password }))
 }
 
+export function getSession() {
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY)) ?? {} } catch { return {} }
+}
+
 export function isLoggedIn() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY)
-    if (!raw) return false
-    return JSON.parse(raw)?.loggedIn === true
-  } catch { return false }
+  return getSession()?.loggedIn === true
+}
+
+/** 'admin' | 'gerente' | 'caixa' — defaults to 'admin' for legacy sessions */
+export function getRole() {
+  return getSession()?.role ?? 'admin'
+}
+
+export function getOperatorName() {
+  const s = getSession()
+  return s?.operatorName ?? s?.user ?? 'Admin'
+}
+
+export function getTerminalId() {
+  return getSession()?.terminalId ?? 1
+}
+
+/** Login as a named operator (cashier/manager) while keeping storeId from the base session. */
+export function loginAsOperator(op) {
+  const base = getSession()
+  localStorage.setItem(SESSION_KEY, JSON.stringify({
+    ...base,
+    loggedIn:     true,
+    operatorId:   op.id,
+    operatorName: op.name,
+    role:         op.role ?? 'caixa',
+    terminalId:   op.terminalId ?? 1,
+  }))
 }
 
 export function logout() {
