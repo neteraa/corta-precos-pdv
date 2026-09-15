@@ -1,4 +1,4 @@
-# Corta Preços MVP — Project Notes (v5.0 — 2026-08)
+# Corta Preços MVP — Project Notes (v6.0 — 2026-08)
 
 ## What this is
 React + Vite + Tailwind MVP platform for retail management (PDV/automação comercial), Brazilian supermarket.
@@ -565,4 +565,70 @@ Botão "Fechar Caixa" no header. Modal `showCaixa` com:
 | Mercado (admin) | `admin` | `1234` | /login |
 | Distribuidor | `megatudo` | `mega2024` | /fornecedor |
 | Caixas | tile → PIN | configurado em /configuracoes | /login |
+| **Painel Master** | — | `zatende2026master` | **/painel** |
+
+---
+
+## SESSION v6.0 — Painel Master + Auth Server-Side (2026-08)
+
+### Problema resolvido
+Antes: todos os mercados compartilhavam as mesmas credenciais (`admin`/`1234`).
+Qualquer pessoa que soubesse o storeId de outro mercado poderia acessar os dados dele.
+Não havia separação real de clientes — impossível escalar como SaaS.
+
+### Solução implementada
+
+#### Netlify Functions (server-side auth)
+- **`netlify/functions/auth.js`** — POST `/api/auth { username, password }`
+  - Valida contra registry no Netlify Blobs (`zs-auth:markets`)
+  - Retorna `{ ok, storeId, storeName }` — storeId vem do servidor, não do browser
+  - Hash SHA-256 com salt aleatório por mercado (nunca armazena senha em claro)
+  - Se mercado inativo → 401 imediato
+
+- **`netlify/functions/markets-admin.js`** — `/api/markets-admin?mk=CHAVE`
+  - GET: lista todos os mercados (sem hash/salt)
+  - POST actions: `create` | `toggle` | `delete` | `reset-pass`
+  - Protegido por `ZS_MASTER_KEY` (env var Netlify, default: `zatende2026master`)
+  - Netlify Blobs store: `zs-auth` (separado de `corta-precos`)
+
+#### Painel Master (`src/pages/MasterPainel.jsx`)
+- Rota: **`/painel`** — sem RequireAuth, sem RequireRole (auth próprio)
+- Login com Chave Master → chave salva em `zs_master_key` localStorage
+- Cards de mercados: nome, usuário, storeId, status, último acesso, WhatsApp
+- Stats: mercados ativos, acessaram hoje (últimas 24h), total cadastrados
+- Modal "Novo Mercado": cria mercado e exibe credenciais prontas para o cliente
+- Reset de senha inline por mercado
+- Ativar/desativar (bloqueia acesso sem remover dados)
+- Botão "Acessar": impersona o mercado em nova aba para suporte
+  - Salva sessão master em `zs_master_session`, seta `cp_session` com storeId do mercado
+- Card fantasma "+" para adicionar novo mercado diretamente da grid
+
+#### Login atualizado (`src/pages/Login.jsx`)
+1. Tenta `POST /api/auth` com username+password
+2. Se `ok: true` → usa storeId retornado pelo servidor (100% seguro)
+3. Se `401` → nega acesso imediato (servidor disse que as credenciais são inválidas)
+4. Se erro de rede (offline/dev local) → fallback para credenciais localStorage
+5. Corta Preços cadastrado: usuário `cortaprecos`, senha `1234`, storeId `cortaprecos`
+
+### Segurança pós-v6.0
+- Mercado A **não consegue** acessar dados do Mercado B em hipótese alguma
+- Credenciais validadas server-side a cada login
+- storeId não pode ser adulterado pelo browser (vem do servidor)
+- Master key **nunca** exposta ao client-side
+- Blobs de auth separados dos blobs de dados (`zs-auth` vs `corta-precos`)
+
+### Para adicionar novo cliente (fluxo operacional)
+1. Acessa `/painel` com chave master
+2. Clica "Novo Mercado"
+3. Preenche: nome do mercado, WhatsApp, usuário, senha inicial
+4. Sistema cria registro seguro no servidor + exibe credenciais prontas
+5. Passa credenciais para o cliente por WhatsApp
+
+### Mudar a chave master
+Netlify → Site configuration → Environment variables → `ZS_MASTER_KEY`
+(Sem redeploy necessário — Netlify Functions leem a env var em runtime)
+
+### Commits desta sessão
+- `34e3e13` feat: multi-tenant isolation completa (storeId nos Blobs)
+- `89cad55` feat: painel master + auth server-side por mercado
 
