@@ -78,7 +78,8 @@ export default function App() {
           <Route path="/loja/:storeSlug" element={<VitrinaDigital />} />
           <Route path="/guia"         element={<Guia />} />
           <Route path="/painel"       element={<MasterPainel />} />
-          <Route path="/caixa"        element={<CaixaLogin />} />
+          <Route path="/caixa"          element={<CaixaLogin />} />
+          <Route path="/caixa/:storeId" element={<CaixaLogin />} />
           {/* /ofertas — pública, mercados acessam sem login PDV */}
           <Route path="/ofertas"      element={<Ofertas />} />
 

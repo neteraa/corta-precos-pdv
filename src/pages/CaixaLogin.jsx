@@ -1,26 +1,31 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Loader2, RefreshCw, UserX } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Loader2, RefreshCw, UserX, Store } from 'lucide-react'
 import { loginAsOperator, getConfiguredStoreId } from '../utils/auth.js'
 
 const PIN_KEYS = ['1','2','3','4','5','6','7','8','9','⌫','0','✓']
 const COLORS   = ['#f97316','#22c55e','#8b5cf6','#06b6d4','#f59e0b','#ec4899','#10b981','#3b82f6']
 
 export default function CaixaLogin() {
-  const navigate = useNavigate()
+  const navigate        = useNavigate()
+  const { storeId: sid } = useParams()
+  // storeId: from URL param (e.g. /caixa/cortaprecos) → isolates the market
+  // fallback: device-configured storeId (for /caixa without param)
+  const storeId = sid || getConfiguredStoreId()
 
-  const [operators, setOperators] = useState([])
-  const [status,    setStatus]    = useState('loading') // loading | ok | empty | error
-  const [selected,  setSelected]  = useState(null)
-  const [pin,       setPin]       = useState('')
-  const [pinErr,    setPinErr]    = useState(false)
+  const [operators,  setOperators]  = useState([])
+  const [storeName,  setStoreName]  = useState('')
+  const [status,     setStatus]     = useState('loading') // loading | ok | empty | error
+  const [selected,   setSelected]   = useState(null)
+  const [pin,        setPin]        = useState('')
+  const [pinErr,     setPinErr]     = useState(false)
 
   const fetchOperators = useCallback(async () => {
     setStatus('loading')
     setSelected(null)
     setPin('')
 
-    const storeId  = getConfiguredStoreId()
+    // Local cache (works when same device as admin)
     const localRaw = localStorage.getItem(`mkt:${storeId}:cp_operators`)
                   ?? localStorage.getItem('cp_operators')
     const localOps = localRaw ? JSON.parse(localRaw).filter(o => o.active !== false) : []
@@ -30,23 +35,24 @@ export default function CaixaLogin() {
       const json = await res.json()
       if (!json.ok) throw new Error('server error')
 
+      // Store name
+      if (json.data?.cp_store_name) setStoreName(json.data.cp_store_name)
+
       const serverOps = json.data?.cp_operators
         ? JSON.parse(json.data.cp_operators).filter(o => o.active !== false)
         : []
 
-      // Server has data → use it and update local cache
       if (serverOps.length) {
         try { localStorage.setItem(`mkt:${storeId}:cp_operators`, json.data.cp_operators) } catch {}
         setOperators(serverOps)
         setStatus('ok')
         return
       }
-    } catch { /* fall through to localStorage */ }
+    } catch { /* fall through to local */ }
 
-    // Use localStorage (same device as admin, server not synced yet)
     setOperators(localOps)
     setStatus(localOps.length ? 'ok' : 'empty')
-  }, [])
+  }, [storeId])
 
   useEffect(() => { fetchOperators() }, [fetchOperators])
 
@@ -75,6 +81,19 @@ export default function CaixaLogin() {
     }
   }, [pin]) // eslint-disable-line
 
+  const MarketHeader = () => (
+    <div className="flex flex-col items-center mb-8">
+      <div className="w-16 h-16 rounded-2xl bg-orange-500/15 border-2 border-orange-500/40 flex items-center justify-center mb-3">
+        <Store className="w-8 h-8 text-orange-400" />
+      </div>
+      {storeName
+        ? <p className="text-white font-black text-xl">{storeName}</p>
+        : <p className="text-gray-500 font-mono text-sm">{storeId}</p>
+      }
+      <p className="text-gray-600 text-xs mt-1 uppercase tracking-widest">Terminal de Caixa</p>
+    </div>
+  )
+
   /* ── Loading ─────────────────────────────────────────── */
   if (status === 'loading') return (
     <div className="min-h-dvh bg-gray-950 flex flex-col items-center justify-center gap-4 text-gray-400">
@@ -86,6 +105,7 @@ export default function CaixaLogin() {
   /* ── Error / Empty ───────────────────────────────────── */
   if (status === 'empty' || status === 'error') return (
     <div className="min-h-dvh bg-gray-950 flex flex-col items-center justify-center gap-6 p-6 text-center">
+      <MarketHeader />
       <UserX className="w-14 h-14 text-gray-600" />
       <div>
         <p className="text-white font-bold text-lg mb-1">
@@ -109,6 +129,7 @@ export default function CaixaLogin() {
     const color = COLORS[operators.indexOf(selected) % COLORS.length]
     return (
       <div className="min-h-dvh bg-gray-950 flex flex-col items-center justify-center p-6">
+        <MarketHeader />
         {/* Avatar */}
         <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl font-black mb-3"
           style={{ background: color + '22', border: `3px solid ${color}`, color }}>
@@ -160,8 +181,9 @@ export default function CaixaLogin() {
 
   /* ── Operator tiles ───────────────────────────────────── */
   return (
-    <div className="min-h-dvh bg-gray-950 flex flex-col items-center justify-start p-6 pt-12">
-      <p className="text-gray-400 text-sm font-semibold uppercase tracking-widest mb-8">
+    <div className="min-h-dvh bg-gray-950 flex flex-col items-center justify-start p-6 pt-10">
+      <MarketHeader />
+      <p className="text-gray-400 text-sm font-semibold uppercase tracking-widest mb-6">
         Quem vai usar o caixa?
       </p>
 

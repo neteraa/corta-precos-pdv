@@ -229,6 +229,13 @@ export default function Configuracoes() {
 
   const saveSettings = () => {
     setSettings(s => ({ ...s, ...form }))
+    // Persist store name to server so /caixa can show it cross-device
+    const storeId = getConfiguredStoreId()
+    fetch('/api/persist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'cp_store_name', value: form.storeName, storeId }),
+    }).catch(() => {})
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
@@ -511,20 +518,24 @@ export default function Configuracoes() {
         </p>
 
         {/* Cashier URL callout */}
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 mb-4">
-          <span className="text-2xl">🧾</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-orange-400 font-bold text-sm">Link exclusivo para o caixa</p>
-            <p className="text-orange-300/80 font-mono text-xs break-all mt-0.5">
-              {window.location.origin}/caixa
-            </p>
-          </div>
-          <button
-            onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/caixa`).then(() => alert('Link copiado!')) }}
-            className="shrink-0 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-colors">
-            Copiar
-          </button>
-        </div>
+        {(() => {
+          const sid = getConfiguredStoreId()
+          const url = `${window.location.origin}/caixa/${sid}`
+          return (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 mb-4">
+              <span className="text-2xl">🧾</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-orange-400 font-bold text-sm">Link exclusivo deste caixa</p>
+                <p className="text-orange-300/80 font-mono text-xs break-all mt-0.5">{url}</p>
+              </div>
+              <button
+                onClick={() => navigator.clipboard.writeText(url).then(() => alert('Link copiado!'))}
+                className="shrink-0 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-colors">
+                Copiar
+              </button>
+            </div>
+          )
+        })()}
 
         {/* Operator cards */}
         {operators.length > 0 && (
