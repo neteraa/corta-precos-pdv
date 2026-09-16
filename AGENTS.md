@@ -632,3 +632,53 @@ Netlify → Site configuration → Environment variables → `ZS_MASTER_KEY`
 - `34e3e13` feat: multi-tenant isolation completa (storeId nos Blobs)
 - `89cad55` feat: painel master + auth server-side por mercado
 
+
+
+---
+
+## SESSION 2026-08-05 — Sidebar + Scanner fix
+
+### Commits
+- 55adff7 fix: sidebar breakpoint lg→md + branding dinamico
+- 871998d fix: sidebar mostra todos os itens (min-h-0 + compactacao)
+- 93429ff fix: scanner celular salva no mercado certo (storeId URL param)
+- 8147ca4 fix: scanner sync sincrono antes do React montar (IIFE)
+
+### Sidebar (Layout.jsx) v6.1
+- Breakpoint md: (768px) — sidebar visivel em todo PC/notebook
+- min-h-0 no nav — CRITICO para overflow-y-auto funcionar em flex container
+- SidebarLogo: le storeName de usePrinter() — multi-tenant, nao hardcoded
+- Terminal/Scanner/Guia dentro do nav scrollavel (secao FERRAMENTAS)
+- Bottom fixo: apenas SyncBar + Logout (~64px)
+- Link Scanner Celular: href=/scan?storeId=getMktStoreId() sempre embutido
+- Import: getMktStoreId de ../utils/tenantStorage.js
+
+### Scanner Mobile (ScanMobile.jsx) v6.1
+BUG: Mobile sem sessao → getMktStoreId()=default → produtos sumiam do desktop (cortaprecos).
+FIX: IIFE sincrono no nivel do modulo — roda ANTES do store inicializar:
+  const sid = new URLSearchParams(window.location.search).get(storeId)
+  if (sid) saveStoreId(sid)  // patches cp_store_id + cp_session.storeId
+
+saveStoreId() patches cp_session.storeId → getMktStoreId() ja retorna certo ao montar store.
+Topbar: nome da loja via usePrinter() + storeId visivel para confirmar.
+
+### Configuracoes — Links do sistema
+3 links com botao Copiar: /caixa/:sid, /scan?storeId=, /scan?storeId=&mode=estoque
+
+### Namespaces Netlify Blobs (Corta Precos)
+- storeId=cortaprecos: 2796 produtos, cp_operators, cp_sales, cp_promos
+- storeId=default: mesmos produtos + dados distribuidor (cp_cash, cp_supplier_orders etc)
+- Login server: cortaprecos/1234 → storeId=cortaprecos
+- Mobile DEVE abrir scanner via sidebar (link ja tem ?storeId=cortaprecos)
+- Produtos manuais migrados: KITANO CHURRASQUEAR (stock 10), PAO CROISSANT (stock 20)
+
+### Features pendentes (proxima sessao)
+- [ ] Preco atacado: campo priceAtacado + qtdAtacado no produto; PDV aplica auto
+- [ ] Scanner mobile: adicionar campo promoGroup (seletor) + priceAtacado no cadastro
+- [ ] Filtro por data/validade no Estoque (deixado pra depois pelo cliente)
+
+### Promocoes Mix-and-Match (JA EXISTE)
+Rota /promocoes — regra: { id, name, group, qty, totalPrice, active }
+PDV: calcPromoEngine em PDV.jsx aplica desconto quando cart tem qty itens do grupo.
+Produto vinculado via p.promoGroup === rule.group.
+ISSO JA E O 3-POR-R10 — so criar regra em Promocoes e vincular produtos.
