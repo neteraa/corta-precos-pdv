@@ -14,6 +14,14 @@ import { useScanSender } from '../hooks/useScanRelay.js'
 import { saveStoreId, getConfiguredStoreId } from '../utils/auth.js'
 import { usePrinter } from '../hooks/usePrinter.js'
 
+// Sync storeId SYNCHRONOUSLY at module load — before the store context
+// initialises. Without this, useStore() opens with storeId='default' because
+// the mobile has no cp_session, and a useEffect fix would be too late.
+;(() => {
+  const sid = new URLSearchParams(window.location.search).get('storeId')
+  if (sid) saveStoreId(sid)
+})()
+
 /* ── styles (all panels float over the full-screen camera) ── */
 const S = {
   // The camera uses fixed inset-0 z-50, so every panel needs z > 50
@@ -78,14 +86,6 @@ export default function ScanMobile() {
   const { products, upsertProduct } = useStore()
   const { settings } = usePrinter()
   const storeName = settings.storeName || 'MEU MERCADO'
-
-  // Sync the storeId from the URL param (?storeId=cortaprecos) so products
-  // are saved under the correct market — without this the mobile has no
-  // session and defaults to 'default', making products invisible on desktop.
-  useEffect(() => {
-    const sid = params.get('storeId')
-    if (sid) saveStoreId(sid)
-  }, []) // eslint-disable-line
 
   /* ── PDV mode state ────────────────────────────────────── */
   const [pdvFeed, setPdvFeed]       = useState([])
