@@ -517,22 +517,32 @@ export default function Configuracoes() {
           Cada funcionário entra com seu nome + PIN. O caixa só vê o PDV; o gerente vê tudo exceto configurações.
         </p>
 
-        {/* Cashier URL callout */}
+        {/* Links callout */}
         {(() => {
-          const sid = getConfiguredStoreId()
-          const url = `${window.location.origin}/caixa/${sid}`
-          return (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 mb-4">
-              <span className="text-2xl">🧾</span>
+          const sid      = getConfiguredStoreId()
+          const urlCaixa = `${window.location.origin}/caixa/${sid}`
+          const urlScan  = `${window.location.origin}/scan?storeId=${sid}`
+          const urlEst   = `${window.location.origin}/scan?storeId=${sid}&mode=estoque`
+          const row = (emoji, label, url) => (
+            <div key={url} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+              <span className="text-xl shrink-0">{emoji}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-orange-400 font-bold text-sm">Link exclusivo deste caixa</p>
-                <p className="text-orange-300/80 font-mono text-xs break-all mt-0.5">{url}</p>
+                <p className="text-gray-300 font-semibold text-xs">{label}</p>
+                <p className="text-gray-500 font-mono text-[10px] break-all mt-0.5">{url}</p>
               </div>
               <button
                 onClick={() => navigator.clipboard.writeText(url).then(() => alert('Link copiado!'))}
-                className="shrink-0 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-colors">
+                className="shrink-0 px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-bold transition-colors">
                 Copiar
               </button>
+            </div>
+          )
+          return (
+            <div className="rounded-xl bg-orange-500/10 border border-orange-500/30 p-3 mb-4 space-y-2">
+              <p className="text-orange-400 font-bold text-xs uppercase tracking-wider mb-1">🔗 Links do sistema</p>
+              {row('🧾', 'Terminal de Caixa (operador login com PIN)', urlCaixa)}
+              {row('📷', 'Scanner PDV — celular envia código pro caixa', urlScan)}
+              {row('📦', 'Scanner Estoque — cadastra produtos + qtd no celular', urlEst)}
             </div>
           )
         })()}

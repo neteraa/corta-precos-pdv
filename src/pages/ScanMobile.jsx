@@ -11,6 +11,8 @@ import { ShoppingCart, Package, CheckCircle, Trash2, Check, ChevronDown } from '
 import CameraScanner from '../components/CameraScanner.jsx'
 import { useStore, BRL } from '../store.jsx'
 import { useScanSender } from '../hooks/useScanRelay.js'
+import { saveStoreId, getConfiguredStoreId } from '../utils/auth.js'
+import { usePrinter } from '../hooks/usePrinter.js'
 
 /* ── styles (all panels float over the full-screen camera) ── */
 const S = {
@@ -74,6 +76,16 @@ export default function ScanMobile() {
   const [params]  = useSearchParams()
   const mode      = params.get('mode') || 'pdv'
   const { products, upsertProduct } = useStore()
+  const { settings } = usePrinter()
+  const storeName = settings.storeName || 'MEU MERCADO'
+
+  // Sync the storeId from the URL param (?storeId=cortaprecos) so products
+  // are saved under the correct market — without this the mobile has no
+  // session and defaults to 'default', making products invisible on desktop.
+  useEffect(() => {
+    const sid = params.get('storeId')
+    if (sid) saveStoreId(sid)
+  }, []) // eslint-disable-line
 
   /* ── PDV mode state ────────────────────────────────────── */
   const [pdvFeed, setPdvFeed]       = useState([])
@@ -235,17 +247,26 @@ export default function ScanMobile() {
       <CameraScanner onScan={handleScan} onClose={() => {}} />
 
       {/* top bar — floats over camera */}
-      <div style={S.topbar}>
-        <div style={S.brand}>✕ CORTA PREÇO$</div>
-        <div style={S.tabs}>
-          <button style={S.tab(mode === 'pdv')} onClick={() => { window.location.href = '/scan' }}>
-            <ShoppingCart style={{ width: 13, height: 13, display: 'inline', marginRight: 4 }} />PDV
-          </button>
-          <button style={S.tab(mode === 'estoque')} onClick={() => { window.location.href = '/scan?mode=estoque' }}>
-            <Package style={{ width: 13, height: 13, display: 'inline', marginRight: 4 }} />Estoque
-          </button>
-        </div>
-      </div>
+      {(() => {
+        const sid = params.get('storeId') || getConfiguredStoreId()
+        const base = `/scan?storeId=${sid}`
+        return (
+          <div style={S.topbar}>
+            <div>
+              <div style={S.brand}>{storeName}</div>
+              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontFamily: 'monospace', marginTop: 1 }}>{sid}</div>
+            </div>
+            <div style={S.tabs}>
+              <button style={S.tab(mode === 'pdv')} onClick={() => { window.location.href = base }}>
+                <ShoppingCart style={{ width: 13, height: 13, display: 'inline', marginRight: 4 }} />PDV
+              </button>
+              <button style={S.tab(mode === 'estoque')} onClick={() => { window.location.href = `${base}&mode=estoque` }}>
+                <Package style={{ width: 13, height: 13, display: 'inline', marginRight: 4 }} />Estoque
+              </button>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* PDV mode — scanned log panel at bottom */}
       {mode === 'pdv' && (
