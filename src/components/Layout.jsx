@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import Footer from './Footer.jsx'
 import ZatendeStockLogo from './ZatendeStockLogo.jsx'
 import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
-  Warehouse, Users, Settings, Menu, Phone, Instagram,
+  Warehouse, Users, Settings, Menu,
   QrCode, Tag, Star, Download, Monitor, Camera, Scissors, HandCoins, LogOut,
   BarChart2, Printer, CalendarClock, Megaphone, RefreshCw, Truck
 } from 'lucide-react'
@@ -76,56 +75,26 @@ function filterByRole(items, role) {
 /* ── logo ─────────────────────────────────────────────────── */
 function SidebarLogo() {
   const { settings } = usePrinter()
-  const name      = settings.storeName  || 'MEU MERCADO'
-  const phone     = settings.phone      || ''
-  const instagram = settings.instagram  || ''
-  // First word of the name as short label, e.g. "CORTA PREÇOS" → "CORTA"
-  const [first, ...rest] = name.split(' ')
+  const name = settings.storeName || 'MEU MERCADO'
 
   return (
-    <div className="px-4 pt-5 pb-4">
-      {/* ZatendeStock platform brand */}
-      <div className="mb-3 flex items-center justify-center py-2 px-3 rounded-xl bg-gray-900/60 border border-gray-800">
+    <div className="px-3 pt-3 pb-2 shrink-0">
+      <div className="mb-2 flex items-center justify-center py-1.5 px-3 rounded-xl bg-gray-900/60 border border-gray-800">
         <ZatendeStockLogo variant="wordmark" />
       </div>
-
-      {/* Store brand block */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-orange-700 p-4 shadow-lg shadow-orange-900/40">
-        <svg className="absolute -right-3 -top-3 w-20 h-20 text-black/10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-orange-500 to-orange-700 px-3 py-2.5 shadow-lg shadow-orange-900/40">
+        <svg className="absolute -right-2 -top-2 w-14 h-14 text-black/10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
           <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
           <line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/>
           <line x1="8.12" y1="8.12" x2="12" y2="12"/>
         </svg>
-        <div className="relative">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-7 h-7 bg-black/20 rounded-lg flex items-center justify-center">
-              <Scissors className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-white font-black text-xl tracking-tight leading-none truncate">
-              {first}<span className="text-black/60">{rest.length ? ' ' + rest.join(' ') : ''}</span>
-            </span>
+        <div className="relative flex items-center gap-2">
+          <div className="w-5 h-5 bg-black/20 rounded-md flex items-center justify-center shrink-0">
+            <Scissors className="w-3 h-3 text-white" />
           </div>
-          <p className="text-orange-100/70 text-[10px] font-medium tracking-wide pl-9">
-            Tecnologia ZatendeStock
-          </p>
+          <span className="text-white font-black text-sm tracking-tight leading-none truncate">{name}</span>
         </div>
       </div>
-
-      {/* contact strip — only renders when configured */}
-      {(phone || instagram) && (
-        <div className="flex items-center justify-between mt-3 px-1 gap-2">
-          {phone && (
-            <span className="flex items-center gap-1.5 text-gray-500 text-[10px] truncate">
-              <Phone className="w-2.5 h-2.5 shrink-0" />{phone}
-            </span>
-          )}
-          {instagram && (
-            <span className="flex items-center gap-1.5 text-gray-500 text-[10px] truncate">
-              <Instagram className="w-2.5 h-2.5 shrink-0" />@{instagram.replace(/^@/, '')}
-            </span>
-          )}
-        </div>
-      )}
     </div>
   )
 }
@@ -141,7 +110,7 @@ function NavSection({ title, items, onClose }) {
         <NavLink
           key={to} to={to} onClick={onClose}
           className={({ isActive }) =>
-            'group relative flex items-center gap-3 mx-2 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-150 ' +
+            'group relative flex items-center gap-3 mx-2 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all duration-150 ' +
             (isActive
               ? 'bg-orange-500/15 text-orange-400 shadow-[inset_0_0_0_1px_rgba(249,115,22,0.25)]'
               : 'text-gray-400 hover:text-gray-100 hover:bg-white/5')
@@ -217,7 +186,7 @@ export default function Layout() {
         <SidebarLogo />
 
         {/* ── Operator badge ── */}
-        <div className="mx-3 mb-2 px-3 py-2 rounded-xl flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="mx-3 mb-2 px-3 py-1.5 rounded-xl flex items-center gap-2 shrink-0" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
           <div style={{ width: 28, height: 28, borderRadius: '50%', background: (ROLE_COLOR[role] ?? '#9ca3af') + '22', border: `1.5px solid ${ROLE_COLOR[role] ?? '#9ca3af'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, color: ROLE_COLOR[role] ?? '#9ca3af', flexShrink: 0 }}>
             {operatorName[0]?.toUpperCase() ?? '?'}
           </div>
@@ -232,62 +201,58 @@ export default function Layout() {
         {/* divider */}
         <div className="mx-4 mb-3 h-px bg-white/5" />
 
-        {/* nav */}
-        <nav className="flex-1 overflow-y-auto pb-2 space-y-3">
+        {/* nav — min-h-0 is required so flex-1 can actually shrink and overflow-y-auto activates */}
+        <nav className="flex-1 min-h-0 overflow-y-auto pb-3 space-y-2">
           <NavSection title="Caixa"   items={filterByRole(CAIXA, role)}   onClose={() => setOpen(false)} />
           <NavSection title="Gestão"  items={filterByRole(GESTAO, role)}  onClose={() => setOpen(false)} />
           {dynamicExtras.length > 0 && <NavSection title="Extras" items={dynamicExtras} onClose={() => setOpen(false)} />}
+
+          {/* ── inline shortcuts — inside scroll so nada fica cortado ── */}
+          <div className="px-2 pt-1 space-y-1">
+            <div className="px-2 mb-1 text-[9px] font-black text-gray-600 tracking-[0.15em] uppercase">Ferramentas</div>
+
+            <a href="/terminal" target="_blank" rel="noreferrer"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all group"
+              style={{ background: 'rgba(234,88,12,0.1)', border: '1px solid rgba(234,88,12,0.2)' }}>
+              <Monitor className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+              <span className="text-orange-300 text-[11px] font-black flex-1 group-hover:text-orange-200">Terminal do Caixa</span>
+              <span className="text-[8px] bg-orange-500 text-black font-black px-1.5 py-0.5 rounded-full">ABRIR</span>
+            </a>
+
+            <a href="/scan" target="_blank" rel="noreferrer"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all group"
+              style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)' }}>
+              <Camera className="w-3.5 h-3.5 text-green-500 shrink-0" />
+              <span className="text-green-400 text-[11px] font-black flex-1 group-hover:text-green-300">Scanner Celular</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            </a>
+
+            {canInstall && (
+              <button onClick={install}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-400 transition-colors">
+                <Download className="w-3.5 h-3.5 text-black shrink-0" />
+                <span className="text-black text-[11px] font-black">Instalar App (PWA)</span>
+              </button>
+            )}
+
+            <a href="/guia"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-500 hover:text-orange-400 hover:bg-orange-500/10 transition-all"
+              style={{ textDecoration: 'none' }}>
+              <span className="text-[13px]">📖</span>
+              <span className="text-[11px] font-semibold">Guia do sistema</span>
+            </a>
+          </div>
         </nav>
 
-        {/* ── bottom shortcuts ──────────────────────────── */}
-        <div className="px-3 py-3 space-y-1.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-
-          <a href="/terminal" target="_blank" rel="noreferrer"
-            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all group"
-            style={{ background: 'rgba(234,88,12,0.1)', border: '1px solid rgba(234,88,12,0.2)' }}>
-            <Monitor className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
-            <span className="text-orange-300 text-[11px] font-black flex-1 group-hover:text-orange-200">Terminal do Caixa</span>
-            <span className="text-[8px] bg-orange-500 text-black font-black px-1.5 py-0.5 rounded-full">ABRIR</span>
-          </a>
-
-          <a href="/scan" target="_blank" rel="noreferrer"
-            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all group"
-            style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)' }}>
-            <Camera className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-            <span className="text-green-400 text-[11px] font-black flex-1 group-hover:text-green-300">Scanner Celular</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-          </a>
-
-          {canInstall && (
-            <button onClick={install}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 transition-colors">
-              <Download className="w-3.5 h-3.5 text-black flex-shrink-0" />
-              <span className="text-black text-[11px] font-black">Instalar App (PWA)</span>
-            </button>
-          )}
-
+        {/* ── bottom strip — só Sync + Sair, tudo mais está no scroll ── */}
+        <div className="px-3 py-2 space-y-1 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <SyncBar />
-
-          <a href="/guia"
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-orange-400/70 hover:text-orange-400 hover:bg-orange-500/10 transition-all"
-            style={{ textDecoration: 'none' }}>
-            <span className="text-[13px]">📖</span>
-            <span className="text-[11px] font-semibold">Guia do sistema</span>
-          </a>
-
           <button onClick={handleLogout}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all group">
-            <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
+            <LogOut className="w-3.5 h-3.5 shrink-0" />
             <span className="text-[11px] font-semibold">Sair do sistema</span>
           </button>
-
-          <div className="pt-1 text-center">
-            <div className="text-gray-600 text-[9px] font-bold tracking-widest uppercase">🙏 Deus é bom o tempo todo</div>
-            <div className="text-gray-700 text-[9px] mt-0.5">PDV v3.1 · Corta Preços</div>
-          </div>
         </div>
-
-        <Footer variant="mkt" />
       </aside>
 
       {/* overlay mobile */}
