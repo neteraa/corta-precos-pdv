@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { StoreProvider } from './store.jsx'
 import Layout from './components/Layout.jsx'
+import UpdateBanner from './components/UpdateBanner.jsx'
 import { isLoggedIn, getRole } from './utils/auth.js'
 
 /* ── Lazy page chunks — each page loads only when first visited ── */
@@ -63,6 +64,8 @@ function RequireRole({ children }) {
 
 export default function App() {
   return (
+    <>
+    <UpdateBanner />
     <StoreProvider>
       <Suspense fallback={<PageSpinner />}>
         <Routes>
@@ -103,5 +106,6 @@ export default function App() {
         </Routes>
       </Suspense>
     </StoreProvider>
+    </>
   )
 }

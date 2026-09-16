@@ -34,21 +34,30 @@
           try {
             const reg = await navigator.serviceWorker.register('/sw.js')
 
-            // When a new SW takes control of this tab, reload to pick up
-            // the fresh JS bundle — safe because network-first already
-            // served the latest HTML when the page opened.
+            const notifyUpdate = () => window.dispatchEvent(new Event('sw-update-ready'))
+
+            // New SW found — wait for it to finish installing, then notify
+            const onUpdateFound = () => {
+              const sw = reg.installing
+              if (!sw) return
+              sw.addEventListener('statechange', () => {
+                if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                  notifyUpdate()
+                }
+              })
+            }
+            reg.addEventListener('updatefound', onUpdateFound)
+
+            // When new SW takes control → reload immediately (startup case)
             navigator.serviceWorker.addEventListener('controllerchange', () => {
-              // Small guard: only auto-reload if user hasn't been on the page
-              // for more than 4 s (i.e. this is startup activation, not mid-use)
-              if (performance.now() < 4000) {
-                window.location.reload()
-              }
+              if (performance.now() < 4000) window.location.reload()
             })
 
-            // Periodically check for updates while the app is open
-            // (browser also checks on every navigation, but PWA can stay
-            //  open all day without navigating)
-            setInterval(() => reg.update(), 60 * 60 * 1000)  // every hour
+            // Check for updates every 5 min and on visibility change
+            setInterval(() => reg.update(), 5 * 60 * 1000)
+            document.addEventListener('visibilitychange', () => {
+              if (document.visibilityState === 'visible') reg.update()
+            })
           } catch {}
         })
       }

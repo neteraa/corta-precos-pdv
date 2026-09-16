@@ -2,7 +2,7 @@
 // Strategy: network-first always so updates appear immediately.
 // Cache is only a fallback for offline use.
 
-const CACHE = 'corta-precos-v2'
+const CACHE = 'corta-precos-v4'
 
 self.addEventListener('install', e => {
   // Activate right away — don't wait for old tabs to close
