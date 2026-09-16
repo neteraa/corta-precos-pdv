@@ -9,6 +9,7 @@ import {
   BarChart2, Printer, CalendarClock, Megaphone, RefreshCw, Truck
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
+import { usePrinter } from '../hooks/usePrinter.js'
 import { logout, getRole, getOperatorName, getTerminalId } from '../utils/auth.js'
 import { useStore } from '../store.jsx'
 
@@ -74,6 +75,13 @@ function filterByRole(items, role) {
 
 /* ── logo ─────────────────────────────────────────────────── */
 function SidebarLogo() {
+  const { settings } = usePrinter()
+  const name      = settings.storeName  || 'MEU MERCADO'
+  const phone     = settings.phone      || ''
+  const instagram = settings.instagram  || ''
+  // First word of the name as short label, e.g. "CORTA PREÇOS" → "CORTA"
+  const [first, ...rest] = name.split(' ')
+
   return (
     <div className="px-4 pt-5 pb-4">
       {/* ZatendeStock platform brand */}
@@ -81,9 +89,8 @@ function SidebarLogo() {
         <ZatendeStockLogo variant="wordmark" />
       </div>
 
-      {/* Corta Preço brand block */}
+      {/* Store brand block */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-orange-700 p-4 shadow-lg shadow-orange-900/40">
-        {/* decorative scissors watermark */}
         <svg className="absolute -right-3 -top-3 w-20 h-20 text-black/10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
           <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
           <line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/>
@@ -94,24 +101,31 @@ function SidebarLogo() {
             <div className="w-7 h-7 bg-black/20 rounded-lg flex items-center justify-center">
               <Scissors className="w-4 h-4 text-white" />
             </div>
-            <span className="text-white font-black text-xl tracking-tight leading-none">
-              CORTA PREÇO<span className="text-black/80">$</span>
+            <span className="text-white font-black text-xl tracking-tight leading-none truncate">
+              {first}<span className="text-black/60">{rest.length ? ' ' + rest.join(' ') : ''}</span>
             </span>
           </div>
-          <p className="text-orange-100/80 text-[10px] font-medium tracking-wide pl-9">
-            Economia de verdade • Variedades todo dia
+          <p className="text-orange-100/70 text-[10px] font-medium tracking-wide pl-9">
+            Tecnologia ZatendeStock
           </p>
         </div>
       </div>
-      {/* contact strip */}
-      <div className="flex items-center justify-between mt-3 px-1">
-        <span className="flex items-center gap-1.5 text-gray-500 text-[10px]">
-          <Phone className="w-2.5 h-2.5" />(15) 99660-4075
-        </span>
-        <span className="flex items-center gap-1.5 text-gray-500 text-[10px]">
-          <Instagram className="w-2.5 h-2.5" />@mercadocortaprecos
-        </span>
-      </div>
+
+      {/* contact strip — only renders when configured */}
+      {(phone || instagram) && (
+        <div className="flex items-center justify-between mt-3 px-1 gap-2">
+          {phone && (
+            <span className="flex items-center gap-1.5 text-gray-500 text-[10px] truncate">
+              <Phone className="w-2.5 h-2.5 shrink-0" />{phone}
+            </span>
+          )}
+          {instagram && (
+            <span className="flex items-center gap-1.5 text-gray-500 text-[10px] truncate">
+              <Instagram className="w-2.5 h-2.5 shrink-0" />@{instagram.replace(/^@/, '')}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -169,6 +183,8 @@ export default function Layout() {
   const role         = getRole()
   const operatorName = getOperatorName()
   const terminalId   = getTerminalId()
+  const { settings: storeSettings } = usePrinter()
+  const storeName    = storeSettings.storeName || 'MEU MERCADO'
 
   const pendingOffersCount = (supplierOffers || []).filter(o => o.status === 'pending').length
 
@@ -193,8 +209,8 @@ export default function Layout() {
 
       {/* ── Sidebar ───────────────────────────────────────── */}
       <aside className={`
-        fixed inset-y-0 left-0 z-40 w-[228px] flex flex-col transition-transform duration-200
-        lg:static lg:translate-x-0
+        fixed inset-y-0 left-0 z-40 w-[228px] shrink-0 flex flex-col transition-transform duration-200
+        md:static md:translate-x-0
         ${open ? 'translate-x-0' : '-translate-x-full'}
       `} style={{ background: '#09090b', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
 
@@ -275,22 +291,22 @@ export default function Layout() {
       </aside>
 
       {/* overlay mobile */}
-      {open && <div className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setOpen(false)} />}
+      {open && <div className="fixed inset-0 z-30 bg-black/70 md:hidden" onClick={() => setOpen(false)} />}
 
       {/* ── Main area ──────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* mobile topbar */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 shadow-sm">
+        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 shadow-sm">
           <button onClick={() => setOpen(true)} className="p-1.5 rounded-lg hover:bg-gray-100 active:scale-95 transition-transform">
             <Menu className="w-5 h-5 text-gray-600" />
           </button>
           <div className="flex items-center gap-2">
             <img src="/icon.svg" alt="logo" className="w-6 h-6" />
-            <span className="font-black text-orange-600 text-base tracking-tight">CORTA PREÇO$</span>
+            <span className="font-black text-orange-600 text-base tracking-tight truncate">{storeName}</span>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <Outlet />
         </main>
       </div>
