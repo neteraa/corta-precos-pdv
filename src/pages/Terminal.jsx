@@ -360,7 +360,6 @@ export default function Terminal() {
 
                 {/* ── Big brand card ── */}
                 <div style={{
-                  animation: 'idleFadeIn .7s cubic-bezier(.22,1,.36,1) forwards, idleFloat 4s ease-in-out 0.7s infinite',
                   width: 'min(280px, 70%)',
                   background: 'linear-gradient(145deg, #1a1a1a, #0a0a0a)',
                   borderRadius: 28,

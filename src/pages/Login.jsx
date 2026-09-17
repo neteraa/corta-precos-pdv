@@ -247,7 +247,7 @@ export default function Login() {
                     {PIN_KEYS.map(k => (
                       <button key={k} onClick={() => handlePin(k)}
                         style={{
-                          padding: '18px 0', border: 'none', borderRadius: 14, cursor: 'pointer', fontSize: k === '⌫' ? 20 : 22, fontWeight: 800,
+                          padding: '18px 0', borderRadius: 14, cursor: 'pointer', fontSize: k === '⌫' ? 20 : 22, fontWeight: 800,
                           background: k === '✓' ? '#f97316' : k === '⌫' ? '#1f2937' : '#0d1117',
                           color: k === '✓' ? '#fff' : '#e5e7eb',
                           border: k === '✓' ? 'none' : '1px solid #1f2937',
