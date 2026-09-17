@@ -111,6 +111,25 @@ export default function Relatorio() {
     return { total, count, ticket, discount, margin, profit, byPayment, catData, topProds, chartData }
   }, [filtered, productMap])
 
+  // Per-operator breakdown for the selected period
+  const byOperatorStats = useMemo(() => {
+    const map = {}
+    filtered.forEach(s => {
+      const name = s.operatorName || 'Admin'
+      if (!map[name]) map[name] = { name, vendas: 0, total: 0, byPayment: {} }
+      map[name].vendas++
+      map[name].total += s.total
+      const pm = (s.payment || 'Outro').split(' ')[0]
+      map[name].byPayment[pm] = (map[name].byPayment[pm] || 0) + s.total
+    })
+    return Object.values(map)
+      .map(o => ({ ...o, avgTicket: o.vendas > 0 ? o.total / o.vendas : 0 }))
+      .sort((a, b) => b.total - a.total)
+  }, [filtered])
+
+  const PAYMENT_METHODS = ['PIX', 'Dinheiro', 'Débito', 'Crédito']
+  const OP_COLORS = ['#f97316','#22c55e','#818cf8','#06b6d4','#f59e0b','#ec4899']
+
   const exportCSV = () => {
     const rows = [['Data','Total','Pagamento','Itens','Desconto']]
     filtered.forEach(s => rows.push([
@@ -191,6 +210,71 @@ export default function Relatorio() {
           </div>
         ))}
       </div>
+
+      {/* ── Por Operador / Caixa ────────────────────────────────── */}
+      {byOperatorStats.length >= 2 && (
+        <div className="card p-4">
+          <h2 className="font-black text-gray-800 text-sm uppercase tracking-wide mb-3">📊 Por Operador / Caixa</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left py-2 pr-4 text-xs text-gray-400 font-bold uppercase tracking-wide">Operador</th>
+                  <th className="text-right py-2 px-3 text-xs text-gray-400 font-bold uppercase tracking-wide">Vendas</th>
+                  <th className="text-right py-2 px-3 text-xs text-gray-400 font-bold uppercase tracking-wide">Total</th>
+                  {PAYMENT_METHODS.map(pm => (
+                    <th key={pm} className="text-right py-2 px-3 text-xs text-gray-400 font-bold uppercase tracking-wide hidden sm:table-cell">{pm}</th>
+                  ))}
+                  <th className="text-right py-2 pl-3 text-xs text-gray-400 font-bold uppercase tracking-wide">Ticket</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byOperatorStats.map((op, i) => {
+                  const color = OP_COLORS[i % OP_COLORS.length]
+                  const pct   = stats.total > 0 ? (op.total / stats.total * 100) : 0
+                  return (
+                    <tr key={op.name} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
+                      <td className="py-3 pr-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black flex-shrink-0"
+                            style={{ background: color + '20', color, border: `1.5px solid ${color}` }}>
+                            {op.name[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-bold text-gray-800">{op.name}</div>
+                            <div className="text-[10px] text-gray-400">{pct.toFixed(0)}% do período</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-right font-semibold text-gray-700">{op.vendas}</td>
+                      <td className="py-3 px-3 text-right font-black text-gray-900">{BRL.format(op.total)}</td>
+                      {PAYMENT_METHODS.map(pm => (
+                        <td key={pm} className="py-3 px-3 text-right text-gray-600 hidden sm:table-cell">
+                          {op.byPayment[pm] ? BRL.format(op.byPayment[pm]) : <span className="text-gray-200">—</span>}
+                        </td>
+                      ))}
+                      <td className="py-3 pl-3 text-right text-gray-500">{BRL.format(op.avgTicket)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-gray-200">
+                  <td className="py-2 pr-4 font-black text-gray-700 text-sm">Total</td>
+                  <td className="py-2 px-3 text-right font-black text-gray-700">{stats.count}</td>
+                  <td className="py-2 px-3 text-right font-black text-brand-600">{BRL.format(stats.total)}</td>
+                  {PAYMENT_METHODS.map(pm => (
+                    <td key={pm} className="py-2 px-3 text-right font-semibold text-gray-600 hidden sm:table-cell">
+                      {stats.byPayment[pm] ? BRL.format(stats.byPayment[pm]) : <span className="text-gray-200">—</span>}
+                    </td>
+                  ))}
+                  <td className="py-2 pl-3 text-right font-semibold text-gray-500">{BRL.format(stats.ticket)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Charts row */}
       {stats.chartData.length > 1 && (

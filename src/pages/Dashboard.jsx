@@ -108,7 +108,21 @@ export default function Dashboard() {
     const suprimentoTotal = todayMovs.filter(m => m.type === 'suprimento').reduce((s, m) => s + m.amount, 0)
     const cashBalance = cashIn - sangriaTotal + suprimentoTotal
 
-    return { todaySales, totalVendas, faturamento, avgTicket, totalDesconto, byPayment, topToday, margem, date: today, todayMovs, sangriaTotal, suprimentoTotal, cashBalance }
+    // ── Per-operator breakdown ─────────────────────────────
+    const opMap = {}
+    todaySales.forEach(s => {
+      const name = s.operatorName || 'Admin'
+      if (!opMap[name]) opMap[name] = { name, vendas: 0, total: 0, byPayment: {} }
+      opMap[name].vendas++
+      opMap[name].total += s.total
+      const pm = (s.payment || 'Outro').split(' ')[0]
+      opMap[name].byPayment[pm] = (opMap[name].byPayment[pm] || 0) + s.total
+    })
+    const byOperator = Object.values(opMap)
+      .map(o => ({ ...o, avgTicket: o.vendas > 0 ? o.total / o.vendas : 0 }))
+      .sort((a, b) => b.total - a.total)
+
+    return { todaySales, totalVendas, faturamento, avgTicket, totalDesconto, byPayment, topToday, margem, date: today, todayMovs, sangriaTotal, suprimentoTotal, cashBalance, byOperator }
   }, [sales, products, cashMovements, showCaixa])
 
   const expiryAlert = useMemo(() => {
@@ -338,6 +352,56 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ── Por Caixa Hoje — visible without opening the modal ─ */}
+      {caixaStats.byOperator?.length >= 2 && (
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-black text-gray-800 text-sm uppercase tracking-wide">📊 Por Caixa — Hoje</h2>
+            <button onClick={() => setShowCaixa(true)} className="text-xs text-brand-600 font-bold hover:underline">
+              Ver fechamento completo →
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {caixaStats.byOperator.map((op, i) => {
+              const COLORS = ['#f97316','#22c55e','#818cf8','#06b6d4','#f59e0b','#ec4899']
+              const color = COLORS[i % COLORS.length]
+              const pct = caixaStats.faturamento > 0 ? (op.total / caixaStats.faturamento * 100) : 0
+              return (
+                <div key={op.name} className="rounded-xl border border-gray-100 overflow-hidden">
+                  <div className="flex items-center gap-2.5 px-3 py-2.5">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-black flex-shrink-0"
+                      style={{ background: color + '20', color, border: `1.5px solid ${color}` }}>
+                      {op.name[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-black text-gray-800 text-sm truncate">{op.name}</div>
+                      <div className="text-xs text-gray-400">{op.vendas} venda{op.vendas !== 1 ? 's' : ''}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-black text-gray-900">{BRL.format(op.total)}</div>
+                      <div className="text-[10px] text-gray-400">{pct.toFixed(0)}% do total</div>
+                    </div>
+                  </div>
+                  <div className="px-3 pb-2 space-y-1.5">
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-1.5 rounded-full" style={{ width: `${pct}%`, background: color }} />
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {Object.entries(op.byPayment).sort((a,b)=>b[1]-a[1]).map(([pm, val]) => (
+                        <span key={pm} className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                          style={{ background: color + '15', color }}>
+                          {pm} {BRL.format(val)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* faturamento 14 dias */}
         <div className="card p-4 lg:col-span-2">
@@ -498,6 +562,53 @@ export default function Dashboard() {
                         })}
                     </div>
                   </div>
+
+                  {/* ── Por Operador ── */}
+                  {caixaStats.byOperator?.length > 0 && (
+                    <div>
+                      <div className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3">Por operador / caixa</div>
+                      <div className="space-y-2">
+                        {caixaStats.byOperator.map((op, i) => {
+                          const COLORS = ['#f97316','#22c55e','#818cf8','#06b6d4','#f59e0b','#ec4899']
+                          const color = COLORS[i % COLORS.length]
+                          const pct = caixaStats.faturamento > 0 ? (op.total / caixaStats.faturamento * 100) : 0
+                          return (
+                            <div key={op.name} className="rounded-xl border border-gray-100 overflow-hidden">
+                              {/* header row */}
+                              <div className="flex items-center gap-3 px-3 py-2.5 bg-gray-50">
+                                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black flex-shrink-0"
+                                  style={{ background: color + '22', color, border: `1.5px solid ${color}` }}>
+                                  {op.name[0].toUpperCase()}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-black text-gray-800 text-sm truncate">{op.name}</div>
+                                  <div className="text-xs text-gray-400">{op.vendas} venda{op.vendas !== 1 ? 's' : ''} · ticket médio {BRL.format(op.avgTicket)}</div>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <div className="font-black text-gray-900 text-base">{BRL.format(op.total)}</div>
+                                  <div className="text-xs text-gray-400">{pct.toFixed(0)}% do dia</div>
+                                </div>
+                              </div>
+                              {/* progress + payment pills */}
+                              <div className="px-3 pb-2.5 pt-1.5 space-y-1.5">
+                                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {Object.entries(op.byPayment).sort((a,b) => b[1]-a[1]).map(([pm, val]) => (
+                                    <span key={pm} className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                      style={{ background: color + '15', color }}>
+                                      {pm} {BRL.format(val)}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* top products */}
                   {caixaStats.topToday.length > 0 && (
