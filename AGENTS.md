@@ -672,11 +672,22 @@ Topbar: nome da loja via usePrinter() + storeId visivel para confirmar.
 - Mobile DEVE abrir scanner via sidebar (link ja tem ?storeId=cortaprecos)
 - Produtos manuais migrados: KITANO CHURRASQUEAR (stock 10), PAO CROISSANT (stock 20)
 
-### Features pendentes (proxima sessao)
+### Features implementadas (sessao 2026-09)
 - [x] Preco atacado: campo priceAtacado + qtdAtacado no produto; PDV aplica auto ✅ (commit 2866251)
 - [x] Scanner mobile: campo priceAtacado + qtdAtacado no form de novo produto ✅ (commit 2866251)
+- [x] Cancelamento de venda com reversão de estoque (Vendas.jsx + store.jsx) ✅ (commit 47a1f0a)
+- [x] Promoções 3 tipos: Combo, Percentual %, Fixo R$ (Promocoes.jsx + PDV.jsx + Terminal.jsx) ✅
+- [x] Parcelamento no cartão: 1× 2× 3× 6× 12× em PDV e Terminal ✅
+- [x] Histórico de compras no perfil do cliente (badges nº vendas + total gasto) ✅
+- [x] Relatório por operador: filtro aparece quando há vendas com operatorName ✅
+- [x] Fix duplicate key 'border' em Fornecedor.jsx Btn component ✅
+- [x] Servidor local com base JSON + auth SHA-256 + scripts iniciar.bat/sh ✅
+
+### Features pendentes (proxima sessao)
 - [ ] Scanner mobile: promoGroup (seletor) no form de novo produto
 - [ ] Filtro por data/validade no Estoque (deixado pra depois pelo cliente)
+- [ ] Backup automático diário (export JSON com timestamp)
+- [ ] Relatório de fechamento de caixa por operador/turno
 
 ### Preço Atacado — Arquitetura (v6.2 — 2026-09)
 - Campos no produto: `priceAtacado` (Number) + `qtdAtacado` (Number, inteiro)
