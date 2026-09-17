@@ -673,9 +673,21 @@ Topbar: nome da loja via usePrinter() + storeId visivel para confirmar.
 - Produtos manuais migrados: KITANO CHURRASQUEAR (stock 10), PAO CROISSANT (stock 20)
 
 ### Features pendentes (proxima sessao)
-- [ ] Preco atacado: campo priceAtacado + qtdAtacado no produto; PDV aplica auto
-- [ ] Scanner mobile: adicionar campo promoGroup (seletor) + priceAtacado no cadastro
+- [x] Preco atacado: campo priceAtacado + qtdAtacado no produto; PDV aplica auto ✅ (commit 2866251)
+- [x] Scanner mobile: campo priceAtacado + qtdAtacado no form de novo produto ✅ (commit 2866251)
+- [ ] Scanner mobile: promoGroup (seletor) no form de novo produto
 - [ ] Filtro por data/validade no Estoque (deixado pra depois pelo cliente)
+
+### Preço Atacado — Arquitetura (v6.2 — 2026-09)
+- Campos no produto: `priceAtacado` (Number) + `qtdAtacado` (Number, inteiro)
+- Lógica: quando `cart item qty >= qtdAtacado && priceAtacado > 0` → desconto aplicado
+- `atacadoDiscount = (price - priceAtacado) * qty` por item elegível
+- `total = subtotal - totalPromoDiscount - atacadoDiscount - discountAmt`
+- PDV visual: badge azul "ATACADO", preço riscado, indicador "+N p/ atacado" antes de atingir
+- Totais: linha "🔖 Preço Atacado − R$ X" + somado em "💰 Total economizado"
+- Scanner mobile: form de novo produto tem campos "Preço atacado" + "Qtd mín. atacado" (qtd desabilitado até preencher preço)
+- Venda registrada com `atacadoDiscount` no objeto de sale
+- INDEPENDENTE de promoGroup — são mecanismos separados
 
 ### Promocoes Mix-and-Match (JA EXISTE)
 Rota /promocoes — regra: { id, name, group, qty, totalPrice, active }
