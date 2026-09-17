@@ -221,10 +221,17 @@ export default function Configuracoes() {
     if (authForm.newPass !== authForm.confirmPass)
       return setAuthMsg({ type: 'err', text: 'As senhas não coincidem.' })
     const { password: currentPass } = getCredentials()
-    saveCredentials(authForm.username.trim(), authForm.newPass || currentPass)
+    const finalPass = authForm.newPass || currentPass
+    saveCredentials(authForm.username.trim(), finalPass)
     setAuthForm(f => ({ ...f, newPass: '', confirmPass: '' }))
     setAuthMsg({ type: 'ok', text: '✅ Credenciais atualizadas!' })
     setTimeout(() => setAuthMsg(null), 3000)
+    // Keep local server _auth.json in sync (silent fail on Netlify / offline)
+    fetch('/api/update-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: authForm.username.trim(), password: finalPass }),
+    }).catch(() => {})
   }
 
   const saveSettings = () => {
