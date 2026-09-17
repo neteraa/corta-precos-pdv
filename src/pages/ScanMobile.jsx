@@ -111,7 +111,9 @@ export default function ScanMobile() {
   const [newProdCost,  setNewProdCost]  = useState('')
   const [newProdCat,   setNewProdCat]   = useState('')
   const [newProdUnit,  setNewProdUnit]  = useState('UN')
-  const [newProdQty,   setNewProdQty]   = useState('')
+  const [newProdQty,          setNewProdQty]          = useState('')
+  const [newProdPriceAtacado, setNewProdPriceAtacado] = useState('')
+  const [newProdQtdAtacado,   setNewProdQtdAtacado]   = useState('')
   const nameRef = useRef(null)
   const UNITS_QUICK = ['UN', 'KG', 'LT', 'CX', 'PC', 'DZ']
 
@@ -142,6 +144,7 @@ export default function ScanMobile() {
     setNewProdCode(code)
     setNewProdName(''); setNewProdPrice(''); setNewProdCost('')
     setNewProdCat(''); setNewProdUnit('UN'); setNewProdQty('')
+    setNewProdPriceAtacado(''); setNewProdQtdAtacado('')
   }, [])
 
   /* ── save new product ───────────────────────────────────── */
@@ -156,7 +159,9 @@ export default function ScanMobile() {
       cost:     parseFloat(newProdCost)  || 0,
       category: newProdCat.trim() || 'Outros',
       unit:     newProdUnit || 'UN',
-      stock:    parseFloat(newProdQty)   || 0,
+      stock:        parseFloat(newProdQty)          || 0,
+      priceAtacado: parseFloat(newProdPriceAtacado) || 0,
+      qtdAtacado:   parseInt(newProdQtdAtacado, 10) || 0,
     }
     upsertProduct(p)
     setNewProdCode(null)
@@ -168,7 +173,7 @@ export default function ScanMobile() {
       setQty(newProdQty || '1'); setVencimento(''); setLote(''); setCusto('')
       setSheet(p)
     }
-  }, [newProdCode, newProdName, newProdPrice, newProdCost, newProdCat, newProdUnit, newProdQty, mode, upsertProduct, sendScan])
+  }, [newProdCode, newProdName, newProdPrice, newProdCost, newProdCat, newProdUnit, newProdQty, newProdPriceAtacado, newProdQtdAtacado, mode, upsertProduct, sendScan])
 
   /* ── scan handler ──────────────────────────────────────── */
   const handleScan = useCallback((code) => {
@@ -364,6 +369,23 @@ export default function ScanMobile() {
                 <input type="number" inputMode="decimal" step="0.01" min="0"
                   value={newProdCost} onChange={e => setNewProdCost(e.target.value)}
                   style={S.input} placeholder="0,00" />
+              </div>
+            </div>
+
+            {/* Preço Atacado */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 20px 14px' }}>
+              <div>
+                <label style={S.label}>Preço atacado (R$)</label>
+                <input type="number" inputMode="decimal" step="0.01" min="0"
+                  value={newProdPriceAtacado} onChange={e => setNewProdPriceAtacado(e.target.value)}
+                  style={S.input} placeholder="0,00" />
+              </div>
+              <div>
+                <label style={{ ...S.label, color: newProdPriceAtacado ? '#a1a1aa' : '#52525b' }}>Qtd mín. atacado</label>
+                <input type="number" inputMode="numeric" step="1" min="1"
+                  value={newProdQtdAtacado} onChange={e => setNewProdQtdAtacado(e.target.value)}
+                  style={{ ...S.input, opacity: newProdPriceAtacado ? 1 : 0.4 }}
+                  placeholder="Ex: 3" disabled={!newProdPriceAtacado} />
               </div>
             </div>
 

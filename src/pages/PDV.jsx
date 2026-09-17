@@ -66,6 +66,11 @@ function CartItem({ item, idx, onQty, onRemove, BRL }) {
   const [draft,   setDraft]   = useState('')
   const inputRef = useRef(null)
 
+  const atacadoActive = item.priceAtacado > 0 && item.qtdAtacado > 0 && item.qty >= item.qtdAtacado
+  const faltaAtacado  = item.priceAtacado > 0 && item.qtdAtacado > 0 && item.qty < item.qtdAtacado
+    ? item.qtdAtacado - item.qty : 0
+  const efectivePrice = atacadoActive ? item.priceAtacado : item.price
+
   const startEdit = () => { setDraft(String(item.qty)); setEditing(true); setTimeout(() => inputRef.current?.select(), 0) }
   const commitEdit = () => {
     const n = parseInt(draft, 10)
@@ -75,13 +80,29 @@ function CartItem({ item, idx, onQty, onRemove, BRL }) {
   }
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group">
+    <div className={`flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group ${atacadoActive ? 'bg-blue-50/40' : ''}`}>
       <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-400 flex-shrink-0">
         {idx + 1}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-gray-800 truncate leading-tight">{item.name}</div>
-        <div className="text-xs text-gray-400 mt-0.5">{BRL.format(item.price)}/un.</div>
+        <div className="flex items-center gap-1.5">
+          <div className="text-sm font-semibold text-gray-800 truncate leading-tight">{item.name}</div>
+          {atacadoActive && (
+            <span className="text-[9px] font-black bg-blue-600 text-white px-1.5 py-0.5 rounded flex-shrink-0 tracking-wide">ATACADO</span>
+          )}
+        </div>
+        {atacadoActive ? (
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-xs text-gray-300 line-through">{BRL.format(item.price)}</span>
+            <span className="text-xs text-blue-600 font-black">{BRL.format(item.priceAtacado)}/un.</span>
+          </div>
+        ) : faltaAtacado > 0 ? (
+          <div className="text-[10px] text-blue-400 mt-0.5 font-semibold">
+            +{faltaAtacado} p/ atacado {BRL.format(item.priceAtacado)}/un.
+          </div>
+        ) : (
+          <div className="text-xs text-gray-400 mt-0.5">{BRL.format(item.price)}/un.</div>
+        )}
       </div>
       <div className="flex items-center gap-1.5 flex-shrink-0">
         <button onClick={() => onQty(item.productId, -1)}
@@ -105,8 +126,11 @@ function CartItem({ item, idx, onQty, onRemove, BRL }) {
           <Plus className="w-4 h-4" />
         </button>
       </div>
-      <div className="w-20 text-right text-sm font-bold text-gray-900 flex-shrink-0">
-        {BRL.format(item.price * item.qty)}
+      <div className="w-20 text-right text-sm font-bold flex-shrink-0">
+        {atacadoActive
+          ? <span className="text-blue-600">{BRL.format(efectivePrice * item.qty)}</span>
+          : <span className="text-gray-900">{BRL.format(item.price * item.qty)}</span>
+        }
       </div>
       <button onClick={() => onRemove(item.productId)}
         className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all ml-1 flex-shrink-0">
@@ -244,9 +268,14 @@ export default function PDV() {
   const promoResults       = calcPromoEngine(cart, products, promos)
   const totalPromoDiscount = promoResults.reduce((s, r) => s + r.discount, 0)
 
-  const subtotal    = cart.reduce((s, i) => s + i.price * i.qty, 0)
+  const subtotal       = cart.reduce((s, i) => s + i.price * i.qty, 0)
+  const atacadoDiscount = cart.reduce((s, i) =>
+    i.priceAtacado > 0 && i.qtdAtacado > 0 && i.qty >= i.qtdAtacado
+      ? s + (i.price - i.priceAtacado) * i.qty
+      : s
+  , 0)
   const discountAmt = subtotal * (discount / 100)
-  const total       = subtotal - totalPromoDiscount - discountAmt
+  const total       = subtotal - totalPromoDiscount - atacadoDiscount - discountAmt
 
   // ── broadcast to customer display ─────────────────────────
   useEffect(() => {
@@ -293,10 +322,11 @@ export default function PDV() {
       const ex = prev.find(i => i.productId === p.id)
       const unit = (p.unit || '').toUpperCase()
       const isWeight = unit === 'KG' || unit === 'G'
+      const base = { productId: p.id, name: p.name, price: p.price, qty, sku: p.sku, promo: p.promo || '', unit: p.unit, priceAtacado: p.priceAtacado || 0, qtdAtacado: p.qtdAtacado || 0 }
       // weight products: always add as new line (each scan = new weight)
-      if (isWeight) return [...prev, { productId: p.id, name: p.name, price: p.price, qty, sku: p.sku, promo: p.promo || '', unit: p.unit }]
+      if (isWeight) return [...prev, base]
       if (ex) return prev.map(i => i.productId === p.id ? { ...i, qty: i.qty + qty } : i)
-      return [...prev, { productId: p.id, name: p.name, price: p.price, qty, sku: p.sku, promo: p.promo || '', unit: p.unit }]
+      return [...prev, base]
     })
     setFlashKey(k => k + 1)
     setTotalKey(k => k + 1)
@@ -424,6 +454,7 @@ export default function PDV() {
       payments: splitMode ? splitPays : [{ method: payment, amount: Math.max(0, total) }],
       discount: discountAmt,
       promoDiscount,
+      atacadoDiscount,
       promos: promoResults.filter(r => r.status === 'active').map(r => ({
         id: r.rule.id, name: r.rule.name, times: r.complete, saving: r.discount,
       })),
@@ -433,6 +464,7 @@ export default function PDV() {
       total: Math.max(0, total),
       payment: paymentLabel,
       promoDiscount,
+      atacadoDiscount,
       received: showTroco ? receivedVal : null,
       troco:    showTroco ? troco : null,
     }
@@ -795,6 +827,16 @@ export default function PDV() {
               </div>
             ))}
 
+            {/* atacado discount */}
+            {atacadoDiscount > 0 && (
+              <div className="flex justify-between text-sm text-blue-600 font-semibold">
+                <span className="flex items-center gap-1">
+                  <span>🔖</span> Preço Atacado
+                </span>
+                <span>− {BRL.format(atacadoDiscount)}</span>
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600 flex-1">Desconto extra (%)</span>
               <input
@@ -812,10 +854,10 @@ export default function PDV() {
             )}
 
             <div className="border-t-2 border-gray-900 pt-2.5">
-              {(totalPromoDiscount > 0 || discountAmt > 0) && (
+              {(totalPromoDiscount > 0 || atacadoDiscount > 0 || discountAmt > 0) && (
                 <div className="flex justify-between text-xs text-green-600 font-bold mb-1">
                   <span>💰 Total economizado</span>
-                  <span>{BRL.format(totalPromoDiscount + discountAmt)}</span>
+                  <span>{BRL.format(totalPromoDiscount + atacadoDiscount + discountAmt)}</span>
                 </div>
               )}
               <div className="flex items-baseline justify-between">
