@@ -82,43 +82,46 @@ export default function CaixaLogin() {
   }, [pin]) // eslint-disable-line
 
   const MarketHeader = () => (
-    <div className="flex flex-col items-center mb-8">
-      <div className="w-16 h-16 rounded-2xl bg-orange-500/15 border-2 border-orange-500/40 flex items-center justify-center mb-3">
-        <Store className="w-8 h-8 text-orange-400" />
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32 }}>
+      <div style={{ width: 64, height: 64, borderRadius: 18, background: 'rgba(249,115,22,.12)', border: '2px solid rgba(249,115,22,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+        <Store style={{ width: 30, height: 30, color: '#f97316' }} />
       </div>
       {storeName
-        ? <p className="text-white font-black text-xl">{storeName}</p>
-        : <p className="text-gray-500 font-mono text-sm">{storeId}</p>
+        ? <p style={{ color: '#f1f5f9', fontWeight: 900, fontSize: 20 }}>{storeName}</p>
+        : <p style={{ color: '#475569', fontFamily: 'monospace', fontSize: 13 }}>{storeId}</p>
       }
-      <p className="text-gray-600 text-xs mt-1 uppercase tracking-widest">Terminal de Caixa</p>
+      <p style={{ color: '#334155', fontSize: 11, marginTop: 4, textTransform: 'uppercase', letterSpacing: '.1em' }}>Terminal de Caixa</p>
     </div>
   )
 
+  const BG = { minHeight: '100dvh', background: '#04080f', position: 'relative', overflow: 'hidden' }
+  const GLOW = { position: 'fixed', inset: 0, background: 'radial-gradient(ellipse at 50% 110%, rgba(249,115,22,.15) 0%, transparent 65%)', pointerEvents: 'none' }
+
   /* ── Loading ─────────────────────────────────────────── */
   if (status === 'loading') return (
-    <div className="min-h-dvh bg-gray-950 flex flex-col items-center justify-center gap-4 text-gray-400">
-      <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
-      <span className="text-sm">Carregando operadores…</span>
+    <div style={{ ...BG, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+      <div style={GLOW} />
+      <Loader2 className="w-10 h-10 animate-spin text-orange-500" style={{ position: 'relative' }} />
+      <span style={{ color: '#475569', fontSize: 14 }}>Carregando operadores…</span>
     </div>
   )
 
   /* ── Error / Empty ───────────────────────────────────── */
   if (status === 'empty' || status === 'error') return (
-    <div className="min-h-dvh bg-gray-950 flex flex-col items-center justify-center gap-6 p-6 text-center">
-      <MarketHeader />
-      <UserX className="w-14 h-14 text-gray-600" />
+    <div style={{ ...BG, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: 32, textAlign: 'center' }}>
+      <div style={GLOW} />
+      <div style={{ position: 'relative' }}><MarketHeader /></div>
+      <UserX style={{ color: '#1e2a3a', width: 56, height: 56 }} />
       <div>
-        <p className="text-white font-bold text-lg mb-1">
+        <p style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 18, marginBottom: 6 }}>
           {status === 'error' ? 'Sem conexão com o servidor' : 'Nenhum operador cadastrado'}
         </p>
-        <p className="text-gray-500 text-sm">
-          {status === 'error'
-            ? 'Verifique a internet e tente novamente.'
-            : 'Peça para o admin cadastrar os operadores em Configurações.'}
+        <p style={{ color: '#475569', fontSize: 14 }}>
+          {status === 'error' ? 'Verifique a internet e tente novamente.' : 'Peça para o admin cadastrar os operadores em Configurações.'}
         </p>
       </div>
       <button onClick={fetchOperators}
-        className="flex items-center gap-2 px-6 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold transition-colors">
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 14, background: 'linear-gradient(135deg,#f97316,#ea580c)', color: '#fff', fontWeight: 700, border: 'none', cursor: 'pointer', boxShadow: '0 6px 20px rgba(249,115,22,.3)' }}>
         <RefreshCw className="w-4 h-4" /> Tentar novamente
       </button>
     </div>
@@ -128,90 +131,110 @@ export default function CaixaLogin() {
   if (selected) {
     const color = COLORS[operators.indexOf(selected) % COLORS.length]
     return (
-      <div className="min-h-dvh bg-gray-950 flex flex-col items-center justify-center p-6">
-        <MarketHeader />
-        {/* Avatar */}
-        <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl font-black mb-3"
-          style={{ background: color + '22', border: `3px solid ${color}`, color }}>
-          {selected.name[0].toUpperCase()}
-        </div>
-        <p className="text-white font-black text-xl mb-1">{selected.name}</p>
-        <p className="text-gray-500 text-sm mb-8">
-          {selected.role === 'admin' ? 'Admin' : selected.role === 'gerente' ? 'Gerente' : 'Caixa'} · Terminal {selected.terminalId ?? 1}
-        </p>
+      <div style={{ ...BG, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={GLOW} />
+        <div style={{ position: 'relative', width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <MarketHeader />
 
-        {/* PIN dots */}
-        <div className={`flex gap-3 mb-6 transition-all ${pinErr ? 'animate-shake' : ''}`}>
-          {Array.from({ length: Math.max(selected.pin?.length || 4, pin.length || 1) }).map((_, i) => (
-            <div key={i}
-              className={`w-4 h-4 rounded-full border-2 transition-all ${
-                i < pin.length
-                  ? pinErr ? 'bg-red-500 border-red-500' : 'border-transparent'
-                  : 'border-gray-600 bg-transparent'
-              }`}
-              style={i < pin.length && !pinErr ? { background: color, borderColor: color } : {}}
-            />
-          ))}
-        </div>
+          {/* Avatar */}
+          <div style={{ width: 88, height: 88, borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38, fontWeight: 900, marginBottom: 12, background: color + '22', border: `3px solid ${color}`, color }}>
+            {selected.name[0].toUpperCase()}
+          </div>
+          <p style={{ color: '#f1f5f9', fontWeight: 900, fontSize: 22, marginBottom: 4 }}>{selected.name}</p>
+          <p style={{ color: '#475569', fontSize: 13, marginBottom: 32 }}>
+            {selected.role === 'admin' ? '🔴 Admin' : selected.role === 'gerente' ? '🔵 Gerente' : '🟢 Caixa'} · Terminal {selected.terminalId ?? 1}
+          </p>
 
-        {/* PIN pad */}
-        <div className="grid grid-cols-3 gap-3 w-full max-w-[260px] mb-6">
-          {PIN_KEYS.map(k => (
-            <button key={k} onClick={() => handlePin(k)}
-              className={`h-16 rounded-2xl text-xl font-black transition-all active:scale-95 ${
-                k === '✓'
-                  ? 'text-white'
-                  : k === '⌫'
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                  : 'bg-gray-800 text-white hover:bg-gray-700'
-              }`}
-              style={k === '✓' ? { background: color } : {}}>
-              {k}
-            </button>
-          ))}
-        </div>
+          {/* PIN dots */}
+          <div style={{ display: 'flex', gap: 14, marginBottom: 8 }}>
+            {Array.from({ length: Math.max(selected.pin?.length || 4, pin.length || 1) }).map((_, i) => (
+              <div key={i} style={{
+                width: 18, height: 18, borderRadius: '50%', transition: 'all .15s',
+                background: i < pin.length ? (pinErr ? '#ef4444' : color) : 'transparent',
+                border: `2px solid ${i < pin.length ? (pinErr ? '#ef4444' : color) : '#2d3f5c'}`,
+              }} />
+            ))}
+          </div>
+          {pinErr && <p style={{ color: '#f87171', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>PIN incorreto — tente novamente</p>}
+          {!selected.pin && <p style={{ color: '#475569', fontSize: 12, marginBottom: 8 }}>Sem PIN configurado — pressione ✓</p>}
 
-        <button onClick={() => { setSelected(null); setPin(''); setPinErr(false) }}
-          className="text-gray-500 text-sm hover:text-gray-300 transition-colors">
-          ← Trocar operador
-        </button>
+          {/* PIN pad */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, width: '100%', maxWidth: 300, marginTop: 16, marginBottom: 24 }}>
+            {PIN_KEYS.map(k => (
+              <button key={k} onClick={() => handlePin(k)}
+                onPointerDown={e => { e.currentTarget.style.transform = 'scale(.92)'; e.currentTarget.style.opacity = '.7' }}
+                onPointerUp={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.opacity = '' }}
+                onPointerLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.opacity = '' }}
+                style={{
+                  height: 72, borderRadius: 18, border: 'none', cursor: 'pointer', fontSize: k === '⌫' ? 22 : 26, fontWeight: 900,
+                  background: k === '✓' ? color : k === '⌫' ? '#131f30' : '#0e1928',
+                  color: k === '✓' ? '#fff' : '#cbd5e1',
+                  outline: k !== '✓' ? '1px solid #1a2740' : 'none',
+                  boxShadow: k === '✓' ? `0 6px 20px ${color}55` : 'none',
+                  transition: 'transform .08s, opacity .08s',
+                }}>
+                {k}
+              </button>
+            ))}
+          </div>
+
+          <button onClick={() => { setSelected(null); setPin(''); setPinErr(false) }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#334155', fontSize: 13, fontWeight: 600 }}>
+            ← Trocar operador
+          </button>
+        </div>
       </div>
     )
   }
 
   /* ── Operator tiles ───────────────────────────────────── */
   return (
-    <div className="min-h-dvh bg-gray-950 flex flex-col items-center justify-start p-6 pt-10">
-      <MarketHeader />
-      <p className="text-gray-400 text-sm font-semibold uppercase tracking-widest mb-6">
-        Quem vai usar o caixa?
-      </p>
+    <div style={{ ...BG, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '40px 20px 32px' }}>
+      <div style={GLOW} />
+      <div style={{ position: 'relative', width: '100%', maxWidth: 480 }}>
+        <MarketHeader />
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full max-w-sm sm:max-w-lg mb-10">
-        {operators.map((op, i) => {
-          const color = COLORS[i % COLORS.length]
-          return (
-            <button key={op.id} onClick={() => { setSelected(op); setPin('') }}
-              className="flex flex-col items-center gap-3 p-5 rounded-2xl bg-gray-800/60 border border-gray-700 hover:border-orange-500/50 hover:bg-gray-800 transition-all active:scale-95">
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-black"
-                style={{ background: color + '22', border: `2px solid ${color}`, color }}>
-                {op.name[0].toUpperCase()}
-              </div>
-              <div className="text-center">
-                <p className="text-white font-bold text-sm leading-tight">{op.name}</p>
-                <p className="text-gray-500 text-xs mt-0.5">
-                  {op.role === 'caixa' ? '🟢 Caixa' : op.role === 'gerente' ? '🔵 Gerente' : '🔴 Admin'}
-                </p>
-              </div>
-            </button>
-          )
-        })}
+        <p style={{ color: '#475569', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', textAlign: 'center', marginBottom: 24 }}>
+          Quem vai usar o caixa?
+        </p>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: operators.length <= 2 ? 'repeat(2,1fr)' : operators.length >= 5 ? 'repeat(3,1fr)' : 'repeat(2,1fr)',
+          gap: 14,
+          marginBottom: 32,
+        }}>
+          {operators.map((op, i) => {
+            const color = COLORS[i % COLORS.length]
+            return (
+              <button key={op.id} onClick={() => { setSelected(op); setPin('') }}
+                onPointerEnter={e => { e.currentTarget.style.borderColor = color + '66'; e.currentTarget.style.background = color + '14'; e.currentTarget.style.transform = 'translateY(-3px)' }}
+                onPointerLeave={e => { e.currentTarget.style.borderColor = '#1a2740'; e.currentTarget.style.background = '#0c1524'; e.currentTarget.style.transform = '' }}
+                onPointerDown={e => e.currentTarget.style.transform = 'scale(.97)'}
+                onPointerUp={e => e.currentTarget.style.transform = 'translateY(-3px)'}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '24px 16px', borderRadius: 22, background: '#0c1524', border: '1.5px solid #1a2740', cursor: 'pointer', transition: 'all .18s' }}>
+                <div style={{ width: 64, height: 64, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 900, background: color + '22', border: `2.5px solid ${color}`, color }}>
+                  {op.name[0].toUpperCase()}
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ color: '#f1f5f9', fontWeight: 800, fontSize: 15, lineHeight: 1.2 }}>{op.name}</p>
+                  <p style={{ color: '#475569', fontSize: 11, marginTop: 4 }}>
+                    {op.role === 'caixa' ? '🟢 Caixa' : op.role === 'gerente' ? '🔵 Gerente' : '🔴 Admin'}
+                    {op.terminalId ? ` · Cx ${op.terminalId}` : ''}
+                  </p>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        <div style={{ textAlign: 'center' }}>
+          <button onClick={fetchOperators}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: '#334155', fontSize: 12, fontWeight: 600 }}>
+            <RefreshCw style={{ width: 13, height: 13 }} /> Atualizar lista
+          </button>
+        </div>
       </div>
-
-      <button onClick={fetchOperators}
-        className="flex items-center gap-2 text-gray-600 hover:text-gray-400 text-xs transition-colors">
-        <RefreshCw className="w-3 h-3" /> Atualizar lista
-      </button>
     </div>
   )
 }
