@@ -71,6 +71,14 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
     setBusy(false)
   }
 
+  const setExpiry = async (dateStr) => {
+    setBusy(true)
+    const expiresAt = dateStr ? new Date(dateStr + 'T23:59:59').toISOString() : null
+    await api('/api/markets-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'set-expiry', id: market.id, expiresAt }) })
+    await onRefresh()
+    setBusy(false)
+  }
+
   const copyId = () => {
     navigator.clipboard.writeText(market.storeId).catch(() => {})
     setCopied(true)
@@ -133,6 +141,42 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
             <span className="text-gray-300">{market.storePhone}</span>
           </div>
         )}
+
+        {/* Expiry / payment status */}
+        {(() => {
+          const exp  = market.expiresAt ? new Date(market.expiresAt) : null
+          const days = exp ? Math.ceil((exp - Date.now()) / 86_400_000) : null
+          const expired = exp && days < 0
+          const warn    = exp && days >= 0 && days <= 5
+          const badge   = expired ? { label: `VENCIDA ${Math.abs(days)}d atrás`, cls: 'bg-red-500/20 text-red-400 border-red-500/30' }
+                        : warn    ? { label: `Vence em ${days}d`, cls: 'bg-amber-500/20 text-amber-400 border-amber-500/30' }
+                        : exp     ? { label: `OK até ${exp.toLocaleDateString('pt-BR')}`, cls: 'bg-green-500/20 text-green-400 border-green-500/30' }
+                        :           { label: 'Sem vencimento', cls: 'bg-gray-700 text-gray-500 border-gray-600' }
+          return (
+            <div className="pt-1 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">Assinatura</span>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${badge.cls}`}>{badge.label}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  defaultValue={exp ? exp.toISOString().slice(0,10) : ''}
+                  disabled={busy}
+                  onChange={e => setExpiry(e.target.value)}
+                  className="flex-1 bg-gray-700 border border-gray-600 text-gray-200 text-xs rounded-lg px-2 py-1.5 outline-none focus:border-orange-500 disabled:opacity-40"
+                  title="Data de vencimento da assinatura"
+                />
+                {exp && (
+                  <button onClick={() => setExpiry('')} disabled={busy} title="Remover vencimento"
+                    className="text-gray-500 hover:text-red-400 transition-colors text-xs px-1.5 py-1 rounded-lg hover:bg-red-500/10">
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* reset password inline */}

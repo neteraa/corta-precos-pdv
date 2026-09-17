@@ -10,6 +10,8 @@ import {
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import { useOnlineStatus } from '../hooks/useOnlineStatus.js'
 import { usePrinter } from '../hooks/usePrinter.js'
+import { useMarketCheck } from '../hooks/useMarketCheck.js'
+import BlockedScreen from './BlockedScreen.jsx'
 import { logout, getRole, getOperatorName, getTerminalId } from '../utils/auth.js'
 import { getMktStoreId } from '../utils/tenantStorage.js'
 import { useStore } from '../store.jsx'
@@ -153,6 +155,7 @@ export default function Layout() {
   const online            = useOnlineStatus()
   const navigate          = useNavigate()
 
+  const marketCheck  = useMarketCheck()
   const role         = getRole()
   const operatorName = getOperatorName()
   const terminalId   = getTerminalId()
@@ -176,6 +179,9 @@ export default function Layout() {
     logout()
     navigate('/login', { replace: true })
   }
+
+  if (marketCheck.blocked)
+    return <BlockedScreen reason={marketCheck.reason} daysLeft={marketCheck.daysLeft} />
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
@@ -283,6 +289,14 @@ export default function Layout() {
           </div>
         )}
 
+        {/* Expiry warning — shown 5 days before subscription ends */}
+        {!marketCheck.blocked && marketCheck.daysLeft != null && marketCheck.daysLeft <= 5 && marketCheck.daysLeft >= 0 && (
+          <div className="bg-amber-500 px-4 py-2 flex items-center justify-between gap-4 text-sm font-bold text-amber-900">
+            <span>⏰ Sua assinatura vence em {marketCheck.daysLeft === 0 ? 'hoje' : `${marketCheck.daysLeft} dia${marketCheck.daysLeft !== 1 ? 's' : ''}`}!</span>
+            <a href="https://wa.me/5500000000000?text=Quero+renovar+minha+assinatura" target="_blank" rel="noopener noreferrer"
+              className="underline whitespace-nowrap">Renovar agora →</a>
+          </div>
+        )}
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <Outlet />
         </main>

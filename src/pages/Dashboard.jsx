@@ -145,6 +145,24 @@ export default function Dashboard() {
     (supplierOffers || []).filter(o => o.status === 'pending'),
   [supplierOffers])
 
+  // ── Sales heatmap: revenue by hour (last 30 days) ─────────
+  const heatmapData = useMemo(() => {
+    const cutoff = Date.now() - 30 * 86_400_000
+    const hours  = Array.from({ length: 24 }, (_, h) => ({ h, rev: 0, count: 0 }))
+    sales.filter(s => new Date(s.date).getTime() > cutoff).forEach(s => {
+      const h = new Date(s.date).getHours()
+      hours[h].rev   += s.total
+      hours[h].count += 1
+    })
+    const maxRev = Math.max(...hours.map(h => h.rev), 1)
+    return hours.map(h => ({ ...h, pct: h.rev / maxRev }))
+  }, [sales])
+
+  // ── Products below minStock threshold (separate from lowStock) ─
+  const minStockAlert = useMemo(() =>
+    products.filter(p => p.minStock > 0 && p.stock < p.minStock).sort((a,b) => a.stock - b.stock),
+  [products])
+
   const kpis = [
     {
       label: 'Faturamento Total', value: BRL.format(totalRevenue), icon: TrendingUp,
@@ -349,6 +367,34 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ── Min-stock alert + WhatsApp ────────────────────────── */}
+      {minStockAlert.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl px-5 py-4 bg-blue-600">
+          <Package className="w-8 h-8 text-blue-200 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="font-black text-lg text-white leading-tight">
+              📦 {minStockAlert.length} produto{minStockAlert.length !== 1 ? 's' : ''} abaixo do mínimo!
+            </div>
+            <div className="flex flex-wrap gap-2 mt-1.5">
+              {minStockAlert.slice(0, 4).map(p => (
+                <span key={p.id} className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/20 text-white">
+                  {p.name.slice(0, 20)} · {p.stock}/{p.minStock} un.
+                </span>
+              ))}
+              {minStockAlert.length > 4 && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/20 text-white">+{minStockAlert.length - 4} mais</span>}
+            </div>
+          </div>
+          <button onClick={() => {
+            const lines = [`📦 *Alerta de Estoque Mínimo*\n`]
+            minStockAlert.forEach(p => lines.push(`• ${p.name}: ${p.stock} un. (mínimo: ${p.minStock})`))
+            lines.push(`\nAtualize o estoque para não faltar produto!`)
+            window.open(`https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`, '_blank')
+          }} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white font-black text-sm transition-colors whitespace-nowrap flex-shrink-0">
+            <MessageCircle className="w-4 h-4" /> Alertar WhatsApp
+          </button>
+        </div>
+      )}
+
       {/* ── Supplier offers banner ─────────────────────────────── */}
       {pendingOffers.length > 0 && (
         <div className="flex items-center gap-4 rounded-2xl px-5 py-4 mb-4 bg-emerald-900/40 border border-emerald-700/50">
@@ -417,6 +463,45 @@ export default function Dashboard() {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Sales heatmap by hour ────────────────────────────── */}
+      {sales.length > 0 && (
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-black text-gray-800 text-sm uppercase tracking-wide">🔥 Horário de Pico — últimos 30 dias</h2>
+            <span className="text-xs text-gray-400">Quanto mais laranja, mais vendas naquela hora</span>
+          </div>
+          <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(18,1fr)' }}>
+            {heatmapData.filter(h => h.h >= 6 && h.h <= 23).map(h => {
+              const alpha = 0.08 + h.pct * 0.92
+              const isTop = h.pct > 0.85
+              return (
+                <div key={h.h} className="flex flex-col items-center gap-1 group">
+                  <div
+                    className="w-full rounded-lg transition-all"
+                    style={{ height: 48, background: h.pct > 0.01 ? `rgba(249,115,22,${alpha})` : 'rgba(243,244,246,0.5)', border: isTop ? '1.5px solid rgba(249,115,22,0.6)' : '1px solid transparent' }}
+                    title={`${h.h}h — ${h.count} vendas — ${BRL.format(h.rev)}`}
+                  />
+                  <span className="text-[9px] font-bold text-gray-400 group-hover:text-brand-600">{h.h}h</span>
+                  {h.count > 0 && <span className="text-[8px] text-gray-300 hidden group-hover:block absolute bg-gray-900 text-white px-2 py-1 rounded-lg shadow-lg z-10 -mt-1 whitespace-nowrap pointer-events-none">{BRL.format(h.rev)}</span>}
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex items-center justify-between mt-3">
+            {(() => {
+              const peak = heatmapData.reduce((a, b) => b.rev > a.rev ? b : a, heatmapData[0])
+              const slow  = heatmapData.filter(h => h.h >= 6).reduce((a, b) => (b.rev < a.rev && b.h !== peak.h) ? b : a, heatmapData[6])
+              return (
+                <>
+                  <div className="text-xs text-gray-500">🔥 Pico: <span className="font-black text-orange-500">{peak.h}h–{peak.h+1}h</span> · {BRL.format(peak.rev)}</div>
+                  <div className="text-xs text-gray-400">🕐 Mais calmo: <span className="font-semibold">{slow.h}h–{slow.h+1}h</span></div>
+                </>
+              )
+            })()}
           </div>
         </div>
       )}

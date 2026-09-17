@@ -6,7 +6,7 @@
 import React, { useState, useMemo } from 'react'
 import {
   HandCoins, Plus, Minus, ChevronDown, ChevronUp,
-  Users, AlertTriangle, CheckCircle2, Search, X, Clock
+  Users, AlertTriangle, CheckCircle2, Search, X, Clock, MessageCircle
 } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
 
@@ -161,6 +161,19 @@ function CustomerCard({ c, onDebt, onPay }) {
               className="w-8 h-8 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg flex items-center justify-center transition-colors"
               title="Receber pagamento">
               <Minus className="w-4 h-4" />
+            </button>
+          )}
+          {hasBalance && c.phone && (
+            <button
+              onClick={() => {
+                const storeName = localStorage.getItem('cp_store_name') || 'o mercado'
+                const msg = `Olá ${c.name}! 👋\n\nPassando para avisar que você tem um saldo em aberto de *${BRL.format(c.fiadoBalance)}* no *${storeName}*.\n\nQuando puder, pode passar aqui para quitar! 😊\n\n_Caso já tenha pago, desconsidere esta mensagem._`
+                const phone = c.phone.replace(/\D/g, '')
+                window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, '_blank')
+              }}
+              className="w-8 h-8 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg flex items-center justify-center transition-colors"
+              title="Cobrar via WhatsApp">
+              <MessageCircle className="w-4 h-4" />
             </button>
           )}
           {logs.length > 0 && (
