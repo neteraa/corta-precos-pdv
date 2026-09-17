@@ -619,14 +619,15 @@ export default function PDV() {
         <div className="lg:col-span-3 space-y-3">
           {/* search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               ref={searchRef}
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={handleSearchKey}
-              placeholder="Buscar por nome, código ou falar 🎤…"
-              className="input pl-9 pr-10 text-sm"
+              placeholder="🔍  Digite o produto ou bata o código de barras…"
+              className="input pl-11 pr-11 text-base font-medium"
+              style={{ height: 52 }}
               autoFocus
             />
             {/* Mic button — Web Speech API, zero custo */}
@@ -865,8 +866,8 @@ export default function PDV() {
                 </div>
               )}
               <div className="flex items-baseline justify-between">
-                <span className="text-base font-black text-gray-900 uppercase tracking-wide">TOTAL</span>
-                <span key={`total-${totalKey}`} className="text-3xl font-black text-brand-600 shimmer-once">
+                <span className="text-base font-black text-gray-900 uppercase tracking-widest">TOTAL</span>
+                <span key={`total-${totalKey}`} className="text-4xl font-black text-brand-600 shimmer-once">
                   {BRL.format(Math.max(0, total))}
                 </span>
               </div>
@@ -893,16 +894,16 @@ export default function PDV() {
             {/* single payment mode */}
             {!splitMode && (
               <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2.5">
                   {PAYMENTS.map(({ key, icon: Icon, color }) => (
                     <button
                       key={key}
                       onClick={() => { setPayment(key); if (key !== 'Crédito') setInstallments(1) }}
-                      className={`flex items-center gap-2 px-3 py-3 rounded-xl border-2 text-sm font-bold transition-all ${
+                      className={`flex items-center justify-center gap-2.5 px-3 py-4 rounded-2xl border-2 text-[15px] font-black transition-all active:scale-95 ${
                         payment === key ? color : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300'
                       }`}
                     >
-                      <Icon className="w-4 h-4" /> {key}
+                      <Icon className="w-5 h-5" /> {key}
                     </button>
                   ))}
                 </div>
@@ -971,10 +972,15 @@ export default function PDV() {
           <button
             disabled={cart.length === 0 || !splitValid}
             onClick={() => { suggestReceived(); setShowFinish(true) }}
-            className="btn-primary w-full justify-center py-4 text-base font-black disabled:opacity-30 disabled:cursor-not-allowed rounded-xl shadow-md"
+            className="btn-primary w-full justify-center disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl shadow-lg active:scale-[.98] transition-transform"
+            style={{ minHeight: 64, fontSize: 18, fontWeight: 900, letterSpacing: '.02em' }}
           >
-            <Check className="w-5 h-5" />
-            {splitMode && !splitValid ? `Falta ${BRL.format(splitRemain)}` : 'FINALIZAR VENDA · F10'}
+            <Check className="w-6 h-6" />
+            {splitMode && !splitValid
+              ? `⚠️  Falta ${BRL.format(splitRemain)}`
+              : cart.length === 0
+                ? 'Adicione itens para finalizar'
+                : `✅  FINALIZAR — ${payment || 'Selecione pagamento'}`}
           </button>
         </div>
       </div>
