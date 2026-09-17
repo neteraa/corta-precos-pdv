@@ -130,6 +130,30 @@ export default function Relatorio() {
   const PAYMENT_METHODS = ['PIX', 'Dinheiro', 'Débito', 'Crédito']
   const OP_COLORS = ['#f97316','#22c55e','#818cf8','#06b6d4','#f59e0b','#ec4899']
 
+  // Full product rentabilidade — all products sold in period, sorted by margin
+  const [rentaSort, setRentaSort] = React.useState('lucro') // 'lucro' | 'margem' | 'receita' | 'qty'
+  const [rentaShowAll, setRentaShowAll] = React.useState(false)
+  const rentaData = React.useMemo(() => {
+    const map = {}
+    filtered.forEach(s => s.items?.forEach(i => {
+      const prod = productMap[i.name]
+      if (!map[i.name]) map[i.name] = { name: i.name, qty: 0, revenue: 0, cost: prod?.cost || 0, price: prod?.price || i.price }
+      map[i.name].qty     += i.qty
+      map[i.name].revenue += i.qty * i.price
+    }))
+    return Object.values(map).map(p => {
+      const totalCost = p.cost ? p.qty * p.cost : null
+      const lucro     = totalCost != null ? p.revenue - totalCost : null
+      const margem    = p.revenue > 0 && totalCost != null ? ((p.revenue - totalCost) / p.revenue * 100) : null
+      return { ...p, totalCost, lucro, margem, lucroUnit: p.cost ? (p.price - p.cost) : null }
+    }).sort((a, b) => {
+      if (rentaSort === 'margem')  return (b.margem ?? -999) - (a.margem ?? -999)
+      if (rentaSort === 'receita') return b.revenue - a.revenue
+      if (rentaSort === 'qty')     return b.qty - a.qty
+      return (b.lucro ?? -999999) - (a.lucro ?? -999999) // lucro
+    })
+  }, [filtered, productMap, rentaSort])
+
   const exportCSV = () => {
     const rows = [['Data','Total','Pagamento','Itens','Desconto']]
     filtered.forEach(s => rows.push([
@@ -384,6 +408,83 @@ export default function Relatorio() {
           </div>
         )}
       </div>
+
+      {/* ── Rentabilidade por Produto ─────────────────────────── */}
+      {rentaData.length > 0 && (
+        <div className="card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 className="font-black text-gray-800 text-sm uppercase tracking-wide">📈 Rentabilidade por Produto</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-400 font-semibold">Ordenar:</span>
+              {[['lucro','Lucro Total'],['margem','Margem %'],['receita','Receita'],['qty','Qtd']].map(([k,l]) => (
+                <button key={k} onClick={() => setRentaSort(k)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${rentaSort===k ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* sem custo warning */}
+          {rentaData.some(p => p.cost === 0) && (
+            <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 font-semibold">
+              ⚠️ {rentaData.filter(p=>p.cost===0).length} produto(s) sem custo cadastrado — margem não calculada. Cadastre o custo em Produtos para dados completos.
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left py-2 pr-3 text-xs text-gray-400 font-bold uppercase tracking-wide">Produto</th>
+                  <th className="text-right py-2 px-2 text-xs text-gray-400 font-bold uppercase tracking-wide hidden sm:table-cell">Custo</th>
+                  <th className="text-right py-2 px-2 text-xs text-gray-400 font-bold uppercase tracking-wide hidden sm:table-cell">Preço</th>
+                  <th className="text-right py-2 px-2 text-xs text-gray-400 font-bold uppercase tracking-wide">Lucro/Un</th>
+                  <th className="text-right py-2 px-2 text-xs text-gray-400 font-bold uppercase tracking-wide">Qtd</th>
+                  <th className="text-right py-2 px-2 text-xs text-gray-400 font-bold uppercase tracking-wide">Receita</th>
+                  <th className="text-right py-2 px-2 text-xs text-gray-400 font-bold uppercase tracking-wide">Lucro Total</th>
+                  <th className="text-right py-2 pl-2 text-xs text-gray-400 font-bold uppercase tracking-wide">Margem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(rentaShowAll ? rentaData : rentaData.slice(0,15)).map((p, i) => {
+                  const mgClass = p.margem == null ? 'bg-gray-100 text-gray-400'
+                    : p.margem >= 30 ? 'bg-green-100 text-green-700'
+                    : p.margem >= 15 ? 'bg-yellow-100 text-yellow-700'
+                    : p.margem >= 0  ? 'bg-red-100 text-red-600'
+                    : 'bg-red-200 text-red-700'
+                  return (
+                    <tr key={p.name} className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${p.lucro < 0 ? 'bg-red-50/40' : ''}`}>
+                      <td className="py-2.5 pr-3 font-semibold text-gray-800 max-w-[180px]">
+                        <div className="truncate">{p.name}</div>
+                        {p.lucro < 0 && <div className="text-[10px] text-red-500 font-bold">⚠️ Vendendo abaixo do custo!</div>}
+                      </td>
+                      <td className="py-2.5 px-2 text-right text-gray-500 hidden sm:table-cell">{p.cost ? BRL.format(p.cost) : <span className="text-gray-200">—</span>}</td>
+                      <td className="py-2.5 px-2 text-right text-gray-600 hidden sm:table-cell">{BRL.format(p.price)}</td>
+                      <td className="py-2.5 px-2 text-right font-semibold">{p.lucroUnit != null ? <span className={p.lucroUnit >= 0 ? 'text-green-600' : 'text-red-500'}>{BRL.format(p.lucroUnit)}</span> : <span className="text-gray-300">—</span>}</td>
+                      <td className="py-2.5 px-2 text-right text-gray-600">{p.qty}</td>
+                      <td className="py-2.5 px-2 text-right font-bold text-gray-900">{BRL.format(p.revenue)}</td>
+                      <td className="py-2.5 px-2 text-right font-black">{p.lucro != null ? <span className={p.lucro >= 0 ? 'text-green-600' : 'text-red-500'}>{BRL.format(p.lucro)}</span> : <span className="text-gray-300">—</span>}</td>
+                      <td className="py-2.5 pl-2 text-right">
+                        <span className={`text-xs font-black px-2 py-0.5 rounded-full ${mgClass}`}>
+                          {p.margem != null ? `${p.margem.toFixed(0)}%` : '—'}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {rentaData.length > 15 && (
+            <button onClick={() => setRentaShowAll(v => !v)}
+              className="mt-3 w-full py-2 text-xs font-bold text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-colors">
+              {rentaShowAll ? '▲ Mostrar menos' : `▼ Ver todos os ${rentaData.length} produtos`}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Summary footer */}
       {stats.count > 0 && (

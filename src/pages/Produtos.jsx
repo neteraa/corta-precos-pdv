@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { Plus, Pencil, Trash2, Search, X, Upload, Camera, LayoutGrid, List, ImageOff,
          Sparkles, StopCircle, Globe, Loader2 } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
-import { parseGdoorCsv } from '../utils/importCsv.js'
+import { parseGdoorCsv, parseGenericCsv, downloadCsvTemplate } from '../utils/importCsv.js'
 import { compressImage, savePhoto as dbSavePhoto } from '../utils/photoDb.js'
 import { autoFetchPhotos, fetchProductPhoto, searchProductPhotos, urlToDataUrl } from '../utils/openFoodFacts.js'
 
@@ -216,6 +216,21 @@ export default function Produtos() {
     try {
       const buf  = await file.arrayBuffer()
       const list = parseGdoorCsv(buf)
+      if (list.length === 0) throw new Error('Nenhum produto encontrado. Use o formato Gdoor ou importe via CSV Padrão.')
+      importProducts(list)
+      alert(`✅ ${list.length} produtos importados do Gdoor!`)
+    } catch (err) { alert('Erro: ' + err.message) }
+    finally { setImporting(false); e.target.value = '' }
+  }
+
+  const handleGenericImport = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    try {
+      const buf  = await file.arrayBuffer()
+      const list = parseGenericCsv(buf)
+      if (list.length === 0) throw new Error('Nenhum produto encontrado. Baixe o modelo CSV e preencha corretamente.')
       importProducts(list)
       alert(`✅ ${list.length} produtos importados!`)
     } catch (err) { alert('Erro: ' + err.message) }
@@ -291,9 +306,17 @@ export default function Produtos() {
             )
           }
 
-          <label className={`btn-ghost cursor-pointer ${importing ? 'opacity-60 pointer-events-none' : ''}`}>
+          {/* CSV Padrão: download template + import */}
+          <button onClick={downloadCsvTemplate} className="btn-ghost" title="Baixar modelo CSV para preenchimento em Excel">
+            📄 Modelo CSV
+          </button>
+          <label className={`btn-ghost cursor-pointer ${importing ? 'opacity-60 pointer-events-none' : ''}`} title="Importar planilha no formato padrão (nome, sku, preco, custo, categoria, estoque)">
             <Upload className="w-4 h-4" />
-            {importing ? 'Importando…' : 'CSV Gdoor'}
+            {importing ? 'Importando…' : 'CSV Padrão'}
+            <input type="file" accept=".csv,.txt" className="hidden" onChange={handleGenericImport} />
+          </label>
+          <label className={`btn-ghost cursor-pointer text-xs opacity-60 ${importing ? 'pointer-events-none' : ''}`} title="Importar exportação do sistema Gdoor">
+            Gdoor
             <input type="file" accept=".csv,.txt" className="hidden" onChange={handleImport} />
           </label>
           <button onClick={() => openEdit(EMPTY)} className="btn-primary">

@@ -7,6 +7,7 @@ import {
 import { TrendingUp, ShoppingCart, Package, AlertTriangle, ArrowRight, Receipt, ClipboardList, X, Printer, Download, MessageCircle, Target, ArrowDownCircle, ArrowUpCircle, Plus, Zap, CalendarClock, Truck } from 'lucide-react'
 import { useStore, BRL, fmtDate } from '../store.jsx'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
+import OnboardingWizard from '../components/OnboardingWizard.jsx'
 
 const COLORS = ['#ea580c', '#fb923c', '#f97316', '#c2410c', '#fed7aa', '#9a3412']
 
@@ -171,6 +172,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-pop">
+      <OnboardingWizard />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-gray-900">Dashboard</h1>
@@ -323,10 +325,27 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-          <button onClick={() => navigate('/validade')}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-black text-sm transition-colors whitespace-nowrap">
-            <Zap className="w-4 h-4" /> Ver + Gerar Promoções
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+            <button onClick={() => {
+              const storeName = JSON.parse(localStorage.getItem('cp_session') || '{}').storeName || 'Mercado'
+              const lines = [`⚠️ *Alerta de Vencimento — ${storeName}*\n`]
+              const expired  = expiryAlert.list.filter(p => p.days < 0)
+              const critical = expiryAlert.list.filter(p => p.days >= 0 && p.days <= 7)
+              const warning  = expiryAlert.list.filter(p => p.days > 7)
+              if (expired.length)  lines.push(`🔴 *Vencidos (${expired.length}):*\n${expired.map(p=>`• ${p.name}`).join('\n')}`)
+              if (critical.length) lines.push(`🟠 *Críticos ≤7 dias (${critical.length}):*\n${critical.map(p=>`• ${p.name} — ${p.days}d`).join('\n')}`)
+              if (warning.length)  lines.push(`⚠️ *No alerta (${warning.length}):*\n${warning.slice(0,5).map(p=>`• ${p.name} — ${p.days}d`).join('\n')}${warning.length>5?`\n• +${warning.length-5} mais`:''}`)
+              lines.push(`\n👉 Acesse Validade para gerar promoções:\n${window.location.origin}/validade`)
+              window.open(`https://wa.me/?text=${encodeURIComponent(lines.join('\n\n'))}`, '_blank')
+            }}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white font-black text-sm transition-colors whitespace-nowrap">
+              <MessageCircle className="w-4 h-4" /> Alertar WhatsApp
+            </button>
+            <button onClick={() => navigate('/validade')}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-black text-sm transition-colors whitespace-nowrap">
+              <Zap className="w-4 h-4" /> Ver Promoções
+            </button>
+          </div>
         </div>
       )}
 

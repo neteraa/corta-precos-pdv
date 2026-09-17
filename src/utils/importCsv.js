@@ -83,3 +83,65 @@ export function parseGdoorCsv(buffer) {
 
   return products
 }
+
+/**
+ * Parse a generic (semicolon or comma) CSV with flexible column names.
+ * Expected headers (case-insensitive, any order):
+ *   nome/name, sku/codigo, preco/price/venda, custo/cost, categoria/category, estoque/stock/saldo, unidade/unit
+ */
+export function parseGenericCsv(buffer) {
+  const text = new TextDecoder('utf-8', { fatal: false }).decode(buffer)
+  const lines = text.split(/\r?\n/).filter(l => l.trim())
+  if (lines.length < 2) return []
+
+  const sep = lines[0].includes(';') ? ';' : ','
+  const raw = lines[0].split(sep).map(h => h.trim().replace(/^"(.*)"$/, '$1'))
+  const H = raw.map(h => h.toLowerCase())
+
+  const col = (...keys) => {
+    for (const k of keys) {
+      const i = H.findIndex(h => h.includes(k))
+      if (i !== -1) return i
+    }
+    return -1
+  }
+
+  const iName = col('nome', 'name', 'descri', 'produto')
+  const iSku  = col('sku', 'codigo', 'código', 'cod', 'barras', 'ean')
+  const iPrice = col('preco', 'preço', 'price', 'venda')
+  const iCost  = col('custo', 'cost')
+  const iCat   = col('categoria', 'category', 'grupo', 'família', 'familia')
+  const iStock = col('estoque', 'stock', 'saldo', 'qtd', 'quantidade')
+  const iUnit  = col('unidade', 'unit', 'un')
+
+  const get = (cols, i) => (i !== -1 && cols[i] != null ? cols[i].replace(/^"(.*)"$/, '$1').trim() : '')
+
+  const products = []
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(sep)
+    const name = get(cols, iName)
+    if (!name) continue
+    const price = parseBR(get(cols, iPrice))
+    const cost  = parseBR(get(cols, iCost))
+    products.push({
+      sku:      get(cols, iSku) || `SKU${i}`,
+      name,
+      category: get(cols, iCat) || 'Outros',
+      price:    price || (cost ? cost * 1.3 : 0),
+      cost:     cost || 0,
+      stock:    Math.max(0, parseInt(get(cols, iStock)) || 0),
+      unit:     get(cols, iUnit) || 'UN',
+    })
+  }
+  return products
+}
+
+/** Generate and download a blank CSV template */
+export function downloadCsvTemplate() {
+  const header = 'nome;sku;preco;custo;categoria;estoque;unidade'
+  const example = 'Arroz Tipo 1 5kg;7891234567890;22.90;15.50;Grãos e Cereais;50;UN'
+  const blob = new Blob([header + '\n' + example], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = 'modelo_produtos.csv'; a.click()
+  URL.revokeObjectURL(url)
+}
