@@ -22,6 +22,8 @@
     }
   ],
   "shortcuts": [
+    { "name": "Caixa (PDV)",         "url": "/pdv",        "description": "Abrir PDV principal" },
+    { "name": "Terminal (Scanner)",   "url": "/caixa",      "description": "Terminal com leitor de código" },
     { "name": "Portal Distribuidor", "url": "/fornecedor", "description": "Portal do Distribuidor" },
     { "name": "Ver Ofertas",         "url": "/ofertas",    "description": "Portal de Ofertas" }
   ],

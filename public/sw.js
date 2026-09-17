@@ -1,26 +1,73 @@
-// Corta Preços PDV — service worker
-// Strategy: network-first always so updates appear immediately.
-// Cache is only a fallback for offline use.
+// Corta Preços PDV — service worker v5
+// Strategy:
+//  • Install: pre-cache the app shell (index.html)
+//  • Static assets (/assets/*): cache-first (hashed names never change)
+//  • Navigation (HTML document): network-first → cache → shell fallback
+//  • API / Netlify functions: network-only (fail silently; app uses localStorage)
 
-const CACHE = 'corta-precos-v4'
+const CACHE   = 'corta-precos-v5'
+const SHELL   = '/'
+const SKIP_RE = /\/(\.netlify|api)\//  // never cache API calls
 
 self.addEventListener('install', e => {
-  // Activate right away — don't wait for old tabs to close
-  e.waitUntil(self.skipWaiting())
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => c.addAll([SHELL]))   // pre-cache the SPA shell
+      .then(() => self.skipWaiting())
+  )
 })
 
 self.addEventListener('activate', e => {
-  // Delete every old cache version
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE).map(k => caches.delete(k))
+      ))
       .then(() => self.clients.claim())
   )
 })
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return
-  // Always try the network first; fall back to cache only when offline
+
+  const url = new URL(e.request.url)
+
+  // Never intercept Netlify functions or /api — let them fail naturally
+  if (SKIP_RE.test(url.pathname)) return
+
+  // Hashed static assets: cache-first (safe because hash changes on rebuild)
+  if (url.pathname.startsWith('/assets/')) {
+    e.respondWith(
+      caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
+        if (res && res.status === 200) {
+          const clone = res.clone()
+          caches.open(CACHE).then(c => c.put(e.request, clone))
+        }
+        return res
+      }))
+    )
+    return
+  }
+
+  // Navigation requests (HTML): network-first → cached page → shell
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          if (res && res.status === 200) {
+            const clone = res.clone()
+            caches.open(CACHE).then(c => c.put(e.request, clone))
+          }
+          return res
+        })
+        .catch(() =>
+          caches.match(e.request).then(hit => hit || caches.match(SHELL))
+        )
+    )
+    return
+  }
+
+  // Everything else: network-first → cache fallback
   e.respondWith(
     fetch(e.request)
       .then(res => {

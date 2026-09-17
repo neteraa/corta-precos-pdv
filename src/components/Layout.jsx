@@ -8,6 +8,7 @@ import {
   BarChart2, Printer, CalendarClock, Megaphone, RefreshCw, Truck
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
+import { useOnlineStatus } from '../hooks/useOnlineStatus.js'
 import { usePrinter } from '../hooks/usePrinter.js'
 import { logout, getRole, getOperatorName, getTerminalId } from '../utils/auth.js'
 import { getMktStoreId } from '../utils/tenantStorage.js'
@@ -15,6 +16,7 @@ import { useStore } from '../store.jsx'
 
 function SyncBar() {
   const { syncNow, lastSync, syncing } = useStore()
+  const online = useOnlineStatus()
   const [ago, setAgo] = useState('')
 
   useEffect(() => {
@@ -33,9 +35,9 @@ function SyncBar() {
   return (
     <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
       style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${syncing ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'}`} />
-      <span className="text-[10px] text-gray-500 flex-1 truncate">
-        {syncing ? 'Sincronizando...' : ago ? `Sync ${ago}` : 'Conectando...'}
+      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${!online ? 'bg-amber-400' : syncing ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'}`} />
+      <span className="text-[10px] flex-1 truncate" style={{ color: !online ? '#fbbf24' : '#6b7280' }}>
+        {!online ? 'Offline — local' : syncing ? 'Sincronizando...' : ago ? `Sync ${ago}` : 'Conectando...'}
       </span>
       <button onClick={syncNow} disabled={syncing}
         className="text-gray-600 hover:text-green-400 transition-colors disabled:opacity-30">
@@ -148,6 +150,7 @@ export default function Layout() {
   const [open, setOpen]   = useState(false)
   const { canInstall, install } = useInstallPWA()
   const { supplierOffers } = useStore()
+  const online            = useOnlineStatus()
   const navigate          = useNavigate()
 
   const role         = getRole()
@@ -271,6 +274,14 @@ export default function Layout() {
             <span className="font-black text-orange-600 text-base tracking-tight truncate">{storeName}</span>
           </div>
         </header>
+
+        {/* offline banner */}
+        {!online && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-400 text-amber-950 text-sm font-bold shrink-0">
+            <span>⚡</span>
+            <span>Sem internet — operando offline. Vendas salvas localmente e sincronizadas quando voltar.</span>
+          </div>
+        )}
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <Outlet />
