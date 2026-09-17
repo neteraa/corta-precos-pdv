@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import PRODUCTS_SEED from './utils/products_seed.json'
 import { getAllPhotos, savePhoto as dbSavePhoto, deletePhoto as dbDeletePhoto } from './utils/photoDb.js'
 import { mktKey, migrateAndGet, getMktStoreId } from './utils/tenantStorage.js'
+import { getOperatorName } from './utils/auth.js'
 
 /* ── formatting helpers ─────────────────────────────────────── */
 export const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -316,7 +317,7 @@ export function StoreProvider({ children }) {
   }, [persist])
 
   const registerSale = useCallback((sale) => {
-    const s = { ...sale, id: `s${Date.now()}`, date: sale.date || new Date().toISOString() }
+    const s = { ...sale, id: `s${Date.now()}`, date: sale.date || new Date().toISOString(), operatorName: sale.operatorName || getOperatorName() }
     setSales(prev => { const next = [s, ...prev]; persist('cp_sales', next); return next })
     setProducts(prev => {
       const next = prev.map(p => {
@@ -329,6 +330,27 @@ export function StoreProvider({ children }) {
     captureSellOut(sale.items, products)
     return s
   }, [persist, products])
+
+  const cancelSale = useCallback((saleId) => {
+    setSales(prev => {
+      const sale = prev.find(s => s.id === saleId)
+      if (!sale) return prev
+      // revert stock for each item that has a productId
+      if (sale.items?.length) {
+        setProducts(pp => {
+          const next = pp.map(p => {
+            const item = sale.items.find(i => i.productId === p.id)
+            return item ? { ...p, stock: (p.stock || 0) + item.qty } : p
+          })
+          persist('cp_products', next)
+          return next
+        })
+      }
+      const next = prev.filter(s => s.id !== saleId)
+      persist('cp_sales', next)
+      return next
+    })
+  }, [persist])
 
   const upsertPromo = useCallback((p) => {
     setPromos(prev => {
@@ -463,7 +485,7 @@ export function StoreProvider({ children }) {
       products, sales, customers, promos,
       cashMovements, salesGoal, operators,
       photos, saveProductPhoto,
-      upsertProduct, deleteProduct, registerSale,
+      upsertProduct, deleteProduct, registerSale, cancelSale,
       upsertCustomer, deleteCustomer, importProducts,
       upsertPromo, deletePromo, assignPromoGroup,
       addFiado, payFiado,

@@ -2,7 +2,14 @@ import React, { useState, useMemo } from 'react'
 import { Plus, Pencil, Trash2, Search, ToggleLeft, ToggleRight, Tag, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
 
-const EMPTY_RULE = { name: '', group: '', qty: 4, totalPrice: 0, active: true }
+const EMPTY_RULE = { name: '', group: '', type: 'combo', qty: 4, totalPrice: 0, discountPct: 0, discountAmt: 0, active: true }
+
+const TYPE_LABELS = { combo: 'Combo', percent: '% Desconto', fixed: 'R$ Fixo' }
+const TYPE_COLORS = {
+  combo:   'bg-orange-100 text-orange-700',
+  percent: 'bg-purple-100 text-purple-700',
+  fixed:   'bg-blue-100   text-blue-700',
+}
 
 /* slugify: "4 Danones por R$10" → "DANONE_4x10" */
 const slugify = (s) => s.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '')
@@ -44,8 +51,15 @@ export default function Promocoes() {
   const activeRule = promos.find(r => r.id === expanded)
 
   /* ── save rule ──────────────────────────────────────────── */
+  const isValid = () => {
+    if (!editing.name.trim() || !editing.group.trim() || editing.qty < 1) return false
+    if (editing.type === 'combo')   return editing.totalPrice > 0 && editing.qty >= 2
+    if (editing.type === 'percent') return editing.discountPct > 0 && editing.discountPct <= 100
+    if (editing.type === 'fixed')   return editing.discountAmt > 0
+    return false
+  }
   const save = () => {
-    if (!editing.name.trim() || !editing.group.trim() || editing.qty < 2 || editing.totalPrice <= 0) return
+    if (!isValid()) return
     upsertPromo(editing)
     setEditing(null)
   }
@@ -113,6 +127,9 @@ export default function Promocoes() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-black text-gray-900">{rule.name}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${TYPE_COLORS[rule.type || 'combo']}`}>
+                      {TYPE_LABELS[rule.type || 'combo']}
+                    </span>
                     {!rule.active && (
                       <span className="text-[10px] font-bold bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full">INATIVA</span>
                     )}
@@ -132,7 +149,9 @@ export default function Promocoes() {
                         : `${rule.productCount} produto${rule.productCount !== 1 ? 's' : ''}`}
                     </span>
                     <span className="text-gray-400">
-                      Preço/un na promo: <strong className="text-gray-600">{BRL.format(rule.totalPrice / rule.qty)}</strong>
+                      {(!rule.type || rule.type === 'combo') && <>Preço/un: <strong className="text-gray-600">{BRL.format((rule.totalPrice || 0) / rule.qty)}</strong></>}
+                      {rule.type === 'percent' && <>Desconto: <strong className="text-purple-600">{rule.discountPct}%</strong></>}
+                      {rule.type === 'fixed'   && <>Desconto: <strong className="text-blue-600">-{BRL.format(rule.discountAmt)}</strong></>}
                     </span>
                   </div>
                 </div>
@@ -258,16 +277,38 @@ export default function Promocoes() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label">Qtd. mínima para ativar *</label>
-                  <input
-                    type="number" min="2" max="50"
-                    value={editing.qty}
-                    onChange={e => setEditing(p => ({ ...p, qty: Math.max(2, Number(e.target.value)) }))}
-                    className="input"
-                  />
+              {/* type selector */}
+              <div>
+                <label className="label">Tipo de desconto</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { key: 'combo',   label: '🎁 Combo',      desc: 'N itens por R$X' },
+                    { key: 'percent', label: '% Percentual',  desc: 'X% de desconto'  },
+                    { key: 'fixed',   label: '💲 Fixo',        desc: '-R$X de desconto'},
+                  ].map(t => (
+                    <button key={t.key} type="button"
+                      onClick={() => setEditing(p => ({ ...p, type: t.key }))}
+                      className={`p-2.5 rounded-xl border-2 text-center transition-colors ${(editing.type || 'combo') === t.key ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                      <div className="font-black text-xs">{t.label}</div>
+                      <div className="text-[10px] mt-0.5 opacity-70">{t.desc}</div>
+                    </button>
+                  ))}
                 </div>
+              </div>
+
+              {/* qty field — used by all types */}
+              <div>
+                <label className="label">Qtd. mínima para ativar *</label>
+                <input
+                  type="number" min={(!editing.type || editing.type === 'combo') ? 2 : 1} max="99"
+                  value={editing.qty}
+                  onChange={e => setEditing(p => ({ ...p, qty: Math.max(1, Number(e.target.value)) }))}
+                  className="input"
+                />
+              </div>
+
+              {/* combo: price field */}
+              {(!editing.type || editing.type === 'combo') && (
                 <div>
                   <label className="label">Preço total do grupo *</label>
                   <input
@@ -278,13 +319,52 @@ export default function Promocoes() {
                     className="input"
                   />
                 </div>
-              </div>
+              )}
 
-              {editing.qty >= 2 && editing.totalPrice > 0 && (
+              {/* percent: pct field */}
+              {editing.type === 'percent' && (
+                <div>
+                  <label className="label">Desconto (%) *</label>
+                  <input
+                    type="number" min="1" max="100" step="0.5"
+                    value={editing.discountPct}
+                    onChange={e => setEditing(p => ({ ...p, discountPct: Number(e.target.value) }))}
+                    placeholder="ex: 10"
+                    className="input"
+                  />
+                </div>
+              )}
+
+              {/* fixed: amount field */}
+              {editing.type === 'fixed' && (
+                <div>
+                  <label className="label">Desconto fixo (R$) *</label>
+                  <input
+                    type="number" min="0.01" step="0.01"
+                    value={editing.discountAmt}
+                    onChange={e => setEditing(p => ({ ...p, discountAmt: Number(e.target.value) }))}
+                    placeholder="ex: 5.00"
+                    className="input"
+                  />
+                </div>
+              )}
+
+              {/* summary preview */}
+              {isValid() && (
                 <div className="bg-brand-50 border border-brand-200 rounded-xl p-3 text-xs text-brand-800 space-y-0.5">
-                  <div className="font-black">Resumo da promoção:</div>
-                  <div>"{editing.qty} unidades do grupo <code className="bg-white px-1 rounded">{editing.group || '...'}</code> por {BRL.format(editing.totalPrice)}"</div>
-                  <div className="text-brand-600">Preço por unidade na promo: {BRL.format(editing.totalPrice / editing.qty)}</div>
+                  <div className="font-black">Resumo:</div>
+                  {(!editing.type || editing.type === 'combo') && (
+                    <>
+                      <div>"{editing.qty} un. do grupo <code className="bg-white px-1 rounded">{editing.group}</code> por {BRL.format(editing.totalPrice)}"</div>
+                      <div className="text-brand-600">Preço/un na promo: {BRL.format(editing.totalPrice / editing.qty)}</div>
+                    </>
+                  )}
+                  {editing.type === 'percent' && (
+                    <div>"{editing.discountPct}% de desconto em produtos do grupo ao comprar ≥ {editing.qty} un."</div>
+                  )}
+                  {editing.type === 'fixed' && (
+                    <div>"-{BRL.format(editing.discountAmt)} de desconto no grupo ao comprar ≥ {editing.qty} un."</div>
+                  )}
                 </div>
               )}
 
@@ -305,7 +385,7 @@ export default function Promocoes() {
               <button onClick={() => setEditing(null)} className="btn-ghost flex-1 justify-center">Cancelar</button>
               <button
                 onClick={save}
-                disabled={!editing.name.trim() || !editing.group.trim() || editing.qty < 2 || editing.totalPrice <= 0}
+                disabled={!isValid()}
                 className="btn-primary flex-1 justify-center disabled:opacity-40"
               >
                 {editing.id ? 'Salvar alterações' : 'Criar promoção'}

@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react'
-import { Search, ChevronDown, ChevronRight, Printer, HandCoins, Plus, X } from 'lucide-react'
+import { Search, ChevronDown, ChevronRight, Printer, HandCoins, Plus, X, Trash2, RotateCcw } from 'lucide-react'
 import { useStore, BRL, fmtDate } from '../store.jsx'
 import { usePrinter } from '../hooks/usePrinter.js'
 
 function payBadge(payment = '') {
   if (payment.startsWith('Fiado'))   return 'bg-red-100 text-red-700'
   if (payment === 'PIX')             return 'bg-orange-100 text-orange-700'
-  if (payment === 'Crédito')         return 'bg-blue-100 text-blue-700'
+  if (payment.startsWith('Crédito')) return 'bg-blue-100 text-blue-700'
   if (payment === 'Débito')          return 'bg-indigo-100 text-indigo-700'
   if (payment === 'Dinheiro')        return 'bg-green-100 text-green-700'
   return 'bg-gray-100 text-gray-600'
@@ -21,10 +21,11 @@ function nowLocal() {
 }
 
 export default function Vendas() {
-  const { sales, registerSale } = useStore()
+  const { sales, registerSale, cancelSale } = useStore()
   const printer = usePrinter()
   const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState(null)
+  const [confirmCancel, setConfirmCancel] = useState(null)   // sale to cancel | null
 
   // ── Manual sale entry ────────────────────────────────────
   const [showModal, setShowModal]   = useState(false)
@@ -155,6 +156,11 @@ export default function Vendas() {
                           title="Reimprimir">
                           <Printer className="w-3.5 h-3.5" />
                         </button>
+                        <button onClick={() => setConfirmCancel(s)}
+                          className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"
+                          title="Cancelar venda e devolver estoque">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                         <button onClick={() => setExpanded(expanded === s.id ? null : s.id)}
                           className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
                           {expanded === s.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -266,6 +272,40 @@ export default function Vendas() {
                 disabled={!mTotal}
                 className={`flex-1 btn-primary ${!mTotal ? 'opacity-40 cursor-not-allowed' : ''}`}>
                 Registrar venda
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: confirmar cancelamento ──────────────────────── */}
+      {confirmCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="card w-full max-w-sm animate-pop p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <RotateCcw className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-gray-900">Cancelar venda?</h2>
+                <p className="text-xs text-gray-500">Esta ação não pode ser desfeita</p>
+              </div>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3 mb-5 text-sm space-y-1">
+              <div className="flex justify-between"><span className="text-gray-500">Total</span><span className="font-black text-red-600">{BRL.format(confirmCancel.total)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Pagamento</span><span className="font-semibold">{confirmCancel.payment}</span></div>
+              {confirmCancel.items?.some(i => i.productId && i.productId !== 'manual') && (
+                <div className="text-xs text-green-700 font-semibold pt-1 border-t border-gray-200 mt-1">
+                  ✅ Estoque será devolvido automaticamente
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmCancel(null)} className="btn-ghost flex-1">Voltar</button>
+              <button
+                onClick={() => { cancelSale(confirmCancel.id); setConfirmCancel(null) }}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2">
+                <Trash2 className="w-4 h-4" /> Cancelar venda
               </button>
             </div>
           </div>

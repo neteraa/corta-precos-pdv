@@ -3,7 +3,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
 } from 'recharts'
-import { TrendingUp, ShoppingCart, Percent, DollarSign, Download } from 'lucide-react'
+import { TrendingUp, ShoppingCart, Percent, DollarSign, Download, User } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
 
 const PERIODS = [
@@ -22,18 +22,29 @@ export default function Relatorio() {
   const [period, setPeriod] = useState(7)
   const [customFrom, setCustomFrom] = useState('')
   const [customTo,   setCustomTo]   = useState('')
+  const [operatorFilter, setOperatorFilter] = useState('')  // '' = todos
+
+  // all unique operators that appear in sales
+  const operators = useMemo(() => {
+    const names = new Set(sales.map(s => s.operatorName).filter(Boolean))
+    return [...names].sort()
+  }, [sales])
 
   const filtered = useMemo(() => {
     const now = new Date()
+    let base
     if (customFrom && customTo) {
       const f = new Date(customFrom + 'T00:00:00')
       const t = new Date(customTo   + 'T23:59:59')
-      return sales.filter(s => { const d = new Date(s.date); return d >= f && d <= t })
+      base = sales.filter(s => { const d = new Date(s.date); return d >= f && d <= t })
+    } else if (period === 0) {
+      base = sales.filter(s => sameDay(new Date(s.date), now))
+    } else {
+      const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - period)
+      base = sales.filter(s => new Date(s.date) >= cutoff)
     }
-    if (period === 0) return sales.filter(s => sameDay(new Date(s.date), now))
-    const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - period)
-    return sales.filter(s => new Date(s.date) >= cutoff)
-  }, [sales, period, customFrom, customTo])
+    return operatorFilter ? base.filter(s => s.operatorName === operatorFilter) : base
+  }, [sales, period, customFrom, customTo, operatorFilter])
 
   const productMap = useMemo(() => Object.fromEntries(products.map(p => [p.name, p])), [products])
 
@@ -144,6 +155,24 @@ export default function Relatorio() {
             className="input py-1 text-sm w-36" />
         </div>
       </div>
+
+      {/* Operator filter — only shown when there are named operators */}
+      {operators.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Operador:</span>
+          <button onClick={() => setOperatorFilter('')}
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${!operatorFilter ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            Todos
+          </button>
+          {operators.map(op => (
+            <button key={op} onClick={() => setOperatorFilter(op)}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${operatorFilter === op ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+              {op}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

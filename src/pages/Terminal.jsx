@@ -24,14 +24,26 @@ function calcPromoEngine(cart, products, promos) {
       return p?.promoGroup === rule.group
     })
     if (!groupItems.length) continue
+
     const totalQty  = groupItems.reduce((s, i) => s + i.qty, 0)
-    const complete  = Math.floor(totalQty / rule.qty)
-    const remainder = totalQty % rule.qty
     const normalSum = groupItems.reduce((s, i) => s + i.qty * i.price, 0)
-    if (!complete) { results.push({ rule, status: 'progress', current: totalQty, needed: rule.qty - totalQty, discount: 0 }); continue }
-    const avgPrice = normalSum / totalQty
-    const promoSum = complete * rule.totalPrice + remainder * avgPrice
-    results.push({ rule, status: 'active', current: totalQty, complete, remainder, discount: Math.max(0, normalSum - promoSum) })
+    const type      = rule.type || 'combo'
+
+    if (type === 'combo') {
+      const complete  = Math.floor(totalQty / rule.qty)
+      const remainder = totalQty % rule.qty
+      if (!complete) { results.push({ rule, status: 'progress', current: totalQty, needed: rule.qty - totalQty, discount: 0 }); continue }
+      const avgPrice = normalSum / totalQty
+      const promoSum = complete * rule.totalPrice + remainder * avgPrice
+      results.push({ rule, status: 'active', current: totalQty, complete, remainder, discount: Math.max(0, normalSum - promoSum) })
+    } else if (type === 'percent') {
+      if (totalQty < rule.qty) { results.push({ rule, status: 'progress', current: totalQty, needed: rule.qty - totalQty, discount: 0 }); continue }
+      const discount = normalSum * (rule.discountPct / 100)
+      results.push({ rule, status: 'active', current: totalQty, complete: 1, remainder: 0, discount })
+    } else if (type === 'fixed') {
+      if (totalQty < rule.qty) { results.push({ rule, status: 'progress', current: totalQty, needed: rule.qty - totalQty, discount: 0 }); continue }
+      results.push({ rule, status: 'active', current: totalQty, complete: 1, remainder: 0, discount: Math.min(rule.discountAmt, normalSum) })
+    }
   }
   return results
 }
@@ -58,6 +70,7 @@ export default function Terminal() {
   // ── Cart ────────────────────────────────────────────────────
   const [cart,    setCart]    = useState([])
   const [payment, setPayment] = useState('PIX')
+  const [installments, setInstallments] = useState(1)
   const [discount, setDiscount] = useState(0)
 
   // ── UI state ────────────────────────────────────────────────
@@ -173,9 +186,12 @@ export default function Terminal() {
     if (!cart.length) return
     const isFiado = payment === 'Fiado'
     const t = receivedVal > 0 && payment === 'Dinheiro' ? receivedVal - total : 0
+    const payLabel = isFiado
+      ? `Fiado — ${selectedCustomer?.name}`
+      : payment === 'Crédito' && installments > 1 ? `Crédito ${installments}×` : payment
     const sale = {
       items: cart, subtotal, discount: discAmt, promoDiscount: totalPromoDiscount, total,
-      payment: isFiado ? `Fiado — ${selectedCustomer?.name}` : payment,
+      payment: payLabel,
       troco: t, date: new Date().toISOString(), id: Date.now(),
       customerId: selectedCustomer?.id || null,
     }
@@ -185,7 +201,7 @@ export default function Terminal() {
       addFiado(selectedCustomer.id, total, desc)
     }
     setLastSale({ ...sale, troco: t, isFiado, customerName: selectedCustomer?.name })
-    setCart([]); setDiscount(0); setReceived(''); setShowPay(false)
+    setCart([]); setDiscount(0); setReceived(''); setShowPay(false); setInstallments(1)
     if (!isFiado) setSelectedCustomerId(null)  // keep customer for next fiado if desired
     broadcast({ type: 'cart', cart: [], promoResults: [], subtotal: 0, total: 0 })
     printer.printReceipt(sale)
@@ -681,6 +697,21 @@ export default function Terminal() {
                 </button>
               </div>
             </div>
+
+            {/* installments — Crédito */}
+            {payment === 'Crédito' && (
+              <div style={{ marginBottom: 16, background: '#0c1a2e', border: '1px solid #1e3a5f', borderRadius: 14, padding: '12px 14px' }}>
+                <div style={{ color: '#93c5fd', fontSize: 11, fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>PARCELAMENTO</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {[1, 2, 3, 6, 12].map(n => (
+                    <button key={n} onClick={() => setInstallments(n)}
+                      style={{ padding: '7px 12px', borderRadius: 8, border: `1.5px solid ${installments === n ? '#3b82f6' : '#1e3a5f'}`, background: installments === n ? '#1d4ed8' : bg3, color: installments === n ? '#fff' : '#93c5fd', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+                      {n === 1 ? '1× à vista' : `${n}× ${BRL.format(total / n)}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* PIX QR */}
             {payment === 'PIX' && printer.settings?.pixKey && total > 0 && (

@@ -1,12 +1,26 @@
 import React, { useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, Search, X, User, HandCoins } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, X, HandCoins, ShoppingBag } from 'lucide-react'
 import { useStore, fmtDate, BRL } from '../store.jsx'
 import { Link } from 'react-router-dom'
 
-const EMPTY = { name: '', phone: '', email: '', doc: '' }
+const EMPTY = { name: '', phone: '', email: '', doc: '', note: '' }
 
 export default function Clientes() {
-  const { customers, upsertCustomer, deleteCustomer } = useStore()
+  const { customers, sales, upsertCustomer, deleteCustomer } = useStore()
+
+  // per-customer purchase stats computed from sales
+  const customerStats = useMemo(() => {
+    const map = {}
+    for (const sale of sales) {
+      const cid = sale.customerId
+      if (!cid) continue
+      if (!map[cid]) map[cid] = { count: 0, total: 0, last: null }
+      map[cid].count++
+      map[cid].total += sale.total
+      if (!map[cid].last || sale.date > map[cid].last) map[cid].last = sale.date
+    }
+    return map
+  }, [sales])
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState(null)
 
@@ -24,7 +38,7 @@ export default function Clientes() {
     upsertCustomer({
       ...(editing.id ? { id: editing.id } : {}),
       name: fd.get('name'), phone: fd.get('phone'),
-      email: fd.get('email'), doc: fd.get('doc'),
+      email: fd.get('email'), doc: fd.get('doc'), note: fd.get('note'),
     })
     setEditing(null)
   }
@@ -71,6 +85,23 @@ export default function Clientes() {
               {c.email && <div className="text-xs text-gray-400 truncate">{c.email}</div>}
               {c.doc   && <div className="text-xs text-gray-400">{c.doc}</div>}
               {c.since && <div className="text-xs text-gray-300 mt-1">cliente desde {fmtDate(c.since)}</div>}
+
+              {/* purchase stats */}
+              {customerStats[c.id] && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-brand-50 border border-brand-200 text-brand-700 text-[11px] font-bold">
+                    <ShoppingBag className="w-3 h-3" /> {customerStats[c.id].count}×
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-green-50 border border-green-200 text-green-700 text-[11px] font-bold">
+                    {BRL.format(customerStats[c.id].total)}
+                  </span>
+                  {customerStats[c.id].last && (
+                    <span className="text-[10px] text-gray-400 self-center">
+                      última {fmtDate(customerStats[c.id].last)}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* Fiado badge */}
               {hasFiado && (
@@ -119,6 +150,10 @@ export default function Clientes() {
               <div>
                 <label className="label">CPF / CNPJ</label>
                 <input name="doc" defaultValue={editing.doc} className="input" />
+              </div>
+              <div>
+                <label className="label">Observação / VIP tag <span className="font-normal text-gray-400">(opcional — aparece no card)</span></label>
+                <input name="note" defaultValue={editing.note} placeholder="ex: Cliente VIP, Atacadista..." className="input" />
               </div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setEditing(null)} className="btn-ghost flex-1 justify-center">Cancelar</button>

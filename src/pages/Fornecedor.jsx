@@ -205,7 +205,7 @@ function Btn({ onClick, children, disabled, secondary, danger, full, sm }) {
   return (
     <button onClick={disabled ? undefined : onClick} style={{
       display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-      padding: sm ? '10px 16px' : '14px 20px', borderRadius:14, border:'none',
+      padding: sm ? '10px 16px' : '14px 20px', borderRadius:14,
       cursor: disabled ? 'not-allowed' : 'pointer', fontWeight:900,
       fontSize: sm ? 13 : 15, width: full ? '100%' : 'auto', opacity: disabled ? 0.45 : 1,
       background: danger ? '#ef4444' : secondary ? 'rgba(16,185,129,0.12)' : 'linear-gradient(135deg,#10b981,#059669)',

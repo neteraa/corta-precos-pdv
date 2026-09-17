@@ -28,32 +28,33 @@ const PAYMENTS = [
 ───────────────────────────────────────────────────────────── */
 function calcPromoEngine(cart, products, promos) {
   const results = []
-  const activeRules = promos.filter(r => r.active)
-
-  for (const rule of activeRules) {
+  for (const rule of promos.filter(r => r.active)) {
     const groupItems = cart.filter(item => {
       const p = products.find(x => x.id === item.productId)
       return p?.promoGroup === rule.group
     })
-    if (groupItems.length === 0) continue
+    if (!groupItems.length) continue
 
-    const totalQty   = groupItems.reduce((s, i) => s + i.qty, 0)
-    const complete   = Math.floor(totalQty / rule.qty)
-    const remainder  = totalQty % rule.qty
-    const normalSum  = groupItems.reduce((s, i) => s + i.qty * i.price, 0)
+    const totalQty  = groupItems.reduce((s, i) => s + i.qty, 0)
+    const normalSum = groupItems.reduce((s, i) => s + i.qty * i.price, 0)
+    const type      = rule.type || 'combo'
 
-    if (complete === 0) {
-      // In progress — not yet reached threshold
-      results.push({ rule, status: 'progress', current: totalQty, needed: rule.qty - totalQty, discount: 0 })
-      continue
+    if (type === 'combo') {
+      const complete  = Math.floor(totalQty / rule.qty)
+      const remainder = totalQty % rule.qty
+      if (!complete) { results.push({ rule, status: 'progress', current: totalQty, needed: rule.qty - totalQty, discount: 0 }); continue }
+      const avgPrice = normalSum / totalQty
+      const promoSum = complete * rule.totalPrice + remainder * avgPrice
+      results.push({ rule, status: 'active', current: totalQty, complete, remainder, discount: Math.max(0, normalSum - promoSum), normalSum, promoSum })
+    } else if (type === 'percent') {
+      if (totalQty < rule.qty) { results.push({ rule, status: 'progress', current: totalQty, needed: rule.qty - totalQty, discount: 0 }); continue }
+      const discount = normalSum * (rule.discountPct / 100)
+      results.push({ rule, status: 'active', current: totalQty, complete: 1, remainder: 0, discount, normalSum, promoSum: normalSum - discount })
+    } else if (type === 'fixed') {
+      if (totalQty < rule.qty) { results.push({ rule, status: 'progress', current: totalQty, needed: rule.qty - totalQty, discount: 0 }); continue }
+      const discount = Math.min(rule.discountAmt, normalSum)
+      results.push({ rule, status: 'active', current: totalQty, complete: 1, remainder: 0, discount, normalSum, promoSum: normalSum - discount })
     }
-
-    // Average unit price for remainder (units that didn't fit in a complete set)
-    const avgPrice  = normalSum / totalQty
-    const promoSum  = complete * rule.totalPrice + remainder * avgPrice
-    const discount  = Math.max(0, normalSum - promoSum)
-
-    results.push({ rule, status: 'active', current: totalQty, complete, remainder, discount, normalSum, promoSum })
   }
   return results
 }
@@ -223,6 +224,7 @@ export default function PDV() {
   const [query, setQuery]           = useState('')
   const [discount, setDiscount]     = useState(0)
   const [payment, setPayment]       = useState('PIX')
+  const [installments, setInstallments] = useState(1)
   const [showFinish, setShowFinish] = useState(false)
   const [lastSale, setLastSale]     = useState(null)
   const [scanFeedback, setScanFeedback] = useState(null)
@@ -445,7 +447,9 @@ export default function PDV() {
     const promoDiscount  = totalPromoDiscount
     const paymentLabel   = splitMode
       ? splitPays.map(p => `${p.method} R$${p.amount}`).join(' + ')
-      : payment
+      : payment === 'Crédito' && installments > 1
+        ? `Crédito ${installments}×`
+        : payment
 
     const sale = registerSale({
       items: cart,
@@ -469,7 +473,7 @@ export default function PDV() {
       troco:    showTroco ? troco : null,
     }
     setLastSale(fullSale)
-    setCart([]); setDiscount(0); setPayment('PIX')
+    setCart([]); setDiscount(0); setPayment('PIX'); setInstallments(1)
     setSplitMode(false); setSplitPays([{ method: 'PIX', amount: '' }])
     setReceived(''); setShowFinish(false)
     // Broadcast cleared cart to display
@@ -888,18 +892,35 @@ export default function PDV() {
 
             {/* single payment mode */}
             {!splitMode && (
-              <div className="grid grid-cols-2 gap-2">
-                {PAYMENTS.map(({ key, icon: Icon, color }) => (
-                  <button
-                    key={key}
-                    onClick={() => setPayment(key)}
-                    className={`flex items-center gap-2 px-3 py-3 rounded-xl border-2 text-sm font-bold transition-all ${
-                      payment === key ? color : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" /> {key}
-                  </button>
-                ))}
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  {PAYMENTS.map(({ key, icon: Icon, color }) => (
+                    <button
+                      key={key}
+                      onClick={() => { setPayment(key); if (key !== 'Crédito') setInstallments(1) }}
+                      className={`flex items-center gap-2 px-3 py-3 rounded-xl border-2 text-sm font-bold transition-all ${
+                        payment === key ? color : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" /> {key}
+                    </button>
+                  ))}
+                </div>
+                {/* installments — only shown for Crédito */}
+                {payment === 'Crédito' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                    <div className="text-xs font-bold text-blue-700 mb-2">Parcelamento</div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {[1, 2, 3, 6, 12].map(n => (
+                        <button key={n}
+                          onClick={() => setInstallments(n)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-black border-2 transition-colors ${installments === n ? 'border-blue-600 bg-blue-600 text-white' : 'border-blue-200 text-blue-600 hover:border-blue-400'}`}>
+                          {n === 1 ? '1× à vista' : `${n}× ${BRL.format(Math.max(0, total) / n)}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
