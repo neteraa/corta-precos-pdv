@@ -83,9 +83,22 @@ const S = {
 export default function ScanMobile() {
   const [params]  = useSearchParams()
   const mode      = params.get('mode') || 'pdv'
-  const { products, upsertProduct } = useStore()
+  const { products, upsertProduct, syncNow, lastSync } = useStore()
   const { settings } = usePrinter()
   const storeName = settings.storeName || 'MEU MERCADO'
+
+  // Garante que o estoque do servidor está carregado antes de cadastrar produtos.
+  // Sem isso, num device novo (sem localStorage) o cadastro pode sobrescrever
+  // o estoque do servidor com uma lista vazia.
+  const [syncReady, setSyncReady] = useState(() => !!lastSync)
+  useEffect(() => {
+    if (syncReady) return
+    setSyncReady(false)
+    syncNow()
+  }, []) // eslint-disable-line
+  useEffect(() => {
+    if (lastSync && !syncReady) setSyncReady(true)
+  }, [lastSync, syncReady])
 
   /* ── PDV mode state ────────────────────────────────────── */
   const [pdvFeed, setPdvFeed]       = useState([])
@@ -240,6 +253,20 @@ export default function ScanMobile() {
         <a href="/validade" style={{ marginTop: 8, padding: '12px 24px', borderRadius: 12, background: '#166534', color: '#4ade80', fontWeight: 800, fontSize: 14, textDecoration: 'none', display: 'inline-block' }}>
           Ver Controle de Validade →
         </a>
+      </div>
+    )
+  }
+
+  // Aguarda sync inicial para evitar overwrite do estoque do servidor
+  if (!syncReady) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: '#09090b', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, fontFamily: 'system-ui,sans-serif' }}>
+        <div style={{ width: 48, height: 48, border: '4px solid #27272a', borderTopColor: '#ea580c', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+        <div style={{ color: '#fff', fontWeight: 800, fontSize: 16 }}>Sincronizando estoque…</div>
+        <div style={{ color: '#71717a', fontSize: 13, textAlign: 'center', maxWidth: 260 }}>
+          Carregando seus produtos do servidor antes de escanear
+        </div>
       </div>
     )
   }
