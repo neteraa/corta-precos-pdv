@@ -273,22 +273,36 @@ async function sendWelcomeEmail(mk, { to, type, storeName, username, password })
 
 /* ── reusable credential success screen ─────────────────── */
 function CredSuccess({ title, icon: Icon, iconColor, accentColor, ok, emailResult, onClose }) {
+  const mode = emailResult?.mode  // 'direct' | 'admin-notify' | undefined
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
         <div className="text-center mb-5">
-          <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 border-2`}
+          <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 border-2"
                style={{ background: `${iconColor}20`, borderColor: iconColor }}>
             <Icon className="w-7 h-7" style={{ color: iconColor }} />
           </div>
           <h3 className="text-white font-black text-xl">{title}</h3>
-          {emailResult?.sent
-            ? <p className="text-green-400 text-sm mt-1 flex items-center justify-center gap-1"><Check className="w-3.5 h-3.5" /> Email enviado para {ok.email}</p>
-            : ok.email
-            ? <p className="text-yellow-400 text-xs mt-1">⚠️ {emailResult?.warning || 'Email não enviado'}</p>
-            : <p className="text-gray-500 text-sm mt-1">Passe as credenciais ao cliente</p>
-          }
+
+          {emailResult?.sent && mode === 'direct' && (
+            <p className="text-green-400 text-sm mt-2 flex items-center justify-center gap-1">
+              <Check className="w-3.5 h-3.5" /> Email enviado direto para {ok.email}
+            </p>
+          )}
+          {emailResult?.sent && mode === 'admin-notify' && (
+            <div className="mt-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+              <p className="text-yellow-400 text-xs font-bold">📬 Notificação enviada para seu email</p>
+              <p className="text-gray-500 text-xs mt-0.5">Abra <strong className="text-gray-400">agn.girardi@gmail.com</strong> e encaminhe para o cliente</p>
+            </div>
+          )}
+          {!emailResult?.sent && ok.email && (
+            <p className="text-yellow-400 text-xs mt-2">⚠️ {emailResult?.warning || 'Email não enviado'}</p>
+          )}
+          {!ok.email && (
+            <p className="text-gray-500 text-sm mt-1">Passe as credenciais ao cliente</p>
+          )}
         </div>
+
         <div className="bg-gray-900 rounded-xl p-4 space-y-2 font-mono text-sm border border-gray-700 mb-4">
           <div className="flex justify-between"><span className="text-gray-400">URL</span><span style={{ color: accentColor }}>zatendestock.netlify.app</span></div>
           <div className="flex justify-between"><span className="text-gray-400">Usuário</span><span className="text-white font-bold">{ok.username}</span></div>

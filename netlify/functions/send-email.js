@@ -25,6 +25,7 @@
 const MASTER_KEY    = process.env.ZS_MASTER_KEY    || 'zatende2026master'
 const RESEND_KEY    = process.env.RESEND_API_KEY   || ''
 const FROM_EMAIL    = process.env.FROM_EMAIL        || 'ZatendeStock <onboarding@resend.dev>'
+const ADMIN_EMAIL   = process.env.ADMIN_EMAIL       || 'agn.girardi@gmail.com'
 const SUPPORT_PHONE = process.env.SUPPORT_WHATSAPP  || '5511985950956'
 
 const CORS = {
@@ -152,17 +153,70 @@ function buildText({ type, storeName, username, password }) {
   const url = type === 'market'
     ? 'https://zatendestock.netlify.app'
     : 'https://zatendestock.netlify.app/fornecedor'
-  return `Olá, ${storeName}!
+  return `Olá, ${storeName}!\n\nSeu acesso ao ZatendeStock foi criado.\n\nUsuário: ${username}\nSenha:   ${password}\nLink:    ${url}\n\nZatendeStock`
+}
 
-Seu acesso ao ZatendeStock foi criado.
+/* ── admin notify email (used when domain not verified) ──── */
+function buildAdminNotify({ clientEmail, type, storeName, username, password }) {
+  const clientHtml = buildHtml({ type, storeName, username, password })
+  const label = type === 'market' ? 'Mercado' : 'Distribuidor'
+  const mailtoBody = encodeURIComponent(
+    `Olá, ${storeName}!\n\nSeu acesso ao ZatendeStock foi criado.\n\nUsuário: ${username}\nSenha: ${password}\nLink: ${type === 'market' ? 'https://zatendestock.netlify.app' : 'https://zatendestock.netlify.app/fornecedor'}`
+  )
+  const mailtoLink = `mailto:${clientEmail}?subject=${encodeURIComponent(`✅ Seu acesso ao ZatendeStock está pronto — ${storeName}`)}&body=${mailtoBody}`
 
-Usuário: ${username}
-Senha:   ${password}
-Link:    ${url}
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/><title>Novo acesso criado</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
 
-Qualquer dúvida, entre em contato com o suporte.
+  <!-- Admin header -->
+  <tr><td style="background:#1e293b;border-radius:16px 16px 0 0;padding:20px 28px">
+    <div style="color:#f97316;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">ZatendeStock · Notificação interna</div>
+    <div style="color:#f1f5f9;font-size:20px;font-weight:900">🆕 Novo ${label} cadastrado</div>
+    <div style="color:#94a3b8;font-size:13px;margin-top:4px">Envie o acesso abaixo para o cliente</div>
+  </td></tr>
 
-ZatendeStock`
+  <!-- Client email target -->
+  <tr><td style="background:#0f172a;padding:16px 28px;border-bottom:1px solid #1e293b">
+    <div style="color:#64748b;font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:6px">Destino do email</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="color:#f1f5f9;font-size:15px;font-weight:700">${clientEmail || '(sem email cadastrado)'}</span>
+    </div>
+  </td></tr>
+
+  <!-- Action button -->
+  <tr><td style="background:#0f172a;padding:20px 28px 24px;text-align:center">
+    <a href="${mailtoLink}" style="display:inline-block;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;font-weight:900;font-size:15px;padding:14px 32px;border-radius:12px;text-decoration:none;margin-bottom:10px">
+      📨 Encaminhar para ${clientEmail || 'cliente'} agora
+    </a>
+    <div style="color:#475569;font-size:11px;margin-top:8px">Clique no botão → seu Gmail abre já com o email pronto para enviar</div>
+  </td></tr>
+
+  <!-- Separator -->
+  <tr><td style="padding:0 28px">
+    <div style="border-top:2px dashed #334155;margin:0;padding:16px 0 8px;color:#475569;font-size:12px;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.08em">Email completo para o cliente (copie ou encaminhe)</div>
+  </td></tr>
+
+  <!-- Client email preview -->
+  <tr><td style="padding:0 28px 28px">
+    <div style="border:1px solid #334155;border-radius:12px;overflow:hidden;font-size:11px;color:#64748b">
+      ${clientHtml}
+    </div>
+  </td></tr>
+
+  <!-- Tip -->
+  <tr><td style="padding:0 28px 28px;text-align:center">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px;color:#475569;font-size:12px">
+      💡 <strong style="color:#94a3b8">Dica:</strong> Para enviar direto ao cliente sem encaminhar, verifique um domínio em <a href="https://resend.com/domains" style="color:#f97316">resend.com/domains</a>
+    </div>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body></html>`
 }
 
 /* ── handler ─────────────────────────────────────────────── */
@@ -189,30 +243,57 @@ export default async (req) => {
     ? `✅ Seu acesso ao ZatendeStock PDV está pronto — ${storeName}`
     : `✅ Portal do Distribuidor ZatendeStock — Acesso criado para ${storeName}`
 
-  // ── Send via Resend API (fetch only, no npm package) ────
-  if (RESEND_KEY) {
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: FROM_EMAIL, to: [to], subject, text, html }),
-      })
-      const data = await res.json()
-      if (res.ok) return new Response(JSON.stringify({ ok: true, sent: true, id: data.id }), { headers: CORS })
-      console.error('Resend error:', data)
-      return new Response(JSON.stringify({ ok: false, sent: false, error: data.message || 'Resend error', previewHtml: html }), { headers: CORS })
-    } catch (err) {
-      console.error('Resend fetch error:', err.message)
-      return new Response(JSON.stringify({ ok: false, sent: false, error: err.message, previewHtml: html }), { headers: CORS })
-    }
+  // ── Send via Resend API ─────────────────────────────────
+  if (!RESEND_KEY) {
+    return new Response(JSON.stringify({ ok: true, sent: false, warning: 'RESEND_API_KEY não configurada.' }), { headers: CORS })
   }
 
-  // ── No key configured — return preview so admin can copy ──
-  return new Response(JSON.stringify({
-    ok: true, sent: false,
-    warning: 'RESEND_API_KEY não configurada. Acesse resend.com → crie conta grátis → API Keys → adicione em Netlify → Env vars.',
-    previewHtml: html,
-  }), { headers: CORS })
+  const send = async (toAddr, subjectStr, htmlStr, textStr) =>
+    fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: FROM_EMAIL, to: [toAddr], subject: subjectStr, text: textStr, html: htmlStr }),
+    }).then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+
+  try {
+    // 1️⃣ Try sending directly to the client
+    const direct = await send(to, subject, html, text)
+
+    if (direct.ok) {
+      // ✅ Domain verified — sent directly
+      return new Response(JSON.stringify({ ok: true, sent: true, mode: 'direct', id: direct.data.id }), { headers: CORS })
+    }
+
+    const msg = direct.data?.message || ''
+    const domainNotVerified = msg.includes('testing emails') || msg.includes('own email') || msg.includes('verify a domain')
+
+    if (!domainNotVerified) {
+      // Some other Resend error
+      console.error('Resend error:', direct.data)
+      return new Response(JSON.stringify({ ok: false, sent: false, error: msg }), { headers: CORS })
+    }
+
+    // 2️⃣ Domain not verified → notify admin with full template + forward button
+    const adminHtml    = buildAdminNotify({ clientEmail: to, type, storeName, username, password })
+    const adminSubject = `🆕 Novo ${type === 'market' ? 'mercado' : 'distribuidor'}: ${storeName} — Enviar acesso para ${to}`
+    const adminText    = `Novo cliente cadastrado!\n\nNome: ${storeName}\nEmail do cliente: ${to}\nUsuário: ${username}\nSenha: ${password}\n\nEncaminhe o acesso para o cliente.`
+
+    const notify = await send(ADMIN_EMAIL, adminSubject, adminHtml, adminText)
+
+    if (notify.ok) {
+      return new Response(JSON.stringify({
+        ok: true, sent: true, mode: 'admin-notify',
+        note: `Email enviado para ${ADMIN_EMAIL} — encaminhe para ${to}`,
+        id: notify.data.id,
+      }), { headers: CORS })
+    }
+
+    return new Response(JSON.stringify({ ok: false, sent: false, error: notify.data?.message || 'Erro ao notificar admin' }), { headers: CORS })
+
+  } catch (err) {
+    console.error('send-email error:', err.message)
+    return new Response(JSON.stringify({ ok: false, sent: false, error: err.message }), { headers: CORS })
+  }
 }
 
 export const config = { path: '/api/send-email' }
