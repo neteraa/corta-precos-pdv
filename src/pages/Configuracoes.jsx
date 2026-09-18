@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { Database, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, Fingerprint, Copy, Check, Image, Palette, MessageCircle, Wifi, WifiOff, RefreshCw, LogOut } from 'lucide-react'
+import { Database, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, Fingerprint, Copy, Check, Image, Palette, MessageCircle, Wifi, WifiOff, RefreshCw, LogOut, Bot, Clock, MapPin, CreditCard, Tag, Phone as PhoneIcon } from 'lucide-react'
 import { useStore } from '../store.jsx'
 import { parseGdoorCsv } from '../utils/importCsv.js'
 import { usePrinter } from '../hooks/usePrinter.js'
@@ -421,6 +421,156 @@ function WhatsAppBotSection({ instance }) {
         Instância: <code className="bg-gray-100 px-1 rounded">{instance}</code>
         {wa.phone && <> · Número: <strong>+{wa.phone}</strong></>}
       </p>
+    </div>
+  )
+}
+
+/* ── Perfil público do bot do mercado ──────────────────────────────────────── */
+const PAYMENT_OPTIONS = ['Dinheiro', 'PIX', 'Débito', 'Crédito', 'Vale-Alimentação', 'Fiado']
+
+function MarketBotProfileSection({ storeId }) {
+  const [profile, setProfile] = useState({
+    storeName: '', address: '', neighborhood: '', city: '',
+    hours: '', payments: [], promotions: '', about: '', policies: '', instagram: '',
+  })
+  const [saving, setSaving]   = useState(false)
+  const [saved,  setSaved]    = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!storeId) return
+    fetch(`/api/market-profile?storeId=${storeId}`)
+      .then(r => r.json())
+      .then(d => { if (d && Object.keys(d).length) setProfile(p => ({ ...p, ...d })) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [storeId])
+
+  const toggle = (pay) => setProfile(p => ({
+    ...p,
+    payments: p.payments?.includes(pay)
+      ? p.payments.filter(x => x !== pay)
+      : [...(p.payments || []), pay],
+  }))
+
+  const save = async () => {
+    if (!storeId) return
+    setSaving(true)
+    try {
+      await fetch(`/api/market-profile?storeId=${storeId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-zs-storeid': storeId },
+        body: JSON.stringify(profile),
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (e) { console.error(e) }
+    finally { setSaving(false) }
+  }
+
+  const inp = 'w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/40 transition-all'
+  const ta  = inp + ' resize-none'
+  const lbl = 'text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5'
+
+  if (loading) return <div className="text-gray-600 text-sm py-4 text-center">Carregando...</div>
+
+  return (
+    <div className="space-y-5">
+      {/* Alerta explicativo */}
+      <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 text-sm text-orange-200">
+        <p className="font-bold mb-1">🤖 Como funciona</p>
+        <p className="text-orange-300 text-xs leading-relaxed">
+          Quando seus clientes mandarem mensagem no seu WhatsApp, o bot vai responder automaticamente usando essas informações.
+          Quanto mais completo você preencher, melhor o bot vai atender!
+        </p>
+      </div>
+
+      {/* Nome e contato */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className={lbl}><Store className="w-3.5 h-3.5" /> Nome da Loja</label>
+          <input className={inp} placeholder="Ex: Mercadinho do João" value={profile.storeName}
+            onChange={e => setProfile(p => ({ ...p, storeName: e.target.value }))} />
+        </div>
+        <div>
+          <label className={lbl}><PhoneIcon className="w-3.5 h-3.5" /> Instagram (opcional)</label>
+          <input className={inp} placeholder="@mercadinhodojoao" value={profile.instagram}
+            onChange={e => setProfile(p => ({ ...p, instagram: e.target.value }))} />
+        </div>
+      </div>
+
+      {/* Endereço */}
+      <div>
+        <label className={lbl}><MapPin className="w-3.5 h-3.5" /> Endereço</label>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <input className={inp + ' sm:col-span-1'} placeholder="Rua e número" value={profile.address}
+            onChange={e => setProfile(p => ({ ...p, address: e.target.value }))} />
+          <input className={inp} placeholder="Bairro" value={profile.neighborhood}
+            onChange={e => setProfile(p => ({ ...p, neighborhood: e.target.value }))} />
+          <input className={inp} placeholder="Cidade" value={profile.city}
+            onChange={e => setProfile(p => ({ ...p, city: e.target.value }))} />
+        </div>
+      </div>
+
+      {/* Horário */}
+      <div>
+        <label className={lbl}><Clock className="w-3.5 h-3.5" /> Horário de Funcionamento</label>
+        <input className={inp} placeholder="Ex: Seg a Sex 07:00–21:00 · Sáb 07:00–20:00 · Dom 08:00–13:00"
+          value={profile.hours} onChange={e => setProfile(p => ({ ...p, hours: e.target.value }))} />
+      </div>
+
+      {/* Formas de pagamento */}
+      <div>
+        <label className={lbl}><CreditCard className="w-3.5 h-3.5" /> Formas de Pagamento</label>
+        <div className="flex flex-wrap gap-2">
+          {PAYMENT_OPTIONS.map(opt => {
+            const active = profile.payments?.includes(opt)
+            return (
+              <button key={opt} onClick={() => toggle(opt)} type="button"
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                  active ? 'bg-orange-500/20 border-orange-500 text-orange-300' : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
+                }`}>
+                {opt}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Promoções — campo mais importante */}
+      <div>
+        <label className={lbl}><Tag className="w-3.5 h-3.5" /> 🔥 Promoções Atuais</label>
+        <textarea rows={5} className={ta}
+          placeholder={"Ex:\n• Refrigerante 2L — R$ 6,99\n• Frango inteiro — R$ 9,99/kg\n• Leve 3 pague 2 em massas\n• PIX tem 5% de desconto em qualquer compra"}
+          value={profile.promotions}
+          onChange={e => setProfile(p => ({ ...p, promotions: e.target.value }))} />
+        <p className="text-xs text-gray-600 mt-1">O bot vai responder essas promoções quando alguém perguntar "tem promoção?"</p>
+      </div>
+
+      {/* Sobre e políticas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className={lbl}><Bot className="w-3.5 h-3.5" /> Sobre a Loja</label>
+          <textarea rows={3} className={ta} placeholder="Ex: Mercadinho de bairro com mais de 10 anos, especializado em carnes e hortifrúti frescos."
+            value={profile.about} onChange={e => setProfile(p => ({ ...p, about: e.target.value }))} />
+        </div>
+        <div>
+          <label className={lbl}><Check className="w-3.5 h-3.5" /> Políticas (entrega, troca, fiado)</label>
+          <textarea rows={3} className={ta} placeholder="Ex: Fazemos entrega no bairro. Troca em até 24h com nota. Fiado apenas para clientes cadastrados."
+            value={profile.policies} onChange={e => setProfile(p => ({ ...p, policies: e.target.value }))} />
+        </div>
+      </div>
+
+      {/* Aviso de segurança */}
+      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-300">
+        🔒 <strong>O bot nunca vai revelar:</strong> faturamento, custos, margens, fornecedores, folha de pagamento ou qualquer dado financeiro/interno — mesmo que o cliente pergunte diretamente.
+      </div>
+
+      <button onClick={save} disabled={saving}
+        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-black text-sm transition-all">
+        {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+        {saving ? 'Salvando...' : saved ? 'Salvo! ✅' : 'Salvar configurações do bot'}
+      </button>
     </div>
   )
 }
@@ -880,10 +1030,17 @@ export default function Configuracoes() {
       </Section>
 
       {/* ── WhatsApp Bot ────────────────────────────────────────────────── */}
-      <Section icon={MessageCircle} title="Bot WhatsApp (IA)">
+      <Section icon={Bot} title="Bot do Meu Mercado — Atendimento Automático">
         <p className="text-xs text-gray-400 mb-4">
-          Conecte um número de WhatsApp para que clientes recebam respostas automáticas com IA sobre o sistema.
-          Cada loja tem sua própria instância — escaneie o QR com o celular do número desejado.
+          Configure as informações públicas da sua loja. Quando clientes mandarem mensagem no WhatsApp,
+          o bot responde automaticamente com horário, promoções, endereço e muito mais.
+        </p>
+        <MarketBotProfileSection storeId={getConfiguredStoreId()} />
+      </Section>
+
+      <Section icon={MessageCircle} title="Bot WhatsApp (IA) — Conexão">
+        <p className="text-xs text-gray-400 mb-4">
+          Conecte o número de WhatsApp da sua loja. Escaneie o QR Code com o celular do número que vai atender seus clientes.
         </p>
         <WhatsAppBotSection instance={getConfiguredStoreId() || 'zatendestok'} />
       </Section>

@@ -172,23 +172,66 @@ async function sendReply(number, text, instance) {
   }
 }
 
-/** Chama OpenAI com histórico + perfil do lead. Retorna resposta bruta (pode conter <zs_lead>) */
-async function askOpenAI(userMessage, senderName, senderNum, leadProfile = {}) {
+// ─── Perfil público do mercado ────────────────────────────────────────────────
+
+async function loadMarketProfile(storeId) {
+  try {
+    const store = getStore({ name: 'market-profiles', consistency: 'strong' })
+    return await store.get(storeId, { type: 'json' }) || {}
+  } catch { return {} }
+}
+
+/** Monta o system prompt para o bot de um mercado cliente */
+function buildMarketPrompt(profile) {
+  const name   = profile.storeName   || 'nosso mercado'
+  const addr   = profile.address     ? `📍 ${profile.address}${profile.neighborhood ? ', ' + profile.neighborhood : ''}${profile.city ? ' — ' + profile.city : ''}` : null
+  const hours  = profile.hours       ? `🕐 Horário: ${profile.hours}` : null
+  const pays   = Array.isArray(profile.payments) && profile.payments.length
+    ? `💳 Pagamento: ${profile.payments.join(', ')}`
+    : profile.payments ? `💳 Pagamento: ${profile.payments}` : null
+  const promos = profile.promotions  ? `\n🔥 PROMOÇÕES ATUAIS:\n${profile.promotions}` : ''
+  const about  = profile.about       ? `\nSobre a loja: ${profile.about}` : ''
+  const policy = profile.policies    ? `\nPolíticas: ${profile.policies}` : ''
+  const insta  = profile.instagram   ? `📸 Instagram: @${profile.instagram.replace('@','')}` : null
+
+  const infoLines = [addr, hours, pays, insta].filter(Boolean).join('\n')
+
+  return `Você é o assistente virtual do ${name}. Atende clientes pelo WhatsApp de forma amigável, rápida e informal.
+
+━━━━━━━━━━━━━━━━━━━━━━
+🏪 INFORMAÇÕES DA LOJA
+━━━━━━━━━━━━━━━━━━━━━━
+${infoLines || 'Loja disponível para atendimento.'}
+${about}${policy}${promos}
+
+━━━━━━━━━━━━━━━━━━━━━━
+🧠 COMO SE COMPORTAR
+━━━━━━━━━━━━━━━━━━━━━━
+- Linguagem informal brasileira, como uma atendente simpática do mercadinho
+- Respostas curtas e diretas (WhatsApp — máximo 4 linhas)
+- Use emojis com naturalidade (1-2 por mensagem)
+- Quando perguntar sobre promoção: informe as promoções atuais com entusiasmo!
+- Quando perguntar o horário: informe claramente
+- Para endereço: informe e ofereça indicação de como chegar
+- Quando não souber algo: "Vou verificar pra você! Um momento 😊"
+
+━━━━━━━━━━━━━━━━━━━━━━
+🚫 NUNCA FALAR SOBRE
+━━━━━━━━━━━━━━━━━━━━━━
+- Faturamento, receita, lucro ou resultados financeiros da loja
+- Custo de produtos, margens ou preços de compra
+- Fornecedores, distribuidores ou parceiros comerciais
+- Salários, folha de pagamento ou dados de funcionários
+- Senhas, sistemas internos ou dados de gestão
+- Qualquer informação que o dono não deveria compartilhar com clientes
+
+Se perguntarem sobre qualquer um desses temas: "Isso é informação interna da loja, não consigo te ajudar com isso 😅 Mas posso te ajudar com [redireciona para produtos/promoções/horário]"`
+}
+
+/** Chama OpenAI com system prompt, histórico e mensagem. Retorna resposta bruta. */
+async function askOpenAI(userMessage, senderNum, systemMsg) {
   const key = process.env.OPENAI_API_KEY
   if (!key) throw new Error('OPENAI_API_KEY not set')
-
-  // Monta contexto do lead: o que já sabemos sobre essa pessoa
-  const knownParts = []
-  if (leadProfile.name)   knownParts.push(`Nome: ${leadProfile.name}`)
-  if (leadProfile.market) knownParts.push(`Mercado: ${leadProfile.market}`)
-  if (leadProfile.city)   knownParts.push(`Cidade: ${leadProfile.city}`)
-  if (leadProfile.stage)  knownParts.push(`Estágio: ${leadProfile.stage}`)
-
-  const profileCtx = knownParts.length
-    ? `\n\n📌 O QUE JÁ SABEMOS SOBRE ESSE CONTATO:\n${knownParts.join('\n')}\nUse essas informações naturalmente — chame pelo nome, mencione o mercado dele.`
-    : `\n\n📌 Primeira conversa com esse contato. Se apresente como Zara e pergunte o nome e tipo de negócio de forma natural.`
-
-  const systemMsg = SYSTEM_PROMPT + profileCtx
 
   const history = getHistory(senderNum)
 
@@ -306,41 +349,67 @@ export default async (req) => {
 
   console.log(`wa-bot [${instanceName}]: msg de ${senderNum} (${senderName}): ${text.slice(0, 80)}`)
 
+  // ── Instância ZatendeStok → Zara (bot de vendas/prospecção) ──────────────
+  const ZARA_INSTANCES = ['zatendeapi', 'zatendestok']
+  const isZara = ZARA_INSTANCES.includes(instanceName?.toLowerCase())
+
   try {
-    // 1. Carrega perfil persistido do lead (Netlify Blobs)
-    const leadProfile = await loadLead(senderNum)
+    let systemMsg
+    let rawReply
 
-    // 2. Salva mensagem do usuário no histórico em memória
-    pushHistory(senderNum, 'user', text)
+    if (isZara) {
+      // ── MODO ZARA: bot de vendas do ZatendeStok ──────────────────────────
+      const leadProfile = await loadLead(senderNum)
 
-    // 3. Gera resposta com IA (inclui contexto do lead + histórico)
-    const rawReply = await askOpenAI(text, senderName, senderNum, leadProfile)
-    if (!rawReply) return new Response('OK', { status: 200 })
+      const knownParts = []
+      if (leadProfile.name)   knownParts.push(`Nome: ${leadProfile.name}`)
+      if (leadProfile.market) knownParts.push(`Mercado: ${leadProfile.market}`)
+      if (leadProfile.city)   knownParts.push(`Cidade: ${leadProfile.city}`)
+      if (leadProfile.stage)  knownParts.push(`Estágio: ${leadProfile.stage}`)
+      if (senderName && !leadProfile.name) knownParts.push(`Nome no WhatsApp: ${senderName}`)
 
-    // 4. Extrai tag <zs_lead> embutida na resposta (invisível ao cliente)
-    const { clean: reply, lead: extracted } = parseLeadTag(rawReply)
+      const profileCtx = knownParts.length
+        ? `\n\n📌 O QUE JÁ SABEMOS SOBRE ESSE CONTATO:\n${knownParts.join('\n')}\nUse essas informações naturalmente — chame pelo nome, mencione o mercado dele.`
+        : `\n\n📌 Primeira conversa com esse contato. Se apresente como Zara e pergunte o nome e tipo de negócio de forma natural.`
 
-    // 5. Salva resposta limpa no histórico
-    pushHistory(senderNum, 'assistant', reply)
+      systemMsg = SYSTEM_PROMPT + profileCtx
+      pushHistory(senderNum, 'user', text)
+      rawReply = await askOpenAI(text, senderNum, systemMsg)
+      if (!rawReply) return new Response('OK', { status: 200 })
 
-    // 6. Atualiza e persiste perfil do lead se extraiu novos dados
-    if (extracted && Object.keys(extracted).length) {
-      const updated = {
-        ...leadProfile,
-        ...extracted,
-        // Preserva nome do WhatsApp como fallback se não tiver name do lead
-        waName: leadProfile.waName || senderName || null,
+      const { clean: reply, lead: extracted } = parseLeadTag(rawReply)
+      pushHistory(senderNum, 'assistant', reply)
+
+      // Persiste lead
+      if (extracted && Object.keys(extracted).length) {
+        await saveLead(senderNum, { ...leadProfile, ...extracted, waName: leadProfile.waName || senderName || null })
+        console.log(`wa-bot: lead atualizado ${senderNum}:`, JSON.stringify(extracted))
+      } else if (!leadProfile.waName && senderName) {
+        await saveLead(senderNum, { waName: senderName, stage: leadProfile.stage || 'novo' })
       }
-      await saveLead(senderNum, updated)
-      console.log(`wa-bot: lead atualizado ${senderNum}:`, JSON.stringify(extracted))
-    } else if (!leadProfile.waName && senderName) {
-      // Salva pelo menos o nome do WhatsApp na primeira interação
-      await saveLead(senderNum, { waName: senderName, stage: leadProfile.stage || 'novo' })
-    }
 
-    // 7. Envia resposta para o cliente
-    await sendReply(senderNum, reply, instanceName)
-    console.log(`wa-bot [${instanceName}]: respondeu ${senderNum}: ${reply.slice(0, 80)}`)
+      await sendReply(senderNum, reply, instanceName)
+      console.log(`wa-bot [Zara]: respondeu ${senderNum}: ${reply.slice(0, 80)}`)
+
+    } else {
+      // ── MODO MERCADO: bot de atendimento ao cliente da loja ──────────────
+      const marketProfile = await loadMarketProfile(instanceName)
+      systemMsg = buildMarketPrompt(marketProfile)
+
+      // Injeta nome do cliente se disponível
+      if (senderName) {
+        systemMsg += `\n\n📌 O cliente que está falando agora se chama *${senderName}*. Use o nome naturalmente.`
+      }
+
+      pushHistory(senderNum, 'user', text)
+      rawReply = await askOpenAI(text, senderNum, systemMsg)
+      if (!rawReply) return new Response('OK', { status: 200 })
+
+      // Bot do mercado não usa <zs_lead> — resposta direta
+      pushHistory(senderNum, 'assistant', rawReply)
+      await sendReply(senderNum, rawReply, instanceName)
+      console.log(`wa-bot [${instanceName}]: respondeu ${senderNum}: ${rawReply.slice(0, 80)}`)
+    }
 
   } catch (err) {
     console.error('wa-bot error:', err.message)
