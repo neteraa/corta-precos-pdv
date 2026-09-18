@@ -2,8 +2,39 @@ import { getStore } from '@netlify/blobs'
 import { createHash, randomBytes } from 'crypto'
 
 const APP_SALT   = 'zs_2026_corta'
-// Set ZS_MASTER_KEY in Netlify → Site settings → Environment variables
 const MASTER_KEY = process.env.ZS_MASTER_KEY || 'zatende2026master'
+
+/** Envia WhatsApp de boas-vindas via Evolution API quando um mercado é ativado */
+async function sendWelcomeWA(phone, storeName, username, password) {
+  const evoUrl  = process.env.EVOLUTION_API_URL?.replace(/\/$/, '')
+  const evoKey  = process.env.EVOLUTION_API_KEY
+  const evoInst = process.env.EVOLUTION_INSTANCE || 'zatendeapi'
+  if (!evoUrl || !evoKey || !phone) return
+
+  // Formata número brasileiro: remove não-dígitos, garante 55 no início
+  const num = '55' + phone.replace(/\D/g, '').replace(/^55/, '').replace(/^0/, '').slice(-11)
+
+  const msg = `✅ *Sua conta no ZatendeStok está ativa!*
+
+Olá! Aqui é a equipe ZatendeStok 🚀
+
+Seu sistema está pronto pra usar:
+🔗 *zatendestok.com.br*
+👤 Usuário: *${username}*
+🔑 Senha: *${password}*
+
+Acessa agora e já começa a cadastrar seus produtos! Se precisar de qualquer ajuda, é só chamar aqui mesmo. A gente resolve na hora 💪
+
+_Bem-vindo(a), ${storeName}!_ 🎉`
+
+  try {
+    await fetch(`${evoUrl}/message/sendText/${evoInst}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': evoKey },
+      body:    JSON.stringify({ number: num, text: msg }),
+    })
+  } catch (e) { console.error('sendWelcomeWA error:', e.message) }
+}
 
 const CORS = {
   'Content-Type': 'application/json',
@@ -107,6 +138,9 @@ export default async (req) => {
 
     markets.push(market)
     await store.set('markets', JSON.stringify(markets))
+
+    // Notificação WhatsApp de boas-vindas (não-bloqueante — falha silenciosa)
+    sendWelcomeWA(storePhone, storeName.trim(), uname, password).catch(() => {})
 
     return new Response(JSON.stringify({
       ok:       true,

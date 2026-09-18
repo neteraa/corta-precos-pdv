@@ -15,6 +15,38 @@
  *   messages.upsert
  */
 
+// ─── Netlify Blobs: armazenamento persistente de leads ───────────────────────
+import { getStore } from '@netlify/blobs'
+
+function leadsStore() {
+  return getStore({ name: 'wa-leads', consistency: 'strong' })
+}
+
+async function loadLead(phone) {
+  try {
+    const store = leadsStore()
+    const raw = await store.get(phone, { type: 'json' })
+    return raw || {}
+  } catch { return {} }
+}
+
+async function saveLead(phone, data) {
+  try {
+    const store = leadsStore()
+    const existing = await loadLead(phone)
+    const updated = {
+      ...existing,
+      ...data,
+      phone,
+      updatedAt: new Date().toISOString(),
+      createdAt: existing.createdAt || new Date().toISOString(),
+    }
+    await store.set(phone, JSON.stringify(updated))
+    return updated
+  } catch (e) { console.error('saveLead error:', e.message) }
+}
+
+// ─── System Prompt ────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `Você é a Zara, assistente comercial do ZatendeStok — sistema de gestão para mercadinhos, mercearias e distribuidoras do Brasil. Você atende pelo WhatsApp e é esperta, carismática e fala como brasileira mesmo.
 
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -84,7 +116,23 @@ Se pedir DEMONSTRAÇÃO → "Perfeito! Acessa zatendestok.com.br agora e consegu
 - NUNCA invente funcionalidades que não existem
 - NUNCA seja robótico ou formal demais
 - Se não souber responder algo técnico específico: "Boa pergunta! Deixa eu confirmar isso com o Pedro e já te retorno 🔍"
-- Máximo 4 linhas por mensagem — se for longo, quebra em mensagens menores`
+- Máximo 4 linhas por mensagem — se for longo, quebra em mensagens menores
+- SEMPRE chame a pessoa pelo nome quando já souber
+
+━━━━━━━━━━━━━━━━━━━━━━
+📋 CAPTURA DE DADOS (INVISÍVEL AO CLIENTE)
+━━━━━━━━━━━━━━━━━━━━━━
+Sempre que souber (ou atualizar) algum dado do cliente, inclua ao FINAL da sua resposta, numa linha separada, o bloco abaixo — o cliente NÃO vê isso, é removido automaticamente:
+
+<zs_lead>{"name":"NOME","market":"NOME DO MERCADO","city":"CIDADE","stage":"ESTAGIO"}</zs_lead>
+
+- stage pode ser: "novo" | "curioso" | "interessado" | "demo" | "fechado"
+- Só inclua os campos que você souber/atualizou — omita os que não souber
+- Exemplos:
+  - Pessoa disse o nome → <zs_lead>{"name":"João"}</zs_lead>
+  - Disse mercado e cidade → <zs_lead>{"market":"Mercearia Central","city":"Sorocaba"}</zs_lead>
+  - Pediu demonstração → <zs_lead>{"stage":"demo"}</zs_lead>
+  - Disse que quer contratar → <zs_lead>{"stage":"fechado"}</zs_lead>`
 
 /** Extrai o texto de qualquer tipo de mensagem do Evolution API */
 function extractText(data) {
@@ -124,17 +172,24 @@ async function sendReply(number, text, instance) {
   }
 }
 
-/** Chama OpenAI com histórico de conversa e retorna a resposta */
-async function askOpenAI(userMessage, senderName, senderNum) {
+/** Chama OpenAI com histórico + perfil do lead. Retorna resposta bruta (pode conter <zs_lead>) */
+async function askOpenAI(userMessage, senderName, senderNum, leadProfile = {}) {
   const key = process.env.OPENAI_API_KEY
   if (!key) throw new Error('OPENAI_API_KEY not set')
 
-  // Injeta o nome do cliente no system prompt se disponível
-  const systemMsg = senderName
-    ? `${SYSTEM_PROMPT}\n\n📌 O cliente que está conversando agora se chama *${senderName}*. Use o nome dele naturalmente na conversa, mas sem exagero.`
-    : SYSTEM_PROMPT
+  // Monta contexto do lead: o que já sabemos sobre essa pessoa
+  const knownParts = []
+  if (leadProfile.name)   knownParts.push(`Nome: ${leadProfile.name}`)
+  if (leadProfile.market) knownParts.push(`Mercado: ${leadProfile.market}`)
+  if (leadProfile.city)   knownParts.push(`Cidade: ${leadProfile.city}`)
+  if (leadProfile.stage)  knownParts.push(`Estágio: ${leadProfile.stage}`)
 
-  // Histórico de conversa desse contato específico
+  const profileCtx = knownParts.length
+    ? `\n\n📌 O QUE JÁ SABEMOS SOBRE ESSE CONTATO:\n${knownParts.join('\n')}\nUse essas informações naturalmente — chame pelo nome, mencione o mercado dele.`
+    : `\n\n📌 Primeira conversa com esse contato. Se apresente como Zara e pergunte o nome e tipo de negócio de forma natural.`
+
+  const systemMsg = SYSTEM_PROMPT + profileCtx
+
   const history = getHistory(senderNum)
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -142,12 +197,12 @@ async function askOpenAI(userMessage, senderName, senderNum) {
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
     body:    JSON.stringify({
       model:       'gpt-4o-mini',
-      max_tokens:  500,
+      max_tokens:  600,
       temperature: 0.75,
       messages: [
         { role: 'system', content: systemMsg },
-        ...history,                              // histórico completo da conversa
-        { role: 'user',   content: userMessage }, // mensagem nova
+        ...history,
+        { role: 'user',   content: userMessage },
       ],
     }),
   })
@@ -159,6 +214,20 @@ async function askOpenAI(userMessage, senderName, senderNum) {
 
   const data = await res.json()
   return data.choices?.[0]?.message?.content?.trim() || null
+}
+
+/** Extrai o bloco <zs_lead>{...}</zs_lead> da resposta e retorna { clean, lead } */
+function parseLeadTag(rawReply) {
+  const match = rawReply?.match(/<zs_lead>([\s\S]*?)<\/zs_lead>/i)
+  if (!match) return { clean: rawReply, lead: null }
+  try {
+    const lead = JSON.parse(match[1].trim())
+    const clean = rawReply.replace(/<zs_lead>[\s\S]*?<\/zs_lead>/gi, '').trim()
+    return { clean, lead }
+  } catch {
+    const clean = rawReply.replace(/<zs_lead>[\s\S]*?<\/zs_lead>/gi, '').trim()
+    return { clean, lead: null }
+  }
 }
 
 // Memória de conversa por contato — mantém contexto entre mensagens
@@ -238,20 +307,43 @@ export default async (req) => {
   console.log(`wa-bot [${instanceName}]: msg de ${senderNum} (${senderName}): ${text.slice(0, 80)}`)
 
   try {
-    // Salva a mensagem do usuário no histórico ANTES de chamar a IA
+    // 1. Carrega perfil persistido do lead (Netlify Blobs)
+    const leadProfile = await loadLead(senderNum)
+
+    // 2. Salva mensagem do usuário no histórico em memória
     pushHistory(senderNum, 'user', text)
 
-    const reply = await askOpenAI(text, senderName, senderNum)
-    if (reply) {
-      // Salva a resposta da IA no histórico para manter contexto
-      pushHistory(senderNum, 'assistant', reply)
+    // 3. Gera resposta com IA (inclui contexto do lead + histórico)
+    const rawReply = await askOpenAI(text, senderName, senderNum, leadProfile)
+    if (!rawReply) return new Response('OK', { status: 200 })
 
-      await sendReply(senderNum, reply, instanceName)
-      console.log(`wa-bot [${instanceName}]: respondeu ${senderNum}: ${reply.slice(0, 80)}`)
+    // 4. Extrai tag <zs_lead> embutida na resposta (invisível ao cliente)
+    const { clean: reply, lead: extracted } = parseLeadTag(rawReply)
+
+    // 5. Salva resposta limpa no histórico
+    pushHistory(senderNum, 'assistant', reply)
+
+    // 6. Atualiza e persiste perfil do lead se extraiu novos dados
+    if (extracted && Object.keys(extracted).length) {
+      const updated = {
+        ...leadProfile,
+        ...extracted,
+        // Preserva nome do WhatsApp como fallback se não tiver name do lead
+        waName: leadProfile.waName || senderName || null,
+      }
+      await saveLead(senderNum, updated)
+      console.log(`wa-bot: lead atualizado ${senderNum}:`, JSON.stringify(extracted))
+    } else if (!leadProfile.waName && senderName) {
+      // Salva pelo menos o nome do WhatsApp na primeira interação
+      await saveLead(senderNum, { waName: senderName, stage: leadProfile.stage || 'novo' })
     }
+
+    // 7. Envia resposta para o cliente
+    await sendReply(senderNum, reply, instanceName)
+    console.log(`wa-bot [${instanceName}]: respondeu ${senderNum}: ${reply.slice(0, 80)}`)
+
   } catch (err) {
     console.error('wa-bot error:', err.message)
-    // Don't crash — just log. Evolution API will retry if we return 5xx.
   }
 
   return new Response('OK', { status: 200 })

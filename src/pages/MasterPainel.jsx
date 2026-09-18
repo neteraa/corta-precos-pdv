@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, TrendingUp, AlertTriangle, CalendarClock, Mail, ClipboardList, CheckCircle2, XCircle, MessageCircle, Phone, MapPin } from 'lucide-react'
+import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, TrendingUp, AlertTriangle, CalendarClock, Mail, ClipboardList, CheckCircle2, XCircle, MessageCircle, Phone, MapPin, Bot, Users, Building2, Flame } from 'lucide-react'
 import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 
 /* ─── constants ──────────────────────────────────────────── */
@@ -618,6 +618,8 @@ export default function MasterPainel() {
   const [err,          setErr]           = useState(null)
   const [showAdd,      setShowAdd]       = useState(false)
   const [tab,          setTab]           = useState('overview')
+  const [leads,        setLeads]         = useState([])
+  const [leadsLoading, setLeadsLoading]  = useState(false)
   const [approving,    setApproving]     = useState(null) // id being processed
 
   const load = useCallback(async (key = mk) => {
@@ -645,6 +647,19 @@ export default function MasterPainel() {
     const key = mkInput.trim(); if (!key) return
     localStorage.setItem(MK_KEY, key); setMk(key); await load(key)
   }
+
+  const loadLeads = useCallback(async () => {
+    if (!mk) return
+    setLeadsLoading(true)
+    try {
+      const res = await api('/api/leads', mk)
+      if (res.ok) setLeads(res.leads || [])
+    } catch { /* silencioso */ }
+    finally { setLeadsLoading(false) }
+  }, [mk])
+
+  // Carrega leads ao entrar na aba
+  useEffect(() => { if (tab === 'leads' && mk) loadLeads() }, [tab, mk, loadLeads])
 
   const accessMarket = (market) => {
     localStorage.setItem('zs_master_session', JSON.stringify({ mk, returnTo: '/painel' }))
@@ -741,6 +756,7 @@ export default function MasterPainel() {
     { id: 'requests',  label: pendingCount > 0 ? `Solicitações (${pendingCount})` : 'Solicitações', icon: ClipboardList },
     { id: 'markets',   label: `Mercados (${markets.length})`,                         icon: Store         },
     { id: 'dist',      label: `Distribuidores (${distributors.length})`,              icon: Truck         },
+    { id: 'leads',     label: leads.length > 0 ? `Leads Bot (${leads.length})` : 'Leads Bot', icon: Bot },
   ]
 
   return (
@@ -1053,6 +1069,137 @@ export default function MasterPainel() {
               </button>
             </div>
           )
+        )}
+        {/* ── LEADS BOT ── */}
+        {tab === 'leads' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h2 className="text-xl font-black text-white flex items-center gap-2">
+                  <Bot className="w-5 h-5 text-orange-400" /> Leads capturados pela Zara
+                </h2>
+                <p className="text-gray-500 text-sm mt-0.5">Contatos que interagiram com o bot WhatsApp</p>
+              </div>
+              <button onClick={loadLeads} disabled={leadsLoading}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-bold text-gray-300 disabled:opacity-50 transition-all">
+                <RefreshCw className={`w-4 h-4 ${leadsLoading ? 'animate-spin' : ''}`} /> Atualizar
+              </button>
+            </div>
+
+            {leadsLoading && (
+              <div className="text-center py-20 text-gray-500">
+                <RefreshCw className="w-8 h-8 mx-auto mb-3 animate-spin opacity-40" />
+                <p>Carregando leads...</p>
+              </div>
+            )}
+
+            {!leadsLoading && leads.length === 0 && (
+              <div className="text-center py-20 text-gray-600">
+                <Bot className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                <p className="font-semibold text-lg">Nenhum lead ainda</p>
+                <p className="text-sm mt-1">Quando alguém mandar mensagem pro bot, aparece aqui</p>
+              </div>
+            )}
+
+            {!leadsLoading && leads.length > 0 && (
+              <div className="space-y-3">
+                {/* Resumo */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Total', value: leads.length,                                     color: 'text-white',       bg: 'bg-gray-800' },
+                    { label: 'Interessados', value: leads.filter(l => ['interessado','demo','fechado'].includes(l.stage)).length, color: 'text-orange-400', bg: 'bg-orange-500/10' },
+                    { label: 'Prontos p/ demo', value: leads.filter(l => l.stage === 'demo').length,   color: 'text-yellow-400',  bg: 'bg-yellow-500/10' },
+                    { label: 'Fechados', value: leads.filter(l => l.stage === 'fechado').length,       color: 'text-green-400',   bg: 'bg-green-500/10' },
+                  ].map(s => (
+                    <div key={s.label} className={`${s.bg} rounded-2xl p-4 border border-gray-700/50`}>
+                      <div className={`text-2xl font-black ${s.color}`}>{s.value}</div>
+                      <div className="text-xs text-gray-500 mt-1">{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Tabela de leads */}
+                <div className="rounded-2xl border border-gray-800 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-800 bg-gray-900/60">
+                          <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider">Contato</th>
+                          <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider hidden sm:table-cell">Mercado</th>
+                          <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">Cidade</th>
+                          <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider">Status</th>
+                          <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider hidden lg:table-cell">Último contato</th>
+                          <th className="px-4 py-3" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800/60">
+                        {leads.map((lead, i) => {
+                          const displayName = lead.name || lead.waName || '(sem nome)'
+                          const phone = lead.phone || ''
+                          const waLink = `https://wa.me/${phone}`
+                          const stageMap = {
+                            novo:        { label: 'Novo',        color: 'bg-gray-700 text-gray-300' },
+                            curioso:     { label: 'Curioso',     color: 'bg-blue-500/20 text-blue-300' },
+                            interessado: { label: 'Interessado', color: 'bg-orange-500/20 text-orange-300' },
+                            demo:        { label: 'Quer demo',   color: 'bg-yellow-500/20 text-yellow-300' },
+                            fechado:     { label: '🔥 Fechado',  color: 'bg-green-500/20 text-green-300' },
+                          }
+                          const stage = stageMap[lead.stage] || stageMap.novo
+                          const timeAgo = (iso) => {
+                            if (!iso) return '—'
+                            const diff = Date.now() - new Date(iso).getTime()
+                            const mins = Math.floor(diff / 60000)
+                            if (mins < 1)  return 'agora'
+                            if (mins < 60) return `${mins}min`
+                            const hrs = Math.floor(mins / 60)
+                            if (hrs < 24)  return `${hrs}h`
+                            return `${Math.floor(hrs / 24)}d`
+                          }
+                          return (
+                            <tr key={phone || i} className="hover:bg-gray-800/30 transition-colors">
+                              <td className="px-4 py-3">
+                                <div className="font-semibold text-white">{displayName}</div>
+                                <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                  <Phone className="w-3 h-3" />
+                                  {phone ? `+${phone.slice(0,2)} (${phone.slice(2,4)}) ${phone.slice(4,9)}-${phone.slice(9)}` : '—'}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 hidden sm:table-cell">
+                                <div className="text-gray-300 flex items-center gap-1">
+                                  <Building2 className="w-3 h-3 text-gray-600" />
+                                  {lead.market || <span className="text-gray-600 italic">não informado</span>}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 hidden md:table-cell">
+                                <div className="text-gray-400 flex items-center gap-1">
+                                  <MapPin className="w-3 h-3 text-gray-600" />
+                                  {lead.city || <span className="text-gray-600 italic">—</span>}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${stage.color}`}>
+                                  {stage.label}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 hidden lg:table-cell text-gray-500 text-xs">
+                                {timeAgo(lead.updatedAt)}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <a href={waLink} target="_blank" rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 text-xs font-bold transition-colors">
+                                  <MessageCircle className="w-3.5 h-3.5" /> Chamar
+                                </a>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
