@@ -2,8 +2,8 @@ import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Eye, EyeOff, Lock, User, MessageCircle, CheckCircle2,
-  Package, TrendingUp, Users, Store, ArrowRight, ArrowLeft,
-  Phone, MapPin, ChevronRight, ShieldCheck, Zap, Headphones,
+  ArrowRight, ArrowLeft, Phone, MapPin,
+  ShieldCheck, Zap, Headphones, Bell, BarChart3, Wifi,
 } from 'lucide-react'
 import { getCredentials, getConfiguredStoreId, saveStoreId } from '../utils/auth.js'
 import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
