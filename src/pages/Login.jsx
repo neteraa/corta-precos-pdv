@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User, MessageCircle, CheckCircle2, ArrowRight, ArrowLeft, Phone, MapPin, ShieldCheck, Zap, Headphones, Bell, BarChart3, Wifi } from 'lucide-react'
 import { getCredentials, getConfiguredStoreId, saveStoreId } from '../utils/auth.js'
+import { registerStoreId, wipeLegacyFlatKeys } from '../utils/tenantStorage.js'
 import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
 
 const ZAP         = '5511985950956'
@@ -239,12 +240,16 @@ export default function Login() {
       if (data.ok) {
         saveStoreId(data.storeId)
         localStorage.setItem('cp_session', JSON.stringify({ loggedIn:true, user:user.trim(), storeId:data.storeId, storeName:data.storeName, role:'admin' }))
+        wipeLegacyFlatKeys()          // remove old flat-key contamination
+        registerStoreId(data.storeId) // mark this storeId as native to this browser
         navigate(from, { replace:true }); return
       }
     } catch {}
     const { username:lu, password:lp } = getCredentials()
     if (user.trim()===lu && pass===lp) {
-      localStorage.setItem('cp_session', JSON.stringify({ loggedIn:true, user:user.trim(), storeId:getConfiguredStoreId(), role:'admin' }))
+      const sid = getConfiguredStoreId()
+      localStorage.setItem('cp_session', JSON.stringify({ loggedIn:true, user:user.trim(), storeId:sid, role:'admin' }))
+      registerStoreId(sid)
       navigate(from, { replace:true })
     } else { setErr('Usuário ou senha incorretos.'); setLoading(false) }
   }

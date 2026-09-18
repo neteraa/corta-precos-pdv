@@ -8,6 +8,7 @@ import { isLoggedIn, getRole } from './utils/auth.js'
 /* ── Lazy page chunks — each page loads only when first visited ── */
 const Landing        = lazy(() => import('./pages/Landing.jsx'))
 const Login          = lazy(() => import('./pages/Login.jsx'))
+const ResetStore     = lazy(() => import('./pages/ResetStore.jsx'))
 const Dashboard      = lazy(() => import('./pages/Dashboard.jsx'))
 const PDV            = lazy(() => import('./pages/PDV.jsx'))
 const Produtos       = lazy(() => import('./pages/Produtos.jsx'))
@@ -73,6 +74,7 @@ export default function App() {
           {/* Public */}
           <Route path="/"        element={<Landing />} />
           <Route path="/login"   element={<Login />} />
+          <Route path="/limpar"  element={<ResetStore />} />
           {/* Full-screen pages — no sidebar */}
           <Route path="/display" element={<CustomerDisplay />} />
           <Route path="/flyer"   element={<RequireAuth><Flyer /></RequireAuth>} />
