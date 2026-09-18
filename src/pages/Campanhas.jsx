@@ -123,6 +123,53 @@ export default function Campanhas() {
   const [localMode, setLocalMode]   = useState(false)
   const [localIdx,  setLocalIdx]    = useState(0)
 
+  // importação CSV/TXT de contatos externos
+  const [importedContacts, setImportedContacts] = useState([])  // [{name, phone}]
+  const [useImported, setUseImported]           = useState(false)
+  const [importError, setImportError]           = useState(null)
+  const fileRef = useRef(null)
+
+  const parseContactFile = useCallback((file) => {
+    if (!file) return
+    setImportError(null)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result
+        const lines = text.split(/\r?\n/).filter(l => l.trim())
+        const contacts = []
+        for (const line of lines) {
+          // Aceita vírgula ou ponto-e-vírgula como separador
+          const cols = line.split(/[,;|\t]/).map(s => s.trim().replace(/^["']|["']$/g, ''))
+          if (!cols.length) continue
+          // Se 2+ colunas: tenta nome,telefone ou telefone,nome
+          let name = '', phone = ''
+          if (cols.length >= 2) {
+            const a = cols[0], b = cols[1]
+            // Se a parece telefone (só dígitos), inverte
+            if (/^\+?[\d\s()-]{7,}$/.test(a) && !/^\+?[\d\s()-]{7,}$/.test(b)) {
+              phone = a; name = b
+            } else {
+              name = a; phone = b
+            }
+          } else {
+            phone = cols[0]; name = ''
+          }
+          // Pula headers
+          if (/^(nome|name|telefone|phone|cel|celular|numero|número)$/i.test(phone.replace(/\D/g,''))) continue
+          const digits = phone.replace(/\D/g, '').replace(/^0/, '')
+          if (digits.length < 8) continue
+          contacts.push({ name: name || 'Contato', phone: digits.slice(-11) })
+        }
+        if (!contacts.length) { setImportError('Nenhum contato válido encontrado no arquivo.'); return }
+        setImportedContacts(contacts)
+        setUseImported(true)
+        setImportError(null)
+      } catch { setImportError('Erro ao ler o arquivo. Use CSV com colunas: nome,telefone') }
+    }
+    reader.readAsText(file, 'utf-8')
+  }, [])
+
   // grupos do zap
   const [groups, setGroups]           = useState([])
   const [fetchingGroups, setFetchingGroups] = useState(false)
@@ -163,11 +210,14 @@ export default function Campanhas() {
   }, [sales])
 
   const audienceList = useMemo(() => {
+    if (useImported && importedContacts.length > 0) {
+      return importedContacts.map((c, i) => ({ id: `imp_${i}`, name: c.name, phone: c.phone, saldo: 0 }))
+    }
     let list = customers
     if (audience === 'phone') list = list.filter(hasPhone)
     if (audience === 'fiado') list = list.filter(c => hasPhone(c) && fiados[c.id])
     return list.map(c => ({ ...c, saldo: fiados[c.id] || 0 }))
-  }, [customers, audience, fiados])
+  }, [customers, audience, fiados, useImported, importedContacts])
 
   /* ── product search results ── */
   const prodResults = useMemo(() => {
@@ -247,6 +297,20 @@ export default function Campanhas() {
     setSendingGroup(false)
   }, [selectedGroup, template, instance])
 
+  /* ── contador diário anti-ban ────────────────────────────── */
+  const DAILY_KEY = `zs_daily_sends_${new Date().toISOString().slice(0,10)}_${instance}`
+  const DAILY_LIMIT = 80
+
+  const getDailyCount = () => {
+    try { return parseInt(localStorage.getItem(DAILY_KEY) || '0', 10) } catch { return 0 }
+  }
+  const addDailyCount = (n) => {
+    try { localStorage.setItem(DAILY_KEY, String(getDailyCount() + n)) } catch {}
+  }
+
+  const [dailyCount, setDailyCount] = useState(() => getDailyCount())
+  const dailyRemaining = Math.max(0, DAILY_LIMIT - dailyCount)
+
   /* ── send via nosso bot com anti-ban avançado ─────────── */
   // Batch: 30 msgs → pausa 5min → repete. Delay aleatório 1.5s-4s entre msgs.
   const BATCH_SIZE = 30
@@ -259,14 +323,26 @@ export default function Campanhas() {
     }
     const list = audienceList.filter(hasPhone)
     if (!list.length) return
+
+    const currentDaily = getDailyCount()
+    if (currentDaily >= DAILY_LIMIT) {
+      alert(`⚠️ Limite diário de ${DAILY_LIMIT} mensagens atingido para hoje. Aguarde amanhã para proteger seu número.`)
+      return
+    }
+    const canSend = Math.min(list.length, DAILY_LIMIT - currentDaily)
+    if (canSend < list.length) {
+      const ok = confirm(`Limite diário: você pode enviar mais ${canSend} de ${list.length} mensagens hoje.\n\nEnviar para os primeiros ${canSend} contatos?`)
+      if (!ok) return
+    }
+
     setSending(true)
     setResults(null)
     abortRef.current = false
-    setSendProgress({ done: 0, total: list.length, pausing: false, pauseSec: 0 })
+    setSendProgress({ done: 0, total: canSend, pausing: false, pauseSec: 0 })
 
     let ok = 0, fail = 0
 
-    for (let i = 0; i < list.length; i++) {
+    for (let i = 0; i < canSend; i++) {
       if (abortRef.current) break
 
       // Pausa de batch a cada BATCH_SIZE mensagens
@@ -289,9 +365,11 @@ export default function Campanhas() {
         fail++
       }
       setSendProgress(p => ({ ...p, done: i + 1 }))
-      if (i < list.length - 1) await randDelay()
+      if (i < canSend - 1) await randDelay()
     }
 
+    addDailyCount(ok)
+    setDailyCount(getDailyCount())
     setResults({ ok, fail })
     setSending(false)
     abortRef.current = false
@@ -305,6 +383,64 @@ export default function Campanhas() {
     window.open(`https://wa.me/${cleanPhone(c.phone)}?text=${encodeURIComponent(renderMsg(template, c))}`, '_blank')
     setLocalIdx(idx + 1)
   }, [audienceList, template])
+
+  /* ── ImportBlock — reutilizável nos 3 tabs ───────────────── */
+  const ImportBlock = (
+    <div className="card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide">📂 Importar Contatos</h2>
+        {importedContacts.length > 0 && (
+          <button onClick={() => { setImportedContacts([]); setUseImported(false) }}
+            className="text-xs text-red-400 hover:text-red-600 font-bold">Limpar importação</button>
+        )}
+      </div>
+      <p className="text-xs text-gray-500">
+        Importe um arquivo <strong>.csv</strong>, <strong>.txt</strong> ou planilha exportada como CSV.
+        Formatos aceitos: <code className="bg-gray-100 px-1 rounded">nome,telefone</code> · <code className="bg-gray-100 px-1 rounded">nome;telefone</code> · só telefone (1 por linha)
+      </p>
+
+      {/* Download template */}
+      <button onClick={() => {
+        const csv = 'nome,telefone\nJoão Silva,11999990001\nMaria Santos,11988880002\n'
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+        const a = document.createElement('a'); a.href = url; a.download = 'modelo_contatos.csv'; a.click()
+        URL.revokeObjectURL(url)
+      }} className="text-xs text-orange-600 font-bold hover:underline flex items-center gap-1">
+        ⬇ Baixar modelo CSV
+      </button>
+
+      <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" className="hidden"
+        onChange={e => parseContactFile(e.target.files[0])} />
+
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={() => fileRef.current?.click()}
+          className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl border-2 border-dashed border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 transition-colors">
+          <Plus className="w-4 h-4" /> Selecionar arquivo
+        </button>
+        {importedContacts.length > 0 && (
+          <label className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl border border-gray-200 cursor-pointer">
+            <input type="checkbox" checked={useImported} onChange={e => setUseImported(e.target.checked)} className="accent-orange-500" />
+            Usar {importedContacts.length} contatos importados
+          </label>
+        )}
+      </div>
+
+      {importError && (
+        <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{importError}</p>
+      )}
+      {importedContacts.length > 0 && (
+        <div className="rounded-xl border border-green-200 bg-green-50 px-3 py-2">
+          <p className="text-xs text-green-700 font-bold">✅ {importedContacts.length} contatos importados</p>
+          <div className="text-[11px] text-green-600 mt-1 max-h-20 overflow-y-auto space-y-0.5">
+            {importedContacts.slice(0, 5).map((c, i) => (
+              <div key={i}>{c.name} · {c.phone}</div>
+            ))}
+            {importedContacts.length > 5 && <div>+ {importedContacts.length - 5} mais...</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 
   const groupText = template
     .replace(/\{\{nome\}\}/gi, 'pessoal')
@@ -411,6 +547,8 @@ export default function Campanhas() {
               )}
             </div>
 
+            {ImportBlock}
+
             {/* Ações */}
             <div className="flex flex-wrap gap-2">
               <button
@@ -495,6 +633,8 @@ export default function Campanhas() {
                 ))}
               </div>
             </div>
+
+            {ImportBlock}
 
             {/* Números copiáveis */}
             <div className="card p-4 space-y-3">
@@ -746,6 +886,21 @@ export default function Campanhas() {
                 </div>
               </div>
             )}
+          </div>
+
+          {ImportBlock}
+
+          {/* Contador diário anti-ban */}
+          <div className={`rounded-xl px-4 py-2.5 flex items-center justify-between text-xs border ${
+            dailyRemaining <= 10 ? 'bg-red-50 border-red-200 text-red-700'
+            : dailyRemaining <= 30 ? 'bg-amber-50 border-amber-200 text-amber-700'
+            : 'bg-gray-50 border-gray-200 text-gray-600'
+          }`}>
+            <span className="font-bold">
+              {dailyRemaining <= 0 ? '🚫 Limite diário atingido'
+               : `📊 Enviadas hoje: ${dailyCount}/${DAILY_LIMIT}`}
+            </span>
+            <span>{dailyRemaining > 0 ? `${dailyRemaining} restantes` : 'Reinicia amanhã'}</span>
           </div>
 
           {/* Actions */}

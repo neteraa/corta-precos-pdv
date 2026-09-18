@@ -98,6 +98,24 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
     setTimeout(() => { setShowResend(false); setResendStatus(null); setResendPass('') }, 3000)
   }
 
+  const sendWppAccess = async () => {
+    const phone = market.storePhone
+    if (!phone) { alert('Mercado sem telefone cadastrado. Edite o cadastro e adicione o WhatsApp do dono.'); return }
+    if (!resendPass || resendPass.length < 4) { alert('Digite uma senha (mín. 4 caracteres) antes de enviar.'); return }
+    setResendStatus('sending')
+    await api('/api/markets-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'reset-pass', id: market.id, password: resendPass }) })
+    try {
+      const res = await fetch('/api/wa-welcome', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mk, phone, storeName: market.storeName, username: market.username, password: resendPass }),
+      })
+      const d = await res.json()
+      setResendStatus(d.ok ? 'ok' : 'err')
+    } catch { setResendStatus('err') }
+    setTimeout(() => { setShowResend(false); setResendStatus(null); setResendPass('') }, 3000)
+  }
+
   return (
     <div className={`relative flex flex-col rounded-2xl border transition-all ${
       market.active ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-900/50 border-gray-800 opacity-60'
@@ -237,16 +255,27 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
       {/* reenviar acesso por email */}
       {showResend && (
         <div className="px-4 pb-3 space-y-2">
-          {resendStatus === 'ok'  && <p className="text-green-400 text-xs font-bold">✅ Email enviado!</p>}
-          {resendStatus === 'err' && <p className="text-yellow-400 text-xs">⚠️ Não enviado (configure RESEND_API_KEY em resend.com)</p>}
+          {resendStatus === 'sending' && <p className="text-orange-400 text-xs font-bold animate-pulse">⏳ Enviando...</p>}
+          {resendStatus === 'ok'  && <p className="text-green-400 text-xs font-bold">✅ Enviado com sucesso!</p>}
+          {resendStatus === 'err' && <p className="text-yellow-400 text-xs">⚠️ Não enviado — verifique a configuração</p>}
           {!resendStatus && <>
+            <p className="text-xs text-gray-400 font-semibold">Reenviar acesso ao cliente:</p>
             <input className="w-full bg-gray-700 border border-gray-600 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-orange-500"
-              placeholder="Email do cliente" type="email" value={resendEmail} onChange={e => setResendEmail(e.target.value)} />
+              placeholder="Nova senha (mín. 4 caracteres)" type="password" value={resendPass} onChange={e => setResendPass(e.target.value)} />
+            <input className="w-full bg-gray-700 border border-gray-600 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-orange-500"
+              placeholder="Email do cliente (para envio por email)" type="email" value={resendEmail} onChange={e => setResendEmail(e.target.value)} />
             <div className="flex gap-2">
-              <input className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-orange-500"
-                placeholder="Nova senha (mín. 4)" type="password" value={resendPass} onChange={e => setResendPass(e.target.value)} />
+              {/* WhatsApp — principal */}
+              <button onClick={sendWppAccess} disabled={resendPass.length < 4}
+                title={market.storePhone ? `Enviar para ${market.storePhone}` : 'Sem telefone cadastrado'}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-bold disabled:opacity-40 transition-colors">
+                <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+              </button>
+              {/* Email */}
               <button onClick={resendAccess} disabled={!resendEmail || resendPass.length < 4}
-                className="px-3 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold disabled:opacity-40">Enviar</button>
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold disabled:opacity-40 transition-colors">
+                <Mail className="w-3.5 h-3.5" /> Email
+              </button>
               <button onClick={() => { setShowResend(false); setResendPass('') }}
                 className="px-2 py-2 rounded-xl bg-gray-700 text-gray-400 text-xs hover:bg-gray-600"><X className="w-3 h-3" /></button>
             </div>
