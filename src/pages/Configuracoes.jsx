@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import { Database, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, Fingerprint, Copy, Check } from 'lucide-react'
+import { Database, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, Fingerprint, Copy, Check, Image, Palette } from 'lucide-react'
 import { useStore } from '../store.jsx'
 import { parseGdoorCsv } from '../utils/importCsv.js'
-import { usePrinter, savePrinterSettings } from '../hooks/usePrinter.js'
+import { usePrinter } from '../hooks/usePrinter.js'
 import PixQR from '../components/PixQR.jsx'
 import { getCredentials, saveCredentials, getConfiguredStoreId, saveStoreId, slugify } from '../utils/auth.js'
 
@@ -18,12 +18,131 @@ const Field = ({ label, hint, children }) => (
 const Section = ({ icon: Icon, title, children }) => (
   <div className="card p-5">
     <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-      <Icon className="w-4 h-4 text-brand-600" />
+      <Icon className="w-4 h-4" style={{ color: 'var(--zs-theme)' }} />
       <h2 className="font-bold text-gray-800">{title}</h2>
     </div>
     {children}
   </div>
 )
+
+/* ── Curated color palette ─────────────────────────────────── */
+const PALETTE = [
+  { group: '🔥 Quentes',    colors: [
+    { name:'Laranja Brasa', v:'#f97316', shades:['#fed7aa','#fb923c','#f97316','#ea580c','#c2410c'] },
+    { name:'Vermelho',      v:'#ef4444', shades:['#fecaca','#f87171','#ef4444','#dc2626','#b91c1c'] },
+    { name:'Rosa Neon',     v:'#f43f5e', shades:['#fecdd3','#fb7185','#f43f5e','#e11d48','#be123c'] },
+    { name:'Âmbar',         v:'#f59e0b', shades:['#fde68a','#fbbf24','#f59e0b','#d97706','#b45309'] },
+  ]},
+  { group: '🌊 Frios',      colors: [
+    { name:'Azul',          v:'#3b82f6', shades:['#bfdbfe','#60a5fa','#3b82f6','#2563eb','#1d4ed8'] },
+    { name:'Oceano',        v:'#0ea5e9', shades:['#bae6fd','#38bdf8','#0ea5e9','#0284c7','#0369a1'] },
+    { name:'Ciano',         v:'#06b6d4', shades:['#a5f3fc','#22d3ee','#06b6d4','#0891b2','#0e7490'] },
+    { name:'Teal',          v:'#14b8a6', shades:['#99f6e4','#2dd4bf','#14b8a6','#0d9488','#0f766e'] },
+  ]},
+  { group: '🌿 Naturais',   colors: [
+    { name:'Verde',         v:'#22c55e', shades:['#bbf7d0','#4ade80','#22c55e','#16a34a','#15803d'] },
+    { name:'Esmeralda',     v:'#10b981', shades:['#a7f3d0','#34d399','#10b981','#059669','#047857'] },
+    { name:'Lima',          v:'#84cc16', shades:['#d9f99d','#a3e635','#84cc16','#65a30d','#4d7c0f'] },
+    { name:'Menta Suave',   v:'#6ee7b7', shades:['#d1fae5','#6ee7b7','#34d399','#10b981','#059669'] },
+  ]},
+  { group: '💜 Vibrantes',  colors: [
+    { name:'Violeta',       v:'#8b5cf6', shades:['#ddd6fe','#a78bfa','#8b5cf6','#7c3aed','#6d28d9'] },
+    { name:'Roxo',          v:'#a855f7', shades:['#e9d5ff','#c084fc','#a855f7','#9333ea','#7e22ce'] },
+    { name:'Fúcsia',        v:'#d946ef', shades:['#f5d0fe','#e879f9','#d946ef','#c026d3','#a21caf'] },
+    { name:'Rosa Pink',     v:'#ec4899', shades:['#fbcfe8','#f472b6','#ec4899','#db2777','#be185d'] },
+  ]},
+  { group: '🌙 Premium',    colors: [
+    { name:'Índigo',        v:'#6366f1', shades:['#c7d2fe','#818cf8','#6366f1','#4f46e5','#4338ca'] },
+    { name:'Ardósia Azul',  v:'#334155', shades:['#cbd5e1','#64748b','#334155','#1e293b','#0f172a'] },
+    { name:'Grafite',       v:'#374151', shades:['#d1d5db','#6b7280','#374151','#1f2937','#111827'] },
+    { name:'Carvão',        v:'#1e293b', shades:['#94a3b8','#475569','#1e293b','#0f172a','#020617'] },
+  ]},
+]
+
+function ColorPicker({ value, onChange }) {
+  const [hoveredShade, setHoveredShade] = useState(null)
+  const [hexInput, setHexInput] = useState(value)
+  const previewColor = hoveredShade || value
+
+  // Find shades for the current selected color
+  const selectedEntry = PALETTE.flatMap(g => g.colors).find(c => c.v === value)
+  const shades = selectedEntry?.shades || []
+
+  const handleHex = (v) => {
+    setHexInput(v)
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange(v)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Palette grid */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {PALETTE.map(({ group, colors }) => (
+          <div key={group} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', width: 90, flexShrink: 0, letterSpacing: '.03em' }}>{group}</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {colors.map(({ name, v, shades: sh }) => (
+                <button key={v} title={name}
+                  onClick={() => { onChange(v); setHexInput(v) }}
+                  onMouseEnter={() => setHoveredShade(v)}
+                  onMouseLeave={() => setHoveredShade(null)}
+                  style={{
+                    width: 30, height: 30, borderRadius: '50%', border: 'none', cursor: 'pointer',
+                    background: v, flexShrink: 0, transition: 'transform .12s, box-shadow .12s',
+                    transform: value === v ? 'scale(1.25)' : 'scale(1)',
+                    boxShadow: value === v ? `0 0 0 2px white, 0 0 0 4px ${v}` : '0 1px 4px rgba(0,0,0,.15)',
+                    outline: 'none',
+                  }} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Shade strip — shows when a palette color is selected */}
+      {shades.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', letterSpacing: '.03em' }}>TONALIDADES — {selectedEntry.name}</span>
+          <div style={{ display: 'flex', gap: 5 }}>
+            {shades.map((s, i) => (
+              <button key={s} title={s} onClick={() => { onChange(s); setHexInput(s) }}
+                style={{
+                  flex: 1, height: 26, borderRadius: 8, border: 'none', cursor: 'pointer',
+                  background: s, transition: 'transform .1s',
+                  transform: value === s ? 'scaleY(1.3)' : 'scaleY(1)',
+                  boxShadow: value === s ? `0 0 0 2px white, 0 0 0 3px ${s}` : 'none',
+                  outline: 'none',
+                }} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Hex input + color wheel + live preview */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10 }}>
+          <div style={{ width: 20, height: 20, borderRadius: 5, background: previewColor, border: '1px solid rgba(0,0,0,.1)', flexShrink: 0 }} />
+          <input value={hexInput} onChange={e => handleHex(e.target.value)}
+            style={{ width: 80, border: 'none', background: 'transparent', fontSize: 13, fontFamily: 'monospace', fontWeight: 700, color: '#111', outline: 'none' }} />
+          <input type="color" value={value} onChange={e => { onChange(e.target.value); setHexInput(e.target.value) }}
+            style={{ width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4, cursor: 'pointer', background: 'transparent' }} title="Roda de cores" />
+        </div>
+
+        {/* Live mini preview */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 12, border: '1px solid #e5e7eb', background: '#f9fafb' }}>
+          <div style={{ width: 10, height: 24, borderRadius: 4, background: previewColor }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+              <div style={{ padding: '2px 10px', borderRadius: 6, background: previewColor, color: '#fff', fontSize: 10, fontWeight: 900 }}>BOTÃO</div>
+              <div style={{ padding: '2px 8px', borderRadius: 20, background: previewColor + '22', color: previewColor, fontSize: 10, fontWeight: 700, border: `1px solid ${previewColor}44` }}>TAG</div>
+            </div>
+            <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600 }}>Preview ao vivo</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const ROLE_META = {
   admin:   { label: 'Admin',   color: '#f97316', bg: '#fff7ed', border: '#fed7aa', desc: 'Acesso total ao sistema' },
@@ -323,30 +442,48 @@ export default function Configuracoes() {
           </Field>
         </div>
 
-        {/* Cor do tema */}
+        {/* Logo da loja */}
         <div className="mt-4">
-          <label className="label mb-2">🎨 Cor do sistema (sidebar, etiquetas, PDV)</label>
-          <div className="flex flex-wrap gap-2 items-center">
-            {['#f97316','#ef4444','#3b82f6','#8b5cf6','#22c55e','#06b6d4','#f59e0b','#ec4899','#111827'].map(c => (
-              <button key={c} onClick={() => set('themeColor', c)}
-                className="w-8 h-8 rounded-full border-2 transition-all"
-                style={{ background: c, borderColor: form.themeColor === c ? '#111' : 'transparent',
-                  boxShadow: form.themeColor === c ? `0 0 0 2px ${c}` : 'none', transform: form.themeColor === c ? 'scale(1.2)' : 'scale(1)' }}
-              />
-            ))}
-            <input type="color" value={form.themeColor} onChange={e => set('themeColor', e.target.value)}
-              className="w-8 h-8 rounded cursor-pointer border border-gray-200" title="Cor personalizada" />
-            <span className="text-xs text-gray-500 ml-1">Escolha ou use cor personalizada</span>
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <div className="w-32 h-8 rounded-lg flex items-center justify-center text-white text-xs font-black"
-              style={{ background: form.themeColor }}>
-              PRÉVIA DA COR
-            </div>
+          <label className="label mb-2"><Image className="w-3 h-3 inline mr-1" />Logo da Loja</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            {settings.logoImage
+              ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ padding: 8, background: '#09090b', borderRadius: 10, border: '1px solid #1f2937' }}>
+                    <img src={settings.logoImage} alt="logo preview" style={{ height: 36, maxWidth: 120, objectFit: 'contain' }} />
+                  </div>
+                  <button onClick={() => setSettings(s => ({ ...s, logoImage: '' }))}
+                    className="text-xs text-red-500 hover:text-red-700 font-semibold">
+                    ✕ Remover
+                  </button>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: '#9ca3af' }}>Aparece na sidebar, terminal e cupom. Sem logo, usa o ícone padrão.</div>
+              )
+            }
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1px dashed #d1d5db', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#6b7280', background: '#f9fafb' }}>
+              <Upload className="w-3 h-3" />
+              {settings.logoImage ? 'Trocar logo' : 'Enviar logo'}
+              <input type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  if (file.size > 300_000) { alert('Logo muito grande. Use até 300KB.'); return }
+                  const reader = new FileReader()
+                  reader.onload = ev => setSettings(s => ({ ...s, logoImage: ev.target.result }))
+                  reader.readAsDataURL(file)
+                }} />
+            </label>
           </div>
         </div>
 
-        <button onClick={saveSettings} className={`btn-primary mt-4 ${saved ? 'bg-green-600 hover:bg-green-600' : ''}`}>
+        {/* Cor do tema */}
+        <div className="mt-5">
+          <label className="label mb-3"><Palette className="w-3 h-3 inline mr-1" />Identidade Visual — Cor do Sistema</label>
+          <ColorPicker value={form.themeColor} onChange={v => set('themeColor', v)} />
+        </div>
+
+        <button onClick={saveSettings} className={`btn-primary mt-5 ${saved ? '!bg-green-600' : ''}`}>
           <Save className="w-4 h-4" /> {saved ? '✅ Salvo!' : 'Salvar dados'}
         </button>
       </Section>

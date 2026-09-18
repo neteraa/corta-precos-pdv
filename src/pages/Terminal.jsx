@@ -243,6 +243,7 @@ export default function Terminal() {
 
   // ── Styles (dark terminal palette) ─────────────────────────
   const _storeName = printer.settings?.storeName  || 'MEU MERCADO'
+  const logoImage  = printer.settings?.logoImage  || null
   const bg   = '#0a0c0f'
   const bg2  = '#111318'
   const bg3  = '#181b22'
@@ -251,15 +252,21 @@ export default function Terminal() {
   const txt  = '#f1f5f9'
   const txt2 = '#64748b'
 
+  // Sync CSS variable so btn-primary and other themed elements pick up the color
+  useEffect(() => {
+    document.documentElement.style.setProperty('--zs-theme', acc)
+  }, [acc])
+
   return (
     <div style={{ height: '100vh', background: bg, color: txt, fontFamily: "'Segoe UI', system-ui, sans-serif", display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       {/* ── Top bar ──────────────────────────────────────────── */}
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 24px', background: bg2, borderBottom: `1px solid ${brd}` }}>
-        {/* logo + operator */}
+        {/* logo + storeName */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {logoImage && <img src={logoImage} alt="logo" style={{ height: 28, maxWidth: 80, objectFit: 'contain', borderRadius: 6 }} />}
           <div style={{ fontFamily: "'Courier New', monospace", fontWeight: 900, fontSize: 20, color: acc, letterSpacing: '-0.5px' }}>
-            ✕ {_storeName}
+            {!logoImage && '✕ '}{_storeName}
           </div>
           {activeOperator && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: '#1e1b4b', border: '1px solid #4338ca55', color: '#a5b4fc', fontSize: 12, fontWeight: 700 }}>
@@ -424,31 +431,36 @@ export default function Terminal() {
                   textAlign: 'center',
                   position: 'relative',
                   animation: 'idleFadeIn .7s cubic-bezier(.22,1,.36,1) forwards, idleFloat 4s ease-in-out 0.7s infinite, idleGlow 3s ease-in-out 1s infinite',
-                  border: '1px solid rgba(234,88,12,0.25)',
+                  border: `1px solid ${acc}40`,
                 }}>
 
                   {/* decorative corner accents */}
-                  <div style={{ position: 'absolute', top: 12, left: 12, width: 20, height: 20, borderTop: '2px solid #ea580c', borderLeft: '2px solid #ea580c', borderRadius: '4px 0 0 0', opacity: 0.6 }} />
-                  <div style={{ position: 'absolute', top: 12, right: 12, width: 20, height: 20, borderTop: '2px solid #ea580c', borderRight: '2px solid #ea580c', borderRadius: '0 4px 0 0', opacity: 0.6 }} />
-                  <div style={{ position: 'absolute', bottom: 12, left: 12, width: 20, height: 20, borderBottom: '2px solid #ea580c', borderLeft: '2px solid #ea580c', borderRadius: '0 0 0 4px', opacity: 0.6 }} />
-                  <div style={{ position: 'absolute', bottom: 12, right: 12, width: 20, height: 20, borderBottom: '2px solid #ea580c', borderRight: '2px solid #ea580c', borderRadius: '0 0 4px 0', opacity: 0.6 }} />
+                  <div style={{ position: 'absolute', top: 12, left: 12, width: 20, height: 20, borderTop: `2px solid ${acc}`, borderLeft: `2px solid ${acc}`, borderRadius: '4px 0 0 0', opacity: 0.6 }} />
+                  <div style={{ position: 'absolute', top: 12, right: 12, width: 20, height: 20, borderTop: `2px solid ${acc}`, borderRight: `2px solid ${acc}`, borderRadius: '0 4px 0 0', opacity: 0.6 }} />
+                  <div style={{ position: 'absolute', bottom: 12, left: 12, width: 20, height: 20, borderBottom: `2px solid ${acc}`, borderLeft: `2px solid ${acc}`, borderRadius: '0 0 0 4px', opacity: 0.6 }} />
+                  <div style={{ position: 'absolute', bottom: 12, right: 12, width: 20, height: 20, borderBottom: `2px solid ${acc}`, borderRight: `2px solid ${acc}`, borderRadius: '0 0 4px 0', opacity: 0.6 }} />
 
-                  {/* animated scissors SVG */}
+                  {/* logo ou ícone animado */}
                   <div style={{ animation: 'idleScissors 3s ease-in-out 1.2s infinite', display: 'inline-block', marginBottom: 16 }}>
-                    <svg width="72" height="72" viewBox="0 0 200 200" style={{ filter: 'drop-shadow(0 0 12px rgba(234,88,12,0.6))' }}>
-                      <rect width="200" height="200" rx="36" fill="#111"/>
-                      <path d="M 30 58 Q 100 82 148 70" stroke="#ea580c" strokeWidth="9" fill="none" strokeLinecap="round"/>
-                      <path d="M 30 98 Q 100 82 148 94" stroke="#ea580c" strokeWidth="9" fill="none" strokeLinecap="round"/>
-                      <circle cx="97" cy="82" r="10" fill="#ea580c"/>
-                      <circle cx="97" cy="82" r="5.5" fill="#0a0a0a"/>
-                      <circle cx="97" cy="82" r="2.5" fill="#ff7a1f"/>
-                      <circle cx="22" cy="54" r="14" fill="none" stroke="#ea580c" strokeWidth="7"/>
-                      <circle cx="22" cy="102" r="14" fill="none" stroke="#ea580c" strokeWidth="7"/>
-                      <rect x="138" y="50" width="48" height="44" rx="7" fill="#ea580c"/>
-                      <circle cx="147" cy="59" r="4.5" fill="#0a0a0a"/>
-                      <rect x="148" y="67" width="28" height="5" rx="2.5" fill="#fff" opacity="0.9"/>
-                      <rect x="148" y="76" width="20" height="4" rx="2" fill="#fff" opacity="0.55"/>
-                    </svg>
+                    {logoImage
+                      ? <img src={logoImage} alt="logo" style={{ width: 72, height: 72, objectFit: 'contain', borderRadius: 16, background: '#111', filter: `drop-shadow(0 0 12px ${acc}99)` }} />
+                      : (
+                        <svg width="72" height="72" viewBox="0 0 200 200" style={{ filter: `drop-shadow(0 0 12px ${acc}99)` }}>
+                          <rect width="200" height="200" rx="36" fill="#111"/>
+                          <path d="M 30 58 Q 100 82 148 70" stroke={acc} strokeWidth="9" fill="none" strokeLinecap="round"/>
+                          <path d="M 30 98 Q 100 82 148 94" stroke={acc} strokeWidth="9" fill="none" strokeLinecap="round"/>
+                          <circle cx="97" cy="82" r="10" fill={acc}/>
+                          <circle cx="97" cy="82" r="5.5" fill="#0a0a0a"/>
+                          <circle cx="97" cy="82" r="2.5" fill={acc + 'cc'}/>
+                          <circle cx="22" cy="54" r="14" fill="none" stroke={acc} strokeWidth="7"/>
+                          <circle cx="22" cy="102" r="14" fill="none" stroke={acc} strokeWidth="7"/>
+                          <rect x="138" y="50" width="48" height="44" rx="7" fill={acc}/>
+                          <circle cx="147" cy="59" r="4.5" fill="#0a0a0a"/>
+                          <rect x="148" y="67" width="28" height="5" rx="2.5" fill="#fff" opacity="0.9"/>
+                          <rect x="148" y="76" width="20" height="4" rx="2" fill="#fff" opacity="0.55"/>
+                        </svg>
+                      )
+                    }
                   </div>
 
                   {/* Store name */}
@@ -478,13 +490,13 @@ export default function Terminal() {
                   {/* floating price badge */}
                   <div style={{
                     position: 'absolute', top: -12, right: -12,
-                    background: '#ea580c',
+                    background: acc,
                     borderRadius: '50%',
                     width: 44, height: 44,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontWeight: 900, fontSize: 18, color: '#000',
                     animation: 'pricePop .6s cubic-bezier(.22,1,.36,1) 0.9s both',
-                    boxShadow: '0 4px 16px rgba(234,88,12,0.5)',
+                    boxShadow: `0 4px 16px ${acc}80`,
                   }}>$</div>
                 </div>
 
@@ -944,7 +956,7 @@ export default function Terminal() {
               <div style={{ background: '#431407', border: '1px solid #c2410c44', borderRadius: 14, padding: '12px 20px', marginBottom: 20 }}>
                 <div style={{ color: '#fb923c', fontWeight: 900, fontSize: 15 }}>🎟️ Cupom Premiado impresso! — R$150</div>
                 <div style={{ color: '#9a3412', fontSize: 12, marginTop: 4 }}>Entregar ao cliente — preencher e depositar na urna</div>
-                <button onClick={() => printer.printCoupon(lastSale)} style={{ marginTop: 8, padding: '6px 16px', borderRadius: 8, background: '#ea580c', border: 'none', color: '#000', fontWeight: 900, fontSize: 12, cursor: 'pointer' }}>
+                <button onClick={() => printer.printCoupon(lastSale)} style={{ marginTop: 8, padding: '6px 16px', borderRadius: 8, background: acc, border: 'none', color: '#000', fontWeight: 900, fontSize: 12, cursor: 'pointer' }}>
                   🖨️ Reimprimir Cupom
                 </button>
               </div>
@@ -1005,7 +1017,10 @@ export default function Terminal() {
 
           {/* header */}
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 28px', background: bg2, borderBottom: `1px solid ${brd}` }}>
-            <div style={{ fontFamily: "'Courier New', monospace", fontWeight: 900, fontSize: 18, color: acc }}>✕ {_storeName}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {logoImage && <img src={logoImage} alt="logo" style={{ height: 26, maxWidth: 72, objectFit: 'contain', borderRadius: 5 }} />}
+              <div style={{ fontFamily: "'Courier New', monospace", fontWeight: 900, fontSize: 18, color: acc }}>{!logoImage && '✕ '}{_storeName}</div>
+            </div>
             <div style={{ color: txt2, fontSize: 13, fontFamily: 'monospace', fontWeight: 700 }}>{timeStr} · {dateStr}</div>
           </div>
 

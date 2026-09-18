@@ -80,19 +80,22 @@ function filterByRole(items, role) {
 /* ── logo ─────────────────────────────────────────────────── */
 function SidebarLogo() {
   const { settings } = usePrinter()
-  // Session storeName is always the server-authoritative name (set on login).
-  // usePrinter may still carry a stale value from a previous brand — session wins.
   const session = (() => { try { return JSON.parse(localStorage.getItem('cp_session') || '{}') } catch { return {} } })()
-  const name  = session.storeName || settings.storeName || 'MEU MERCADO'
-  const color = settings.themeColor || '#f97316'
-  // Derive a darker shade for the gradient end
+  const name    = session.storeName || settings.storeName || 'MEU MERCADO'
+  const color   = settings.themeColor || '#f97316'
   const colorDk = color + 'cc'
+  const logoImg = settings.logoImage
 
   return (
     <div className="px-3 pt-3 pb-2 shrink-0">
+      {/* brand wordmark or custom logo */}
       <div className="mb-2 flex items-center justify-center py-1.5 px-3 rounded-xl bg-gray-900/60 border border-gray-800">
-        <ZatendeStokLogo variant="wordmark" />
+        {logoImg
+          ? <img src={logoImg} alt="logo" style={{ height: 28, maxWidth: 148, objectFit: 'contain' }} />
+          : <ZatendeStokLogo variant="wordmark" />
+        }
       </div>
+      {/* store name badge */}
       <div className="relative overflow-hidden rounded-xl px-3 py-2.5 shadow-lg"
         style={{ background: `linear-gradient(135deg, ${color}, ${colorDk})`, boxShadow: `0 8px 24px ${color}40` }}>
         <div className="relative flex items-center gap-2">
@@ -171,6 +174,11 @@ export default function Layout() {
   const _session     = (() => { try { return JSON.parse(localStorage.getItem('cp_session') || '{}') } catch { return {} } })()
   const storeName    = _session.storeName || storeSettings.storeName || 'MEU MERCADO'
   const themeColor   = storeSettings.themeColor || '#f97316'
+
+  // Keep CSS variable in sync so ALL --zs-theme consumers (btn-primary, inputs, etc.) update instantly
+  useEffect(() => {
+    document.documentElement.style.setProperty('--zs-theme', themeColor)
+  }, [themeColor])
 
   const pendingOffersCount = (supplierOffers || []).filter(o => o.status === 'pending').length
 

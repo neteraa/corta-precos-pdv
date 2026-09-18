@@ -2,10 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Dynamic theme token — updated at runtime by Layout/Terminal ── */
+:root { --zs-theme: #f97316; --zs-theme-dk: #ea580c; }
+
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg transition-colors;
+    @apply inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition-all;
+    background-color: var(--zs-theme);
   }
+  .btn-primary:hover  { filter: brightness(0.88); }
+  .btn-primary:active { filter: brightness(0.78); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
   .btn-ghost {
     @apply inline-flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg transition-colors;
   }
@@ -16,7 +23,8 @@
     @apply bg-white rounded-xl shadow-sm border border-gray-100;
   }
   .input {
-    @apply w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent;
+    @apply w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:border-transparent;
+    --tw-ring-color: var(--zs-theme);
   }
   .label {
     @apply block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1;
