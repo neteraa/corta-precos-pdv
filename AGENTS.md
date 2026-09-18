@@ -57,7 +57,7 @@ npm run build && ./node_modules/.bin/netlify deploy --prod --dir=dist --function
 | `/campanhas` | Campanhas.jsx | WhatsApp campaigns |
 | `/configuracoes` | Configuracoes.jsx | Backup, import CSV, reset |
 
-## COMPLETED FEATURES (as of commit a91f364)
+## COMPLETED FEATURES (as of commit 91a5a52)
 - ✅ Full PDV (caixa) with barcode scanner + keyboard shortcuts
 - ✅ 2795 products imported from Gdoor CSV (pipe-delimited, MacRoman encoding)
 - ✅ Estoque: pagination 100/page, sortable columns (name/category/cost/price/stock/stockValue/receivedAt)
@@ -69,6 +69,16 @@ npm run build && ./node_modules/.bin/netlify deploy --prod --dir=dist --function
 - ✅ ScanMobile: cadastro completo (nome/preço/unidade/qty/vencimento), vencimento saved to expiryDate
 - ✅ Product photos via IndexedDB + OpenFoodFacts picker
 - ✅ Promos, Fiado, Fidelidade/WhatsApp, Campanhas, Relatório, Etiquetas
+- ✅ **Multi-tenancy**: storeName/themeColor dinâmico por tenant em TODOS os componentes visuais
+  - Layout.jsx sidebar/header, PDV.jsx banner, Terminal.jsx, CustomerDisplay.jsx, Flyer.jsx
+  - Etiquetas.jsx (template 'mercado' usa themeColor do cliente)
+  - Fidelidade.jsx (links WhatsApp dinâmicos), Fornecedor.jsx (relatório CSV)
+  - Configuracoes.jsx: seletor de cor (9 presets + color picker nativo)
+  - Seed automático de storeName+phone+themeColor após login (seedSettingsFromSession)
+- ✅ **Preço Atacado**: priceAtacado + qtdAtacado no formulário desktop (Produtos.jsx)
+  - Já implementado no PDV (ativa automaticamente quando qty >= qtdAtacado)
+  - ScanMobile já tinha os campos; agora desktop também
+  - Badge azul "📦 R$X c/N+" na tabela de produtos
 
 ## Promo structure (SEED_PROMOS / upsertPromo)
 ```js
