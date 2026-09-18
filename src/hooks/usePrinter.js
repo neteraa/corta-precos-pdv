@@ -36,7 +36,7 @@ export function savePrinterSettings(s, sourceId) {
   } catch {}
 }
 
-/** Seed storeName + themeColor from the auth session (called after login). */
+/** Seed storeName/storePhone/themeColor from the auth session (called after login). */
 export function seedSettingsFromSession() {
   try {
     const session = JSON.parse(localStorage.getItem('cp_session') || '{}')
@@ -44,7 +44,8 @@ export function seedSettingsFromSession() {
     const key     = mktKey(BASE_KEY)
     const current = JSON.parse(localStorage.getItem(key) || '{}')
     let changed   = false
-    if (!current.storeName && session.storeName) { current.storeName = session.storeName; changed = true }
+    if (!current.storeName  && session.storeName)  { current.storeName  = session.storeName;  changed = true }
+    if (!current.phone      && session.storePhone) { current.phone      = session.storePhone; changed = true }
     if (!current.themeColor) { current.themeColor = '#f97316'; changed = true }  // default orange
     if (changed) localStorage.setItem(key, JSON.stringify(current))
   } catch {}

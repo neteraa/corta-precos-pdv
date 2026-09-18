@@ -310,7 +310,7 @@ export default function Login() {
       const data = await res.json()
       if (data.ok) {
         saveStoreId(data.storeId)
-        localStorage.setItem('cp_session', JSON.stringify({ loggedIn:true, user:u, storeId:data.storeId, storeName:data.storeName, role:'admin' }))
+        localStorage.setItem('cp_session', JSON.stringify({ loggedIn:true, user:u, storeId:data.storeId, storeName:data.storeName, storePhone:data.storePhone, role:'admin' }))
         wipeLegacyFlatKeys()
         registerStoreId(data.storeId)
         seedSettingsFromSession()          // pre-populate storeName + themeColor
