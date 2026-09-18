@@ -24,6 +24,12 @@
   to     = "/.netlify/functions/wa-bot"
   status = 200
 
+# WhatsApp status/QR proxy — usado pelo painel de configurações
+[[redirects]]
+  from   = "/api/wa-status"
+  to     = "/.netlify/functions/wa-status"
+  status = 200
+
 [[redirects]]
   from   = "/*"
   to     = "/index.html"

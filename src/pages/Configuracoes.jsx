@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Database, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, Fingerprint, Copy, Check, Image, Palette } from 'lucide-react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { Database, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, Fingerprint, Copy, Check, Image, Palette, MessageCircle, Wifi, WifiOff, RefreshCw, LogOut } from 'lucide-react'
 import { useStore } from '../store.jsx'
 import { parseGdoorCsv } from '../utils/importCsv.js'
 import { usePrinter } from '../hooks/usePrinter.js'
@@ -293,6 +293,134 @@ function AddOperatorForm({ onAdd }) {
         <Plus className="w-4 h-4" />
         Adicionar {meta.label}
       </button>
+    </div>
+  )
+}
+
+/* ── WhatsApp Bot Section ─────────────────────────────────────────────── */
+function WhatsAppBotSection({ instance }) {
+  const [wa, setWa]       = useState(null)   // { exists, status, phone, profileName, qrcode }
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const timerRef = useRef(null)
+
+  const poll = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/wa-status?instance=${instance}`)
+      const d = await r.json()
+      setWa(d)
+    } catch { /* offline */ } finally { setLoading(false) }
+  }, [instance])
+
+  // Poll: a cada 8s se conectando, a cada 30s se conectado
+  useEffect(() => {
+    poll()
+    const tick = () => {
+      poll()
+      const interval = wa?.status === 'open' ? 30_000 : 8_000
+      timerRef.current = setTimeout(tick, interval)
+    }
+    timerRef.current = setTimeout(tick, wa?.status === 'open' ? 30_000 : 8_000)
+    return () => clearTimeout(timerRef.current)
+  }, [poll, wa?.status])
+
+  const handleCreate = async () => {
+    setCreating(true)
+    try {
+      await fetch(`/api/wa-status?instance=${instance}&action=create`, { method: 'POST' })
+      await poll()
+    } finally { setCreating(false) }
+  }
+
+  const handleRefreshQR = async () => {
+    setRefreshing(true)
+    try {
+      const r = await fetch(`/api/wa-status?instance=${instance}&action=refresh-qr`, { method: 'POST' })
+      const d = await r.json()
+      setWa(prev => ({ ...prev, qrcode: d.qrcode }))
+    } finally { setRefreshing(false) }
+  }
+
+  const handleDisconnect = async () => {
+    if (!confirm('Desconectar o WhatsApp? O bot vai parar de responder até reconectar.')) return
+    await fetch(`/api/wa-status?instance=${instance}&action=disconnect`, { method: 'POST' })
+    setWa(prev => ({ ...prev, status: 'connecting', phone: null, profileName: null, qrcode: null }))
+    setTimeout(poll, 2000)
+  }
+
+  if (loading) return (
+    <div className="flex items-center gap-2 py-4 text-gray-400 text-sm">
+      <RefreshCw className="w-4 h-4 animate-spin" /> Verificando status...
+    </div>
+  )
+
+  // Sem configuração de Evolution API
+  if (wa?.error?.includes('não configurada')) return (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+      ⚠️ Evolution API não configurada. Configure <code>EVOLUTION_API_URL</code> e <code>EVOLUTION_API_KEY</code> no Netlify.
+    </div>
+  )
+
+  // Instância não existe ainda
+  if (!wa?.exists) return (
+    <div className="space-y-3">
+      <p className="text-sm text-gray-500">Nenhuma instância criada para esta loja ainda.</p>
+      <button onClick={handleCreate} disabled={creating}
+        className="btn-primary flex items-center gap-2 text-sm px-4 py-2">
+        <MessageCircle className="w-4 h-4" />
+        {creating ? 'Criando...' : 'Criar instância WhatsApp'}
+      </button>
+    </div>
+  )
+
+  const connected = wa.status === 'open'
+
+  return (
+    <div className="space-y-4">
+      {/* Status badge */}
+      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-bold ${connected ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+        {connected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+        {connected ? `Conectado — ${wa.profileName || wa.phone || ''}` : 'Aguardando conexão'}
+      </div>
+
+      {/* QR Code se não conectado */}
+      {!connected && wa.qrcode && (
+        <div className="flex flex-col items-start gap-3">
+          <div className="border-2 border-gray-200 rounded-2xl p-3 bg-white inline-block">
+            <img src={wa.qrcode} alt="QR Code WhatsApp" className="w-52 h-52 object-contain" />
+          </div>
+          <p className="text-xs text-gray-500 max-w-xs">
+            Abra o WhatsApp no celular → <strong>Aparelhos conectados</strong> → <strong>Conectar um aparelho</strong> → escaneie esse QR.
+            O QR atualiza automaticamente a cada 8 segundos.
+          </p>
+          <button onClick={handleRefreshQR} disabled={refreshing}
+            className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-semibold">
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            Atualizar QR manualmente
+          </button>
+        </div>
+      )}
+
+      {/* Sem QR ainda */}
+      {!connected && !wa.qrcode && (
+        <div className="text-sm text-gray-400 flex items-center gap-2">
+          <RefreshCw className="w-4 h-4 animate-spin" /> Gerando QR code...
+        </div>
+      )}
+
+      {/* Botão desconectar */}
+      {connected && (
+        <button onClick={handleDisconnect}
+          className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 font-semibold">
+          <LogOut className="w-3.5 h-3.5" /> Desconectar WhatsApp
+        </button>
+      )}
+
+      <p className="text-xs text-gray-400">
+        Instância: <code className="bg-gray-100 px-1 rounded">{instance}</code>
+        {wa.phone && <> · Número: <strong>+{wa.phone}</strong></>}
+      </p>
     </div>
   )
 }
@@ -749,6 +877,15 @@ export default function Configuracoes() {
 
         {/* Add form — self-contained, no state in parent → no scroll jump */}
         <AddOperatorForm onAdd={op => upsertOperator(op)} />
+      </Section>
+
+      {/* ── WhatsApp Bot ────────────────────────────────────────────────── */}
+      <Section icon={MessageCircle} title="Bot WhatsApp (IA)">
+        <p className="text-xs text-gray-400 mb-4">
+          Conecte um número de WhatsApp para que clientes recebam respostas automáticas com IA sobre o sistema.
+          Cada loja tem sua própria instância — escaneie o QR com o celular do número desejado.
+        </p>
+        <WhatsAppBotSection instance={getConfiguredStoreId() || 'zatendestok'} />
       </Section>
 
     </div>
