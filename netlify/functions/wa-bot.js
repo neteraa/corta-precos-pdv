@@ -46,6 +46,25 @@ async function saveLead(phone, data) {
   } catch (e) { console.error('saveLead error:', e.message) }
 }
 
+// ─── Lookup cliente existente pelo telefone ───────────────────────────────────
+async function findMarketByPhone(senderNum) {
+  try {
+    const store = getStore({ name: 'zs-auth', consistency: 'strong' })
+    const raw = await store.get('markets')
+    if (!raw) return null
+    const markets = JSON.parse(raw)
+    const norm = p => p?.replace(/\D/g, '').replace(/^55/, '').replace(/^0+/, '').slice(-11) || ''
+    const sender = norm(senderNum)
+    return markets.find(m => norm(m.storePhone) === sender) || null
+  } catch { return null }
+}
+
+const PLAN_LABEL = {
+  basic:      'Essencial — R$297/mês',
+  pro:        'Profissional — R$497/mês',
+  enterprise: 'Enterprise (personalizado)',
+}
+
 // ─── System Prompt ────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `Você é a Zara, assistente comercial do ZatendeStok — sistema de gestão para mercadinhos, mercearias e distribuidoras do Brasil. Você atende pelo WhatsApp e é esperta, carismática e fala como brasileira mesmo.
 
@@ -362,18 +381,39 @@ export default async (req) => {
 
     if (isZara) {
       // ── MODO ZARA: bot de vendas do ZatendeStok ──────────────────────────
-      const leadProfile = await loadLead(senderNum)
+      const [leadProfile, existingMarket] = await Promise.all([
+        loadLead(senderNum),
+        findMarketByPhone(senderNum),
+      ])
 
-      const knownParts = []
-      if (leadProfile.name)   knownParts.push(`Nome: ${leadProfile.name}`)
-      if (leadProfile.market) knownParts.push(`Mercado: ${leadProfile.market}`)
-      if (leadProfile.city)   knownParts.push(`Cidade: ${leadProfile.city}`)
-      if (leadProfile.stage)  knownParts.push(`Estágio: ${leadProfile.stage}`)
-      if (senderName && !leadProfile.name) knownParts.push(`Nome no WhatsApp: ${senderName}`)
+      let profileCtx
 
-      const profileCtx = knownParts.length
-        ? `\n\n📌 O QUE JÁ SABEMOS SOBRE ESSE CONTATO:\n${knownParts.join('\n')}\nUse essas informações naturalmente — chame pelo nome, mencione o mercado dele.`
-        : `\n\n📌 Primeira conversa com esse contato. Se apresente como Zara e pergunte o nome e tipo de negócio de forma natural.`
+      if (existingMarket) {
+        // ── Cliente já cadastrado → contexto de renovação ─────────────────
+        const planLabel = PLAN_LABEL[existingMarket.plan] || existingMarket.plan || 'plano ativo'
+        profileCtx = `
+
+⚠️ CLIENTE EXISTENTE — NÃO TRATE COMO LEAD NOVO:
+- Mercado: ${existingMarket.storeName}
+- Plano atual: ${planLabel}
+- Usuário no sistema: ${existingMarket.username}
+- Acesso: zatendestok.com.br
+
+Se falar em RENOVAR: confirme o plano atual (${planLabel}), informe o valor e pergunte se quer manter ou mudar de plano. Não peça informações que você já tem. Seja direto e amigável — ele já é nosso cliente!
+Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga que o Pedro vai entrar em contato.`
+      } else {
+        // ── Lead novo ou prospect ─────────────────────────────────────────
+        const knownParts = []
+        if (leadProfile.name)   knownParts.push(`Nome: ${leadProfile.name}`)
+        if (leadProfile.market) knownParts.push(`Mercado: ${leadProfile.market}`)
+        if (leadProfile.city)   knownParts.push(`Cidade: ${leadProfile.city}`)
+        if (leadProfile.stage)  knownParts.push(`Estágio: ${leadProfile.stage}`)
+        if (senderName && !leadProfile.name) knownParts.push(`Nome no WhatsApp: ${senderName}`)
+
+        profileCtx = knownParts.length
+          ? `\n\n📌 O QUE JÁ SABEMOS SOBRE ESSE CONTATO:\n${knownParts.join('\n')}\nUse essas informações naturalmente — chame pelo nome, mencione o mercado dele.`
+          : `\n\n📌 Primeira conversa com esse contato. Se apresente como Zara e pergunte o nome e tipo de negócio de forma natural.`
+      }
 
       systemMsg = SYSTEM_PROMPT + profileCtx
       pushHistory(senderNum, 'user', text)
