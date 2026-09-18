@@ -6,6 +6,7 @@ import UpdateBanner from './components/UpdateBanner.jsx'
 import { isLoggedIn, getRole } from './utils/auth.js'
 
 /* ── Lazy page chunks — each page loads only when first visited ── */
+const Landing        = lazy(() => import('./pages/Landing.jsx'))
 const Login          = lazy(() => import('./pages/Login.jsx'))
 const Dashboard      = lazy(() => import('./pages/Dashboard.jsx'))
 const PDV            = lazy(() => import('./pages/PDV.jsx'))
@@ -70,6 +71,7 @@ export default function App() {
       <Suspense fallback={<PageSpinner />}>
         <Routes>
           {/* Public */}
+          <Route path="/"        element={<Landing />} />
           <Route path="/login"   element={<Login />} />
           {/* Full-screen pages — no sidebar */}
           <Route path="/display" element={<CustomerDisplay />} />
@@ -87,7 +89,6 @@ export default function App() {
           <Route path="/ofertas"      element={<Ofertas />} />
 
           <Route element={<RequireAuth><RequireRole><Layout /></RequireRole></RequireAuth>}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard"    element={<Dashboard />} />
             <Route path="/pdv"          element={<PDV />} />
             <Route path="/produtos"     element={<Produtos />} />
