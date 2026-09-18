@@ -24,15 +24,22 @@ async function evoFetch(path, opts = {}) {
 }
 
 async function getStatus(instance) {
-  const { data } = await evoFetch(`/instance/fetchInstances?instanceName=${instance}`)
-  const inst = Array.isArray(data) ? data[0] : null
-  if (!inst) return { exists: false }
-  return {
-    exists:      true,
-    status:      inst.connectionStatus || 'unknown',
-    phone:       inst.ownerJid?.replace('@s.whatsapp.net', '') || null,
-    profileName: inst.profileName || null,
+  // Usa connectionState que devolve { instance: { instanceName, state } } — simples e direto
+  const { ok, data } = await evoFetch(`/instance/connectionState/${instance}`)
+  if (!ok || !data?.instance) return { exists: false }
+  const state = data.instance.state || 'unknown'
+
+  // Busca phone/profileName só se conectado (evita req desnecessária)
+  let phone = null, profileName = null
+  if (state === 'open') {
+    const { data: list } = await evoFetch(`/instance/fetchInstances?instanceName=${instance}`)
+    // fetchInstances retorna array plano: [{name, connectionStatus, ownerJid, profileName, ...}]
+    const inst = Array.isArray(list) ? list[0] : null
+    phone       = inst?.ownerJid?.replace('@s.whatsapp.net','') || null
+    profileName = inst?.profileName || null
   }
+
+  return { exists: true, status: state, phone, profileName }
 }
 
 async function getQR(instance) {
