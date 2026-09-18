@@ -128,7 +128,7 @@ export default function Guia() {
         {tab === 'mercado' && (
           <>
             <div style={{ background: `linear-gradient(135deg,${ORANGE}22,${ORANGE}08)`, borderRadius: 20, padding: '18px 20px', marginBottom: 28, border: `1px solid ${ORANGE}33` }}>
-              <div style={{ color: ORANGE, fontWeight: 900, fontSize: 16 }}>Portal Corta Preços — PDV</div>
+              <div style={{ color: ORANGE, fontWeight: 900, fontSize: 16 }}>Portal ZatendeStok — PDV</div>
               <div style={{ color: '#94a3b8', fontSize: 13, marginTop: 4 }}>
                 Caixa, estoque, validade, promoções e fidelidade — tudo em um só lugar
               </div>

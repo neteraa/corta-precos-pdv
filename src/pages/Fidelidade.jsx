@@ -40,7 +40,7 @@ const ROADMAP = [
       'QR no caixa após cada venda → cliente abre o ZAP',
       'QR em display físico na entrada / balcão',
       'QR impresso na sacola / embalagem',
-      'Criação de grupo VIP "Ofertinhas Corta Preços"',
+      'Criação de grupo VIP "Ofertinhas da Semana"',
     ],
   },
   {
@@ -112,7 +112,7 @@ export default function Fidelidade() {
   const print = () => {
     const win = window.open('', '_blank')
     win.document.write(`
-      <html><head><title>QR Corta Preços</title>
+      <html><head><title>QR Fidelidade</title>
       <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 40px; background: #fff; }
         .logo { font-size: 32px; font-weight: 900; color: #ea580c; margin-bottom: 4px; }

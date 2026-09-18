@@ -56,7 +56,7 @@ export default function BlockedScreen({ reason, daysLeft }) {
         </a>
 
         <div style={{ color: '#1e3a5f', fontSize: 11, marginTop: 20 }}>
-          Corta Preços PDV · Sistema de Gestão de Mercados
+          ZatendeStok · Sistema de Gestão de Mercados
         </div>
       </div>
     </div>

@@ -38,17 +38,16 @@ function Word({ size = 52, gap = 0 }) {
 
 export default function ZatendeStokLogo({ variant = 'wordmark', style = {} }) {
 
+  /* full — stacked so it never overflows narrow containers (login left panel = ~320px) */
   if (variant === 'full') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, ...style }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <BasketIcon size={88} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <Word size={52} />
-            <span style={{ color: '#7b82c8', fontSize: 12, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-              Gestão Inteligente de Estoque
-            </span>
-          </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10, ...style }}>
+        <BasketIcon size={52} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <Word size={36} />
+          <span style={{ color: '#7b82c8', fontSize: 11, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
+            Gestão Inteligente de Estoque
+          </span>
         </div>
       </div>
     )

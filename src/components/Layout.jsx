@@ -110,12 +110,12 @@ function SidebarLogo() {
 function NavSection({ title, items, onClose, color = '#f97316' }) {
   return (
     <div className="mb-1">
-      <div className="px-4 mb-1 text-[9px] font-black text-gray-600 tracking-[0.15em] uppercase">
+      <div className="px-4 mb-1 text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: '#6b7280' }}>
         {title}
       </div>
       {items.map(({ to, icon: Icon, label, badge, hot }) => (
         <NavLink key={to} to={to} onClick={onClose}
-          className="group relative flex items-center gap-3 mx-2 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all duration-150"
+          className="group relative flex items-center gap-3 mx-2 px-3 py-2 rounded-xl text-[13px] font-semibold text-gray-400 transition-all duration-150"
         >
           {({ isActive }) => (
             <>
@@ -127,9 +127,9 @@ function NavSection({ title, items, onClose, color = '#f97316' }) {
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full" style={{ background: color }} />
               )}
               <Icon className="w-4 h-4 flex-shrink-0 transition-colors"
-                style={{ color: isActive ? color : undefined }}
+                style={{ color: isActive ? color : '#9ca3af' }}
               />
-              <span className="flex-1" style={{ color: isActive ? color : undefined }}>{label}</span>
+              <span className="flex-1" style={{ color: isActive ? color : '#d1d5db' }}>{label}</span>
               {hot && !badge && (
                 <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: color }} />
               )}

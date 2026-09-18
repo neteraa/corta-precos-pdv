@@ -9,7 +9,7 @@ const cleanPhone = p =>
 
 const hasPhone = c => /\d{8,}/.test((c.phone || '').replace(/\D/g, ''))
 
-const renderMsg = (template, customer, store = 'Corta Preços') =>
+const renderMsg = (template, customer, store = 'MEU MERCADO') =>
   template
     .replace(/\{\{nome\}\}/gi,  customer?.name?.split(' ')[0] || 'cliente')
     .replace(/\{\{loja\}\}/gi,  store)
@@ -40,7 +40,7 @@ function WaBubble({ text }) {
           <MessageCircle className="w-4 h-4 text-white" />
         </div>
         <div>
-          <div className="text-green-400 text-xs font-bold">Corta Preços</div>
+          <div className="text-green-400 text-xs font-bold">ZatendeStok</div>
           <div className="text-gray-500 text-[10px]">WhatsApp Business</div>
         </div>
       </div>

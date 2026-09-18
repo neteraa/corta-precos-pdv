@@ -1113,7 +1113,7 @@ export default function PDV() {
                   const disc = lastSale.discount > 0 ? `\n🏷️ Desconto: -R$${lastSale.discount.toFixed(2).replace('.', ',')}` : ''
                   const troco = lastSale.troco > 0 ? `\n💵 Troco: R$${lastSale.troco.toFixed(2).replace('.', ',')}` : ''
                   const msg = [
-                    `🛒 *Cupom Corta Preços*`,
+                    `🛒 *Cupom ${_storeName}*`,
                     `📅 ${new Date(lastSale.date).toLocaleDateString('pt-BR')} ${new Date(lastSale.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
                     ``,
                     items,
@@ -1124,7 +1124,7 @@ export default function PDV() {
                     troco,
                     ``,
                     `🙏 Obrigado! Volte sempre!`,
-                    `_Corta Preços · @mercadocortaprecos_`,
+                    `_${_storeName}_`,
                   ].filter(Boolean).join('\n')
                   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
                 }}
