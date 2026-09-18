@@ -36,7 +36,13 @@ export function savePrinterSettings(s, sourceId) {
   } catch {}
 }
 
-/** Seed storeName/storePhone/themeColor from the auth session (called after login). */
+// Old hardcoded branding names that should be replaced by the registered store name
+const STALE_NAMES = ['', 'CORTA PREÇOS', 'CORTA PRECOS', 'MEU MERCADO']
+
+/** Sync storeName/storePhone/themeColor from the auth session (called after login).
+ *  Overwrites storeName only when it's still an old default (migration) or empty.
+ *  User-set names (via Configurações) are preserved.
+ *  themeColor is only seeded once. */
 export function seedSettingsFromSession() {
   try {
     const session = JSON.parse(localStorage.getItem('cp_session') || '{}')
@@ -44,9 +50,11 @@ export function seedSettingsFromSession() {
     const key     = mktKey(BASE_KEY)
     const current = JSON.parse(localStorage.getItem(key) || '{}')
     let changed   = false
-    if (!current.storeName  && session.storeName)  { current.storeName  = session.storeName;  changed = true }
-    if (!current.phone      && session.storePhone) { current.phone      = session.storePhone; changed = true }
-    if (!current.themeColor) { current.themeColor = '#f97316'; changed = true }  // default orange
+    if (session.storeName && STALE_NAMES.includes(current.storeName ?? '')) {
+      current.storeName = session.storeName; changed = true
+    }
+    if (session.storePhone && !current.phone) { current.phone = session.storePhone; changed = true }
+    if (!current.themeColor) { current.themeColor = '#f97316'; changed = true }
     if (changed) localStorage.setItem(key, JSON.stringify(current))
   } catch {}
 }

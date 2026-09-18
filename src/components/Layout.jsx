@@ -4,12 +4,12 @@ import ZatendeStokLogo from './ZatendeStokLogo.jsx'
 import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
   Warehouse, Users, Settings, Menu,
-  QrCode, Tag, Star, Download, Monitor, Camera, Scissors, HandCoins, LogOut,
+  QrCode, Tag, Star, Download, Monitor, Camera, Store, HandCoins, LogOut,
   BarChart2, Printer, CalendarClock, Megaphone, RefreshCw, Truck
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import { useOnlineStatus } from '../hooks/useOnlineStatus.js'
-import { usePrinter } from '../hooks/usePrinter.js'
+import { usePrinter, seedSettingsFromSession } from '../hooks/usePrinter.js'
 import { useMarketCheck } from '../hooks/useMarketCheck.js'
 import BlockedScreen from './BlockedScreen.jsx'
 import { logout, getRole, getOperatorName, getTerminalId } from '../utils/auth.js'
@@ -94,7 +94,7 @@ function SidebarLogo() {
         style={{ background: `linear-gradient(135deg, ${color}, ${colorDk})`, boxShadow: `0 8px 24px ${color}40` }}>
         <div className="relative flex items-center gap-2">
           <div className="w-5 h-5 bg-black/20 rounded-md flex items-center justify-center shrink-0">
-            <Scissors className="w-3 h-3 text-white" />
+            <Store className="w-3 h-3 text-white" />
           </div>
           <span className="text-white font-black text-sm tracking-tight leading-none truncate">{name}</span>
         </div>
@@ -152,6 +152,13 @@ export default function Layout() {
   const { supplierOffers } = useStore()
   const online            = useOnlineStatus()
   const navigate          = useNavigate()
+
+  // Re-run seed on mount so stale branding names (e.g. "CORTA PREÇOS") are replaced
+  useEffect(() => {
+    seedSettingsFromSession()
+    // Notify all usePrinter instances to re-read settings from localStorage
+    window.dispatchEvent(new CustomEvent('cp-settings-saved', { detail: { sourceId: '__layout_seed__' } }))
+  }, [])
 
   const marketCheck  = useMarketCheck()
   const role         = getRole()
