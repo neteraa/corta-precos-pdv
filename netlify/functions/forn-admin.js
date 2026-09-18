@@ -111,7 +111,7 @@ export default async (req) => {
     }
 
     // Default: create new distributor
-    const { storeName, username, password, storePhone = '', themeColor = '#10b981' } = body
+    const { storeName, username, password, storePhone = '', email = '', themeColor = '#10b981' } = body
     if (!storeName || !username || !password)
       return new Response(JSON.stringify({ ok: false, error: 'storeName, username e password são obrigatórios' }), { status: 400, headers: CORS })
 
@@ -128,6 +128,7 @@ export default async (req) => {
       salt,
       storeName:    storeName.trim(),
       storePhone:   storePhone.trim(),
+      email:        email.trim(),
       themeColor,
       active:       true,
       expiresAt:    null,

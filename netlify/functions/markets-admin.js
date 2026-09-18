@@ -82,7 +82,7 @@ export default async (req) => {
     }
 
     // Default: create new market
-    const { storeName, username, password, storePhone = '' } = body
+    const { storeName, username, password, storePhone = '', email = '' } = body
     if (!storeName || !username || !password)
       return new Response(JSON.stringify({ ok: false, error: 'storeName, username e password são obrigatórios' }), { status: 400, headers: CORS })
 
@@ -95,6 +95,7 @@ export default async (req) => {
       id:           `mkt_${Date.now()}`,
       storeName:    storeName.trim(),
       storePhone:   storePhone.trim(),
+      email:        email.trim(),
       username:     uname,
       passwordHash: hashPwd(password, salt),
       salt,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, Users, TrendingUp, AlertTriangle, CalendarClock } from 'lucide-react'
+import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, TrendingUp, AlertTriangle, CalendarClock, Mail } from 'lucide-react'
 import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
 
 /* ─── constants ──────────────────────────────────────────── */
@@ -27,10 +27,14 @@ function StatCard({ label, value, sub, color = '#f97316' }) {
 }
 
 function MarketCard({ market, mk, onRefresh, onAccess }) {
-  const [busy,   setBusy]   = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [showReset, setShowReset] = useState(false)
-  const [newPass, setNewPass] = useState('')
+  const [busy,       setBusy]       = useState(false)
+  const [copied,     setCopied]     = useState(false)
+  const [showReset,  setShowReset]  = useState(false)
+  const [newPass,    setNewPass]    = useState('')
+  const [showResend, setShowResend] = useState(false)
+  const [resendPass, setResendPass] = useState('')
+  const [resendEmail, setResendEmail] = useState(market.email || '')
+  const [resendStatus, setResendStatus] = useState(null)  // null | 'sending' | 'ok' | 'err'
 
   const initial = (market.storeName || '?')[0].toUpperCase()
   const colors = ['#f97316','#22c55e','#8b5cf6','#06b6d4','#f59e0b','#ec4899','#10b981']
@@ -83,6 +87,15 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
     navigator.clipboard.writeText(market.storeId).catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
+  }
+
+  const resendAccess = async () => {
+    if (!resendEmail || !resendPass || resendPass.length < 4) return
+    setResendStatus('sending')
+    await api('/api/markets-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'reset-pass', id: market.id, password: resendPass }) })
+    const eRes = await sendWelcomeEmail(mk, { to: resendEmail, type: 'market', storeName: market.storeName, username: market.username, password: resendPass })
+    setResendStatus(eRes.sent ? 'ok' : 'err')
+    setTimeout(() => { setShowResend(false); setResendStatus(null); setResendPass('') }, 3000)
   }
 
   return (
@@ -182,22 +195,34 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
       {/* reset password inline */}
       {showReset && (
         <div className="px-4 pb-3 flex gap-2">
-          <input
-            className="flex-1 bg-gray-700 border border-gray-600 text-white text-sm rounded-xl px-3 py-2 outline-none focus:border-orange-500"
-            placeholder="Nova senha (mín. 4)"
-            type="password"
-            value={newPass}
-            onChange={e => setNewPass(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && resetPass()}
-          />
+          <input className="flex-1 bg-gray-700 border border-gray-600 text-white text-sm rounded-xl px-3 py-2 outline-none focus:border-orange-500"
+            placeholder="Nova senha (mín. 4)" type="password" value={newPass}
+            onChange={e => setNewPass(e.target.value)} onKeyDown={e => e.key === 'Enter' && resetPass()} />
           <button onClick={resetPass} disabled={newPass.length < 4 || busy}
-            className="px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black disabled:opacity-40 transition-colors">
-            OK
-          </button>
-          <button onClick={() => setShowReset(false)}
-            className="px-3 py-2 rounded-xl bg-gray-700 text-gray-400 text-xs transition-colors hover:bg-gray-600">
+            className="px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black disabled:opacity-40">OK</button>
+          <button onClick={() => setShowReset(false)} className="px-3 py-2 rounded-xl bg-gray-700 text-gray-400 text-xs hover:bg-gray-600">
             <X className="w-3 h-3" />
           </button>
+        </div>
+      )}
+
+      {/* reenviar acesso por email */}
+      {showResend && (
+        <div className="px-4 pb-3 space-y-2">
+          {resendStatus === 'ok'  && <p className="text-green-400 text-xs font-bold">✅ Email enviado!</p>}
+          {resendStatus === 'err' && <p className="text-yellow-400 text-xs">⚠️ Não enviado (configure GMAIL_APP_PASSWORD)</p>}
+          {!resendStatus && <>
+            <input className="w-full bg-gray-700 border border-gray-600 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-orange-500"
+              placeholder="Email do cliente" type="email" value={resendEmail} onChange={e => setResendEmail(e.target.value)} />
+            <div className="flex gap-2">
+              <input className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-orange-500"
+                placeholder="Nova senha (mín. 4)" type="password" value={resendPass} onChange={e => setResendPass(e.target.value)} />
+              <button onClick={resendAccess} disabled={!resendEmail || resendPass.length < 4}
+                className="px-3 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold disabled:opacity-40">Enviar</button>
+              <button onClick={() => { setShowResend(false); setResendPass('') }}
+                className="px-2 py-2 rounded-xl bg-gray-700 text-gray-400 text-xs hover:bg-gray-600"><X className="w-3 h-3" /></button>
+            </div>
+          </>}
         </div>
       )}
 
@@ -206,6 +231,11 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
         <button onClick={() => onAccess(market)}
           className="flex-1 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black transition-all flex items-center justify-center gap-1.5">
           <LogIn className="w-3.5 h-3.5" /> Acessar
+        </button>
+        <button onClick={() => { setShowResend(v => !v); setShowReset(false) }}
+          title="Reenviar acesso por email"
+          className="px-3 py-2 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-xs transition-colors">
+          <Mail className="w-3.5 h-3.5" />
         </button>
         <button onClick={() => setShowReset(v => !v)}
           title="Resetar senha"
@@ -229,115 +259,112 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
   )
 }
 
-function AddMarketModal({ mk, onClose, onCreated }) {
-  const [form, setForm]   = useState({ storeName: '', username: '', password: '', storePhone: '' })
-  const [show, setShow]   = useState(false)
-  const [err,  setErr]    = useState(null)
-  const [ok,   setOk]     = useState(null)
-  const [busy, setBusy]   = useState(false)
-
-  const submit = async () => {
-    setErr(null)
-    if (!form.storeName.trim() || !form.username.trim() || !form.password)
-      return setErr('Preencha nome, usuário e senha.')
-    if (form.password.length < 4)
-      return setErr('Senha mínimo 4 caracteres.')
-    setBusy(true)
-    const res = await api('/api/markets-admin', mk, {
+/* ── shared email sender ─────────────────────────────────── */
+async function sendWelcomeEmail(mk, { to, type, storeName, username, password }) {
+  if (!to) return { sent: false, warning: 'Sem email cadastrado' }
+  try {
+    const res = await api('/api/send-email', mk, {
       method: 'POST',
-      body: JSON.stringify({ ...form, action: 'create' }),
+      body: JSON.stringify({ to, type, storeName, username, password }),
     })
-    setBusy(false)
-    if (!res.ok) return setErr(res.error || 'Erro ao criar mercado.')
-    setOk({ storeId: res.storeId, username: res.username, password: form.password })
-    onCreated()
-  }
+    return res
+  } catch { return { sent: false, warning: 'Erro de rede ao enviar email' } }
+}
 
-  if (ok) return (
+/* ── reusable credential success screen ─────────────────── */
+function CredSuccess({ title, icon: Icon, iconColor, accentColor, ok, emailResult, onClose }) {
+  return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-pop">
+      <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
         <div className="text-center mb-5">
-          <div className="w-14 h-14 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center mx-auto mb-3">
-            <Check className="w-7 h-7 text-green-400" />
+          <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 border-2`}
+               style={{ background: `${iconColor}20`, borderColor: iconColor }}>
+            <Icon className="w-7 h-7" style={{ color: iconColor }} />
           </div>
-          <h3 className="text-white font-black text-xl">Mercado criado!</h3>
-          <p className="text-gray-400 text-sm mt-1">Passe as credenciais para o cliente</p>
+          <h3 className="text-white font-black text-xl">{title}</h3>
+          {emailResult?.sent
+            ? <p className="text-green-400 text-sm mt-1 flex items-center justify-center gap-1"><Check className="w-3.5 h-3.5" /> Email enviado para {ok.email}</p>
+            : ok.email
+            ? <p className="text-yellow-400 text-xs mt-1">⚠️ {emailResult?.warning || 'Email não enviado'}</p>
+            : <p className="text-gray-500 text-sm mt-1">Passe as credenciais ao cliente</p>
+          }
         </div>
-        <div className="bg-gray-900 rounded-xl p-4 space-y-2 font-mono text-sm border border-gray-700">
-          <div className="flex justify-between">
-            <span className="text-gray-400">URL</span>
-            <span className="text-orange-400">zatendestock.netlify.app</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Usuário</span>
-            <span className="text-white font-bold">{ok.username}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Senha</span>
-            <span className="text-white font-bold">{ok.password}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Store ID</span>
-            <span className="text-green-400 font-bold">{ok.storeId}</span>
-          </div>
+        <div className="bg-gray-900 rounded-xl p-4 space-y-2 font-mono text-sm border border-gray-700 mb-4">
+          <div className="flex justify-between"><span className="text-gray-400">URL</span><span style={{ color: accentColor }}>zatendestock.netlify.app</span></div>
+          <div className="flex justify-between"><span className="text-gray-400">Usuário</span><span className="text-white font-bold">{ok.username}</span></div>
+          <div className="flex justify-between"><span className="text-gray-400">Senha</span><span className="text-white font-bold">{ok.password}</span></div>
+          {ok.storeId && <div className="flex justify-between"><span className="text-gray-400">Store ID</span><span className="text-green-400">{ok.storeId}</span></div>}
         </div>
-        <button onClick={onClose}
-          className="w-full mt-4 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black transition-colors">
+        <button onClick={onClose} className="w-full py-3 rounded-xl text-white font-black transition-colors" style={{ background: accentColor }}>
           Fechar
         </button>
       </div>
     </div>
   )
+}
+
+function AddMarketModal({ mk, onClose, onCreated }) {
+  const [form, setForm] = useState({ storeName: '', username: '', password: '', storePhone: '', email: '' })
+  const [show, setShow] = useState(false)
+  const [err,  setErr]  = useState(null)
+  const [ok,   setOk]   = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [emailResult, setEmailResult] = useState(null)
+
+  const submit = async () => {
+    setErr(null)
+    if (!form.storeName.trim() || !form.username.trim() || !form.password) return setErr('Preencha nome, usuário e senha.')
+    if (form.password.length < 4) return setErr('Senha mínimo 4 caracteres.')
+    setBusy(true)
+    const res = await api('/api/markets-admin', mk, { method: 'POST', body: JSON.stringify(form) })
+    if (!res.ok) { setBusy(false); return setErr(res.error || 'Erro ao criar mercado.') }
+    const creds = { storeId: res.storeId, username: form.username, password: form.password, email: form.email }
+    const eRes  = await sendWelcomeEmail(mk, { to: form.email, type: 'market', storeName: form.storeName, username: form.username, password: form.password })
+    setBusy(false)
+    setEmailResult(eRes)
+    setOk(creds)
+    onCreated()
+  }
+
+  if (ok) return <CredSuccess title="Mercado criado!" icon={Check} iconColor="#22c55e" accentColor="#f97316" ok={ok} emailResult={emailResult} onClose={onClose} />
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-pop" onClick={e => e.stopPropagation()}>
+      <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-white font-black text-lg flex items-center gap-2"><Store className="w-5 h-5 text-orange-400" /> Novo Mercado</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-white"><X className="w-5 h-5" /></button>
+          <button onClick={onClose}><X className="w-5 h-5 text-gray-500 hover:text-white" /></button>
         </div>
-
         <div className="space-y-3">
           {[
-            { key: 'storeName', label: 'Nome do Mercado', placeholder: 'Ex: Mercado São José', type: 'text' },
-            { key: 'storePhone', label: 'WhatsApp (opcional)', placeholder: '(11) 99999-0000', type: 'text' },
-            { key: 'username', label: 'Usuário de acesso', placeholder: 'ex: mercadosaojose', type: 'text' },
+            { key: 'storeName',  label: 'Nome do Mercado',         placeholder: 'Ex: Mercado São José' },
+            { key: 'storePhone', label: 'WhatsApp (opcional)',      placeholder: '(11) 99999-0000' },
+            { key: 'email',      label: 'Email (envia credenciais automaticamente)', placeholder: 'cliente@email.com' },
+            { key: 'username',   label: 'Usuário de acesso',        placeholder: 'ex: mercadosaojose' },
           ].map(f => (
             <div key={f.key}>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">{f.label}</label>
-              <input
-                className="w-full bg-gray-700 border border-gray-600 text-white rounded-xl px-4 py-2.5 outline-none focus:border-orange-500 transition-colors text-sm"
-                placeholder={f.placeholder} type={f.type}
-                value={form[f.key]}
-                onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-              />
+              <input className="w-full bg-gray-700 border border-gray-600 text-white rounded-xl px-4 py-2.5 outline-none focus:border-orange-500 text-sm"
+                placeholder={f.placeholder} value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
             </div>
           ))}
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Senha inicial</label>
             <div className="relative">
-              <input
-                className="w-full bg-gray-700 border border-gray-600 text-white rounded-xl px-4 py-2.5 pr-12 outline-none focus:border-orange-500 transition-colors text-sm"
-                placeholder="mínimo 4 caracteres"
-                type={show ? 'text' : 'password'}
-                value={form.password}
-                onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && submit()}
-              />
-              <button type="button" onClick={() => setShow(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200">
+              <input className="w-full bg-gray-700 border border-gray-600 text-white rounded-xl px-4 py-2.5 pr-12 outline-none focus:border-orange-500 text-sm"
+                placeholder="mínimo 4 caracteres" type={show ? 'text' : 'password'}
+                value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} onKeyDown={e => e.key === 'Enter' && submit()} />
+              <button type="button" onClick={() => setShow(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200">
                 {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
         </div>
-
         {err && <div className="mt-3 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{err}</div>}
-
         <button onClick={submit} disabled={busy}
-          className="w-full mt-5 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-black transition-all flex items-center justify-center gap-2">
+          className="w-full mt-5 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-black flex items-center justify-center gap-2">
           {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          {busy ? 'Criando...' : 'Criar Mercado'}
+          {busy ? 'Criando...' : 'Criar e Enviar Acesso'}
         </button>
       </div>
     </div>
@@ -346,9 +373,13 @@ function AddMarketModal({ mk, onClose, onCreated }) {
 
 /* ─── DistCard ───────────────────────────────────────────── */
 function DistCard({ dist, mk, onRefresh }) {
-  const [busy,      setBusy]      = useState(false)
-  const [showReset, setShowReset] = useState(false)
-  const [newPass,   setNewPass]   = useState('')
+  const [busy,        setBusy]       = useState(false)
+  const [showReset,   setShowReset]  = useState(false)
+  const [newPass,     setNewPass]    = useState('')
+  const [showResend,  setShowResend] = useState(false)
+  const [resendPass,  setResendPass] = useState('')
+  const [resendEmail, setResendEmail] = useState(dist.email || '')
+  const [resendStatus, setResendStatus] = useState(null)
 
   const color  = ['#10b981', '#f97316', '#8b5cf6', '#0ea5e9', '#ec4899'][dist.storeName.length % 5]
   const initial = (dist.storeName || '?')[0].toUpperCase()
@@ -388,6 +419,15 @@ function DistCard({ dist, mk, onRefresh }) {
     const expiresAt = dateStr ? new Date(dateStr + 'T23:59:59').toISOString() : null
     await api('/api/forn-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'set-expiry', id: dist.id, expiresAt }) })
     await onRefresh()
+  }
+
+  const resendAccess = async () => {
+    if (!resendEmail || !resendPass || resendPass.length < 4) return
+    setResendStatus('sending')
+    await api('/api/forn-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'reset-pass', id: dist.id, password: resendPass }) })
+    const eRes = await sendWelcomeEmail(mk, { to: resendEmail, type: 'dist', storeName: dist.storeName, username: dist.username, password: resendPass })
+    setResendStatus(eRes.sent ? 'ok' : 'err')
+    setTimeout(() => { setShowResend(false); setResendStatus(null); setResendPass('') }, 3000)
   }
 
   const exp    = dist.expiresAt ? new Date(dist.expiresAt) : null
@@ -444,9 +484,30 @@ function DistCard({ dist, mk, onRefresh }) {
             className="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-400 text-xs"><X className="w-3 h-3" /></button>
         </div>
       ) : (
-        <button onClick={() => setShowReset(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-700/50 hover:bg-gray-700 text-gray-400 hover:text-white text-xs transition-colors">
+        <button onClick={() => { setShowReset(true); setShowResend(false) }}
+          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-700/50 hover:bg-gray-700 text-gray-400 hover:text-white text-xs transition-colors">
           <Key className="w-3 h-3" /> Resetar senha
         </button>
+      )}
+
+      {/* reenviar acesso por email */}
+      {showResend && (
+        <div className="space-y-2">
+          {resendStatus === 'ok'  && <p className="text-green-400 text-xs font-bold">✅ Email enviado!</p>}
+          {resendStatus === 'err' && <p className="text-yellow-400 text-xs">⚠️ Não enviado (configure GMAIL_APP_PASSWORD)</p>}
+          {!resendStatus && <>
+            <input className="w-full bg-gray-700 border border-gray-600 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-emerald-400"
+              placeholder="Email do distribuidor" type="email" value={resendEmail} onChange={e => setResendEmail(e.target.value)} />
+            <div className="flex gap-2">
+              <input className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-emerald-400"
+                placeholder="Nova senha (mín. 4)" type="password" value={resendPass} onChange={e => setResendPass(e.target.value)} />
+              <button onClick={resendAccess} disabled={!resendEmail || resendPass.length < 4}
+                className="px-3 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold disabled:opacity-40">Enviar</button>
+              <button onClick={() => { setShowResend(false); setResendPass('') }}
+                className="px-2 rounded-xl bg-gray-700 text-gray-400 text-xs hover:bg-gray-600"><X className="w-3 h-3" /></button>
+            </div>
+          </>}
+        </div>
       )}
 
       {/* actions */}
@@ -454,6 +515,11 @@ function DistCard({ dist, mk, onRefresh }) {
         <button onClick={toggle} disabled={busy}
           className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-40 ${dist.active ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-green-500/20 hover:bg-green-500/30 text-green-400'}`}>
           <Power className="w-3 h-3" /> {dist.active ? 'Desativar' : 'Ativar'}
+        </button>
+        <button onClick={() => { setShowResend(v => !v); setShowReset(false) }}
+          title="Reenviar acesso por email"
+          className="px-3 py-2 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-xs transition-colors">
+          <Mail className="w-3 h-3" />
         </button>
         <button onClick={remove} disabled={busy}
           className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs transition-colors disabled:opacity-40">
@@ -466,11 +532,12 @@ function DistCard({ dist, mk, onRefresh }) {
 
 /* ─── AddDistModal ───────────────────────────────────────── */
 function AddDistModal({ mk, onClose, onCreated }) {
-  const [form, setForm] = useState({ storeName: '', username: '', password: '', storePhone: '', themeColor: '#10b981' })
-  const [show, setShow] = useState(false)
-  const [err,  setErr]  = useState(null)
-  const [ok,   setOk]   = useState(null)
-  const [busy, setBusy] = useState(false)
+  const [form, setForm]       = useState({ storeName: '', username: '', password: '', storePhone: '', email: '', themeColor: '#10b981' })
+  const [show, setShow]       = useState(false)
+  const [err,  setErr]        = useState(null)
+  const [ok,   setOk]         = useState(null)
+  const [busy, setBusy]       = useState(false)
+  const [emailResult, setEmailResult] = useState(null)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -478,22 +545,14 @@ function AddDistModal({ mk, onClose, onCreated }) {
     if (!form.storeName || !form.username || !form.password) { setErr('Preencha todos os campos obrigatórios'); return }
     setBusy(true); setErr(null)
     const res = await api('/api/forn-admin', mk, { method: 'POST', body: JSON.stringify(form) })
-    setBusy(false)
-    if (!res.ok) { setErr(res.error || 'Erro ao criar'); return }
-    setOk(res)
+    if (!res.ok) { setBusy(false); setErr(res.error || 'Erro ao criar'); return }
+    const eRes = await sendWelcomeEmail(mk, { to: form.email, type: 'dist', storeName: form.storeName, username: form.username, password: form.password })
+    setBusy(false); setEmailResult(eRes)
+    setOk({ username: form.username, password: form.password, email: form.email })
+    onCreated()
   }
 
-  if (ok) return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCreated}>
-      <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 text-center max-w-sm w-full">
-        <div className="text-5xl mb-4">✅</div>
-        <div className="text-white font-black text-xl mb-2">Distribuidor criado!</div>
-        <div className="text-gray-400 text-sm mb-1">Usuário: <span className="font-mono text-orange-400">{form.username}</span></div>
-        <div className="text-gray-400 text-sm mb-6">Senha: <span className="font-mono text-orange-400">{form.password}</span></div>
-        <button onClick={onCreated} className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black">Fechar</button>
-      </div>
-    </div>
-  )
+  if (ok) return <CredSuccess title="Distribuidor criado!" icon={Check} iconColor="#10b981" accentColor="#10b981" ok={ok} emailResult={emailResult} onClose={onClose} />
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
@@ -503,12 +562,17 @@ function AddDistModal({ mk, onClose, onCreated }) {
           <button onClick={onClose}><X className="w-5 h-5 text-gray-500 hover:text-white" /></button>
         </div>
         <div className="space-y-4">
-          {[['storeName', 'Nome do distribuidor *'], ['username', 'Usuário *'], ['password', 'Senha *'], ['storePhone', 'Telefone']].map(([k, label]) => (
+          {[
+            ['storeName', 'Nome do distribuidor *', 'text'],
+            ['storePhone', 'Telefone / WhatsApp', 'text'],
+            ['email', 'Email (envia credenciais automaticamente)', 'email'],
+            ['username', 'Usuário *', 'text'],
+            ['password', 'Senha *', show ? 'text' : 'password'],
+          ].map(([k, label, type]) => (
             <div key={k}>
               <label className="block text-xs font-bold text-gray-400 uppercase mb-1">{label}</label>
               <input className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-emerald-400"
-                value={form[k]} onChange={e => set(k, e.target.value)}
-                type={k === 'password' ? (show ? 'text' : 'password') : 'text'} />
+                value={form[k]} onChange={e => set(k, e.target.value)} type={type} />
             </div>
           ))}
           <div>
@@ -519,9 +583,9 @@ function AddDistModal({ mk, onClose, onCreated }) {
         </div>
         {err && <div className="mt-4 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{err}</div>}
         <button onClick={submit} disabled={busy}
-          className="w-full mt-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white font-black transition-colors flex items-center justify-center gap-2">
+          className="w-full mt-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white font-black flex items-center justify-center gap-2">
           {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          {busy ? 'Criando...' : 'Criar Distribuidor'}
+          {busy ? 'Criando...' : 'Criar e Enviar Acesso'}
         </button>
       </div>
     </div>
