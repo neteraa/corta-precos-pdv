@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Eye, EyeOff, Lock, User, MessageCircle, CheckCircle2, ArrowRight, ArrowLeft, Phone, MapPin, ShieldCheck, Zap, Headphones, Bell, BarChart3, Wifi } from 'lucide-react'
+import { Eye, EyeOff, Lock, User, MessageCircle, CheckCircle2, ArrowRight, ArrowLeft, Phone, MapPin, ShieldCheck, Zap, Headphones, Bell, BarChart3, Wifi, Store, Truck } from 'lucide-react'
 import { getCredentials, getConfiguredStoreId, saveStoreId } from '../utils/auth.js'
 import { registerStoreId, wipeLegacyFlatKeys } from '../utils/tenantStorage.js'
 import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
@@ -26,6 +26,8 @@ const CSS = `
   .btn-wpp:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(34,197,94,.35)!important}
   .tab-pill{transition:all .2s}
   .tab-pill.active{background:#fff!important;color:#0f172a!important;box-shadow:0 1px 6px rgba(0,0,0,.1)!important}
+  .tipo-card{transition:all .2s;cursor:pointer}
+  .tipo-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.1)!important}
   @media(max-width:899px){.lp{display:none!important}.mob-hdr{display:block!important}}
 `
 
@@ -116,32 +118,73 @@ function RecoverPanel({ username, onClose }) {
   )
 }
 
+/* ── Cadastro multi-step COM seleção de tipo ─────────────── */
 function CadastroFlow() {
-  const [step, setStep] = useState(1)
-  const [form, setForm] = useState({ nome:'', mercado:'', cidade:'', telefone:'' })
-  const [sent, setSent] = useState(false)
-  const [errs, setErrs] = useState({})
-  const set = k => v => setForm(f => ({ ...f, [k]:v }))
+  const [tipo,   setTipo]   = useState(null)   // null | 'mercado' | 'distribuidor'
+  const [step,   setStep]   = useState(1)
+  const [form,   setForm]   = useState({ nome:'', empresa:'', cidade:'', telefone:'', email:'' })
+  const [sent,   setSent]   = useState(false)
+  const [errs,   setErrs]   = useState({})
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+
   const validate = () => {
     const e = {}
     if (!form.nome.trim())     e.nome     = 'Informe seu nome'
-    if (!form.mercado.trim())  e.mercado  = 'Informe o nome do mercado'
+    if (!form.empresa.trim())  e.empresa  = tipo === 'mercado' ? 'Informe o nome do mercado' : 'Informe o nome da distribuidora'
     if (!form.cidade.trim())   e.cidade   = 'Informe a cidade'
     if (!form.telefone.trim()) e.telefone = 'Informe o WhatsApp'
     setErrs(e); return Object.keys(e).length === 0
   }
+
   const solicitar = async () => {
-    setSent(true) // Optimistic UI
+    setSent(true)
     try {
       await fetch('/api/request-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, mercado: form.empresa, tipo }),
       })
-    } catch { /* funciona mesmo offline — admin verifica WPP */ }
-    // Also notify admin via WhatsApp as backup
-    openWpp(`🛒 *Solicitação de cadastro — ZatendeStock*\n\n👤 Nome: *${form.nome}*\n🏪 Mercado: *${form.mercado}*\n📍 Cidade: *${form.cidade}*\n📱 WhatsApp: *${form.telefone}*\n\nQuero começar a usar o ZatendeStock! 🚀`)
+    } catch {}
+    const tipoLabel = tipo === 'distribuidor' ? 'distribuidora' : 'mercado'
+    openWpp(`🛒 *Solicitação de cadastro — ZatendeStock*\n\n👤 Nome: *${form.nome}*\n🏪 ${tipoLabel}: *${form.empresa}*\n📍 Cidade: *${form.cidade}*\n📱 WhatsApp: *${form.telefone}*\n🏷 Tipo: *${tipo === 'distribuidor' ? 'Distribuidora/Atacado' : 'Mercado/Loja'}*\n\nQuero começar a usar o ZatendeStock! 🚀`)
   }
+
+  /* Passo 0 — escolha do tipo */
+  if (!tipo) return (
+    <div style={{ animation:'fadeUp .25s ease' }}>
+      <div style={{ marginBottom:24 }}>
+        <h1 style={{ fontSize:22, fontWeight:900, color:B.text, marginBottom:4 }}>O que você quer cadastrar?</h1>
+        <p style={{ color:B.muted, fontSize:14 }}>Escolha o tipo de negócio para continuar</p>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+        <button className="tipo-card" onClick={() => setTipo('mercado')}
+          style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12, padding:'24px 16px', border:`2px solid ${B.border}`, borderRadius:16, background:'#fff', boxShadow:'0 2px 8px rgba(0,0,0,.06)' }}>
+          <div style={{ width:52, height:52, borderRadius:14, background:'#eef2ff', border:'1.5px solid #c7d2fe', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <Store size={26} color={B.blue} />
+          </div>
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontWeight:800, fontSize:15, color:B.text, marginBottom:4 }}>Mercado / Loja</div>
+            <div style={{ fontSize:12, color:B.muted, lineHeight:1.5 }}>Gestão de estoque, PDV, validade e pedidos ao distribuidor</div>
+          </div>
+        </button>
+        <button className="tipo-card" onClick={() => setTipo('distribuidor')}
+          style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12, padding:'24px 16px', border:`2px solid ${B.border}`, borderRadius:16, background:'#fff', boxShadow:'0 2px 8px rgba(0,0,0,.06)' }}>
+          <div style={{ width:52, height:52, borderRadius:14, background:'#f0fdf4', border:'1.5px solid #bbf7d0', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <Truck size={26} color={B.green} />
+          </div>
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontWeight:800, fontSize:15, color:B.text, marginBottom:4 }}>Distribuidora</div>
+            <div style={{ fontSize:12, color:B.muted, lineHeight:1.5 }}>Portal de ofertas, gestão de pedidos e conexão com mercados</div>
+          </div>
+        </button>
+      </div>
+      <div style={{ marginTop:16, padding:'12px 14px', background:'#f8fafc', border:`1px solid ${B.border}`, borderRadius:12 }}>
+        <p style={{ color:B.muted, fontSize:12, textAlign:'center' }}>Acesso criado em até 2 horas · Sem contrato · Suporte via WhatsApp</p>
+      </div>
+    </div>
+  )
+
+  /* Sucesso */
   if (sent) return (
     <div style={{ textAlign:'center', animation:'fadeUp .3s ease' }}>
       <div style={{ width:72, height:72, borderRadius:'50%', background:'#f0fdf4', border:'2px solid #bbf7d0', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>
@@ -160,33 +203,55 @@ function CadastroFlow() {
       </div>
     </div>
   )
+
+  /* Badge de tipo selecionado */
+  const tipoBadge = (
+    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 12px', background: tipo==='mercado' ? '#eef2ff' : '#f0fdf4', border:`1px solid ${tipo==='mercado'?'#c7d2fe':'#bbf7d0'}`, borderRadius:999 }}>
+        {tipo==='mercado' ? <Store size={13} color={B.blue} /> : <Truck size={13} color={B.green} />}
+        <span style={{ fontSize:12, fontWeight:700, color: tipo==='mercado'?B.blue:B.green }}>
+          {tipo==='mercado' ? 'Mercado / Loja' : 'Distribuidora / Atacado'}
+        </span>
+      </div>
+      <button onClick={() => { setTipo(null); setStep(1) }} style={{ background:'none', border:'none', cursor:'pointer', color:B.muted, fontSize:12, fontWeight:600 }}>trocar</button>
+    </div>
+  )
+
+  /* Steps bar */
+  const stepsBar = (
+    <div style={{ display:'flex', alignItems:'center', marginBottom:20 }}>
+      {[{ n:1, label:'Dados' },{ n:2, label:'Confirmar' }].map((s, i, arr) => (
+        <React.Fragment key={s.n}>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ width:26, height:26, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, flexShrink:0, transition:'all .25s', background:step>=s.n?B.blue:B.bg, border:`2px solid ${step>=s.n?B.blue:B.border}`, color:step>=s.n?'#fff':B.muted }}>
+              {step>s.n?'✓':s.n}
+            </div>
+            <span style={{ fontSize:12, fontWeight:700, color:step>=s.n?B.text:B.muted }}>{s.label}</span>
+          </div>
+          {i<arr.length-1 && <div style={{ flex:1, height:2, background:step>s.n?B.blue:B.border, margin:'0 10px', borderRadius:2, transition:'background .3s' }} />}
+        </React.Fragment>
+      ))}
+    </div>
+  )
+
   return (
     <div style={{ animation:'fadeUp .25s ease' }}>
-      <div style={{ display:'flex', alignItems:'center', marginBottom:24 }}>
-        {[{ n:1, label:'Dados' },{ n:2, label:'Confirmar' }].map((s, i, arr) => (
-          <React.Fragment key={s.n}>
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <div style={{ width:26, height:26, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, flexShrink:0, transition:'all .25s', background:step>=s.n?B.blue:B.bg, border:`2px solid ${step>=s.n?B.blue:B.border}`, color:step>=s.n?'#fff':B.muted }}>
-                {step>s.n?'checkmark':s.n}
-              </div>
-              <span style={{ fontSize:12, fontWeight:700, color:step>=s.n?B.text:B.muted }}>{s.label}</span>
-            </div>
-            {i<arr.length-1 && <div style={{ flex:1, height:2, background:step>s.n?B.blue:B.border, margin:'0 10px', borderRadius:2, transition:'background .3s' }} />}
-          </React.Fragment>
-        ))}
-      </div>
+      {tipoBadge}
+      {stepsBar}
+
       {step===1 && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <p style={{ color:B.muted, fontSize:13 }}>Preencha abaixo — nossa equipe cria seu acesso em até 2 horas.</p>
           {[
             { key:'nome',     icon:User,        label:'Seu nome completo', placeholder:'Ex: João Silva'      },
-            { key:'mercado',  icon:ShieldCheck, label:'Nome do mercado',   placeholder:'Ex: Mercado Central' },
-            { key:'cidade',   icon:MapPin,      label:'Cidade / Estado',   placeholder:'Ex: São Paulo - SP'  },
+            { key:'empresa',  icon:tipo==='mercado'?Store:Truck, label: tipo==='mercado'?'Nome do mercado':'Nome da distribuidora', placeholder: tipo==='mercado'?'Ex: Mercado Central':'Ex: Distribuidora São Paulo' },
+            { key:'cidade',   icon:MapPin,      label:'Cidade / Estado',   placeholder:'Ex: São Paulo – SP'  },
             { key:'telefone', icon:Phone,       label:'WhatsApp',          placeholder:'(11) 99999-0000'     },
+            { key:'email',    icon:null,        label:'Email (opcional)',   placeholder:'seu@email.com'       },
           ].map(f => (
             <div key={f.key}>
-              <Inp label={f.label} icon={f.icon} value={form[f.key]} onChange={e=>set(f.key)(e.target.value)} placeholder={f.placeholder} />
-              {errs[f.key] && <p style={{ color:'#ef4444', fontSize:11, marginTop:4 }}>Informe este campo</p>}
+              <Inp label={f.label} icon={f.icon} value={form[f.key]} onChange={set(f.key)} placeholder={f.placeholder} type={f.key==='email'?'email':'text'} />
+              {errs[f.key] && <p style={{ color:'#ef4444', fontSize:11, marginTop:4 }}>⚠ {errs[f.key]}</p>}
             </div>
           ))}
           <button className="btn-blue" onClick={() => { if(validate()) setStep(2) }}
@@ -195,11 +260,12 @@ function CadastroFlow() {
           </button>
         </div>
       )}
+
       {step===2 && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <p style={{ color:B.muted, fontSize:13 }}>Confira os dados e solicite o cadastro.</p>
           <div style={{ border:`1px solid ${B.border}`, borderRadius:12, overflow:'hidden' }}>
-            {[['Nome',form.nome],['Mercado',form.mercado],['Cidade',form.cidade],['WhatsApp',form.telefone]].map(([k,v]) => (
+            {[['Nome',form.nome],[tipo==='mercado'?'Mercado':'Distribuidora',form.empresa],['Cidade',form.cidade],['WhatsApp',form.telefone],form.email?['Email',form.email]:null].filter(Boolean).map(([k,v]) => (
               <div key={k} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'11px 16px', borderBottom:`1px solid ${B.border}`, background:'#fff' }}>
                 <span style={{ color:B.muted, fontSize:13 }}>{k}</span>
                 <span style={{ color:B.text, fontWeight:700, fontSize:14 }}>{v}</span>
@@ -220,6 +286,7 @@ function CadastroFlow() {
   )
 }
 
+/* ══════════════════════════════════════════════════════════ */
 export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -234,24 +301,41 @@ export default function Login() {
 
   const submit = async (e) => {
     e.preventDefault(); setLoading(true); setErr('')
+    const u = user.trim().toLowerCase()
+
+    /* 1. Try mercado auth */
     try {
-      const res  = await fetch('/api/auth', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ username:user.trim(), password:pass }) })
+      const res  = await fetch('/api/auth', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ username:u, password:pass }) })
       const data = await res.json()
       if (data.ok) {
         saveStoreId(data.storeId)
-        localStorage.setItem('cp_session', JSON.stringify({ loggedIn:true, user:user.trim(), storeId:data.storeId, storeName:data.storeName, role:'admin' }))
-        wipeLegacyFlatKeys()          // remove old flat-key contamination
-        registerStoreId(data.storeId) // mark this storeId as native to this browser
+        localStorage.setItem('cp_session', JSON.stringify({ loggedIn:true, user:u, storeId:data.storeId, storeName:data.storeName, role:'admin' }))
+        wipeLegacyFlatKeys()
+        registerStoreId(data.storeId)
         navigate(from, { replace:true }); return
       }
     } catch {}
+
+    /* 2. Try distribuidor auth */
+    try {
+      const res  = await fetch('/api/forn-auth', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ username:u, password:pass }) })
+      const data = await res.json()
+      if (data.ok) {
+        localStorage.setItem('cp_session_v1', JSON.stringify({ loggedIn:true, id:data.tenantId, username:u, storeName:data.storeName }))
+        navigate('/fornecedor', { replace:true }); return
+      }
+    } catch {}
+
+    /* 3. Fallback: local credentials (offline/seed) */
     const { username:lu, password:lp } = getCredentials()
-    if (user.trim()===lu && pass===lp) {
+    if (u === lu && pass === lp) {
       const sid = getConfiguredStoreId()
-      localStorage.setItem('cp_session', JSON.stringify({ loggedIn:true, user:user.trim(), storeId:sid, role:'admin' }))
+      localStorage.setItem('cp_session', JSON.stringify({ loggedIn:true, user:u, storeId:sid, role:'admin' }))
       registerStoreId(sid)
-      navigate(from, { replace:true })
-    } else { setErr('Usuário ou senha incorretos.'); setLoading(false) }
+      navigate(from, { replace:true }); return
+    }
+
+    setErr('Usuário ou senha incorretos.'); setLoading(false)
   }
 
   return (
@@ -267,7 +351,7 @@ export default function Login() {
         <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'40px 24px' }}>
           <div style={{ width:'100%', maxWidth:420 }}>
             <div style={{ display:'flex', background:'#eef2f7', border:`1px solid ${B.border}`, borderRadius:14, padding:4, marginBottom:28, gap:2 }}>
-              {[{ key:'acesso', label:'Entrar' },{ key:'cadastro', label:'Cadastrar' }].map(t => (
+              {[{ key:'acesso', label:'Entrar' },{ key:'cadastro', label:'Criar conta' }].map(t => (
                 <button key={t.key} className={`tab-pill ${tab===t.key?'active':''}`}
                   onClick={() => { setTab(t.key); setRecover(false) }}
                   style={{ flex:1, padding:'10px 8px', border:'none', cursor:'pointer', borderRadius:10, fontWeight:700, fontSize:13, color:tab===t.key?B.text:B.muted, background:'transparent' }}>
@@ -282,13 +366,13 @@ export default function Login() {
                   <>
                     <div style={{ marginBottom:24 }}>
                       <h1 style={{ fontSize:22, fontWeight:900, color:B.text, marginBottom:4 }}>Bem-vindo de volta</h1>
-                      <p style={{ color:B.muted, fontSize:14 }}>Entre com suas credenciais de acesso</p>
+                      <p style={{ color:B.muted, fontSize:14 }}>Funciona para mercados e distribuidoras</p>
                     </div>
                     <form onSubmit={submit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
                       <Inp label="Usuário" icon={User} value={user} onChange={e => { setUser(e.target.value); setErr('') }} placeholder="seu usuário" autoComplete="username" />
                       <Inp label="Senha" icon={Lock}
                         topRight={<button type="button" onClick={() => setRecover(true)} style={{ background:'none', border:'none', cursor:'pointer', color:B.blue, fontSize:12, fontWeight:700 }}>Esqueceu a senha?</button>}
-                        type={show?'text':'password'} value={pass} onChange={e => { setPass(e.target.value); setErr('') }} placeholder="..." autoComplete="current-password"
+                        type={show?'text':'password'} value={pass} onChange={e => { setPass(e.target.value); setErr('') }} placeholder="senha" autoComplete="current-password"
                         right={<button type="button" onClick={() => setShow(v => !v)} style={{ position:'absolute', right:13, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'#94a3b8', padding:0 }}>{show?<EyeOff size={16}/>:<Eye size={16}/>}</button>}
                       />
                       {err && (
@@ -314,10 +398,6 @@ export default function Login() {
 
             {tab==='cadastro' && (
               <div style={{ animation:'fadeUp .3s ease' }}>
-                <div style={{ marginBottom:24 }}>
-                  <h1 style={{ fontSize:22, fontWeight:900, color:B.text, marginBottom:4 }}>Cadastre seu mercado</h1>
-                  <p style={{ color:B.muted, fontSize:14 }}>Acesso criado em até 2 horas · Sem contrato</p>
-                </div>
                 <CadastroFlow />
               </div>
             )}

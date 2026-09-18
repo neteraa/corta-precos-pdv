@@ -711,8 +711,13 @@ export default function MasterPainel() {
       })
       if (res.ok) {
         setRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'approved', username: res.username } : r))
-        setMarkets(prev => [...prev, { storeName: req.mercado, username: res.username, storeId: res.storeId, active: true, email: req.email }])
-        alert(`✅ Acesso criado!\nUsuário: ${res.username}\nSenha: ${res.password}\n\n${res.emailResult?.sent ? 'Email enviado ao cliente!' : 'Envie as credenciais manualmente.'}`)
+        const isDistrib = res.tipo === 'distribuidor'
+        if (!isDistrib) {
+          setMarkets(prev => [...prev, { storeName: req.mercado, username: res.username, storeId: res.storeId, active: true, email: req.email }])
+        }
+        const loginUrl = isDistrib ? '/fornecedor' : '/login'
+        const emailInfo = res.emailResult?.sent ? '\nEmail enviado ao cliente!' : '\nEnvie as credenciais manualmente via WhatsApp.'
+        alert(`✅ Acesso criado!\n\nTipo: ${isDistrib ? 'Distribuidora' : 'Mercado'}\nUsuário: ${res.username}\nSenha: ${res.password}\nLogin: ${loginUrl}${emailInfo}`)
       }
     } catch { alert('Erro ao aprovar.') }
     setApproving(null)
@@ -934,6 +939,11 @@ export default function MasterPainel() {
                           }`}>
                             {isPending ? '⏳ Pendente' : isApproved ? '✅ Aprovado' : '❌ Rejeitado'}
                           </span>
+                          {req.tipo && (
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${req.tipo === 'distribuidor' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
+                              {req.tipo === 'distribuidor' ? '🚛 Distribuidora' : '🏪 Mercado'}
+                            </span>
+                          )}
                           <span className="text-gray-500 text-xs">{dt}</span>
                           {isApproved && req.username && (
                             <span className="text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full font-mono">@{req.username}</span>

@@ -31,32 +31,6 @@ function auth(req) {
   return new URL(req.url).searchParams.get('mk') === MASTER_KEY
 }
 
-/** Seed legacy megatudo on first access (same as forn-auth.js) */
-async function seedLegacy(store) {
-  const raw  = await store.get('distributors')
-  const list = raw ? JSON.parse(raw) : []
-  if (list.find(d => d.tenantId === 'mega')) return list
-
-  const salt = randomBytes(16).toString('hex')
-  list.push({
-    id:           'forn_mega',
-    tenantId:     'mega',
-    username:     'megatudo',
-    passwordHash: hashPwd('mega2024', salt),
-    salt,
-    storeName:    'Mega Tudo Barato',
-    storePhone:   '11 2815-1989',
-    themeColor:   '#f97316',
-    active:       true,
-    expiresAt:    null,
-    createdAt:    new Date().toISOString(),
-    lastLogin:    null,
-  })
-
-  await store.set('distributors', JSON.stringify(list))
-  return list
-}
-
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response('', { status: 204, headers: CORS })
 
@@ -67,7 +41,8 @@ export default async (req) => {
 
   // ── GET: list ──────────────────────────────────────────────
   if (req.method === 'GET') {
-    const list = await seedLegacy(store)
+    const raw  = await store.get('distributors')
+    const list = raw ? JSON.parse(raw) : []
     return new Response(JSON.stringify({
       ok: true,
       distributors: list.map(({ passwordHash, salt, ...safe }) => safe),
@@ -78,7 +53,8 @@ export default async (req) => {
   if (req.method === 'POST') {
     const body   = await req.json()
     const { action } = body
-    const list   = await seedLegacy(store)
+    const raw    = await store.get('distributors')
+    const list   = raw ? JSON.parse(raw) : []
 
     if (action === 'delete') {
       const next = list.filter(d => d.id !== body.id)

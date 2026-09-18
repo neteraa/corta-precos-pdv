@@ -125,28 +125,63 @@ export default async (req) => {
       return new Response(JSON.stringify({ ok: true }), { headers: CORS })
     }
 
-    /* ── approve: create market account ── */
+    /* ── approve: create account (mercado OR distribuidor) ── */
     if (action === 'approve') {
-      const req2 = list[idx]
+      const req2     = list[idx]
+      const isDistrib = (req2.tipo === 'distribuidor')
 
       // Generate credentials
-      const password  = genPass()
-      const salt      = randomBytes(16).toString('hex')
-      const pwdHash   = hashPwd(password, salt)
-      const username  = slugify(req2.mercado)
-      const storeId   = `${username}_${Date.now()}`
+      const password = genPass()
+      const salt     = randomBytes(16).toString('hex')
+      const username = slugify(req2.mercado || req2.empresa || 'mercado')
 
-      // Load markets and add new entry
+      if (isDistrib) {
+        // Create distribuidor account in zs-forn-auth store
+        const fornStore = getStore('zs-forn-auth')
+        const fornRaw   = await fornStore.get('distributors')
+        const fornList  = fornRaw ? JSON.parse(fornRaw) : []
+
+        const existsUser  = fornList.some(d => d.username === username)
+        const finalUser   = existsUser ? `${username}${fornList.length}` : username
+        const tenantId    = finalUser
+        const id          = `forn_${finalUser}`
+
+        fornList.push({
+          id, tenantId,
+          username:     finalUser,
+          passwordHash: hashPwd(password, salt),
+          salt,
+          storeName:    req2.mercado,
+          storePhone:   req2.telefone,
+          email:        req2.email || '',
+          themeColor:   '#22c55e',
+          active:       true,
+          plan:         'basic',
+          createdAt:    new Date().toISOString(),
+          requestId:    req2.id,
+        })
+        await fornStore.set('distributors', JSON.stringify(fornList))
+
+        list[idx].status     = 'approved'
+        list[idx].approvedAt = new Date().toISOString()
+        list[idx].username   = finalUser
+        list[idx].tenantId   = tenantId
+        await store.set('pending-requests', JSON.stringify(list))
+
+        return new Response(JSON.stringify({ ok:true, username:finalUser, password, tipo:'distribuidor', loginUrl:'/fornecedor' }), { headers: CORS })
+      }
+
+      // Create MERCADO account in zs-auth store
+      const storeId = `${username}_${Date.now()}`
       const mRaw    = await store.get('markets')
       const markets = mRaw ? JSON.parse(mRaw) : []
 
-      // Avoid duplicate username
       const existsUser = markets.some(m => m.username === username)
       const finalUser  = existsUser ? `${username}${markets.length}` : username
 
       const newMarket = {
         id:           storeId,
-        storeId:      storeId,
+        storeId,
         storeName:    req2.mercado,
         username:     finalUser,
         passwordHash: hashPwd(password, salt),
