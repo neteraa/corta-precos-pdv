@@ -54,7 +54,7 @@ export default async (req) => {
       return new Response(JSON.stringify({ ok: false, error: 'JSON inválido' }), { status: 400, headers: CORS })
     }
 
-    const { nome, mercado, cidade, telefone, email } = body
+    const { nome, mercado, cidade, telefone, email, tipo } = body
     if (!nome || !mercado || !cidade || !telefone) {
       return new Response(JSON.stringify({ ok: false, error: 'Campos obrigatórios: nome, mercado, cidade, telefone' }), { status: 400, headers: CORS })
     }
@@ -69,7 +69,8 @@ export default async (req) => {
       cidade:    cidade.trim(),
       telefone:  telefone.trim(),
       email:     (email || '').trim(),
-      status:    'pending',  // 'pending' | 'approved' | 'rejected'
+      tipo:      tipo || 'mercado',   // 'mercado' | 'distribuidor'
+      status:    'pending',
       createdAt: new Date().toISOString(),
     }
 
