@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, TrendingUp, AlertTriangle, CalendarClock, Mail } from 'lucide-react'
+import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, TrendingUp, AlertTriangle, CalendarClock, Mail, ClipboardList, CheckCircle2, XCircle, MessageCircle, Phone, MapPin } from 'lucide-react'
 import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
 
 /* ─── constants ──────────────────────────────────────────── */
@@ -613,22 +613,26 @@ export default function MasterPainel() {
   const [authed,       setAuthed]        = useState(false)
   const [markets,      setMarkets]       = useState([])
   const [distributors, setDistributors]  = useState([])
+  const [requests,     setRequests]      = useState([])
   const [loading,      setLoading]       = useState(false)
   const [err,          setErr]           = useState(null)
-  const [showAdd,      setShowAdd]       = useState(false)   // 'market' | 'dist' | false
-  const [tab,          setTab]           = useState('overview') // 'overview' | 'markets' | 'dist'
+  const [showAdd,      setShowAdd]       = useState(false)
+  const [tab,          setTab]           = useState('overview')
+  const [approving,    setApproving]     = useState(null) // id being processed
 
   const load = useCallback(async (key = mk) => {
     if (!key) return
     setLoading(true); setErr(null)
     try {
-      const [mRes, dRes] = await Promise.all([
+      const [mRes, dRes, rRes] = await Promise.all([
         api('/api/markets-admin', key),
         api('/api/forn-admin', key),
+        api('/api/request-admin', key),
       ])
       if (!mRes.ok) { setErr('Chave master incorreta.'); setAuthed(false); return }
       setMarkets(mRes.markets || [])
       setDistributors(dRes.ok ? (dRes.distributors || []) : [])
+      setRequests(rRes.ok ? (rRes.requests || []) : [])
       setAuthed(true)
     } catch {
       setErr('Erro de conexão. Verifique sua rede.')
@@ -696,11 +700,42 @@ export default function MasterPainel() {
     </div>
   )
 
+  const pendingCount = requests.filter(r => r.status === 'pending').length
+
+  const approveRequest = async (req) => {
+    setApproving(req.id)
+    try {
+      const res = await api('/api/request-admin', mk, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'approve', id: req.id }),
+      })
+      if (res.ok) {
+        setRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'approved', username: res.username } : r))
+        setMarkets(prev => [...prev, { storeName: req.mercado, username: res.username, storeId: res.storeId, active: true, email: req.email }])
+        alert(`✅ Acesso criado!\nUsuário: ${res.username}\nSenha: ${res.password}\n\n${res.emailResult?.sent ? 'Email enviado ao cliente!' : 'Envie as credenciais manualmente.'}`)
+      }
+    } catch { alert('Erro ao aprovar.') }
+    setApproving(null)
+  }
+
+  const rejectRequest = async (id) => {
+    if (!confirm('Rejeitar esta solicitação?')) return
+    await api('/api/request-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'reject', id }) })
+    setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'rejected' } : r))
+  }
+
+  const deleteRequest = async (id) => {
+    if (!confirm('Excluir esta solicitação?')) return
+    await api('/api/request-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'delete', id }) })
+    setRequests(prev => prev.filter(r => r.id !== id))
+  }
+
   /* ── authenticated layout ── */
   const TABS = [
-    { id: 'overview', label: 'Visão Geral',    icon: BarChart2 },
-    { id: 'markets',  label: `Mercados (${markets.length})`,  icon: Store  },
-    { id: 'dist',     label: `Distribuidores (${distributors.length})`, icon: Truck  },
+    { id: 'overview',  label: 'Visão Geral',                                         icon: BarChart2     },
+    { id: 'requests',  label: pendingCount > 0 ? `Solicitações (${pendingCount})` : 'Solicitações', icon: ClipboardList },
+    { id: 'markets',   label: `Mercados (${markets.length})`,                         icon: Store         },
+    { id: 'dist',      label: `Distribuidores (${distributors.length})`,              icon: Truck         },
   ]
 
   return (
@@ -736,7 +771,7 @@ export default function MasterPainel() {
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
               <span className="hidden sm:block">Atualizar</span>
             </button>
-            {tab !== 'overview' && (
+            {(tab === 'markets' || tab === 'dist') && (
               <button onClick={() => setShowAdd(tab === 'markets' ? 'market' : 'dist')}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black transition-colors">
                 <Plus className="w-3.5 h-3.5" />
@@ -757,7 +792,9 @@ export default function MasterPainel() {
               <StatCard label="Clientes ativos"   value={allActive}         sub={`de ${totalAll} cadastrados`}      color="#f97316" />
               <StatCard label="Mercados"           value={markets.length}    sub={`${mActive.length} ativos`}        color="#8b5cf6" />
               <StatCard label="Distribuidores"     value={distributors.length} sub={`${dActive.length} ativos`}     color="#10b981" />
-              <StatCard label="Acessaram hoje"     value={recent24.length}   sub="últimas 24h"                      color="#0ea5e9" />
+              <button onClick={() => setTab('requests')} className="text-left hover:scale-105 transition-transform">
+                <StatCard label="Solicitações"     value={pendingCount}      sub={pendingCount > 0 ? '⏳ aguardando aprovação' : 'nenhuma pendente'} color={pendingCount > 0 ? '#eab308' : '#64748b'} />
+              </button>
             </div>
 
             {/* alert rows */}
@@ -850,7 +887,117 @@ export default function MasterPainel() {
           </div>
         )}
 
-        {/* ── MERCADOS ── */}
+        {/* ── SOLICITAÇÕES ── */}
+        {tab === 'requests' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black text-white">Solicitações de cadastro</h2>
+                <p className="text-gray-400 text-sm mt-1">{pendingCount} pendente{pendingCount !== 1 ? 's' : ''} · {requests.length} total</p>
+              </div>
+              {pendingCount > 0 && (
+                <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/30 px-3 py-1.5 rounded-xl">
+                  <AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />
+                  <span className="text-yellow-400 text-xs font-bold">{pendingCount} aguardando aprovação</span>
+                </div>
+              )}
+            </div>
+
+            {requests.length === 0 && (
+              <div className="text-center py-20 text-gray-600">
+                <ClipboardList className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                <p className="font-bold text-lg">Nenhuma solicitação ainda</p>
+                <p className="text-sm mt-1">Quando um mercado solicitar cadastro pelo site, aparece aqui.</p>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {[...requests].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)).map(req => {
+                const isPending  = req.status === 'pending'
+                const isApproved = req.status === 'approved'
+                const isRejected = req.status === 'rejected'
+                const dt = new Date(req.createdAt).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
+                return (
+                  <div key={req.id} className={`rounded-2xl border p-5 ${
+                    isPending  ? 'bg-gray-800/60 border-gray-700' :
+                    isApproved ? 'bg-green-500/5 border-green-500/20' :
+                    'bg-gray-800/30 border-gray-800 opacity-60'
+                  }`}>
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                      {/* info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-3 flex-wrap">
+                          <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                            isPending  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                            isApproved ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                            'bg-gray-700 text-gray-400'
+                          }`}>
+                            {isPending ? '⏳ Pendente' : isApproved ? '✅ Aprovado' : '❌ Rejeitado'}
+                          </span>
+                          <span className="text-gray-500 text-xs">{dt}</span>
+                          {isApproved && req.username && (
+                            <span className="text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full font-mono">@{req.username}</span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="flex items-center gap-2">
+                            <Store className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                            <span className="text-white font-bold text-sm">{req.mercado}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400 text-sm">{req.nome}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Phone className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                            <a href={`https://wa.me/55${req.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
+                              className="text-green-400 text-sm hover:underline">{req.telefone}</a>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                            <span className="text-gray-400 text-sm">{req.cidade}</span>
+                          </div>
+                          {req.email && (
+                            <div className="flex items-center gap-2 sm:col-span-2">
+                              <Mail className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                              <span className="text-gray-400 text-sm">{req.email}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* actions */}
+                      {isPending && (
+                        <div className="flex gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => rejectRequest(req.id)}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-700 hover:bg-red-500/20 hover:border-red-500/30 border border-gray-600 text-gray-300 hover:text-red-400 text-xs font-bold transition-colors">
+                            <XCircle className="w-3.5 h-3.5" /> Rejeitar
+                          </button>
+                          <button
+                            onClick={() => approveRequest(req)}
+                            disabled={approving === req.id}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white text-xs font-black transition-colors">
+                            {approving === req.id
+                              ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              : <CheckCircle2 className="w-3.5 h-3.5" />}
+                            Aprovar e criar acesso
+                          </button>
+                        </div>
+                      )}
+                      {!isPending && (
+                        <button onClick={() => deleteRequest(req.id)}
+                          className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {tab === 'markets' && (
           markets.length === 0 ? (
             <div className="text-center py-20 text-gray-500">

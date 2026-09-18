@@ -129,9 +129,17 @@ function CadastroFlow() {
     if (!form.telefone.trim()) e.telefone = 'Informe o WhatsApp'
     setErrs(e); return Object.keys(e).length === 0
   }
-  const solicitar = () => {
-    openWpp(`Solicitação de cadastro — ZatendeStock\n\nNome: ${form.nome}\nMercado: ${form.mercado}\nCidade: ${form.cidade}\nWhatsApp: ${form.telefone}\n\nQuero começar a usar o ZatendeStock!`)
-    setSent(true)
+  const solicitar = async () => {
+    setSent(true) // Optimistic UI
+    try {
+      await fetch('/api/request-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+    } catch { /* funciona mesmo offline — admin verifica WPP */ }
+    // Also notify admin via WhatsApp as backup
+    openWpp(`🛒 *Solicitação de cadastro — ZatendeStock*\n\n👤 Nome: *${form.nome}*\n🏪 Mercado: *${form.mercado}*\n📍 Cidade: *${form.cidade}*\n📱 WhatsApp: *${form.telefone}*\n\nQuero começar a usar o ZatendeStock! 🚀`)
   }
   if (sent) return (
     <div style={{ textAlign:'center', animation:'fadeUp .3s ease' }}>
