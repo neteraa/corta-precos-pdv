@@ -68,9 +68,16 @@ function ColorPicker({ value, onChange }) {
   const selectedEntry = PALETTE.flatMap(g => g.colors).find(c => c.v === value)
   const shades = selectedEntry?.shades || []
 
+  // Apply color instantly to CSS variable so ALL themed elements update live (no flash, no wait-for-save)
+  const apply = (v) => {
+    document.documentElement.style.setProperty('--zs-theme', v)
+    onChange(v)
+    setHexInput(v)
+  }
+
   const handleHex = (v) => {
     setHexInput(v)
-    if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange(v)
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) apply(v)
   }
 
   return (
@@ -83,7 +90,7 @@ function ColorPicker({ value, onChange }) {
             <div style={{ display: 'flex', gap: 6 }}>
               {colors.map(({ name, v, shades: sh }) => (
                 <button key={v} title={name}
-                  onClick={() => { onChange(v); setHexInput(v) }}
+                  onClick={() => apply(v)}
                   onMouseEnter={() => setHoveredShade(v)}
                   onMouseLeave={() => setHoveredShade(null)}
                   style={{
@@ -105,7 +112,7 @@ function ColorPicker({ value, onChange }) {
           <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', letterSpacing: '.03em' }}>TONALIDADES — {selectedEntry.name}</span>
           <div style={{ display: 'flex', gap: 5 }}>
             {shades.map((s, i) => (
-              <button key={s} title={s} onClick={() => { onChange(s); setHexInput(s) }}
+              <button key={s} title={s} onClick={() => apply(s)}
                 style={{
                   flex: 1, height: 26, borderRadius: 8, border: 'none', cursor: 'pointer',
                   background: s, transition: 'transform .1s',
@@ -124,7 +131,7 @@ function ColorPicker({ value, onChange }) {
           <div style={{ width: 20, height: 20, borderRadius: 5, background: previewColor, border: '1px solid rgba(0,0,0,.1)', flexShrink: 0 }} />
           <input value={hexInput} onChange={e => handleHex(e.target.value)}
             style={{ width: 80, border: 'none', background: 'transparent', fontSize: 13, fontFamily: 'monospace', fontWeight: 700, color: '#111', outline: 'none' }} />
-          <input type="color" value={value} onChange={e => { onChange(e.target.value); setHexInput(e.target.value) }}
+          <input type="color" value={value} onChange={e => apply(e.target.value)}
             style={{ width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4, cursor: 'pointer', background: 'transparent' }} title="Roda de cores" />
         </div>
 
@@ -461,19 +468,23 @@ export default function Configuracoes() {
                 <div style={{ fontSize: 12, color: '#9ca3af' }}>Aparece na sidebar, terminal e cupom. Sem logo, usa o ícone padrão.</div>
               )
             }
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1px dashed #d1d5db', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#6b7280', background: '#f9fafb' }}>
+            <button
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1px dashed #d1d5db', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#6b7280', background: '#f9fafb' }}
+              onClick={() => document.getElementById('_logo_file_input').click()}
+            >
               <Upload className="w-3 h-3" />
               {settings.logoImage ? 'Trocar logo' : 'Enviar logo'}
-              <input type="file" accept="image/*" style={{ display: 'none' }}
-                onChange={e => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  if (file.size > 300_000) { alert('Logo muito grande. Use até 300KB.'); return }
-                  const reader = new FileReader()
-                  reader.onload = ev => setSettings(s => ({ ...s, logoImage: ev.target.result }))
-                  reader.readAsDataURL(file)
-                }} />
-            </label>
+            </button>
+            <input id="_logo_file_input" type="file" accept="image/*,image/svg+xml" style={{ display: 'none' }}
+              onChange={e => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                if (file.size > 1_000_000) { alert('Logo muito grande. Use uma imagem menor que 1MB (idealmente PNG/SVG otimizado).'); return }
+                const reader = new FileReader()
+                reader.onload = () => setSettings(s => ({ ...s, logoImage: reader.result }))
+                reader.onerror = () => alert('Erro ao ler a imagem. Tente outro arquivo.')
+                reader.readAsDataURL(file)
+              }} />
           </div>
         </div>
 

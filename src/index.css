@@ -7,12 +7,13 @@
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition-all;
+    @apply inline-flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg;
     background-color: var(--zs-theme);
+    transition: filter 0.12s ease, opacity 0.12s ease;
   }
-  .btn-primary:hover  { filter: brightness(0.88); }
-  .btn-primary:active { filter: brightness(0.78); }
-  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+  .btn-primary:hover  { filter: brightness(0.86); }
+  .btn-primary:active { filter: brightness(0.74) scale(0.98); }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; filter: none; pointer-events: none; }
   .btn-ghost {
     @apply inline-flex items-center gap-2 px-4 py-2 border border-gray-300 hover:bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg transition-colors;
   }

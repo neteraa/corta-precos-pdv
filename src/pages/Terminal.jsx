@@ -1068,9 +1068,9 @@ export default function Terminal() {
             ) : (
               /* ── PIN keypad ── */
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }} key={pinTarget.id}>
-                {/* PIN dots */}
+                {/* PIN dots — count matches the target PIN's length */}
                 <div style={{ display: 'flex', gap: 12, animation: pinError ? 'pinShake .4s ease' : 'none' }}>
-                  {[0,1,2,3,4,5].map(i => (
+                  {Array.from({ length: Math.max(pinTarget.pin.length, 4) }).map((_, i) => (
                     <div key={i} style={{ width: 16, height: 16, borderRadius: '50%', background: i < pinInput.length ? acc : bg3, border: `2px solid ${i < pinInput.length ? acc : brd}`, transition: 'background .15s' }} />
                   ))}
                 </div>
@@ -1078,23 +1078,39 @@ export default function Terminal() {
 
                 {/* numeric keypad */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, width: 240 }}>
-                  {[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map((k, i) => (
-                    <button key={i} disabled={k === ''}
-                      onClick={() => {
-                        if (k === '⌫') { setPinInput(p => p.slice(0,-1)); return }
-                        if (k === '') return
-                        const next = pinInput + k
-                        setPinInput(next)
-                        if (next.length >= 6) setTimeout(() => {
-                          if (next === pinTarget.pin) { setActiveOperator(pinTarget); setPinTarget(null); setPinInput('') }
-                          else { setPinError(true); setPinInput(''); setTimeout(() => setPinError(false), 1200) }
-                        }, 100)
-                      }}
-                      style={{ height: 60, borderRadius: 14, background: k === '' ? 'transparent' : bg2, border: k === '' ? 'none' : `1.5px solid ${brd}`, color: txt, fontSize: k === '⌫' ? 20 : 22, fontWeight: 900, cursor: k === '' ? 'default' : 'pointer', transition: 'background .1s, border-color .1s' }}
-                      onMouseEnter={e => { if (k !== '') { e.currentTarget.style.background = bg3; e.currentTarget.style.borderColor = acc }}}
-                      onMouseLeave={e => { if (k !== '') { e.currentTarget.style.background = bg2; e.currentTarget.style.borderColor = brd }}}
-                    >{k}</button>
-                  ))}
+                  {[1,2,3,4,5,6,7,8,9,'✓',0,'⌫'].map((k, i) => {
+                    const isEnter = k === '✓'
+                    const isDel   = k === '⌫'
+                    return (
+                      <button key={i}
+                        onClick={() => {
+                          if (isDel) { setPinInput(p => p.slice(0,-1)); return }
+                          if (isEnter) {
+                            if (!pinInput) return
+                            if (pinInput === pinTarget.pin) { setActiveOperator(pinTarget); setPinTarget(null); setPinInput('') }
+                            else { setPinError(true); setPinInput(''); setTimeout(() => setPinError(false), 1200) }
+                            return
+                          }
+                          const next = pinInput + k
+                          setPinInput(next)
+                          // Auto-confirm when the entered PIN matches the stored PIN's length
+                          if (next.length >= pinTarget.pin.length) setTimeout(() => {
+                            if (next === pinTarget.pin) { setActiveOperator(pinTarget); setPinTarget(null); setPinInput('') }
+                            else { setPinError(true); setPinInput(''); setTimeout(() => setPinError(false), 1200) }
+                          }, 120)
+                        }}
+                        style={{
+                          height: 60, borderRadius: 14, border: `1.5px solid ${isEnter ? acc : brd}`,
+                          background: isEnter ? acc + '22' : bg2,
+                          color: isEnter ? acc : txt,
+                          fontSize: isDel ? 20 : isEnter ? 24 : 22,
+                          fontWeight: 900, cursor: 'pointer', transition: 'background .1s, border-color .1s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = isEnter ? acc + '44' : bg3; e.currentTarget.style.borderColor = acc }}
+                        onMouseLeave={e => { e.currentTarget.style.background = isEnter ? acc + '22' : bg2; e.currentTarget.style.borderColor = isEnter ? acc : brd }}
+                      >{k}</button>
+                    )
+                  })}
                 </div>
 
                 <button onClick={() => { setPinTarget(null); setPinInput('') }}
