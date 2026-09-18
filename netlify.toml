@@ -24,17 +24,6 @@
   to     = "/.netlify/functions/wa-bot"
   status = 200
 
-# WhatsApp status/QR proxy — usado pelo painel de configurações
-[[redirects]]
-  from   = "/api/wa-status"
-  to     = "/.netlify/functions/wa-status"
-  status = 200
-
-# WhatsApp send proxy — envia mensagens via Evolution API (API key server-side)
-[[redirects]]
-  from   = "/api/wa-send"
-  to     = "/.netlify/functions/wa-send"
-  status = 200
 
 [[redirects]]
   from   = "/*"

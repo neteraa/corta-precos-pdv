@@ -131,4 +131,4 @@ export default async (req) => {
   }
 }
 
-export const config = { path: '/wa-status' }
+export const config = { path: '/api/wa-status' }

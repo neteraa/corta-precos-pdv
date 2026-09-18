@@ -42,4 +42,4 @@ export default async (req) => {
   }
 }
 
-export const config = { path: '/wa-send' }
+export const config = { path: '/api/wa-send' }
