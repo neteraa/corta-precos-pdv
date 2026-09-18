@@ -60,24 +60,21 @@ const PALETTE = [
 ]
 
 function ColorPicker({ value, onChange }) {
-  const [hoveredShade, setHoveredShade] = useState(null)
   const [hexInput, setHexInput] = useState(value)
-  const previewColor = hoveredShade || value
 
-  // Find shades for the current selected color
   const selectedEntry = PALETTE.flatMap(g => g.colors).find(c => c.v === value)
   const shades = selectedEntry?.shades || []
 
-  // Apply color instantly to CSS variable so ALL themed elements update live (no flash, no wait-for-save)
+  // Applies color: updates CSS var immediately (live UI) + form state + hex input
   const apply = (v) => {
     document.documentElement.style.setProperty('--zs-theme', v)
     onChange(v)
     setHexInput(v)
   }
 
-  const handleHex = (v) => {
-    setHexInput(v)
-    if (/^#[0-9a-fA-F]{6}$/.test(v)) apply(v)
+  const handleHex = (raw) => {
+    setHexInput(raw)
+    if (/^#[0-9a-fA-F]{6}$/.test(raw)) apply(raw)
   }
 
   return (
@@ -88,17 +85,14 @@ function ColorPicker({ value, onChange }) {
           <div key={group} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', width: 90, flexShrink: 0, letterSpacing: '.03em' }}>{group}</span>
             <div style={{ display: 'flex', gap: 6 }}>
-              {colors.map(({ name, v, shades: sh }) => (
-                <button key={v} title={name}
-                  onClick={() => apply(v)}
-                  onMouseEnter={() => setHoveredShade(v)}
-                  onMouseLeave={() => setHoveredShade(null)}
+              {colors.map(({ name, v }) => (
+                <button key={v} title={name} onClick={() => apply(v)}
                   style={{
                     width: 30, height: 30, borderRadius: '50%', border: 'none', cursor: 'pointer',
-                    background: v, flexShrink: 0, transition: 'transform .12s, box-shadow .12s',
-                    transform: value === v ? 'scale(1.25)' : 'scale(1)',
+                    background: v, flexShrink: 0, outline: 'none',
+                    transition: 'transform .12s, box-shadow .12s',
+                    transform: value === v ? 'scale(1.28)' : 'scale(1)',
                     boxShadow: value === v ? `0 0 0 2px white, 0 0 0 4px ${v}` : '0 1px 4px rgba(0,0,0,.15)',
-                    outline: 'none',
                   }} />
               ))}
             </div>
@@ -106,19 +100,20 @@ function ColorPicker({ value, onChange }) {
         ))}
       </div>
 
-      {/* Shade strip — shows when a palette color is selected */}
+      {/* Shade strip */}
       {shades.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', letterSpacing: '.03em' }}>TONALIDADES — {selectedEntry.name}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', letterSpacing: '.03em' }}>
+            TONALIDADES — {selectedEntry.name}
+          </span>
           <div style={{ display: 'flex', gap: 5 }}>
-            {shades.map((s, i) => (
+            {shades.map(s => (
               <button key={s} title={s} onClick={() => apply(s)}
                 style={{
-                  flex: 1, height: 26, borderRadius: 8, border: 'none', cursor: 'pointer',
+                  flex: 1, height: 26, borderRadius: 8, border: 'none', cursor: 'pointer', outline: 'none',
                   background: s, transition: 'transform .1s',
-                  transform: value === s ? 'scaleY(1.3)' : 'scaleY(1)',
+                  transform: value === s ? 'scaleY(1.32)' : 'scaleY(1)',
                   boxShadow: value === s ? `0 0 0 2px white, 0 0 0 3px ${s}` : 'none',
-                  outline: 'none',
                 }} />
             ))}
           </div>
@@ -128,20 +123,20 @@ function ColorPicker({ value, onChange }) {
       {/* Hex input + color wheel + live preview */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10 }}>
-          <div style={{ width: 20, height: 20, borderRadius: 5, background: previewColor, border: '1px solid rgba(0,0,0,.1)', flexShrink: 0 }} />
+          <div style={{ width: 20, height: 20, borderRadius: 5, background: value, border: '1px solid rgba(0,0,0,.1)', flexShrink: 0 }} />
           <input value={hexInput} onChange={e => handleHex(e.target.value)}
             style={{ width: 80, border: 'none', background: 'transparent', fontSize: 13, fontFamily: 'monospace', fontWeight: 700, color: '#111', outline: 'none' }} />
           <input type="color" value={value} onChange={e => apply(e.target.value)}
-            style={{ width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4, cursor: 'pointer', background: 'transparent' }} title="Roda de cores" />
+            style={{ width: 24, height: 24, padding: 0, border: 'none', borderRadius: 4, cursor: 'pointer', background: 'transparent' }} title="Cor personalizada (roda de cores)" />
         </div>
 
-        {/* Live mini preview */}
+        {/* Live mini preview using the actual CSS variable */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 12, border: '1px solid #e5e7eb', background: '#f9fafb' }}>
-          <div style={{ width: 10, height: 24, borderRadius: 4, background: previewColor }} />
+          <div style={{ width: 10, height: 24, borderRadius: 4, background: 'var(--zs-theme)' }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-              <div style={{ padding: '2px 10px', borderRadius: 6, background: previewColor, color: '#fff', fontSize: 10, fontWeight: 900 }}>BOTÃO</div>
-              <div style={{ padding: '2px 8px', borderRadius: 20, background: previewColor + '22', color: previewColor, fontSize: 10, fontWeight: 700, border: `1px solid ${previewColor}44` }}>TAG</div>
+              <div style={{ padding: '2px 10px', borderRadius: 6, background: 'var(--zs-theme)', color: '#fff', fontSize: 10, fontWeight: 900 }}>BOTÃO</div>
+              <div style={{ padding: '2px 8px', borderRadius: 20, background: 'color-mix(in srgb, var(--zs-theme) 15%, transparent)', color: 'var(--zs-theme)', fontSize: 10, fontWeight: 700, border: '1px solid color-mix(in srgb, var(--zs-theme) 35%, transparent)' }}>TAG</div>
             </div>
             <div style={{ fontSize: 10, color: '#6b7280', fontWeight: 600 }}>Preview ao vivo</div>
           </div>
@@ -245,7 +240,7 @@ function AddOperatorForm({ onAdd }) {
           />
         </div>
         <div>
-          <label className="label text-xs">{form.role === 'caixa' ? '📟 Terminal' : 'Terminal'}</label>
+          <label className="label text-xs">{form.role === 'caixa' ? '📟 Terminal (nº do caixa)' : 'Terminal'}</label>
           <input
             type="number" min={1} max={20}
             className="input text-center font-bold"
@@ -254,12 +249,14 @@ function AddOperatorForm({ onAdd }) {
             disabled={form.role !== 'caixa'}
             style={{ opacity: form.role !== 'caixa' ? 0.35 : 1 }}
           />
+          {form.role === 'caixa' && <p className="text-[10px] text-gray-400 mt-1">Caixa 1, 2, 3… — separa o carrinho por terminal</p>}
         </div>
       </div>
 
       {/* PIN field with dot preview */}
       <div>
         <label className="label text-xs">PIN de acesso (opcional)</label>
+        <p className="text-[10px] text-gray-400 mb-1.5">4 a 6 dígitos numéricos · ex: 1234 ou 198556</p>
         <div className="relative">
           <input
             className="input pr-24 font-mono tracking-widest"
@@ -279,7 +276,9 @@ function AddOperatorForm({ onAdd }) {
             ))}
           </div>
         </div>
-        {!form.pin && <p className="text-[10px] text-gray-400 mt-1">Sem PIN = funcionário entra sem senha</p>}
+        <p className="text-[10px] text-gray-400 mt-1">
+          {form.pin ? `✓ PIN com ${form.pin.length} dígito${form.pin.length > 1 ? 's' : ''} definido` : 'Sem PIN = funcionário entra direto, sem pedir senha'}
+        </p>
       </div>
 
       {/* Submit */}
@@ -435,23 +434,24 @@ export default function Configuracoes() {
       {/* ── Dados da loja ──────────────────────────────────────── */}
       <Section icon={Store} title="Dados da Loja">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Nome da loja">
-            <input className="input" value={form.storeName} onChange={e => set('storeName', e.target.value)} placeholder="Ex: Mercado do João" />
+          <Field label="Nome da loja" hint="Aparece no cupom, sidebar e no terminal de caixa">
+            <input className="input" maxLength={40} value={form.storeName} onChange={e => set('storeName', e.target.value)} placeholder="Ex: Mercado do João" />
           </Field>
-          <Field label="Telefone / WhatsApp">
-            <input className="input" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(11) 99999-9999" />
+          <Field label="Telefone / WhatsApp" hint="Com DDD — ex: (15) 99660-4075 · usado no link do cupom">
+            <input className="input" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(15) 99999-9999" />
           </Field>
-          <Field label="Endereço (opcional)">
-            <input className="input" value={form.address} onChange={e => set('address', e.target.value)} />
+          <Field label="Endereço (opcional)" hint="Impresso no rodapé do cupom térmico">
+            <input className="input" value={form.address} onChange={e => set('address', e.target.value)} placeholder="Rua Exemplo, 123 — Bairro" />
           </Field>
-          <Field label="Instagram (sem @)">
+          <Field label="Instagram (sem @)" hint="Aparece no cupom — ex: meumercado">
             <input className="input" value={form.instagram} onChange={e => set('instagram', e.target.value)} placeholder="meumercado" />
           </Field>
         </div>
 
         {/* Logo da loja */}
         <div className="mt-4">
-          <label className="label mb-2"><Image className="w-3 h-3 inline mr-1" />Logo da Loja</label>
+          <label className="label mb-1"><Image className="w-3 h-3 inline mr-1" />Logo da Loja</label>
+          <p className="text-xs text-gray-400 mb-2">PNG, JPG ou SVG · tamanho máx. 1 MB · fundo transparente fica melhor na sidebar escura</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             {settings.logoImage
               ? (
@@ -461,11 +461,11 @@ export default function Configuracoes() {
                   </div>
                   <button onClick={() => setSettings(s => ({ ...s, logoImage: '' }))}
                     className="text-xs text-red-500 hover:text-red-700 font-semibold">
-                    ✕ Remover
+                    ✕ Remover logo
                   </button>
                 </div>
               ) : (
-                <div style={{ fontSize: 12, color: '#9ca3af' }}>Aparece na sidebar, terminal e cupom. Sem logo, usa o ícone padrão.</div>
+                <div style={{ fontSize: 12, color: '#9ca3af' }}>Sem logo — usando ícone padrão ZatendeStok</div>
               )
             }
             <button
@@ -479,10 +479,10 @@ export default function Configuracoes() {
               onChange={e => {
                 const file = e.target.files?.[0]
                 if (!file) return
-                if (file.size > 1_000_000) { alert('Logo muito grande. Use uma imagem menor que 1MB (idealmente PNG/SVG otimizado).'); return }
+                if (file.size > 1_000_000) { alert('Imagem muito grande (máx. 1 MB).\nDica: use um PNG comprimido ou SVG vetorial.'); return }
                 const reader = new FileReader()
                 reader.onload = () => setSettings(s => ({ ...s, logoImage: reader.result }))
-                reader.onerror = () => alert('Erro ao ler a imagem. Tente outro arquivo.')
+                reader.onerror = () => alert('Erro ao ler a imagem. Tente outro formato (PNG ou SVG).')
                 reader.readAsDataURL(file)
               }} />
           </div>
@@ -490,7 +490,8 @@ export default function Configuracoes() {
 
         {/* Cor do tema */}
         <div className="mt-5">
-          <label className="label mb-3"><Palette className="w-3 h-3 inline mr-1" />Identidade Visual — Cor do Sistema</label>
+          <label className="label mb-1"><Palette className="w-3 h-3 inline mr-1" />Identidade Visual — Cor do Sistema</label>
+          <p className="text-xs text-gray-400 mb-3">A cor muda botões, sidebar e terminal em tempo real. Clique em Salvar para persistir.</p>
           <ColorPicker value={form.themeColor} onChange={v => set('themeColor', v)} />
         </div>
 
@@ -652,14 +653,14 @@ export default function Configuracoes() {
             />
           </Field>
           <div /> {/* spacer */}
-          <Field label="Nova senha">
+          <Field label="Nova senha" hint="Mínimo 6 caracteres · deixe em branco para manter a atual">
             <div className="relative">
               <input
                 type={showPass ? 'text' : 'password'}
                 className="input pr-10"
                 value={authForm.newPass}
                 onChange={e => setAuthForm(f => ({ ...f, newPass: e.target.value }))}
-                placeholder="mínimo 4 caracteres"
+                placeholder="mínimo 6 caracteres"
               />
               <button type="button" onClick={() => setShowPass(v => !v)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">

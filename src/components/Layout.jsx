@@ -82,8 +82,6 @@ function SidebarLogo() {
   const { settings } = usePrinter()
   const session = (() => { try { return JSON.parse(localStorage.getItem('cp_session') || '{}') } catch { return {} } })()
   const name    = session.storeName || settings.storeName || 'MEU MERCADO'
-  const color   = settings.themeColor || '#f97316'
-  const colorDk = color + 'cc'
   const logoImg = settings.logoImage
 
   return (
@@ -95,9 +93,9 @@ function SidebarLogo() {
           : <ZatendeStokLogo variant="wordmark" />
         }
       </div>
-      {/* store name badge */}
+      {/* store name badge — uses CSS var so it follows the picker live */}
       <div className="relative overflow-hidden rounded-xl px-3 py-2.5 shadow-lg"
-        style={{ background: `linear-gradient(135deg, ${color}, ${colorDk})`, boxShadow: `0 8px 24px ${color}40` }}>
+        style={{ background: 'linear-gradient(135deg, var(--zs-theme), color-mix(in srgb, var(--zs-theme) 70%, black))', boxShadow: '0 8px 24px color-mix(in srgb, var(--zs-theme) 35%, transparent)' }}>
         <div className="relative flex items-center gap-2">
           <div className="w-5 h-5 bg-black/20 rounded-md flex items-center justify-center shrink-0">
             <Store className="w-3 h-3 text-white" />
@@ -110,7 +108,8 @@ function SidebarLogo() {
 }
 
 /* ── nav section ──────────────────────────────────────────── */
-function NavSection({ title, items, onClose, color = '#f97316' }) {
+// Uses var(--zs-theme) so active states update instantly when theme changes (no save needed).
+function NavSection({ title, items, onClose }) {
   return (
     <div className="mb-1">
       <div className="px-4 mb-1 text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: '#6b7280' }}>
@@ -118,23 +117,21 @@ function NavSection({ title, items, onClose, color = '#f97316' }) {
       </div>
       {items.map(({ to, icon: Icon, label, badge, hot }) => (
         <NavLink key={to} to={to} onClick={onClose}
-          className="group relative flex items-center gap-3 mx-2 px-3 py-2 rounded-xl text-[13px] font-semibold text-gray-400 transition-all duration-150"
+          className="group relative flex items-center gap-3 mx-2 px-3 py-2 rounded-xl text-[13px] font-semibold transition-colors duration-150"
         >
           {({ isActive }) => (
             <>
-              <span className="absolute inset-0 rounded-xl pointer-events-none transition-all duration-150"
-                style={isActive
-                  ? { background: `${color}22`, boxShadow: `inset 0 0 0 1px ${color}40` }
-                  : {}} />
+              <span className="absolute inset-0 rounded-xl pointer-events-none"
+                style={isActive ? { background: 'color-mix(in srgb, var(--zs-theme) 16%, transparent)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--zs-theme) 35%, transparent)' } : {}} />
               {isActive && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full" style={{ background: color }} />
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full" style={{ background: 'var(--zs-theme)' }} />
               )}
-              <Icon className="w-4 h-4 flex-shrink-0 transition-colors"
-                style={{ color: isActive ? color : '#9ca3af' }}
+              <Icon className="w-4 h-4 flex-shrink-0"
+                style={{ color: isActive ? 'var(--zs-theme)' : '#9ca3af' }}
               />
-              <span className="flex-1" style={{ color: isActive ? color : '#d1d5db' }}>{label}</span>
+              <span className="flex-1" style={{ color: isActive ? 'var(--zs-theme)' : '#d1d5db' }}>{label}</span>
               {hot && !badge && (
-                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: color }} />
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--zs-theme)' }} />
               )}
               {badge && (
                 <span className="text-[9px] font-black bg-green-500/20 text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded-full leading-none">
@@ -231,9 +228,9 @@ export default function Layout() {
 
         {/* nav — min-h-0 is required so flex-1 can actually shrink and overflow-y-auto activates */}
         <nav className="flex-1 min-h-0 overflow-y-auto pb-3 space-y-2">
-          <NavSection title="Caixa"   items={filterByRole(CAIXA, role)}   onClose={() => setOpen(false)} color={themeColor} />
-          <NavSection title="Gestão"  items={filterByRole(GESTAO, role)}  onClose={() => setOpen(false)} color={themeColor} />
-          {dynamicExtras.length > 0 && <NavSection title="Extras" items={dynamicExtras} onClose={() => setOpen(false)} color={themeColor} />}
+          <NavSection title="Caixa"   items={filterByRole(CAIXA, role)}   onClose={() => setOpen(false)} />
+          <NavSection title="Gestão"  items={filterByRole(GESTAO, role)}  onClose={() => setOpen(false)} />
+          {dynamicExtras.length > 0 && <NavSection title="Extras" items={dynamicExtras} onClose={() => setOpen(false)} />}
 
           {/* ── inline shortcuts — inside scroll so nada fica cortado ── */}
           <div className="px-2 pt-1 space-y-1">
