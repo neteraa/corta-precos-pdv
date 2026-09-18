@@ -3,7 +3,7 @@
  * Página pública, sem auth. Serve de onboarding e material de vendas.
  */
 import React, { useState } from 'react'
-import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
+import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 
 const VERSION = 'v3.1'
 const UPDATED = 'Agosto 2026'
@@ -93,7 +93,7 @@ export default function Guia() {
 
       {/* ── Header ─────────────────────────────────── */}
       <div style={{ background: 'linear-gradient(135deg,#0a1929,#0d2137)', borderBottom: `1px solid ${BORDER}`, padding: '24px 20px', textAlign: 'center' }}>
-        <ZatendeStockLogo variant="full" />
+        <ZatendeStokLogo variant="full" />
         <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
           <Badge color={ORANGE}>{VERSION}</Badge>
           <Badge color={GREEN}>Atualizado {UPDATED}</Badge>
@@ -188,7 +188,7 @@ export default function Guia() {
               <div style={{ fontSize: 28, marginBottom: 8 }}>❓</div>
               <div style={{ color: '#f1f5f9', fontWeight: 800, fontSize: 15 }}>Precisa de ajuda?</div>
               <div style={{ color: '#64748b', fontSize: 13, margin: '8px 0 16px' }}>Fale com a gente via WhatsApp</div>
-              <a href="https://wa.me/5511985950956?text=Olá!%20Preciso%20de%20ajuda%20com%20o%20ZatendeStock"
+              <a href="https://wa.me/5511985950956?text=Olá!%20Preciso%20de%20ajuda%20com%20o%20ZatendeStok"
                 target="_blank" rel="noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#16a34a', color: '#fff', fontWeight: 900, fontSize: 14, padding: '12px 24px', borderRadius: 12, textDecoration: 'none' }}>
                 💬 (011) 98595-0956
@@ -218,7 +218,7 @@ export default function Guia() {
                 desc="Acesse zatendestock.netlify.app/fornecedor. Instale como app no celular para acessar mais rápido."
                 tip="O portal é 100% separado do portal do mercado — tenha os dois abertos em abas diferentes" />
               <Step n="2" icon="🔐" title="Faça login"
-                desc="Use as credenciais fornecidas pelo administrador ZatendeStock. Após o login você vê o dashboard FIFO." />
+                desc="Use as credenciais fornecidas pelo administrador ZatendeStok. Após o login você vê o dashboard FIFO." />
               <Step n="3" icon="🏢" title="Configure seu perfil"
                 desc='Clique na aba "Perfil" (último ícone) → preencha nome da distribuidora, telefone e logo. Isso aparece para todos os mercados.'
                 tip="O logo e os dados do seu perfil aparecem na vitrine digital dos mercados e nas mensagens de WhatsApp" />
@@ -292,7 +292,7 @@ export default function Guia() {
               <div style={{ fontSize: 28, marginBottom: 8 }}>❓</div>
               <div style={{ color: '#f1f5f9', fontWeight: 800, fontSize: 15 }}>Suporte & Ativação</div>
               <div style={{ color: '#64748b', fontSize: 13, margin: '8px 0 16px' }}>Cadastro de novos distribuidores via WhatsApp</div>
-              <a href="https://wa.me/5511985950956?text=Olá!%20Quero%20conhecer%20o%20Portal%20do%20Distribuidor%20ZatendeStock"
+              <a href="https://wa.me/5511985950956?text=Olá!%20Quero%20conhecer%20o%20Portal%20do%20Distribuidor%20ZatendeStok"
                 target="_blank" rel="noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#16a34a', color: '#fff', fontWeight: 900, fontSize: 14, padding: '12px 24px', borderRadius: 12, textDecoration: 'none' }}>
                 💬 (011) 98595-0956
@@ -303,7 +303,7 @@ export default function Guia() {
 
         {/* ── Footer ──────────────────────────────── */}
         <div style={{ marginTop: 40, textAlign: 'center', borderTop: `1px solid ${BORDER}`, paddingTop: 24 }}>
-          <ZatendeStockLogo variant="wordmark" />
+          <ZatendeStokLogo variant="wordmark" />
           <div style={{ color: '#1e4060', fontSize: 11, marginTop: 8 }}>
             {VERSION} · {UPDATED} · Zatende — Dubai, UAE
           </div>

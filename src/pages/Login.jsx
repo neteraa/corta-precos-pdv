@@ -4,7 +4,7 @@ import { Eye, EyeOff, Lock, User, MessageCircle, CheckCircle2, ArrowRight, Arrow
 import { getCredentials, getConfiguredStoreId, saveStoreId } from '../utils/auth.js'
 import { registerStoreId, wipeLegacyFlatKeys } from '../utils/tenantStorage.js'
 import { seedSettingsFromSession } from '../hooks/usePrinter.js'
-import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
+import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 
 const ZAP         = '5511985950956'
 const ZAP_DISPLAY = '(011) 98595-0956'
@@ -64,7 +64,7 @@ function LeftPanel() {
       <div aria-hidden style={{ position:'absolute', bottom:-60, left:-60, width:250, height:250, borderRadius:'50%', background:'rgba(34,197,94,.15)', filter:'blur(50px)', pointerEvents:'none' }} />
       <div aria-hidden style={{ position:'absolute', inset:0, backgroundImage:'radial-gradient(circle,rgba(255,255,255,.04) 1px,transparent 1px)', backgroundSize:'28px 28px', pointerEvents:'none' }} />
       <div style={{ position:'relative' }}>
-        <ZatendeStockLogo variant="full" />
+        <ZatendeStokLogo variant="full" />
         <div style={{ marginTop:40 }}>
           <div style={{ color:'rgba(255,255,255,.45)', fontSize:11, fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', marginBottom:10 }}>Por que nos escolher</div>
           <h2 style={{ color:'#fff', fontSize:27, fontWeight:900, lineHeight:1.25, marginBottom:28 }}>Chega de falta<br/>no mercado.</h2>
@@ -93,8 +93,8 @@ function LeftPanel() {
 
 function RecoverPanel({ username, onClose }) {
   const msg = username
-    ? `Olá! Preciso recuperar minha senha da ZatendeStock.\n\nMeu usuário é: *${username}*`
-    : 'Olá! Preciso recuperar minha senha da ZatendeStock.'
+    ? `Olá! Preciso recuperar minha senha da ZatendeStok.\n\nMeu usuário é: *${username}*`
+    : 'Olá! Preciso recuperar minha senha da ZatendeStok.'
   return (
     <div style={{ animation:'fadeUp .3s ease' }}>
       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
@@ -147,7 +147,7 @@ function CadastroFlow() {
       })
     } catch {}
     const tipoLabel = tipo === 'distribuidor' ? 'distribuidora' : 'mercado'
-    openWpp(`🛒 *Solicitação de cadastro — ZatendeStock*\n\n👤 Nome: *${form.nome}*\n🏪 ${tipoLabel}: *${form.empresa}*\n📍 Cidade: *${form.cidade}*\n📱 WhatsApp: *${form.telefone}*\n🏷 Tipo: *${tipo === 'distribuidor' ? 'Distribuidora/Atacado' : 'Mercado/Loja'}*\n\nQuero começar a usar o ZatendeStock! 🚀`)
+    openWpp(`🛒 *Solicitação de cadastro — ZatendeStok*\n\n👤 Nome: *${form.nome}*\n🏪 ${tipoLabel}: *${form.empresa}*\n📍 Cidade: *${form.cidade}*\n📱 WhatsApp: *${form.telefone}*\n🏷 Tipo: *${tipo === 'distribuidor' ? 'Distribuidora/Atacado' : 'Mercado/Loja'}*\n\nQuero começar a usar o ZatendeStok! 🚀`)
   }
 
   /* Passo 0 — escolha do tipo */
@@ -348,7 +348,7 @@ export default function Login() {
 
       <div style={{ flex:1, display:'flex', flexDirection:'column', minHeight:'100dvh', overflowY:'auto' }}>
         <div className="mob-hdr" style={{ display:'none', background:'linear-gradient(135deg,#1e1b4b,#1e3a8a)', padding:'20px 24px' }}>
-          <ZatendeStockLogo variant="full" />
+          <ZatendeStokLogo variant="full" />
         </div>
 
         <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'40px 24px' }}>
@@ -407,7 +407,7 @@ export default function Login() {
 
             <div style={{ marginTop:32, textAlign:'center', display:'flex', flexDirection:'column', gap:8, alignItems:'center' }}>
               <a href="/guia" style={{ color:B.muted, fontSize:12, fontWeight:600, textDecoration:'none' }}>Ver guia do sistema</a>
-              <span style={{ color:B.border, fontSize:11 }}>ZatendeStock · zatendestok.com.br</span>
+              <span style={{ color:B.border, fontSize:11 }}>ZatendeStok · zatendestok.com.br</span>
             </div>
           </div>
         </div>

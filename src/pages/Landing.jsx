@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, MessageCircle, ChevronDown, CheckCircle2, AlertTriangle, TrendingUp, ClipboardList, BarChart3, Truck, Smartphone, ShieldCheck } from 'lucide-react'
-import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
+import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 import { isLoggedIn } from '../utils/auth.js'
 
 const ZAP     = '5511985950956'
-const ZAP_MSG = 'Olá! Quero conhecer o ZatendeStock para meu mercado.'
+const ZAP_MSG = 'Olá! Quero conhecer o ZatendeStok para meu mercado.'
 const openWpp = (msg) => window.open(`https://wa.me/${ZAP}?text=${encodeURIComponent(msg || ZAP_MSG)}`, '_blank')
 
 const CSS = `
@@ -49,7 +49,7 @@ const DIFS = [
     border: '#c7d2fe',
     tag: 'FIFO Automático',
     title: 'Primeiro que entra, primeiro que sai.',
-    body: 'O ZatendeStock organiza seu estoque no padrão FIFO: os lotes mais antigos aparecem na frente para venda. Menos produto vencendo, menos prejuízo. Funciona para frios, secos, limpeza — qualquer categoria.',
+    body: 'O ZatendeStok organiza seu estoque no padrão FIFO: os lotes mais antigos aparecem na frente para venda. Menos produto vencendo, menos prejuízo. Funciona para frios, secos, limpeza — qualquer categoria.',
   },
   {
     icon: AlertTriangle,
@@ -94,7 +94,7 @@ const PERSONAS = [
   {
     emoji: '🏘️',
     tipo: 'Mercearia de bairro',
-    desc: 'Você conhece cada cliente pelo nome, mas não tem como lembrar de tudo que entra e sai. O ZatendeStock faz esse controle por você — sem complicação, sem treinamento longo.',
+    desc: 'Você conhece cada cliente pelo nome, mas não tem como lembrar de tudo que entra e sai. O ZatendeStok faz esse controle por você — sem complicação, sem treinamento longo.',
     items: ['Controle de fiado digital', 'Alertas de estoque mínimo', 'PDV simples para funcionários', 'Relatório de produtos mais vendidos'],
   },
   {
@@ -135,7 +135,7 @@ export default function Landing() {
 
       {/* ══ NAV ══════════════════════════════════════════════ */}
       <nav style={{ position:'sticky', top:0, zIndex:50, background:'rgba(255,255,255,.92)', backdropFilter:'blur(12px)', borderBottom:'1px solid #f1f5f9', padding:'0 32px', height:64, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <ZatendeStockLogo variant="wordmark" />
+        <ZatendeStokLogo variant="wordmark" />
         <div style={{ display:'flex', gap:10, alignItems:'center' }}>
           <a href="/guia" style={{ color:'#64748b', fontSize:13, fontWeight:600, padding:'8px 14px', borderRadius:8 }}>Guia</a>
           <button onClick={() => navigate('/login')} style={{ padding:'9px 20px', borderRadius:9, border:'1px solid #e2e8f0', background:'#fff', color:'#0f172a', fontSize:13, fontWeight:700, cursor:'pointer' }} className="btn-outline">
@@ -249,7 +249,7 @@ export default function Landing() {
               FIFO significa <strong style={{ color:'rgba(255,255,255,.9)' }}>First In, First Out</strong> — o padrão ouro para qualquer negócio com produto de validade. Quem chega primeiro, sai primeiro. Menos desperdício, menos vencimento, mais margem.
             </p>
             <p style={{ color:'rgba(255,255,255,.6)', fontSize:16, lineHeight:1.8 }}>
-              O ZatendeStock registra cada entrada com data de fabricação e vencimento, e <strong style={{ color:'#4ade80' }}>sugere automaticamente qual lote vender primeiro</strong>. Funciona para frios, laticínios, hortifrúti, padaria, bebidas, limpeza — qualquer categoria com validade.
+              O ZatendeStok registra cada entrada com data de fabricação e vencimento, e <strong style={{ color:'#4ade80' }}>sugere automaticamente qual lote vender primeiro</strong>. Funciona para frios, laticínios, hortifrúti, padaria, bebidas, limpeza — qualquer categoria com validade.
             </p>
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
@@ -339,7 +339,7 @@ export default function Landing() {
               CHEGA DE<br/>PREJUÍZO COM<br/>ESTOQUE.
             </h2>
             <p style={{ color:'rgba(255,255,255,.55)', fontSize:16, lineHeight:1.7, marginBottom:36, maxWidth:440, margin:'0 auto 36px' }}>
-              Fale com a gente e receba acesso ao ZatendeStock em até 2 horas. Sem contrato, sem mensalidade surpresa.
+              Fale com a gente e receba acesso ao ZatendeStok em até 2 horas. Sem contrato, sem mensalidade surpresa.
             </p>
             <button className="btn-wpp" onClick={() => openWpp()}
               style={{ display:'inline-flex', alignItems:'center', gap:12, padding:'18px 40px', borderRadius:16, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#22c55e,#16a34a)', color:'#fff', fontSize:18, fontWeight:900, boxShadow:'0 4px 24px rgba(34,197,94,.35)' }}>
@@ -352,7 +352,7 @@ export default function Landing() {
 
       {/* ══ FOOTER ═══════════════════════════════════════════ */}
       <footer style={{ borderTop:'1px solid #f1f5f9', padding:'28px 32px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16 }}>
-        <ZatendeStockLogo variant="wordmark" />
+        <ZatendeStokLogo variant="wordmark" />
         <div style={{ display:'flex', gap:24, alignItems:'center', flexWrap:'wrap' }}>
           <a href="/guia" style={{ color:'#94a3b8', fontSize:12, fontWeight:600, textDecoration:'none' }}>Guia</a>
           <button onClick={() => navigate('/login')} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', fontSize:12, fontWeight:600 }}>Entrar</button>

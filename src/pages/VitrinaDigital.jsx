@@ -9,7 +9,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
+import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -222,7 +222,7 @@ export default function VitrinaDigital() {
 
       {/* Footer */}
       <div style={{ textAlign:'center', padding:'16px 20px 32px', borderTop:'1px solid #0d2137' }}>
-        <div style={{ color:'#1e4060', fontSize:11 }}>Vitrine powered by ZatendeStock · Portal B2B</div>
+        <div style={{ color:'#1e4060', fontSize:11 }}>Vitrine powered by ZatendeStok · Portal B2B</div>
       </div>
     </div>
   )

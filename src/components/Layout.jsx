@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import ZatendeStockLogo from './ZatendeStockLogo.jsx'
+import ZatendeStokLogo from './ZatendeStokLogo.jsx'
 import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
   Warehouse, Users, Settings, Menu,
@@ -88,7 +88,7 @@ function SidebarLogo() {
   return (
     <div className="px-3 pt-3 pb-2 shrink-0">
       <div className="mb-2 flex items-center justify-center py-1.5 px-3 rounded-xl bg-gray-900/60 border border-gray-800">
-        <ZatendeStockLogo variant="wordmark" />
+        <ZatendeStokLogo variant="wordmark" />
       </div>
       <div className="relative overflow-hidden rounded-xl px-3 py-2.5 shadow-lg"
         style={{ background: `linear-gradient(135deg, ${color}, ${colorDk})`, boxShadow: `0 8px 24px ${color}40` }}>

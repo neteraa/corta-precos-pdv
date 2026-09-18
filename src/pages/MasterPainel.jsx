@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, TrendingUp, AlertTriangle, CalendarClock, Mail, ClipboardList, CheckCircle2, XCircle, MessageCircle, Phone, MapPin } from 'lucide-react'
-import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
+import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 
 /* ─── constants ──────────────────────────────────────────── */
 const MK_KEY  = 'zs_master_key'
@@ -673,7 +673,7 @@ export default function MasterPainel() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-4"><ZatendeStockLogo variant="full" /></div>
+          <div className="flex justify-center mb-4"><ZatendeStokLogo variant="full" /></div>
           <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-black px-4 py-1.5 rounded-full">
             <ShieldAlert className="w-3.5 h-3.5" /> PAINEL MASTER — ACESSO RESTRITO
           </div>
@@ -695,7 +695,7 @@ export default function MasterPainel() {
             {loading ? 'Verificando...' : 'Entrar no Painel Master'}
           </button>
         </div>
-        <p className="text-center text-gray-600 text-xs mt-6">ZatendeStock · Painel interno · Não compartilhe esta URL</p>
+        <p className="text-center text-gray-600 text-xs mt-6">ZatendeStok · Painel interno · Não compartilhe esta URL</p>
       </div>
     </div>
   )
@@ -749,7 +749,7 @@ export default function MasterPainel() {
       <div className="bg-gray-900/80 border-b border-gray-800 sticky top-0 z-10 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-shrink-0">
-            <ZatendeStockLogo variant="wordmark" />
+            <ZatendeStokLogo variant="wordmark" />
             <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30 hidden sm:block">
               PAINEL MASTER
             </span>

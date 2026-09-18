@@ -15,7 +15,7 @@ import CameraScanner from '../components/CameraScanner.jsx'
 import PRODUCTS_SEED from '../utils/products_seed.json'
 import { fornKey, migrateToNamespace } from '../utils/tenantStorage.js'
 import Footer from '../components/Footer.jsx'
-import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
+import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 
 const BRL         = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const LOCAL       = 'cp_fornecedor_v1'
@@ -1024,7 +1024,7 @@ function SetupScreen({ onDone }) {
   return (
     <div style={{ minHeight:'100dvh', background:'#050f1a', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
       <div style={{ textAlign:'center', marginBottom:24 }}>
-        <ZatendeStockLogo variant="full" />
+        <ZatendeStokLogo variant="full" />
         <div style={{ color:'#10b981', fontSize:14, marginTop:10, fontWeight:700 }}>
           {saved.name ? `Bem-vindo de volta, ${saved.name.split(' ')[0]}!` : 'Portal do Distribuidor'}
         </div>
@@ -1045,7 +1045,7 @@ function SetupScreen({ onDone }) {
           <Check size={18} /> Entrar
         </Btn>
       </div>
-      <div style={{ color:'#1e4060', fontSize:12, marginTop:24 }}>ZatendeStock · Plataforma Distribuidora</div>
+      <div style={{ color:'#1e4060', fontSize:12, marginTop:24 }}>ZatendeStok · Plataforma Distribuidora</div>
     </div>
   )
 }
@@ -4223,7 +4223,7 @@ function LoginPage({ onLogin }) {
 
       {/* Platform branding */}
       <div style={{ textAlign:'center', marginBottom:32 }}>
-        <ZatendeStockLogo variant="full" />
+        <ZatendeStokLogo variant="full" />
         <div style={{ color:'#10b981', fontSize:12, fontWeight:700, marginTop:10, textTransform:'uppercase', letterSpacing:'0.12em' }}>Portal do Distribuidor</div>
       </div>
 
@@ -4577,7 +4577,7 @@ export default function Fornecedor() {
   }, [synced]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const prev = document.title
-    document.title = 'ZatendeStock – Portal do Distribuidor'
+    document.title = 'ZatendeStok – Portal do Distribuidor'
     return () => { document.title = prev }
   }, [])
 
@@ -4750,8 +4750,8 @@ export default function Fornecedor() {
           </div>
         </button>
 
-        {/* ── center: ZatendeStock platform brand ── */}
-        <ZatendeStockLogo variant="wordmark" style={{ justifyContent:'center' }} />
+        {/* ── center: ZatendeStok platform brand ── */}
+        <ZatendeStokLogo variant="wordmark" style={{ justifyContent:'center' }} />
 
         <div className="fh-right" style={{ display:'flex', gap:6, alignItems:'center', justifyContent:'flex-end' }}>
           <button onClick={sync} disabled={syncing} className="fh-sync" style={{ background:'none', border:'none', cursor:'pointer', color:'#475569', padding:4 }}>
