@@ -760,3 +760,91 @@ Rota /promocoes — regra: { id, name, group, qty, totalPrice, active }
 PDV: calcPromoEngine em PDV.jsx aplica desconto quando cart tem qty itens do grupo.
 Produto vinculado via p.promoGroup === rule.group.
 ISSO JA E O 3-POR-R10 — so criar regra em Promocoes e vincular produtos.
+
+---
+
+## SESSION 2026-09-18 — Chatbot ZAP + Evolution API + Guia v4
+
+### Commits desta sessão
+- `50b7dcb` feat: nova arte OG image + meta tags prod + URLs netlify→prod + manifest ZatendeStok
+- `30998d7` feat: guia reescrito (3 tabs + FAQ + atalhos + diferenciais) + Baileys anti-ban tips
+- `121dce3` feat: chatbot ZAP (wa-bot Netlify fn + OpenAI + anti-ban) + novo numero (15) 99796-9303
+
+### Número de suporte atualizado
+- **Novo:** `(15) 99796-9303` / `5515997969303`
+- Atualizado em: Guia.jsx (WA_NUM const), Campanhas.jsx CTAs, Configuracoes.jsx, og:description, AGENTS.md
+
+### Guia.jsx v4.0 — 3 abas (zatendestok.com.br/guia)
+- **🏪 Mercado** — onboarding completo: acesso, PDV, estoque, ferramentas, atalhos kbd, FAQ colapsável, CTA WA
+- **🚚 Distribuidor** — perfil, lote, BlastScreen, pedidos RT, inteligência, fluxo real c/ exemplo de lucro
+- **✦ Diferenciais** — 10 features únicas + checklist 12 itens (serve como pitch de vendas)
+- Sem "grátis" / "demo" / credenciais expostas — todo CTA → WhatsApp (15) 99796-9303
+
+### Campanhas.jsx — Card Baileys / Anti-Ban
+Card adicionado ao sidebar da tela de campanhas:
+- Evolution API (integrado) = SEGURO
+- Baileys (não oficial) = USE COM CUIDADO
+- Regras: delay 5-15s, máx 80 msgs/24h, variar conteúdo, número exclusivo
+
+### wa-bot — Chatbot WhatsApp IA (netlify/functions/wa-bot.js)
+- Webhook: `https://zatendestok.com.br/wa-bot` (redirect em netlify.toml)
+- Modelo: GPT-4o-mini, max_tokens: 400, system prompt sobre ZatendeStok
+- Filtra: mensagens próprias, grupos, status@broadcast
+- Deduplicação por message ID (Set com trim em 500 entradas)
+- Env vars necessárias no Netlify:
+  - `EVOLUTION_API_URL` = URL do Railway (ex: https://evolution-api-production-2d21.up.railway.app)
+  - `EVOLUTION_API_KEY` = `zs198556pedro` (ou nova senha)
+  - `EVOLUTION_INSTANCE` = `zatendestok`
+  - `OPENAI_API_KEY` = chave OpenAI (ROTACIONAR a chave exposta!)
+- Instância WA: `POST /instance/create` → conectar com QR code → configurar webhook
+
+### Evolution API no Railway (PENDENTE — não finalizado)
+- URL Railway: `evolution-api-production-2d21.up.railway.app` (offline ainda)
+- Fork criado: `github.com/neteraa/evolution-api`
+- Railway tentou buildar do source GitHub mas sessão crashou
+- **PRÓXIMOS PASSOS** (prompt para Railway Agent):
+```
+The service at evolution-api-production-2d21.up.railway.app is still offline (x-railway-fallback: true).
+Please check the build and runtime logs for the current deployment.
+If there are build errors, try the following fix:
+1. In Settings → Service, make sure the start command is: npm start
+2. Ensure these env vars are set: PORT=8080, SERVER_PORT=8080, AUTHENTICATION_TYPE=apikey, AUTHENTICATION_API_KEY=zs198556pedro, AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true, DATABASE_ENABLED=false, WEBHOOK_GLOBAL_ENABLED=false, CONFIG_SESSION_PHONE_CLIENT=ZatendeStok, CONFIG_SESSION_PHONE_NAME=Chrome, LOG_LEVEL=ERROR
+3. If the build still fails, look for a Railway template for "Evolution API" in the Railway template marketplace and deploy that instead.
+4. Confirm when the service is healthy and accessible at the public URL.
+```
+
+### Quando Evolution API estiver online (fazer nessa ordem)
+```bash
+EVOURL=https://evolution-api-production-2d21.up.railway.app
+EVOKEY=zs198556pedro
+
+# 1. Criar instância
+curl -s -X POST "$EVOURL/instance/create" \
+  -H "apikey: $EVOKEY" \
+  -H "Content-Type: application/json" \
+  -d '{"instanceName":"zatendestok","qrcode":true,"integration":"WHATSAPP-BAILEYS"}'
+
+# 2. Ver QR code (escanear com celular do número 15 997969303)
+curl -s "$EVOURL/instance/connect/zatendestok" -H "apikey: $EVOKEY"
+
+# 3. Configurar webhook
+curl -s -X POST "$EVOURL/webhook/set/zatendestok" \
+  -H "apikey: $EVOKEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://zatendestok.com.br/wa-bot","webhook_by_events":true,"events":["messages.upsert"]}'
+
+# 4. Setar env vars no Netlify (via CLI ou Dashboard)
+# EVOLUTION_API_URL=https://evolution-api-production-2d21.up.railway.app
+# EVOLUTION_API_KEY=zs198556pedro
+# EVOLUTION_INSTANCE=zatendestok
+# OPENAI_API_KEY=<nova chave rotacionada>
+```
+
+### OG Image (public/og-image.png)
+- Fundo escuro gradiente, "ZatendeStok" laranja/branco, tagline, feature pills, URL zatendestok.com.br
+- 1200x630px
+
+### Meta tags (index.html)
+- og:url = https://zatendestok.com.br/
+- og:image = https://zatendestok.com.br/og-image.png
+- Manifest: ZatendeStok (sem "Stock")
