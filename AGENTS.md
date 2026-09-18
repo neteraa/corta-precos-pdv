@@ -848,3 +848,75 @@ curl -s -X POST "$EVOURL/webhook/set/zatendestok" \
 - og:url = https://zatendestok.com.br/
 - og:image = https://zatendestok.com.br/og-image.png
 - Manifest: ZatendeStok (sem "Stock")
+
+---
+
+## Sessão 2026-09-18 (continuação) — Evolution API + Bot WhatsApp + Campanhas
+
+### Estado final após esta sessão
+
+#### Evolution API (Railway)
+- URL: `https://evolution-api-zjth-production.up.railway.app`
+- API Key: `zs198556pedro` (env var `EVOLUTION_API_KEY` no Netlify)
+- Serviços Railway: evolution-api-ZjTh + Postgres + Redis (todos ACTIVE)
+- Versão: v2.3.7
+
+#### Instâncias WhatsApp criadas
+| Instância | Número | Status | Uso |
+|---|---|---|---|
+| `zatendeapi` | +55 (15) 99796-9303 | **open ✅** | Bot ZatendeStok (suporte/vendas) |
+| `zatendestok` | — | connecting | instância legada (não usar) |
+
+#### Usuário admin ZatendeStok
+- Username: `zatendeapi` / Senha inicial: `198556@@Neto`
+- storeId: `zatendeapi`
+- Usado para acessar Configurações e escanear QR do bot
+
+#### Netlify Functions novas
+| Arquivo | Path | Função |
+|---|---|---|
+| `netlify/functions/wa-status.js` | `GET/POST /api/wa-status?instance=X` | Retorna status + QR code; cria/desconecta instância |
+| `netlify/functions/wa-send.js` | `POST /api/wa-send` | Proxy seguro de envio (API key server-side) |
+
+**wa-status query params:**
+- `GET ?instance=X` → `{ exists, status, phone, profileName, qrcode }`
+- `POST ?instance=X&action=create` → cria instância + configura webhook automaticamente
+- `POST ?instance=X&action=disconnect` → desconecta
+- `POST ?instance=X&action=refresh-qr` → novo QR
+
+**wa-send body:** `{ instance, number, text }` → `{ ok: true/false }`
+
+**IMPORTANTE — config.path:** As funções usam `export const config = { path: '/api/wa-status' }` (e `/api/wa-send`). NÃO adicionar redirects em netlify.toml para esses paths — o config.path já registra a rota diretamente.
+
+#### Campanhas.jsx — Zatende removido
+- Removido: config Zatende (URL/key/instância), botão "Zatende", `cp_zatende` localStorage
+- Adicionado: badge status bot (verde/amarelo), botão "🤖 Disparar via Bot" (usa `/api/wa-send`)
+- Instância automática via `getConfiguredStoreId()` — cada loja usa a própria
+- Modo manual (wa.me) mantido como fallback
+
+#### Configuracoes.jsx — Seção Bot WhatsApp
+- Componente `WhatsAppBotSection` adicionado (fora do export default — estável)
+- Poll automático: 8s se connecting, 30s se open
+- Mostra QR code com `<img src={qrcode}>` (base64 data URL)
+- Botões: Criar instância / Atualizar QR / Desconectar
+- Instância = `getConfiguredStoreId() || 'zatendestok'`
+
+#### Arquitetura multi-tenant WhatsApp
+```
+Cada loja → instância própria na Evolution API (nome = storeId)
+Configurações → bot conectado lá → QR aparece na tela
+Campanhas → Disparar via Bot → /api/wa-send → Evolution API → WhatsApp do loja
+```
+
+### Commits desta sessão
+| Hash | Mensagem |
+|---|---|
+| `d14c898` | docs: AGENTS.md atualizado — sessão 2026-09-18 |
+| `642a8ac` | feat: Bot WhatsApp IA — wa-status proxy fn + QR code na página Configurações |
+| `550bed3` | feat: Campanhas — remove Zatende, usa nosso próprio bot |
+| `1523575` | fix: wa-status e wa-send path config corrigido para /api/wa-* |
+
+### Pendente
+- `OPENAI_API_KEY` no Netlify → sem ela o bot recebe mensagens mas não responde com IA
+  - Rotacionar em platform.openai.com → API Keys → invalidar antiga → criar nova
+  - Setar: `netlify env:set OPENAI_API_KEY "sk-proj-..." --force --site $NETLIFY_SITE_ID --auth $NETLIFY_AUTH_TOKEN`
