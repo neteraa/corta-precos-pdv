@@ -161,26 +161,26 @@ export default function Guia() {
         {tab === 'mercado' && (
           <>
             <div style={{ background: `linear-gradient(135deg,${ORANGE}22,${ORANGE}08)`, borderRadius: 20, padding: '18px 20px', marginBottom: 28, border: `1px solid ${ORANGE}33` }}>
-              <div style={{ color: ORANGE, fontWeight: 900, fontSize: 16 }}>Portal ZatendeStok — PDV</div>
+              <div style={{ color: ORANGE, fontWeight: 900, fontSize: 16 }}>Portal ZatendeStok — Sistema de Gestão</div>
               <div style={{ color: '#94a3b8', fontSize: 13, marginTop: 4 }}>
-                Caixa, estoque, validade, promoções e fidelidade — tudo em um só lugar
+                PDV, estoque, validade, promoções, fiado, campanhas e fidelidade — tudo em um só lugar, sem instalar nada.
               </div>
               <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                <Badge color={ORANGE}>🌐 zatendestok.com.br/login</Badge>
-                <Badge color="#94a3b8">Usuário: admin · Senha: 1234</Badge>
+                <Badge color={ORANGE}>🌐 zatendestok.com.br</Badge>
+                <Badge color={GREEN}>✅ Ativação no mesmo dia</Badge>
               </div>
             </div>
 
-            <Section title="1. Primeiro Acesso" subtitle="Leva menos de 2 minutos" color={ORANGE}>
-              <Step n="1" icon="🌐" title="Abra o link no celular ou PC"
-                desc="Acesse zatendestok.com.br. No celular, clique em 'Adicionar à tela inicial' para instalar como app (sem precisar de loja de apps)."
-                tip="Chrome/Edge no Android: menu ⋮ → 'Adicionar à tela inicial'" />
-              <Step n="2" icon="🔐" title='Clique em "Acesso ao sistema"'
-                desc='Na tela inicial, clique no botão 🔐 Acesso ao sistema. Digite usuário e senha. Para a demo: admin / 1234.'
-                tip="Cada mercado tem seu próprio usuário e senha — fale com (15) 99796-9303 para cadastrar o seu" />
-              <Step n="3" icon="📊" title="Dashboard — visão geral"
-                desc="Ao entrar, você vê o Dashboard com as vendas do dia, produtos com validade próxima e resumo do caixa."
-                tip="O banner laranja no topo avisa quando tem produto vencendo em até 30 dias" />
+            <Section title="1. Primeiro Acesso" subtitle="Pronto em menos de 2 minutos" color={ORANGE}>
+              <Step n="1" icon="🌐" title="Abra o sistema no celular ou PC"
+                desc="Acesse zatendestok.com.br no navegador. Funciona em qualquer dispositivo — sem instalar app de loja."
+                tip="No celular: Chrome ou Safari → menu → 'Adicionar à tela inicial' para usar como aplicativo" />
+              <Step n="2" icon="🔐" title="Faça login com suas credenciais"
+                desc="Use o usuário e senha enviados pela equipe ZatendeStok no WhatsApp no momento da ativação. Cada loja tem acesso exclusivo."
+                tip="Esqueceu a senha? Chame a gente no WhatsApp e reativamos em minutos" />
+              <Step n="3" icon="📊" title="Dashboard — sua loja em tempo real"
+                desc="Ao entrar, você vê as vendas do dia, produtos com validade próxima, resumo do caixa e alertas importantes."
+                tip="O banner laranja avisa sobre produtos vencendo em até 30 dias — sem surpresas no estoque" />
             </Section>
 
             <Section title="2. Usando o Caixa (PDV)" subtitle="F2 busca, F10 finaliza" color={ORANGE}>
@@ -218,13 +218,15 @@ export default function Guia() {
             </Section>
 
             <div style={{ background: '#0a2540', borderRadius: 16, padding: 20, textAlign: 'center', border: `1px solid ${BLUE}33` }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>❓</div>
-              <div style={{ color: '#f1f5f9', fontWeight: 800, fontSize: 15 }}>Precisa de ajuda?</div>
-              <div style={{ color: '#64748b', fontSize: 13, margin: '8px 0 16px' }}>Fale com a gente via WhatsApp</div>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>💬</div>
+              <div style={{ color: '#f1f5f9', fontWeight: 800, fontSize: 15 }}>Suporte direto pelo WhatsApp</div>
+              <div style={{ color: '#64748b', fontSize: 13, margin: '8px 0 16px' }}>
+                Nossa equipe responde na hora — sem fila, sem chamado
+              </div>
               <a href="https://wa.me/5515997969303?text=Olá!%20Preciso%20de%20ajuda%20com%20o%20ZatendeStok"
                 target="_blank" rel="noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#16a34a', color: '#fff', fontWeight: 900, fontSize: 14, padding: '12px 24px', borderRadius: 12, textDecoration: 'none' }}>
-                💬 (15) 99796-9303
+                💬 Falar com suporte
               </a>
             </div>
           </>
@@ -322,13 +324,15 @@ export default function Guia() {
             </Section>
 
             <div style={{ background: '#0a2540', borderRadius: 16, padding: 20, textAlign: 'center', border: `1px solid ${BLUE}33` }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>❓</div>
-              <div style={{ color: '#f1f5f9', fontWeight: 800, fontSize: 15 }}>Suporte & Ativação</div>
-              <div style={{ color: '#64748b', fontSize: 13, margin: '8px 0 16px' }}>Cadastro de novos distribuidores via WhatsApp</div>
-              <a href="https://wa.me/5515997969303?text=Olá!%20Quero%20conhecer%20o%20Portal%20do%20Distribuidor%20ZatendeStok"
+              <div style={{ fontSize: 28, marginBottom: 8 }}>💬</div>
+              <div style={{ color: '#f1f5f9', fontWeight: 800, fontSize: 15 }}>Suporte direto pelo WhatsApp</div>
+              <div style={{ color: '#64748b', fontSize: 13, margin: '8px 0 16px' }}>
+                Nossa equipe responde na hora — sem fila, sem chamado
+              </div>
+              <a href="https://wa.me/5515997969303?text=Olá!%20Preciso%20de%20ajuda%20com%20o%20Portal%20do%20Distribuidor%20ZatendeStok"
                 target="_blank" rel="noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#16a34a', color: '#fff', fontWeight: 900, fontSize: 14, padding: '12px 24px', borderRadius: 12, textDecoration: 'none' }}>
-                💬 (15) 99796-9303
+                💬 Falar com suporte
               </a>
             </div>
           </>
