@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Database, RotateCcw, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, Fingerprint, Copy, Check } from 'lucide-react'
+import { Database, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, Fingerprint, Copy, Check } from 'lucide-react'
 import { useStore } from '../store.jsx'
 import { parseGdoorCsv } from '../utils/importCsv.js'
 import { usePrinter, savePrinterSettings } from '../hooks/usePrinter.js'
@@ -173,7 +173,7 @@ function AddOperatorForm({ onAdd }) {
 }
 
 export default function Configuracoes() {
-  const { products, sales, customers, importProducts, resetAll, operators, upsertOperator, deleteOperator, syncOperators } = useStore()
+  const { products, sales, customers, importProducts, operators, upsertOperator, deleteOperator, syncOperators } = useStore()
   const { settings, setSettings } = usePrinter()
   const [form, setForm] = useState(() => ({
     storeName:  settings.storeName  || '',
@@ -602,13 +602,6 @@ export default function Configuracoes() {
         <AddOperatorForm onAdd={op => upsertOperator(op)} />
       </Section>
 
-      {/* ── Reset ──────────────────────────────────────────────── */}
-      <Section icon={RotateCcw} title="Reset">
-        <p className="text-sm text-red-500 font-medium mb-3">⚠️ Apaga todos os dados e restaura demonstração.</p>
-        <button onClick={() => { if (confirm('Tem certeza? Todos os dados serão apagados!')) resetAll() }} className="btn-danger">
-          <RotateCcw className="w-4 h-4" /> Resetar para dados demo
-        </button>
-      </Section>
     </div>
   )
 }

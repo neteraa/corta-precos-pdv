@@ -58,7 +58,7 @@ const PAYMENTS = ['PIX', 'Débito', 'Crédito', 'Dinheiro']
 const PAY_ICON = { PIX: Smartphone, Débito: CreditCard, Crédito: CreditCard, Dinheiro: Banknote }
 
 export default function Terminal() {
-  const { products, registerSale, promos, sales, customers, addFiado } = useStore()
+  const { products, registerSale, promos, sales, customers, addFiado, operators } = useStore()
   const todaySales = useMemo(() => {
     const today = new Date().toDateString()
     return sales.filter(s => new Date(s.date).toDateString() === today).length
@@ -137,6 +137,38 @@ export default function Terminal() {
 
   const [showHelp, setShowHelp] = useState(false)
 
+  // ── Operator login ──────────────────────────────────────────
+  const [activeOperator, setActiveOperator] = useState(null) // {id,name,pin,role}
+  const [pinTarget,      setPinTarget]      = useState(null) // operator being PIN'd
+  const [pinInput,       setPinInput]       = useState('')
+  const [pinError,       setPinError]       = useState(false)
+  const [showClose,      setShowClose]      = useState(false) // fechar caixa confirm
+
+  const caixaOps = useMemo(() => operators.filter(o => o.role === 'caixa'), [operators])
+
+  const selectOperator = (op) => {
+    if (!op.pin) { setActiveOperator(op); setPinTarget(null); setPinInput(''); return }
+    setPinTarget(op); setPinInput(''); setPinError(false)
+  }
+
+  const confirmPin = () => {
+    if (!pinTarget) return
+    if (pinInput === pinTarget.pin) {
+      setActiveOperator(pinTarget); setPinTarget(null); setPinInput('')
+    } else {
+      setPinError(true); setPinInput('')
+      setTimeout(() => setPinError(false), 1200)
+    }
+  }
+
+  const doLock = () => {
+    setActiveOperator(null); setPinTarget(null); setPinInput(''); setShowClose(false)
+  }
+
+  const closeCaixa = () => {
+    setShowClose(false); doLock()
+  }
+
   // ── Customer / Fiado ────────────────────────────────────────
   const [selectedCustomerId,  setSelectedCustomerId]  = useState(null)
   const [showCustomerPicker,  setShowCustomerPicker]  = useState(false)
@@ -165,6 +197,7 @@ export default function Terminal() {
       if (e.key === 'F8')  { setPayment('Dinheiro'); return }
       if (e.key === 'F9')  { if (cart.length > 0 && window.confirm('Limpar carrinho?')) setCart([]); return }
       if (e.key === 'F10' && cart.length > 0) setShowPay(true)
+      if (e.key === 'F11') { doLock(); return }
       if (e.key === 'F12') { window.open('/display', 'cp_display', 'width=1280,height=720'); return }
       if (e.key === 'Enter' && showPay && trocoOk && cart.length > 0) { e.preventDefault(); finish() }
       if (e.key === 'Escape') { setShowPay(false); setShowCamera(false); setShowHelp(false) }
@@ -194,6 +227,7 @@ export default function Terminal() {
       payment: payLabel,
       troco: t, date: new Date().toISOString(), id: Date.now(),
       customerId: selectedCustomer?.id || null,
+      operatorName: activeOperator?.name || '',
     }
     registerSale(sale)
     if (isFiado && selectedCustomer) {
@@ -222,10 +256,19 @@ export default function Terminal() {
 
       {/* ── Top bar ──────────────────────────────────────────── */}
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 24px', background: bg2, borderBottom: `1px solid ${brd}` }}>
-        {/* logo */}
-        <div style={{ fontFamily: "'Courier New', monospace", fontWeight: 900, fontSize: 20, color: acc, letterSpacing: '-0.5px' }}>
-          ✕ {_storeName}
+        {/* logo + operator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ fontFamily: "'Courier New', monospace", fontWeight: 900, fontSize: 20, color: acc, letterSpacing: '-0.5px' }}>
+            ✕ {_storeName}
+          </div>
+          {activeOperator && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: '#1e1b4b', border: '1px solid #4338ca55', color: '#a5b4fc', fontSize: 12, fontWeight: 700 }}>
+              <Users style={{ width: 12, height: 12 }} />
+              {activeOperator.name}
+            </div>
+          )}
         </div>
+
         {/* status pills */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ padding: '4px 12px', borderRadius: 20, background: cart.length > 0 ? '#431407' : '#052e16', border: `1px solid ${cart.length > 0 ? '#c2410c44' : '#16a34a44'}`, color: cart.length > 0 ? '#fb923c' : '#4ade80', fontSize: 12, fontWeight: 700 }}>
@@ -258,6 +301,19 @@ export default function Terminal() {
             style={{ padding: '4px 12px', borderRadius: 20, background: '#1e1b4b', border: '1px solid #4338ca44', color: '#818cf8', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
             <Monitor style={{ width: 13, height: 13, display: 'inline', marginRight: 4 }} />Tela Cliente
           </button>
+          {/* Travar / Fechar Caixa */}
+          {activeOperator && (
+            <>
+              <button onClick={doLock}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, background: '#292524', border: '1px solid #57534e55', color: '#a8a29e', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                🔒 Travar (F11)
+              </button>
+              <button onClick={() => setShowClose(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 20, background: '#450a0a', border: '1px solid #991b1b55', color: '#fca5a5', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                🚪 Fechar Caixa
+              </button>
+            </>
+          )}
           <a href="/pdv" style={{ padding: '4px 12px', borderRadius: 20, background: bg3, border: `1px solid ${brd}`, color: txt2, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
             ← Admin
           </a>
@@ -395,29 +451,18 @@ export default function Terminal() {
                     </svg>
                   </div>
 
-                  {/* CORTA wordmark */}
+                  {/* Store name */}
                   <div style={{
                     fontFamily: "'Arial Black', Impact, sans-serif",
                     fontWeight: 900,
-                    fontSize: 'clamp(26px, 4vw, 36px)',
-                    color: '#ffffff',
-                    letterSpacing: '-1px',
-                    lineHeight: 1,
-                    textShadow: '0 2px 12px rgba(0,0,0,0.5)',
-                  }}>CORTA</div>
-
-                  {/* PREÇOS in orange gradient */}
-                  <div style={{
-                    fontFamily: "'Arial Black', Impact, sans-serif",
-                    fontWeight: 900,
-                    fontSize: 'clamp(24px, 3.5vw, 32px)',
-                    background: 'linear-gradient(90deg, #ff7a1f, #ea580c)',
+                    fontSize: 'clamp(20px, 3vw, 30px)',
+                    background: `linear-gradient(90deg, #fff, ${acc})`,
                     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
-                    letterSpacing: '1px',
-                    lineHeight: 1,
-                    marginTop: 2,
-                  }}>PREÇOS</div>
+                    letterSpacing: '-0.5px',
+                    lineHeight: 1.1,
+                    textAlign: 'center',
+                  }}>{_storeName}</div>
 
                   {/* tagline */}
                   <div style={{
@@ -428,7 +473,7 @@ export default function Terminal() {
                     textTransform: 'uppercase',
                     marginTop: 10,
                     animation: 'idleTextIn .5s ease-out 1.2s both',
-                  }}>Economia de verdade</div>
+                  }}>Terminal de Caixa</div>
 
                   {/* floating price badge */}
                   <div style={{
@@ -912,6 +957,142 @@ export default function Terminal() {
               style={{ width: '100%', padding: '14px', borderRadius: 14, background: acc, border: 'none', color: '#000', fontWeight: 900, fontSize: 18, cursor: 'pointer' }}>
               Próximo Cliente →
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Fechar Caixa confirm ───────────────────────────── */}
+      {showClose && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.85)' }}>
+          <div style={{ background: bg2, border: `1px solid ${brd}`, borderRadius: 20, padding: 32, width: '100%', maxWidth: 380, textAlign: 'center', boxShadow: '0 25px 80px rgba(0,0,0,.9)' }} className="animate-pop">
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🚪</div>
+            <div style={{ fontWeight: 900, fontSize: 22, color: txt, marginBottom: 6 }}>Fechar Caixa?</div>
+            <div style={{ color: txt2, fontSize: 14, marginBottom: 8 }}>Operador: <strong style={{ color: '#a5b4fc' }}>{activeOperator?.name}</strong></div>
+            <div style={{ background: bg3, borderRadius: 14, padding: '14px 20px', marginBottom: 24, border: `1px solid ${brd}` }}>
+              <div style={{ color: txt2, fontSize: 12, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>RESUMO DO TURNO</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ color: txt2, fontSize: 13 }}>Vendas hoje</span>
+                <span style={{ color: txt, fontWeight: 800 }}>{todaySales}</span>
+              </div>
+              {cart.length > 0 && (
+                <div style={{ color: '#fbbf24', fontSize: 12, marginTop: 6, fontWeight: 700 }}>
+                  ⚠️ Há {cart.length} item(s) no carrinho — será descartado
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowClose(false)}
+                style={{ flex: 1, padding: '14px', borderRadius: 12, background: bg3, border: `1px solid ${brd}`, color: txt2, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button onClick={() => { setCart([]); closeCaixa() }}
+                style={{ flex: 1, padding: '14px', borderRadius: 12, background: '#991b1b', border: 'none', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer' }}>
+                ✓ Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Operator lock screen ────────────────────────────── */}
+      {!activeOperator && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0 }}>
+          <style>{`
+            @keyframes pinShake {
+              0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)}
+            }
+          `}</style>
+
+          {/* header */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 28px', background: bg2, borderBottom: `1px solid ${brd}` }}>
+            <div style={{ fontFamily: "'Courier New', monospace", fontWeight: 900, fontSize: 18, color: acc }}>✕ {_storeName}</div>
+            <div style={{ color: txt2, fontSize: 13, fontFamily: 'monospace', fontWeight: 700 }}>{timeStr} · {dateStr}</div>
+          </div>
+
+          {/* content */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, marginTop: 40 }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 42, marginBottom: 8 }}>🔒</div>
+              <div style={{ fontWeight: 900, fontSize: 22, color: txt, letterSpacing: 1 }}>
+                {pinTarget ? `PIN — ${pinTarget.name}` : 'SELECIONAR OPERADOR'}
+              </div>
+              <div style={{ color: txt2, fontSize: 13, marginTop: 4 }}>
+                {pinTarget ? 'Digite o PIN de acesso' : 'Clique no seu nome para entrar'}
+              </div>
+            </div>
+
+            {!pinTarget ? (
+              /* ── Operator grid ── */
+              caixaOps.length === 0 ? (
+                <div style={{ textAlign: 'center', color: txt2, fontSize: 14 }}>
+                  <div style={{ fontSize: 36, marginBottom: 10 }}>👤</div>
+                  Nenhum operador cadastrado.<br />
+                  <a href="/configuracoes" style={{ color: acc, fontWeight: 700 }}>Cadastrar em Configurações</a>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'center', maxWidth: 560 }}>
+                  {caixaOps.map(op => (
+                    <button key={op.id} onClick={() => selectOperator(op)}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '20px 28px', borderRadius: 18, background: bg2, border: `1.5px solid ${brd}`, cursor: 'pointer', minWidth: 120, transition: 'border-color .15s, background .15s' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = acc; e.currentTarget.style.background = bg3 }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = brd; e.currentTarget.style.background = bg2 }}
+                    >
+                      <div style={{ width: 56, height: 56, borderRadius: '50%', background: `linear-gradient(135deg, ${acc}33, ${acc}66)`, border: `2px solid ${acc}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 900, color: acc }}>
+                        {op.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ fontWeight: 800, fontSize: 15, color: txt, textAlign: 'center' }}>{op.name}</div>
+                      {op.pin ? (
+                        <div style={{ fontSize: 10, color: txt2, fontWeight: 700 }}>🔐 PIN</div>
+                      ) : (
+                        <div style={{ fontSize: 10, color: '#4ade80', fontWeight: 700 }}>✓ ACESSO DIRETO</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : (
+              /* ── PIN keypad ── */
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }} key={pinTarget.id}>
+                {/* PIN dots */}
+                <div style={{ display: 'flex', gap: 12, animation: pinError ? 'pinShake .4s ease' : 'none' }}>
+                  {[0,1,2,3,4,5].map(i => (
+                    <div key={i} style={{ width: 16, height: 16, borderRadius: '50%', background: i < pinInput.length ? acc : bg3, border: `2px solid ${i < pinInput.length ? acc : brd}`, transition: 'background .15s' }} />
+                  ))}
+                </div>
+                {pinError && <div style={{ color: '#f87171', fontSize: 13, fontWeight: 700 }}>PIN incorreto — tente novamente</div>}
+
+                {/* numeric keypad */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, width: 240 }}>
+                  {[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map((k, i) => (
+                    <button key={i} disabled={k === ''}
+                      onClick={() => {
+                        if (k === '⌫') { setPinInput(p => p.slice(0,-1)); return }
+                        if (k === '') return
+                        const next = pinInput + k
+                        setPinInput(next)
+                        if (next.length >= 6) setTimeout(() => {
+                          if (next === pinTarget.pin) { setActiveOperator(pinTarget); setPinTarget(null); setPinInput('') }
+                          else { setPinError(true); setPinInput(''); setTimeout(() => setPinError(false), 1200) }
+                        }, 100)
+                      }}
+                      style={{ height: 60, borderRadius: 14, background: k === '' ? 'transparent' : bg2, border: k === '' ? 'none' : `1.5px solid ${brd}`, color: txt, fontSize: k === '⌫' ? 20 : 22, fontWeight: 900, cursor: k === '' ? 'default' : 'pointer', transition: 'background .1s, border-color .1s' }}
+                      onMouseEnter={e => { if (k !== '') { e.currentTarget.style.background = bg3; e.currentTarget.style.borderColor = acc }}}
+                      onMouseLeave={e => { if (k !== '') { e.currentTarget.style.background = bg2; e.currentTarget.style.borderColor = brd }}}
+                    >{k}</button>
+                  ))}
+                </div>
+
+                <button onClick={() => { setPinTarget(null); setPinInput('') }}
+                  style={{ marginTop: 4, background: 'none', border: 'none', color: txt2, fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
+                  ← Voltar
+                </button>
+              </div>
+            )}
+
+            {/* admin link */}
+            <a href="/pdv" style={{ marginTop: 12, color: txt2, fontSize: 12, fontWeight: 600, textDecoration: 'none', opacity: 0.5 }}>
+              ← Painel Admin
+            </a>
           </div>
         </div>
       )}
