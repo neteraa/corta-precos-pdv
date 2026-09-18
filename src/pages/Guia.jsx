@@ -1,19 +1,20 @@
 /**
- * /guia — Passo a passo para ambas as plataformas
- * Página pública, sem auth. Serve de onboarding e material de vendas.
+ * /guia — Onboarding público · serve também como material de vendas
  */
 import React, { useState } from 'react'
 import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 
 const VERSION = 'v3.1'
-const UPDATED = 'Agosto 2026'
+const UPDATED = 'Set 2026'
 
 const ORANGE = '#f97316'
 const GREEN  = '#10b981'
 const BLUE   = '#3b82f6'
-const DARK   = '#050f1a'
+const PURPLE = '#8b5cf6'
 const CARD   = '#0d2137'
 const BORDER = '#1a3a50'
+const WA_NUM = '5515996604075'
+const WA_URL = `https://wa.me/${WA_NUM}?text=`
 
 function Badge({ color, children }) {
   return (
@@ -25,7 +26,7 @@ function Badge({ color, children }) {
   )
 }
 
-function Step({ n, icon, title, desc, tip }) {
+function Step({ n, icon, title, desc, tip, color = ORANGE }) {
   return (
     <div style={{
       display: 'flex', gap: 14, alignItems: 'flex-start',
@@ -34,17 +35,16 @@ function Step({ n, icon, title, desc, tip }) {
     }}>
       <div style={{
         minWidth: 36, height: 36, borderRadius: 12,
-        background: `linear-gradient(135deg,${ORANGE}33,${ORANGE}11)`,
-        border: `1px solid ${ORANGE}44`,
+        background: `${color}22`, border: `1px solid ${color}44`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: ORANGE, fontWeight: 900, fontSize: 15, flexShrink: 0,
+        color, fontWeight: 900, fontSize: 15, flexShrink: 0,
       }}>{n}</div>
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <span style={{ fontSize: 18 }}>{icon}</span>
           <span style={{ color: '#f1f5f9', fontWeight: 800, fontSize: 14 }}>{title}</span>
         </div>
-        <div style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.5 }}>{desc}</div>
+        <div style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.55 }}>{desc}</div>
         {tip && (
           <div style={{
             marginTop: 8, background: '#0a2540', borderRadius: 8, padding: '7px 10px',
@@ -56,11 +56,43 @@ function Step({ n, icon, title, desc, tip }) {
   )
 }
 
-function Feature({ icon, text }) {
+function Feature({ icon, title, desc, color = GREEN }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: `1px solid ${BORDER}` }}>
-      <span style={{ fontSize: 18, flexShrink: 0 }}>{icon}</span>
-      <span style={{ color: '#94a3b8', fontSize: 13 }}>{text}</span>
+    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '10px 0', borderBottom: `1px solid ${BORDER}` }}>
+      <span style={{ fontSize: 20, flexShrink: 0, marginTop: 1 }}>{icon}</span>
+      <div>
+        <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 13 }}>{title}</div>
+        {desc && <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>{desc}</div>}
+      </div>
+    </div>
+  )
+}
+
+function KbdRow({ keys, action }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderBottom: `1px solid ${BORDER}` }}>
+      <div style={{ display: 'flex', gap: 4, minWidth: 140 }}>
+        {keys.map(k => (
+          <kbd key={k} style={{ background: '#1e3a5f', color: '#93c5fd', border: '1px solid #2563eb55', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontFamily: 'monospace', fontWeight: 700 }}>{k}</kbd>
+        ))}
+      </div>
+      <span style={{ color: '#94a3b8', fontSize: 13 }}>{action}</span>
+    </div>
+  )
+}
+
+function Faq({ q, a }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ borderBottom: `1px solid ${BORDER}` }}>
+      <button onClick={() => setOpen(v => !v)} style={{
+        width: '100%', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer',
+        padding: '13px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
+      }}>
+        <span style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 13 }}>{q}</span>
+        <span style={{ color: ORANGE, fontSize: 16, flexShrink: 0 }}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && <div style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.6, paddingBottom: 14 }}>{a}</div>}
     </div>
   )
 }
@@ -71,10 +103,10 @@ function Section({ title, subtitle, color, children }) {
       <div style={{
         background: `linear-gradient(135deg,${color}22,${color}08)`,
         border: `1px solid ${color}33`, borderRadius: 20,
-        padding: '20px 22px', marginBottom: 20,
+        padding: '18px 22px', marginBottom: 18,
       }}>
-        <div style={{ color, fontWeight: 900, fontSize: 18 }}>{title}</div>
-        <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>{subtitle}</div>
+        <div style={{ color, fontWeight: 900, fontSize: 17 }}>{title}</div>
+        {subtitle && <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>{subtitle}</div>}
       </div>
       {children}
     </div>

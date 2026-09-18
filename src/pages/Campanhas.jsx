@@ -571,6 +571,61 @@ export default function Campanhas() {
             </div>
             <p className="text-[10px] text-blue-500 mt-1.5">Cole no Meta Ads como URL de destino do anúncio</p>
           </div>
+
+          {/* ── Baileys / anti-ban tips ── */}
+          <div className="card p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 space-y-3">
+            <h3 className="text-xs font-black text-amber-800 uppercase tracking-wide">⚡ Disparo em Massa — Regras Anti-Ban</h3>
+            <p className="text-xs text-amber-700 leading-relaxed">
+              O modo <strong>wa.me</strong> acima abre 1 conversa por vez — você clica Enviar manualmente. É seguro.
+              Para automatizar, existem 2 caminhos:
+            </p>
+
+            {/* Evolution API */}
+            <div className="bg-white rounded-xl p-3 border border-amber-200">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-base">🔌</span>
+                <span className="text-xs font-black text-gray-800">Evolution API (recomendado)</span>
+                <span className="text-[10px] bg-green-100 text-green-700 rounded-full px-2 py-0.5 font-bold">SEGURO</span>
+              </div>
+              <p className="text-[11px] text-gray-600 leading-relaxed">
+                Configure em ⚙️ acima. Já integrado aqui com delay de 1,2s entre mensagens.
+                Use junto com <strong>WhatsApp Business API oficial</strong> (Meta) para volume maior sem risco.
+              </p>
+            </div>
+
+            {/* Baileys */}
+            <div className="bg-white rounded-xl p-3 border border-amber-200">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-base">🐝</span>
+                <span className="text-xs font-black text-gray-800">Baileys (biblioteca JS não oficial)</span>
+                <span className="text-[10px] bg-yellow-100 text-yellow-700 rounded-full px-2 py-0.5 font-bold">USE COM CUIDADO</span>
+              </div>
+              <p className="text-[11px] text-gray-600 leading-relaxed mb-2">
+                Baileys simula o WhatsApp Web via WebSocket. <strong>Gratuito e ilimitado</strong>, mas viola os Termos do WhatsApp — risco real de ban do número se mal configurado.
+              </p>
+              <div className="space-y-1">
+                {[
+                  ['✅','Delay aleatório entre mensagens: 5–15 segundos (nunca constante)'],
+                  ['✅','Máx. 50–80 mensagens por sessão de 24h (por número)'],
+                  ['✅','Varie o conteúdo: use {{nome}}, {{saldo}}, emojis diferentes'],
+                  ['✅','Nunca envie para não-contatos ou números frios'],
+                  ['✅','Use número exclusivo para disparos (não o número pessoal)'],
+                  ['⚠️','Pause 30–60 min entre lotes de 30 msgs para parecer humano'],
+                  ['⚠️','Evite palavras como "promoção", "oferta", "clique aqui" em excesso'],
+                  ['❌','Nunca dispare 500+ msgs em série sem intervalo — ban garantido'],
+                ].map(([icon, tip]) => (
+                  <div key={tip} className="flex items-start gap-2 text-[11px] text-gray-600">
+                    <span className="flex-shrink-0 font-bold">{icon}</span>
+                    <span>{tip}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-[10px] text-amber-600 leading-relaxed">
+              <strong>Dica prática:</strong> Use a Lista de Transmissão nativa do WhatsApp Business (até 256 contatos) para envios ocasionais — zero risco de ban porque é oficial. Reserve Baileys/Evolution para automações mais avançadas.
+            </p>
+          </div>
         </div>
       </div>
     </div>
