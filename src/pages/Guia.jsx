@@ -209,7 +209,7 @@ export default function Guia() {
               </div>
               <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 <Badge color={GREEN}>🌐 zatendestock.netlify.app/fornecedor</Badge>
-                <Badge color="#94a3b8">Usuário: megatudo · Senha: mega2024</Badge>
+                <Badge color="#94a3b8">Usuário e senha fornecidos pelo administrador</Badge>
               </div>
             </div>
 
@@ -218,7 +218,7 @@ export default function Guia() {
                 desc="Acesse zatendestock.netlify.app/fornecedor. Instale como app no celular para acessar mais rápido."
                 tip="O portal é 100% separado do portal do mercado — tenha os dois abertos em abas diferentes" />
               <Step n="2" icon="🔐" title="Faça login"
-                desc="Use as credenciais fornecidas. Para a demo: megatudo / mega2024. Após o login você vê o dashboard FIFO." />
+                desc="Use as credenciais fornecidas pelo administrador ZatendeStock. Após o login você vê o dashboard FIFO." />
               <Step n="3" icon="🏢" title="Configure seu perfil"
                 desc='Clique na aba "Perfil" (último ícone) → preencha nome da distribuidora, telefone e logo. Isso aparece para todos os mercados.'
                 tip="O logo e os dados do seu perfil aparecem na vitrine digital dos mercados e nas mensagens de WhatsApp" />

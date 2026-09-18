@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useId } from 'react'
 import { buildReceipt, buildPromoCoupon } from '../utils/escpos.js'
 
 // Promo raffle coupon is only printed for sales >= R$100
@@ -16,17 +16,32 @@ const STORAGE_KEY = 'cp_printer_settings'
 function loadSettings() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {} } catch { return {} }
 }
-export function savePrinterSettings(s) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)) } catch {}
+export function savePrinterSettings(s, sourceId) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
+    // Notify all OTHER usePrinter instances in this tab to re-sync
+    window.dispatchEvent(new CustomEvent('cp-settings-saved', { detail: { sourceId } }))
+  } catch {}
 }
 
 export function usePrinter() {
-  const portRef   = useRef(null)
+  const portRef    = useRef(null)
+  const instanceId = useId()   // stable per-hook-instance ID
 
   const [status, setStatus]     = useState('disconnected') // 'disconnected'|'connecting'|'connected'|'printing'|'error'
   const [settings, setSettings] = useState(loadSettings)
 
-  useEffect(() => { savePrinterSettings(settings) }, [settings])
+  useEffect(() => { savePrinterSettings(settings, instanceId) }, [settings, instanceId])
+
+  // Re-sync when ANOTHER instance saves (e.g. Configurações → Layout storeName)
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.sourceId !== instanceId) setSettings(loadSettings())
+    }
+    window.addEventListener('cp-settings-saved', handler)
+    return () => window.removeEventListener('cp-settings-saved', handler)
+  }, [instanceId])
+
 
   const isSupported = typeof navigator !== 'undefined' && 'serial' in navigator
 

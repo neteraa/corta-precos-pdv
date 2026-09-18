@@ -4147,11 +4147,13 @@ const ZAP_KEY_KEY    = 'cp_zatende_key'
 const ZAP_SLUG_KEY   = 'cp_zatende_slug'
 const ZAP_DEFAULT    = ''
 
+// Local profile/market seed data — no credentials here.
+// Authentication is server-side via /api/forn-auth.
 const TENANTS = [
   {
     id: 'mega',
+    tenantId: 'mega',
     username: 'megatudo',
-    password: 'mega2024',
     profile: {
       name: 'Mega Tudo Barato',
       phone: '11 2815-1989',
@@ -4168,7 +4170,7 @@ const TENANTS = [
       { id:'mega_mkt4', name:'Mini Mercado Expresso',  phone:'15976543210', contact:'Fátima Alves',  address:'Av. Brasil, 1200, Sorocaba, SP',        city:'Sorocaba/SP'       },
       { id:'mega_mkt5', name:'Armazém do Povo',        phone:'15991234567', contact:'Roberto Santos',address:'Rua Central, 44, São Roque, SP',        city:'São Roque/SP'      },
     ],
-    autoSeedDemo: true, // carrega DEMO_ESTOQUE/OFFERS/ORDERS na primeira entrada
+    autoSeedDemo: true,
   },
 ]
 
@@ -4182,18 +4184,38 @@ function LoginPage({ onLogin }) {
 
   const inp = { display:'block', width:'100%', background:'#0a1929', border:'1px solid #1e4060', borderRadius:14, padding:'14px 16px', color:'#e2e8f0', fontSize:16, boxSizing:'border-box', outline:'none', marginBottom:12 }
 
-  function handleLogin() {
+  async function handleLogin() {
     if (!user || !pass) return
     setLoading(true); setError('')
-    setTimeout(() => {
-      const tenant = TENANTS.find(t => t.username === user.trim().toLowerCase() && t.password === pass)
-      if (tenant) {
-        onLogin(tenant)
-      } else {
-        setError('Usuário ou senha incorretos')
-        setLoading(false)
+    try {
+      const res  = await fetch('/api/forn-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user.trim().toLowerCase(), password: pass }),
+      })
+      const data = await res.json()
+      if (!data.ok) { setError(data.error || 'Usuário ou senha incorretos'); setLoading(false); return }
+
+      // Merge server identity with local profile/seedMarkets if available
+      const local  = TENANTS.find(t => t.tenantId === data.tenantId || t.id === data.tenantId)
+      const tenant = {
+        ...(local || {}),
+        id:        data.tenantId,
+        tenantId:  data.tenantId,
+        profile:   local?.profile || {
+          name:          data.storeName,
+          businessName:  data.storeName,
+          phone:         data.storePhone || '',
+          themeColor:    data.themeColor || '#10b981',
+        },
+        seedMarkets:  local?.seedMarkets  || [],
+        autoSeedDemo: local?.autoSeedDemo || false,
       }
-    }, 700) // simulate network delay
+      onLogin(tenant)
+    } catch {
+      setError('Erro de conexão. Tente novamente.')
+      setLoading(false)
+    }
   }
 
   return (
@@ -4237,21 +4259,8 @@ function LoginPage({ onLogin }) {
           {loading ? '⏳ Entrando...' : '🔐 Entrar'}
         </button>
 
-        {/* Demo credentials */}
-        <div style={{ marginTop:20, padding:'14px 16px', background:'#060e1a', borderRadius:14, border:'1px dashed #1e4060' }}>
-          <div style={{ color:'#334155', fontSize:10, fontWeight:700, textTransform:'uppercase', marginBottom:10 }}>ACESSO PARA DEMONSTRAÇÃO</div>
-          {TENANTS.map(t => (
-            <button key={t.id} onClick={() => { setUser(t.username); setPass(t.password); setError('') }}
-              style={{ display:'flex', alignItems:'center', gap:10, width:'100%', background:'#0d2137', border:'1px solid #1e4060', borderRadius:12, padding:'10px 14px', cursor:'pointer', marginBottom:6 }}>
-              <div style={{ width:32, height:32, borderRadius:10, background:`linear-gradient(135deg,${t.profile.themeColor},${t.profile.themeColor}aa)`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <span style={{ color:'#fff', fontWeight:900, fontSize:11 }}>{t.profile.businessName.split(' ').map(w=>w[0]).slice(0,3).join('')}</span>
-              </div>
-              <div style={{ textAlign:'left' }}>
-                <div style={{ color:'#e2e8f0', fontWeight:700, fontSize:13 }}>{t.profile.businessName}</div>
-                <div style={{ color:'#475569', fontSize:11 }}>👤 {t.username} · 🔑 {t.password}</div>
-              </div>
-            </button>
-          ))}
+        <div style={{ marginTop:20, textAlign:'center', color:'#1e4060', fontSize:11 }}>
+          Acesso restrito a distribuidoras cadastradas.<br/>Contate o suporte para obter credenciais.
         </div>
       </div>
 

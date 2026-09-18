@@ -75,7 +75,7 @@ export default function App() {
           <Route path="/display" element={<CustomerDisplay />} />
           <Route path="/flyer"   element={<RequireAuth><Flyer /></RequireAuth>} />
           <Route path="/terminal" element={<RequireAuth><Terminal /></RequireAuth>} />
-          <Route path="/scan"         element={<ScanMobile />} />
+          <Route path="/scan"         element={<RequireAuth><ScanMobile /></RequireAuth>} />
           <Route path="/fornecedor"   element={<Fornecedor />} />
           <Route path="/tv"           element={<PainelTV />} />
           <Route path="/loja/:storeSlug" element={<VitrinaDigital />} />

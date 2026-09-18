@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap } from 'lucide-react'
+import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, Users, TrendingUp, AlertTriangle, CalendarClock } from 'lucide-react'
 import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
 
 /* ─── constants ──────────────────────────────────────────── */
@@ -344,25 +344,213 @@ function AddMarketModal({ mk, onClose, onCreated }) {
   )
 }
 
-/* ─── main page ──────────────────────────────────────────── */
+/* ─── DistCard ───────────────────────────────────────────── */
+function DistCard({ dist, mk, onRefresh }) {
+  const [busy,      setBusy]      = useState(false)
+  const [showReset, setShowReset] = useState(false)
+  const [newPass,   setNewPass]   = useState('')
+
+  const color  = ['#10b981', '#f97316', '#8b5cf6', '#0ea5e9', '#ec4899'][dist.storeName.length % 5]
+  const initial = (dist.storeName || '?')[0].toUpperCase()
+
+  function lastLoginLabel() {
+    if (!dist.lastLogin) return '–'
+    const diff = Date.now() - new Date(dist.lastLogin)
+    const mins = Math.floor(diff / 60000)
+    if (mins < 60) return `${mins}min atrás`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h atrás`
+    return `${Math.floor(hrs / 24)}d atrás`
+  }
+
+  const toggle = async () => {
+    setBusy(true)
+    await api('/api/forn-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'toggle', id: dist.id }) })
+    await onRefresh(); setBusy(false)
+  }
+
+  const remove = async () => {
+    if (!confirm(`Remover ${dist.storeName}?`)) return
+    setBusy(true)
+    await api('/api/forn-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'delete', id: dist.id }) })
+    await onRefresh(); setBusy(false)
+  }
+
+  const resetPass = async () => {
+    if (!newPass.trim()) return
+    setBusy(true)
+    await api('/api/forn-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'reset-pass', id: dist.id, password: newPass }) })
+    setShowReset(false); setNewPass('')
+    setBusy(false)
+  }
+
+  const setExpiry = async (dateStr) => {
+    const expiresAt = dateStr ? new Date(dateStr + 'T23:59:59').toISOString() : null
+    await api('/api/forn-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'set-expiry', id: dist.id, expiresAt }) })
+    await onRefresh()
+  }
+
+  const exp    = dist.expiresAt ? new Date(dist.expiresAt) : null
+  const days   = exp ? Math.ceil((exp - Date.now()) / 86_400_000) : null
+  const expired = days !== null && days < 0
+
+  const badge = expired
+    ? { label: `VENCIDA ${Math.abs(days)}d atrás`, cls: 'bg-red-500/20 text-red-400 border-red-500/30' }
+    : days !== null && days <= 5
+    ? { label: `Vence em ${days}d`, cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' }
+    : days !== null
+    ? { label: `${days}d restantes`, cls: 'bg-green-500/20 text-green-400 border-green-500/30' }
+    : { label: 'Sem vencimento', cls: 'bg-gray-700/50 text-gray-500 border-gray-600/30' }
+
+  return (
+    <div className={`rounded-2xl border p-5 flex flex-col gap-4 transition-all ${dist.active ? 'bg-gray-800/80 border-gray-700 hover:border-gray-600' : 'bg-gray-900/60 border-gray-800 opacity-60'}`}>
+      {/* header */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-base flex-shrink-0" style={{ background: color }}>
+          {initial}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-black text-white text-sm truncate">{dist.storeName}</div>
+          <div className="text-gray-500 text-xs">@{dist.username}</div>
+        </div>
+        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${dist.active ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-gray-700/50 text-gray-500 border-gray-600/30'}`}>
+          {dist.active ? 'ATIVO' : 'INATIVO'}
+        </span>
+      </div>
+
+      {/* meta */}
+      <div className="text-xs text-gray-500 space-y-1">
+        {dist.storePhone && <div>📞 {dist.storePhone}</div>}
+        <div className="flex items-center gap-1"><Clock className="w-3 h-3" /> {lastLoginLabel()}</div>
+        <div><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badge.cls}`}>{badge.label}</span></div>
+      </div>
+
+      {/* expiry picker */}
+      <div>
+        <label className="text-[10px] text-gray-600 uppercase font-bold block mb-1">Vencimento</label>
+        <input type="date" defaultValue={dist.expiresAt?.slice(0, 10) || ''}
+          className="w-full text-xs bg-gray-700/50 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 focus:outline-none focus:border-orange-500"
+          onChange={e => setExpiry(e.target.value)} />
+      </div>
+
+      {/* reset pass */}
+      {showReset ? (
+        <div className="flex gap-2">
+          <input placeholder="Nova senha" value={newPass} onChange={e => setNewPass(e.target.value)}
+            className="flex-1 text-xs bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-gray-200 focus:outline-none focus:border-orange-500" />
+          <button onClick={resetPass} disabled={busy || !newPass.trim()}
+            className="px-3 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold disabled:opacity-40">OK</button>
+          <button onClick={() => setShowReset(false)}
+            className="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-400 text-xs"><X className="w-3 h-3" /></button>
+        </div>
+      ) : (
+        <button onClick={() => setShowReset(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-700/50 hover:bg-gray-700 text-gray-400 hover:text-white text-xs transition-colors">
+          <Key className="w-3 h-3" /> Resetar senha
+        </button>
+      )}
+
+      {/* actions */}
+      <div className="flex gap-2 pt-1 border-t border-gray-700/50">
+        <button onClick={toggle} disabled={busy}
+          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-40 ${dist.active ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-green-500/20 hover:bg-green-500/30 text-green-400'}`}>
+          <Power className="w-3 h-3" /> {dist.active ? 'Desativar' : 'Ativar'}
+        </button>
+        <button onClick={remove} disabled={busy}
+          className="px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs transition-colors disabled:opacity-40">
+          <Trash2 className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ─── AddDistModal ───────────────────────────────────────── */
+function AddDistModal({ mk, onClose, onCreated }) {
+  const [form, setForm] = useState({ storeName: '', username: '', password: '', storePhone: '', themeColor: '#10b981' })
+  const [show, setShow] = useState(false)
+  const [err,  setErr]  = useState(null)
+  const [ok,   setOk]   = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const submit = async () => {
+    if (!form.storeName || !form.username || !form.password) { setErr('Preencha todos os campos obrigatórios'); return }
+    setBusy(true); setErr(null)
+    const res = await api('/api/forn-admin', mk, { method: 'POST', body: JSON.stringify(form) })
+    setBusy(false)
+    if (!res.ok) { setErr(res.error || 'Erro ao criar'); return }
+    setOk(res)
+  }
+
+  if (ok) return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onCreated}>
+      <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 text-center max-w-sm w-full">
+        <div className="text-5xl mb-4">✅</div>
+        <div className="text-white font-black text-xl mb-2">Distribuidor criado!</div>
+        <div className="text-gray-400 text-sm mb-1">Usuário: <span className="font-mono text-orange-400">{form.username}</span></div>
+        <div className="text-gray-400 text-sm mb-6">Senha: <span className="font-mono text-orange-400">{form.password}</span></div>
+        <button onClick={onCreated} className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black">Fechar</button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-6">
+          <div className="font-black text-white text-lg flex items-center gap-2"><Truck className="w-5 h-5 text-emerald-400" /> Novo Distribuidor</div>
+          <button onClick={onClose}><X className="w-5 h-5 text-gray-500 hover:text-white" /></button>
+        </div>
+        <div className="space-y-4">
+          {[['storeName', 'Nome do distribuidor *'], ['username', 'Usuário *'], ['password', 'Senha *'], ['storePhone', 'Telefone']].map(([k, label]) => (
+            <div key={k}>
+              <label className="block text-xs font-bold text-gray-400 uppercase mb-1">{label}</label>
+              <input className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-emerald-400"
+                value={form[k]} onChange={e => set(k, e.target.value)}
+                type={k === 'password' ? (show ? 'text' : 'password') : 'text'} />
+            </div>
+          ))}
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Cor do tema</label>
+            <input type="color" value={form.themeColor} onChange={e => set('themeColor', e.target.value)}
+              className="w-12 h-10 rounded-lg border border-gray-600 cursor-pointer bg-gray-700" />
+          </div>
+        </div>
+        {err && <div className="mt-4 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{err}</div>}
+        <button onClick={submit} disabled={busy}
+          className="w-full mt-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white font-black transition-colors flex items-center justify-center gap-2">
+          {busy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+          {busy ? 'Criando...' : 'Criar Distribuidor'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function MasterPainel() {
-  const [mk,       setMk]       = useState(getMK)
-  const [mkInput,  setMkInput]  = useState(getMK)
-  const [showMk,   setShowMk]   = useState(false)
-  const [authed,   setAuthed]   = useState(false)
-  const [markets,  setMarkets]  = useState([])
-  const [loading,  setLoading]  = useState(false)
-  const [err,      setErr]      = useState(null)
-  const [showAdd,  setShowAdd]  = useState(false)
+  const [mk,           setMk]           = useState(getMK)
+  const [mkInput,      setMkInput]       = useState(getMK)
+  const [showMk,       setShowMk]        = useState(false)
+  const [authed,       setAuthed]        = useState(false)
+  const [markets,      setMarkets]       = useState([])
+  const [distributors, setDistributors]  = useState([])
+  const [loading,      setLoading]       = useState(false)
+  const [err,          setErr]           = useState(null)
+  const [showAdd,      setShowAdd]       = useState(false)   // 'market' | 'dist' | false
+  const [tab,          setTab]           = useState('overview') // 'overview' | 'markets' | 'dist'
 
   const load = useCallback(async (key = mk) => {
     if (!key) return
-    setLoading(true)
-    setErr(null)
+    setLoading(true); setErr(null)
     try {
-      const res = await api('/api/markets-admin', key)
-      if (!res.ok) { setErr('Chave master incorreta.'); setAuthed(false); return }
-      setMarkets(res.markets || [])
+      const [mRes, dRes] = await Promise.all([
+        api('/api/markets-admin', key),
+        api('/api/forn-admin', key),
+      ])
+      if (!mRes.ok) { setErr('Chave master incorreta.'); setAuthed(false); return }
+      setMarkets(mRes.markets || [])
+      setDistributors(dRes.ok ? (dRes.distributors || []) : [])
       setAuthed(true)
     } catch {
       setErr('Erro de conexão. Verifique sua rede.')
@@ -372,135 +560,272 @@ export default function MasterPainel() {
   }, [mk])
 
   const login = async () => {
-    const key = mkInput.trim()
-    if (!key) return
-    localStorage.setItem(MK_KEY, key)
-    setMk(key)
-    await load(key)
+    const key = mkInput.trim(); if (!key) return
+    localStorage.setItem(MK_KEY, key); setMk(key); await load(key)
   }
 
   const accessMarket = (market) => {
-    // Save current master session separately, then impersonate the market
     localStorage.setItem('zs_master_session', JSON.stringify({ mk, returnTo: '/painel' }))
     localStorage.setItem('cp_session', JSON.stringify({
-      loggedIn:  true,
-      user:      market.username,
-      storeId:   market.storeId,
-      storeName: market.storeName,
-      role:      'admin',
+      loggedIn: true, user: market.username, storeId: market.storeId, storeName: market.storeName, role: 'admin',
     }))
     window.open('/dashboard', '_blank')
   }
 
-  const active  = markets.filter(m => m.active)
-  const recent  = markets.filter(m => m.lastLogin && Date.now() - new Date(m.lastLogin) < 24 * 3600000)
+  /* ── derived stats ── */
+  const now        = Date.now()
+  const mActive    = markets.filter(m => m.active)
+  const dActive    = distributors.filter(d => d.active)
+  const allActive  = mActive.length + dActive.length
+  const totalAll   = markets.length + distributors.length
+  const recent24   = [...markets, ...distributors].filter(x => x.lastLogin && now - new Date(x.lastLogin) < 86_400_000)
+  const expiring7  = [...markets, ...distributors].filter(x => {
+    if (!x.expiresAt) return false
+    const d = Math.ceil((new Date(x.expiresAt) - now) / 86_400_000)
+    return d >= 0 && d <= 7
+  })
+  const expired    = [...markets, ...distributors].filter(x => x.expiresAt && new Date(x.expiresAt) < now)
 
+  /* ── login screen ── */
   if (!authed) return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <ZatendeStockLogo variant="full" />
-          </div>
+          <div className="flex justify-center mb-4"><ZatendeStockLogo variant="full" /></div>
           <div className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-black px-4 py-1.5 rounded-full">
             <ShieldAlert className="w-3.5 h-3.5" /> PAINEL MASTER — ACESSO RESTRITO
           </div>
         </div>
-
         <div className="bg-gray-800/60 border border-gray-700 rounded-2xl p-6 backdrop-blur-sm">
           <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Chave Master</label>
           <div className="relative mb-4">
-            <input
-              className="w-full bg-gray-700 border border-gray-600 text-white rounded-xl px-4 py-3 pr-12 outline-none focus:border-orange-500 transition-colors font-mono"
-              type={showMk ? 'text' : 'password'}
-              placeholder="Chave de acesso master"
-              value={mkInput}
-              onChange={e => setMkInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && login()}
-              autoFocus
-            />
-            <button onClick={() => setShowMk(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200">
+            <input className="w-full bg-gray-700 border border-gray-600 text-white rounded-xl px-4 py-3 pr-12 outline-none focus:border-orange-500 transition-colors font-mono"
+              type={showMk ? 'text' : 'password'} placeholder="Chave de acesso master"
+              value={mkInput} onChange={e => setMkInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} autoFocus />
+            <button onClick={() => setShowMk(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200">
               {showMk ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
-
           {err && <div className="mb-4 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{err}</div>}
-
           <button onClick={login} disabled={loading || !mkInput.trim()}
             className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-black transition-all flex items-center justify-center gap-2">
             {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             {loading ? 'Verificando...' : 'Entrar no Painel Master'}
           </button>
         </div>
-
-        <p className="text-center text-gray-600 text-xs mt-6">
-          ZatendeStock · Painel interno · Não compartilhe esta URL
-        </p>
+        <p className="text-center text-gray-600 text-xs mt-6">ZatendeStock · Painel interno · Não compartilhe esta URL</p>
       </div>
     </div>
   )
 
+  /* ── authenticated layout ── */
+  const TABS = [
+    { id: 'overview', label: 'Visão Geral',    icon: BarChart2 },
+    { id: 'markets',  label: `Mercados (${markets.length})`,  icon: Store  },
+    { id: 'dist',     label: `Distribuidores (${distributors.length})`, icon: Truck  },
+  ]
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      {/* header */}
+      {/* sticky header */}
       <div className="bg-gray-900/80 border-b border-gray-800 sticky top-0 z-10 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <ZatendeStockLogo variant="wordmark" />
-            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30 hidden sm:block">
               PAINEL MASTER
             </span>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* tabs */}
+          <div className="flex items-center gap-1 bg-gray-800/80 rounded-xl p-1 flex-1 max-w-md">
+            {TABS.map(t => {
+              const Icon = t.icon
+              return (
+                <button key={t.id} onClick={() => setTab(t.id)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+                    tab === t.id ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}>
+                  <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="hidden sm:block truncate">{t.label}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button onClick={() => load()}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs transition-colors">
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Atualizar
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:block">Atualizar</span>
             </button>
-            <button onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black transition-colors">
-              <Plus className="w-3.5 h-3.5" /> Novo Mercado
-            </button>
+            {tab !== 'overview' && (
+              <button onClick={() => setShowAdd(tab === 'markets' ? 'market' : 'dist')}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black transition-colors">
+                <Plus className="w-3.5 h-3.5" />
+                <span className="hidden sm:block">{tab === 'markets' ? 'Novo Mercado' : 'Novo Distribuidor'}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
-          <StatCard label="Mercados ativos" value={active.length} sub={`de ${markets.length} cadastrados`} />
-          <StatCard label="Acessaram hoje" value={recent.length} sub="últimas 24 horas" color="#22c55e" />
-          <StatCard label="Total mercados" value={markets.length} sub="na plataforma" color="#8b5cf6" />
-        </div>
 
-        {/* markets grid */}
-        {markets.length === 0 ? (
-          <div className="text-center py-20 text-gray-500">
-            <Store className="w-12 h-12 mx-auto mb-4 opacity-30" />
-            <p className="font-semibold text-lg">Nenhum mercado cadastrado ainda</p>
-            <p className="text-sm mt-1 mb-6">Clique em "Novo Mercado" para adicionar o primeiro cliente</p>
-            <button onClick={() => setShowAdd(true)}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black transition-colors">
-              <Plus className="w-4 h-4" /> Adicionar primeiro mercado
-            </button>
+        {/* ── VISÃO GERAL ── */}
+        {tab === 'overview' && (
+          <div className="space-y-8">
+            {/* summary cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard label="Clientes ativos"   value={allActive}         sub={`de ${totalAll} cadastrados`}      color="#f97316" />
+              <StatCard label="Mercados"           value={markets.length}    sub={`${mActive.length} ativos`}        color="#8b5cf6" />
+              <StatCard label="Distribuidores"     value={distributors.length} sub={`${dActive.length} ativos`}     color="#10b981" />
+              <StatCard label="Acessaram hoje"     value={recent24.length}   sub="últimas 24h"                      color="#0ea5e9" />
+            </div>
+
+            {/* alert rows */}
+            {expiring7.length > 0 && (
+              <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-5">
+                <div className="flex items-center gap-2 text-yellow-400 font-black text-sm mb-4">
+                  <CalendarClock className="w-4 h-4" /> Vencendo em 7 dias ({expiring7.length})
+                </div>
+                <div className="space-y-2">
+                  {expiring7.map(x => {
+                    const d = Math.ceil((new Date(x.expiresAt) - now) / 86_400_000)
+                    return (
+                      <div key={x.id} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-300">{x.storeName || x.username}</span>
+                        <span className="text-yellow-400 font-bold text-xs">{d === 0 ? 'hoje' : `${d}d`}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {expired.length > 0 && (
+              <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-5">
+                <div className="flex items-center gap-2 text-red-400 font-black text-sm mb-4">
+                  <AlertTriangle className="w-4 h-4" /> Licenças vencidas ({expired.length}) — cobrar ou desativar
+                </div>
+                <div className="space-y-2">
+                  {expired.map(x => {
+                    const d = Math.abs(Math.ceil((new Date(x.expiresAt) - now) / 86_400_000))
+                    return (
+                      <div key={x.id} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-300">{x.storeName || x.username}</span>
+                        <span className="text-red-400 font-bold text-xs">{d}d atrás</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* recent activity */}
+            <div>
+              <div className="text-xs font-black text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <TrendingUp className="w-3.5 h-3.5" /> Atividade recente
+              </div>
+              {recent24.length === 0 ? (
+                <p className="text-gray-600 text-sm">Nenhum acesso nas últimas 24h</p>
+              ) : (
+                <div className="space-y-2">
+                  {recent24.map(x => {
+                    const diff = now - new Date(x.lastLogin)
+                    const label = diff < 3_600_000
+                      ? `${Math.floor(diff / 60000)}min`
+                      : `${Math.floor(diff / 3_600_000)}h`
+                    return (
+                      <div key={x.id} className="flex items-center gap-3 py-2 border-b border-gray-800/60">
+                        <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                        <span className="text-gray-300 text-sm flex-1">{x.storeName || x.username}</span>
+                        <span className="text-gray-600 text-xs">{label} atrás</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${x.tenantId ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-purple-500/10 text-purple-400 border-purple-500/20'}`}>
+                          {x.tenantId ? 'DIST' : 'MERC'}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* quick nav */}
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => setTab('markets')}
+                className="flex items-center gap-3 p-5 rounded-2xl border border-gray-700 bg-gray-800/40 hover:bg-gray-800 transition-all text-left group">
+                <Store className="w-8 h-8 text-purple-400" />
+                <div>
+                  <div className="font-black text-white">Mercados</div>
+                  <div className="text-gray-500 text-xs">{markets.length} cadastrados · {mActive.length} ativos</div>
+                </div>
+              </button>
+              <button onClick={() => setTab('dist')}
+                className="flex items-center gap-3 p-5 rounded-2xl border border-gray-700 bg-gray-800/40 hover:bg-gray-800 transition-all text-left group">
+                <Truck className="w-8 h-8 text-emerald-400" />
+                <div>
+                  <div className="font-black text-white">Distribuidores</div>
+                  <div className="text-gray-500 text-xs">{distributors.length} cadastrados · {dActive.length} ativos</div>
+                </div>
+              </button>
+            </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {markets.map(m => (
-              <MarketCard key={m.id} market={m} mk={mk} onRefresh={load} onAccess={accessMarket} />
-            ))}
-            {/* Add card */}
-            <button onClick={() => setShowAdd(true)}
-              className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-700 hover:border-orange-500/50 hover:bg-orange-500/5 transition-all min-h-[280px] gap-3 text-gray-500 hover:text-orange-400">
-              <Plus className="w-8 h-8" />
-              <span className="text-sm font-bold">Novo mercado</span>
-            </button>
-          </div>
+        )}
+
+        {/* ── MERCADOS ── */}
+        {tab === 'markets' && (
+          markets.length === 0 ? (
+            <div className="text-center py-20 text-gray-500">
+              <Store className="w-12 h-12 mx-auto mb-4 opacity-30" />
+              <p className="font-semibold text-lg">Nenhum mercado cadastrado ainda</p>
+              <button onClick={() => setShowAdd('market')}
+                className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black">
+                <Plus className="w-4 h-4" /> Adicionar primeiro mercado
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {markets.map(m => (
+                <MarketCard key={m.id} market={m} mk={mk} onRefresh={load} onAccess={accessMarket} />
+              ))}
+              <button onClick={() => setShowAdd('market')}
+                className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-700 hover:border-orange-500/50 hover:bg-orange-500/5 transition-all min-h-[280px] gap-3 text-gray-500 hover:text-orange-400">
+                <Plus className="w-8 h-8" /><span className="text-sm font-bold">Novo mercado</span>
+              </button>
+            </div>
+          )
+        )}
+
+        {/* ── DISTRIBUIDORES ── */}
+        {tab === 'dist' && (
+          distributors.length === 0 ? (
+            <div className="text-center py-20 text-gray-500">
+              <Truck className="w-12 h-12 mx-auto mb-4 opacity-30" />
+              <p className="font-semibold text-lg">Nenhum distribuidor cadastrado ainda</p>
+              <button onClick={() => setShowAdd('dist')}
+                className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black">
+                <Plus className="w-4 h-4" /> Adicionar primeiro distribuidor
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {distributors.map(d => (
+                <DistCard key={d.id} dist={d} mk={mk} onRefresh={load} />
+              ))}
+              <button onClick={() => setShowAdd('dist')}
+                className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-700 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all min-h-[280px] gap-3 text-gray-500 hover:text-emerald-400">
+                <Plus className="w-8 h-8" /><span className="text-sm font-bold">Novo distribuidor</span>
+              </button>
+            </div>
+          )
         )}
       </div>
 
-      {showAdd && (
+      {showAdd === 'market' && (
         <AddMarketModal mk={mk} onClose={() => setShowAdd(false)} onCreated={() => { setShowAdd(false); load() }} />
+      )}
+      {showAdd === 'dist' && (
+        <AddDistModal mk={mk} onClose={() => setShowAdd(false)} onCreated={() => { setShowAdd(false); load() }} />
       )}
     </div>
   )
