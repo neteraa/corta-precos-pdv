@@ -58,11 +58,14 @@ function extractText(data) {
   )
 }
 
-/** Envia mensagem de texto via Evolution API */
-async function sendReply(number, text) {
-  const url    = process.env.EVOLUTION_API_URL?.replace(/\/$/, '')
-  const key    = process.env.EVOLUTION_API_KEY
-  const inst   = process.env.EVOLUTION_INSTANCE
+/** Envia mensagem de texto via Evolution API
+ *  instance: vem do payload do webhook (multi-tenant — cada loja usa a própria instância)
+ */
+async function sendReply(number, text, instance) {
+  const url = process.env.EVOLUTION_API_URL?.replace(/\/$/, '')
+  const key = process.env.EVOLUTION_API_KEY
+  // Usa a instância do payload; fallback para env var legada
+  const inst = instance || process.env.EVOLUTION_INSTANCE
 
   if (!url || !key || !inst) {
     console.error('wa-bot: Evolution API not configured')
@@ -134,11 +137,14 @@ export default async (req) => {
     return new Response('Bad Request', { status: 400 })
   }
 
-  // Only handle message upsert events
-  const event = payload?.event
-  if (event !== 'messages.upsert' && event !== 'message') {
+  // Only handle message upsert events (Evolution API v2 envia maiúsculo: "MESSAGES_UPSERT")
+  const event = (payload?.event || '').toLowerCase()
+  if (event !== 'messages.upsert' && event !== 'message' && event !== 'messages_upsert') {
     return new Response('OK', { status: 200 })
   }
+
+  // Instância que recebeu a mensagem — multi-tenant: cada loja usa a própria
+  const instanceName = payload?.instance || process.env.EVOLUTION_INSTANCE
 
   const data = payload?.data
 
@@ -171,8 +177,8 @@ export default async (req) => {
   try {
     const reply = await askOpenAI(text, senderName)
     if (reply) {
-      await sendReply(senderNum, reply)
-      console.log(`wa-bot: replied to ${senderNum}: ${reply.slice(0, 80)}`)
+      await sendReply(senderNum, reply, instanceName)
+      console.log(`wa-bot [${instanceName}]: replied to ${senderNum}: ${reply.slice(0, 80)}`)
     }
   } catch (err) {
     console.error('wa-bot error:', err.message)
