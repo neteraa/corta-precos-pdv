@@ -18,6 +18,12 @@
   to     = "/.netlify/functions/priceref"
   status = 200
 
+# WhatsApp AI bot — Evolution API envia webhook para este endpoint
+[[redirects]]
+  from   = "/wa-bot"
+  to     = "/.netlify/functions/wa-bot"
+  status = 200
+
 [[redirects]]
   from   = "/*"
   to     = "/index.html"

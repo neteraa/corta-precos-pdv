@@ -10,7 +10,7 @@ import { useBroadcastSend } from '../hooks/useBroadcast.js'
 import { useScanReceiver }  from '../hooks/useScanRelay.js'
 import PixQR from '../components/PixQR.jsx'
 
-const WA_LINK = 'https://wa.me/5515996604075?text=Oi%20Corta%20Pre%C3%A7os!%20Quero%20receber%20as%20promo%C3%A7%C3%B5es%20da%20semana%20%F0%9F%9B%92'
+const WA_LINK = 'https://wa.me/5515997969303?text=Oi%20Corta%20Pre%C3%A7os!%20Quero%20receber%20as%20promo%C3%A7%C3%B5es%20da%20semana%20%F0%9F%9B%92'
 
 const PAYMENTS = [
   { key: 'Dinheiro', icon: Banknote,    color: 'text-green-700 border-green-400 bg-green-50' },

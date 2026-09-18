@@ -6,8 +6,8 @@ import { registerStoreId, wipeLegacyFlatKeys } from '../utils/tenantStorage.js'
 import { seedSettingsFromSession } from '../hooks/usePrinter.js'
 import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 
-const ZAP         = '5511985950956'
-const ZAP_DISPLAY = '(011) 98595-0956'
+const ZAP         = '5515997969303'
+const ZAP_DISPLAY = '(15) 99796-9303'
 const openWpp     = (msg) => window.open(`https://wa.me/${ZAP}?text=${encodeURIComponent(msg)}`, '_blank')
 
 const B = { blue:'#4F5BD5', blueDk:'#3730A3', green:'#22c55e', greenDk:'#16a34a', text:'#0f172a', muted:'#64748b', border:'#e2e8f0', bg:'#f8fafc' }

@@ -4,7 +4,7 @@ import { ArrowRight, MessageCircle, ChevronDown, CheckCircle2, AlertTriangle, Tr
 import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 import { isLoggedIn } from '../utils/auth.js'
 
-const ZAP     = '5511985950956'
+const ZAP     = '5515997969303'
 const ZAP_MSG = 'Olá! Quero conhecer o ZatendeStok para meu mercado.'
 const openWpp = (msg) => window.open(`https://wa.me/${ZAP}?text=${encodeURIComponent(msg || ZAP_MSG)}`, '_blank')
 

@@ -838,7 +838,7 @@ export default function Dashboard() {
                       ``,
                       `🙏 _Deus é bom o tempo todo!_`,
                     ].filter(Boolean).join('\n')
-                    const phone = '5515996604075'
+                    const phone = '5515997969303'
                     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
                   }}
                   className="flex-1 py-3 bg-green-500 hover:bg-green-600 text-white font-black rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"

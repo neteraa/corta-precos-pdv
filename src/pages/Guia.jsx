@@ -13,7 +13,7 @@ const BLUE   = '#3b82f6'
 const PURPLE = '#8b5cf6'
 const CARD   = '#0d2137'
 const BORDER = '#1a3a50'
-const WA_NUM = '5515996604075'
+const WA_NUM = '5515997969303'
 const WA_URL = `https://wa.me/${WA_NUM}?text=`
 
 function Badge({ color, children }) {
@@ -176,7 +176,7 @@ export default function Guia() {
                 tip="Chrome/Edge no Android: menu ⋮ → 'Adicionar à tela inicial'" />
               <Step n="2" icon="🔐" title='Clique em "Acesso ao sistema"'
                 desc='Na tela inicial, clique no botão 🔐 Acesso ao sistema. Digite usuário e senha. Para a demo: admin / 1234.'
-                tip="Cada mercado tem seu próprio usuário e senha — fale com (011) 98595-0956 para cadastrar o seu" />
+                tip="Cada mercado tem seu próprio usuário e senha — fale com (15) 99796-9303 para cadastrar o seu" />
               <Step n="3" icon="📊" title="Dashboard — visão geral"
                 desc="Ao entrar, você vê o Dashboard com as vendas do dia, produtos com validade próxima e resumo do caixa."
                 tip="O banner laranja no topo avisa quando tem produto vencendo em até 30 dias" />
@@ -220,10 +220,10 @@ export default function Guia() {
               <div style={{ fontSize: 28, marginBottom: 8 }}>❓</div>
               <div style={{ color: '#f1f5f9', fontWeight: 800, fontSize: 15 }}>Precisa de ajuda?</div>
               <div style={{ color: '#64748b', fontSize: 13, margin: '8px 0 16px' }}>Fale com a gente via WhatsApp</div>
-              <a href="https://wa.me/5511985950956?text=Olá!%20Preciso%20de%20ajuda%20com%20o%20ZatendeStok"
+              <a href="https://wa.me/5515997969303?text=Olá!%20Preciso%20de%20ajuda%20com%20o%20ZatendeStok"
                 target="_blank" rel="noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#16a34a', color: '#fff', fontWeight: 900, fontSize: 14, padding: '12px 24px', borderRadius: 12, textDecoration: 'none' }}>
-                💬 (011) 98595-0956
+                💬 (15) 99796-9303
               </a>
             </div>
           </>
@@ -324,10 +324,10 @@ export default function Guia() {
               <div style={{ fontSize: 28, marginBottom: 8 }}>❓</div>
               <div style={{ color: '#f1f5f9', fontWeight: 800, fontSize: 15 }}>Suporte & Ativação</div>
               <div style={{ color: '#64748b', fontSize: 13, margin: '8px 0 16px' }}>Cadastro de novos distribuidores via WhatsApp</div>
-              <a href="https://wa.me/5511985950956?text=Olá!%20Quero%20conhecer%20o%20Portal%20do%20Distribuidor%20ZatendeStok"
+              <a href="https://wa.me/5515997969303?text=Olá!%20Quero%20conhecer%20o%20Portal%20do%20Distribuidor%20ZatendeStok"
                 target="_blank" rel="noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#16a34a', color: '#fff', fontWeight: 900, fontSize: 14, padding: '12px 24px', borderRadius: 12, textDecoration: 'none' }}>
-                💬 (011) 98595-0956
+                💬 (15) 99796-9303
               </a>
             </div>
           </>
