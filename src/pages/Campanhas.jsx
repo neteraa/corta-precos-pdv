@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useCallback } from 'react'
-import { Send, Copy, Check, Search, X, MessageCircle, Users, ChevronDown, ChevronUp,
-         Zap, Settings, Phone, AlertCircle, Plus, Trash2, Flame, ExternalLink } from 'lucide-react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { Copy, Check, Search, X, MessageCircle, Users, Phone, Plus, Trash2, Flame, ExternalLink, Wifi, WifiOff, Bot } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
+import { getConfiguredStoreId } from '../utils/auth.js'
 
 /* ── helpers ─────────────────────────────────────────────── */
 const cleanPhone = p =>
@@ -16,18 +16,17 @@ const renderMsg = (template, customer, store = 'MEU MERCADO') =>
     .replace(/\{\{saldo\}\}/gi, customer?.saldo ? BRL.format(customer.saldo) : 'R$ 0,00')
     .replace(/\{\{data\}\}/gi,  new Date().toLocaleDateString('pt-BR'))
 
-/* ── zatende / Evolution API sender ─────────────────────── */
-async function sendViaZatende(cfg, phone, text) {
-  /* cfg: { url, key, instance }
-     Compatible with Evolution API v2 (which zatende uses) */
-  const endpoint = cfg.url.replace(/\/$/, '')
-  const res = await fetch(`${endpoint}/message/sendText/${cfg.instance}`, {
+/* ── send via nosso proxy (Evolution API server-side) ─────── */
+async function sendViaBot(instance, phone, text) {
+  const res = await fetch('/api/wa-send', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'apikey': cfg.key },
-    body: JSON.stringify({ number: phone, text }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ instance, number: phone, text }),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  const d = await res.json()
+  if (!d.ok) throw new Error(d.error || 'Erro ao enviar')
+  return d
 }
 
 /* ── WhatsApp bubble preview ─────────────────────────────── */
@@ -83,12 +82,17 @@ function ProductRow({ p, onAdd }) {
 ══════════════════════════════════════════════════════════ */
 export default function Campanhas() {
   const { products, customers, sales, promos } = useStore()
+  const instance = getConfiguredStoreId() || 'zatendestok'
 
-  // zatende config stored in localStorage
-  const [cfg, setCfg] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('cp_zatende') || '{}') } catch { return {} }
-  })
-  const [showCfg, setShowCfg] = useState(false)
+  // bot connection status
+  const [botStatus, setBotStatus] = useState(null) // null | 'open' | 'connecting'
+  useEffect(() => {
+    fetch(`/api/wa-status?instance=${instance}`)
+      .then(r => r.json())
+      .then(d => setBotStatus(d.exists ? d.status : 'disconnected'))
+      .catch(() => setBotStatus('disconnected'))
+  }, [instance])
+  const botConnected = botStatus === 'open'
 
   // message template
   const [template, setTemplate] = useState(
@@ -106,7 +110,7 @@ export default function Campanhas() {
   const [results, setResults]       = useState(null) // { ok, fail }
   const [copied, setCopied]         = useState(false)
 
-  // local wa.me sequential dispatch (no Zatende needed)
+  // local wa.me sequential dispatch
   const [localMode, setLocalMode]   = useState(false)
   const [localIdx,  setLocalIdx]    = useState(0)
 
@@ -190,21 +194,22 @@ export default function Campanhas() {
     window.open(`https://wa.me/${phone}?text=${text}`, '_blank')
   }
 
-  /* ── send via zatende API ── */
+  /* ── send via nosso bot (Evolution API via proxy) ── */
   const sendAll = async () => {
-    if (!cfg.url || !cfg.key || !cfg.instance) {
-      alert('Configure a integração Zatende primeiro (botão ⚙️ acima).')
+    if (!botConnected) {
+      alert('Bot WhatsApp não conectado. Vá em Configurações → Bot WhatsApp para escanear o QR.')
       return
     }
-    if (!audienceList.filter(hasPhone).length) return
+    const list = audienceList.filter(hasPhone)
+    if (!list.length) return
     setSending(true)
     setResults(null)
     let ok = 0, fail = 0
-    for (const c of audienceList.filter(hasPhone)) {
+    for (const c of list) {
       try {
-        await sendViaZatende(cfg, cleanPhone(c.phone), renderMsg(template, c))
+        await sendViaBot(instance, cleanPhone(c.phone), renderMsg(template, c))
         ok++
-        await new Promise(r => setTimeout(r, 1200)) // rate limit: 1 msg/1.2s
+        await new Promise(r => setTimeout(r, 1400)) // anti-ban: ~1 msg/1.4s
       } catch {
         fail++
       }
@@ -213,7 +218,7 @@ export default function Campanhas() {
     setSending(false)
   }
 
-  /* open wa.me for one customer at a time (local mode, no server needed) */
+  /* open wa.me for one customer at a time (local mode) */
   const openNextWaMe = useCallback((idx) => {
     const list = audienceList.filter(hasPhone)
     if (idx >= list.length) { setLocalMode(false); setLocalIdx(0); return }
@@ -222,71 +227,26 @@ export default function Campanhas() {
     setLocalIdx(idx + 1)
   }, [audienceList, template])
 
-  /* ── save zatende config ── */
-  const saveCfg = (e) => {
-    e.preventDefault()
-    const fd = new FormData(e.target)
-    const next = { url: fd.get('url'), key: fd.get('key'), instance: fd.get('instance') }
-    setCfg(next)
-    localStorage.setItem('cp_zatende', JSON.stringify(next))
-    setShowCfg(false)
-  }
-
-  const cfgOk = cfg.url && cfg.key && cfg.instance
-
   return (
     <div className="space-y-5 animate-pop max-w-3xl">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-black text-gray-900">Campanhas WhatsApp</h1>
-          <p className="text-gray-500 text-sm">Broadcast de ofertas via lista de transmissão · Zatende</p>
+          <p className="text-gray-500 text-sm">Broadcast de ofertas para seus clientes via bot</p>
         </div>
-        <button onClick={() => setShowCfg(v => !v)}
-          className={`flex items-center gap-2 text-sm font-bold px-3 py-2 rounded-xl border transition-colors ${
-            cfgOk ? 'border-green-300 bg-green-50 text-green-700' : 'border-amber-300 bg-amber-50 text-amber-700'
-          }`}>
-          <Settings className="w-4 h-4" />
-          {cfgOk ? '✓ Zatende conectado' : '⚙️ Configurar Zatende'}
-          {showCfg ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        </button>
+        {/* Bot status badge */}
+        <div className={`flex items-center gap-2 text-sm font-bold px-3 py-2 rounded-xl border ${
+          botStatus === null ? 'border-gray-200 bg-gray-50 text-gray-400'
+          : botConnected ? 'border-green-300 bg-green-50 text-green-700'
+          : 'border-amber-300 bg-amber-50 text-amber-700'
+        }`}>
+          {botConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+          {botStatus === null ? 'Verificando bot...'
+            : botConnected ? 'Bot conectado'
+            : 'Bot desconectado'}
+        </div>
       </div>
-
-      {/* ── Zatende config ── */}
-      {showCfg && (
-        <div className="card p-4 border-2 border-amber-200 bg-amber-50/50 animate-pop">
-          <div className="flex items-start gap-2 mb-3">
-            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-800 leading-relaxed">
-              Acesse seu painel no <a href="https://zatende.com.br" target="_blank" rel="noreferrer" className="font-bold underline">zatende.com.br</a>{' '}
-              → Configurações → API · Copie a URL do servidor, a API Key e o nome da instância conectada.
-            </p>
-          </div>
-          <form onSubmit={saveCfg} className="space-y-2">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <div className="sm:col-span-2">
-                <label className="label">URL do servidor Zatende</label>
-                <input name="url" defaultValue={cfg.url || ''} required className="input text-sm"
-                  placeholder="https://api.zatende.com.br" />
-              </div>
-              <div>
-                <label className="label">Nome da instância</label>
-                <input name="instance" defaultValue={cfg.instance || ''} required className="input text-sm"
-                  placeholder="meu-zap" />
-              </div>
-            </div>
-            <div>
-              <label className="label">API Key</label>
-              <input name="key" type="password" defaultValue={cfg.key || ''} required className="input text-sm font-mono"
-                placeholder="••••••••••••••••" />
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button type="button" onClick={() => setShowCfg(false)} className="btn-ghost text-sm">Cancelar</button>
-              <button type="submit" className="btn-primary text-sm">Salvar configuração</button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {/* ── Promoções Prontas (de vencimento) ── */}
       {activePromos.length > 0 && (
@@ -491,31 +451,31 @@ export default function Campanhas() {
             <button onClick={copyNumbers}
               className="flex items-center gap-2 btn-ghost text-sm justify-center px-3 py-2 rounded-xl border border-gray-200">
               {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-              {copied ? 'Copiado!' : `Copiar números`}
+              {copied ? 'Copiado!' : 'Copiar números'}
             </button>
 
-            {/* LOCAL dispatch — no Zatende needed */}
+            {/* Manual — wa.me 1 por vez */}
             <button
               onClick={() => { setLocalIdx(0); setLocalMode(true) }}
               disabled={!audienceList.filter(hasPhone).length}
-              className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl transition-colors flex-1 justify-center text-white disabled:opacity-50"
+              className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl transition-colors justify-center text-white disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg,#25d366,#128c7e)' }}>
               <MessageCircle className="w-4 h-4" />
-              Disparar Local ({audienceList.filter(hasPhone).length}) — sem servidor
+              Enviar um a um ({audienceList.filter(hasPhone).length})
             </button>
 
-            {/* Zatende — requires server */}
+            {/* Automático — via nosso bot */}
             <button
               onClick={sendAll}
-              disabled={sending || !cfgOk || !audienceList.filter(hasPhone).length}
-              title={!cfgOk ? 'Configure o Zatende primeiro' : ''}
+              disabled={sending || !audienceList.filter(hasPhone).length}
+              title={!botConnected ? 'Bot não conectado — vá em Configurações para escanear o QR' : ''}
               className={`flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl transition-colors justify-center
-                ${cfgOk
+                ${botConnected
                   ? 'bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
               {sending
-                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Enviando...</>
-                : <><Zap className="w-4 h-4" /> Zatende</>
+                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Disparando...</>
+                : <><Bot className="w-4 h-4" /> Disparar via Bot</>
               }
             </button>
           </div>
@@ -547,7 +507,7 @@ export default function Campanhas() {
               <div className="flex items-start gap-2"><span className="text-orange-500 font-bold flex-shrink-0">1.</span>Escreva a mensagem com variáveis (ex: <code className="bg-orange-50 text-orange-700 px-1 rounded">{'{{nome}}'}</code>)</div>
               <div className="flex items-start gap-2"><span className="text-orange-500 font-bold flex-shrink-0">2.</span>Adicione produtos com o preço para mostrar as ofertas</div>
               <div className="flex items-start gap-2"><span className="text-orange-500 font-bold flex-shrink-0">3.</span>Selecione quem vai receber</div>
-              <div className="flex items-start gap-2"><span className="text-orange-500 font-bold flex-shrink-0">4.</span><span>Copie os números para a <b>Lista de Transmissão</b> no Zatende ou envie direto via API</span></div>
+              <div className="flex items-start gap-2"><span className="text-orange-500 font-bold flex-shrink-0">4.</span><span><b>Disparar via Bot</b> — envia automático (bot precisa estar conectado em Configurações) · ou <b>Enviar um a um</b> para abrir o WhatsApp manualmente</span></div>
             </div>
           </div>
 
@@ -572,59 +532,25 @@ export default function Campanhas() {
             <p className="text-[10px] text-blue-500 mt-1.5">Cole no Meta Ads como URL de destino do anúncio</p>
           </div>
 
-          {/* ── Baileys / anti-ban tips ── */}
-          <div className="card p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 space-y-3">
-            <h3 className="text-xs font-black text-amber-800 uppercase tracking-wide">⚡ Disparo em Massa — Regras Anti-Ban</h3>
-            <p className="text-xs text-amber-700 leading-relaxed">
-              O modo <strong>wa.me</strong> acima abre 1 conversa por vez — você clica Enviar manualmente. É seguro.
-              Para automatizar, existem 2 caminhos:
-            </p>
-
-            {/* Evolution API */}
-            <div className="bg-white rounded-xl p-3 border border-amber-200">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-base">🔌</span>
-                <span className="text-xs font-black text-gray-800">Evolution API (recomendado)</span>
-                <span className="text-[10px] bg-green-100 text-green-700 rounded-full px-2 py-0.5 font-bold">SEGURO</span>
-              </div>
-              <p className="text-[11px] text-gray-600 leading-relaxed">
-                Configure em ⚙️ acima. Já integrado aqui com delay de 1,2s entre mensagens.
-                Use junto com <strong>WhatsApp Business API oficial</strong> (Meta) para volume maior sem risco.
-              </p>
+          {/* ── Anti-ban tips ── */}
+          <div className="card p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 space-y-2">
+            <h3 className="text-xs font-black text-amber-800 uppercase tracking-wide">⚡ Regras Anti-Ban</h3>
+            <div className="space-y-1">
+              {[
+                ['✅','Delay de 1,4s entre mensagens já aplicado automaticamente'],
+                ['✅','Máx. 50–80 mensagens por sessão de 24h por número'],
+                ['✅','Varie o conteúdo — use {{nome}}, {{saldo}}, {{data}} para personalizar'],
+                ['✅','Envie só para quem salvou seu número (clientes reais)'],
+                ['⚠️','Pause 30–60 min entre lotes de 30 msgs'],
+                ['⚠️','Use número exclusivo para disparos — não o pessoal'],
+                ['❌','Nunca dispare 500+ msgs em série sem pausa — ban garantido'],
+              ].map(([icon, tip]) => (
+                <div key={tip} className="flex items-start gap-2 text-[11px] text-gray-600">
+                  <span className="flex-shrink-0 font-bold">{icon}</span>
+                  <span>{tip}</span>
+                </div>
+              ))}
             </div>
-
-            {/* Baileys */}
-            <div className="bg-white rounded-xl p-3 border border-amber-200">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-base">🐝</span>
-                <span className="text-xs font-black text-gray-800">Baileys (biblioteca JS não oficial)</span>
-                <span className="text-[10px] bg-yellow-100 text-yellow-700 rounded-full px-2 py-0.5 font-bold">USE COM CUIDADO</span>
-              </div>
-              <p className="text-[11px] text-gray-600 leading-relaxed mb-2">
-                Baileys simula o WhatsApp Web via WebSocket. <strong>Gratuito e ilimitado</strong>, mas viola os Termos do WhatsApp — risco real de ban do número se mal configurado.
-              </p>
-              <div className="space-y-1">
-                {[
-                  ['✅','Delay aleatório entre mensagens: 5–15 segundos (nunca constante)'],
-                  ['✅','Máx. 50–80 mensagens por sessão de 24h (por número)'],
-                  ['✅','Varie o conteúdo: use {{nome}}, {{saldo}}, emojis diferentes'],
-                  ['✅','Nunca envie para não-contatos ou números frios'],
-                  ['✅','Use número exclusivo para disparos (não o número pessoal)'],
-                  ['⚠️','Pause 30–60 min entre lotes de 30 msgs para parecer humano'],
-                  ['⚠️','Evite palavras como "promoção", "oferta", "clique aqui" em excesso'],
-                  ['❌','Nunca dispare 500+ msgs em série sem intervalo — ban garantido'],
-                ].map(([icon, tip]) => (
-                  <div key={tip} className="flex items-start gap-2 text-[11px] text-gray-600">
-                    <span className="flex-shrink-0 font-bold">{icon}</span>
-                    <span>{tip}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <p className="text-[10px] text-amber-600 leading-relaxed">
-              <strong>Dica prática:</strong> Use a Lista de Transmissão nativa do WhatsApp Business (até 256 contatos) para envios ocasionais — zero risco de ban porque é oficial. Reserve Baileys/Evolution para automações mais avançadas.
-            </p>
           </div>
         </div>
       </div>

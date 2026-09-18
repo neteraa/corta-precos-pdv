@@ -30,6 +30,12 @@
   to     = "/.netlify/functions/wa-status"
   status = 200
 
+# WhatsApp send proxy — envia mensagens via Evolution API (API key server-side)
+[[redirects]]
+  from   = "/api/wa-send"
+  to     = "/.netlify/functions/wa-send"
+  status = 200
+
 [[redirects]]
   from   = "/*"
   to     = "/index.html"
