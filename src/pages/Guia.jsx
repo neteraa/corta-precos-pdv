@@ -133,14 +133,14 @@ export default function Guia() {
                 Caixa, estoque, validade, promoções e fidelidade — tudo em um só lugar
               </div>
               <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                <Badge color={ORANGE}>🌐 zatendestock.netlify.app/login</Badge>
+                <Badge color={ORANGE}>🌐 zatendestok.com.br/login</Badge>
                 <Badge color="#94a3b8">Usuário: admin · Senha: 1234</Badge>
               </div>
             </div>
 
             <Section title="1. Primeiro Acesso" subtitle="Leva menos de 2 minutos" color={ORANGE}>
               <Step n="1" icon="🌐" title="Abra o link no celular ou PC"
-                desc="Acesse zatendestock.netlify.app. No celular, clique em 'Adicionar à tela inicial' para instalar como app (sem precisar de loja de apps)."
+                desc="Acesse zatendestok.com.br. No celular, clique em 'Adicionar à tela inicial' para instalar como app (sem precisar de loja de apps)."
                 tip="Chrome/Edge no Android: menu ⋮ → 'Adicionar à tela inicial'" />
               <Step n="2" icon="🔐" title='Clique em "Acesso ao sistema"'
                 desc='Na tela inicial, clique no botão 🔐 Acesso ao sistema. Digite usuário e senha. Para a demo: admin / 1234.'
@@ -208,14 +208,14 @@ export default function Guia() {
                 Controle lotes, publique ofertas e gerencie pedidos dos mercados via WhatsApp
               </div>
               <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                <Badge color={GREEN}>🌐 zatendestock.netlify.app/fornecedor</Badge>
+                <Badge color={GREEN}>🌐 zatendestok.com.br/fornecedor</Badge>
                 <Badge color="#94a3b8">Usuário e senha fornecidos pelo administrador</Badge>
               </div>
             </div>
 
             <Section title="1. Primeiro Acesso" subtitle="Configure em 5 minutos" color={GREEN}>
               <Step n="1" icon="🌐" title="Abra o portal do distribuidor"
-                desc="Acesse zatendestock.netlify.app/fornecedor. Instale como app no celular para acessar mais rápido."
+                desc="Acesse zatendestok.com.br/fornecedor. Instale como app no celular para acessar mais rápido."
                 tip="O portal é 100% separado do portal do mercado — tenha os dois abertos em abas diferentes" />
               <Step n="2" icon="🔐" title="Faça login"
                 desc="Use as credenciais fornecidas pelo administrador ZatendeStok. Após o login você vê o dashboard FIFO." />

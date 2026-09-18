@@ -31,9 +31,9 @@ function ofertasUrl() {
   try {
     const s = JSON.parse(localStorage.getItem('cp_session_v1') || '{}')
     const id = s.id || 'mega'
-    return `https://zatendestock.netlify.app/ofertas?s=${id}`
+    return `https://zatendestok.com.br/ofertas?s=${id}`
   } catch {
-    return 'https://zatendestock.netlify.app/ofertas?s=mega'
+    return 'https://zatendestok.com.br/ofertas?s=mega'
   }
 }
 const OFFERS_KEY  = 'cp_supplier_offers'
@@ -3196,7 +3196,7 @@ function TabSellOut({ orders, markets }) {
         <div style={{ color:'#64748b', fontSize:12, lineHeight:1.6, marginBottom:14 }}>
           Ofereça desconto de 10–15% pra quem adotar. É como a Cimed faz com as farmácias — e vira diferencial competitivo no seu nicho.
         </div>
-        <a href="https://zatendestock.netlify.app/qr.html" target="_blank" rel="noreferrer"
+        <a href="https://zatendestok.com.br/qr.html" target="_blank" rel="noreferrer"
           style={{ display:'inline-flex', alignItems:'center', gap:6, background:'linear-gradient(135deg,#3b82f6,#2563eb)', color:'#fff', borderRadius:12, padding:'10px 18px', fontSize:13, fontWeight:800, textDecoration:'none' }}>
           📱 Ver QR codes para os mercados
         </a>

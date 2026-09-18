@@ -1,7 +1,7 @@
 {
-  "name": "ZatendeStock",
-  "short_name": "ZatendeStock",
-  "description": "Gestão de estoque, ofertas e pedidos para distribuidoras e mercados",
+  "name": "ZatendeStok",
+  "short_name": "ZatendeStok",
+  "description": "PDV, estoque, fiado e promoções para mercados. Simples e rápido.",
   "start_url": "/login",
   "display": "standalone",
   "background_color": "#050f1a",

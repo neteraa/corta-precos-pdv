@@ -304,7 +304,7 @@ function CredSuccess({ title, icon: Icon, iconColor, accentColor, ok, emailResul
         </div>
 
         <div className="bg-gray-900 rounded-xl p-4 space-y-2 font-mono text-sm border border-gray-700 mb-4">
-          <div className="flex justify-between"><span className="text-gray-400">URL</span><span style={{ color: accentColor }}>zatendestock.netlify.app</span></div>
+          <div className="flex justify-between"><span className="text-gray-400">URL</span><span style={{ color: accentColor }}>zatendestok.com.br</span></div>
           <div className="flex justify-between"><span className="text-gray-400">Usuário</span><span className="text-white font-bold">{ok.username}</span></div>
           <div className="flex justify-between"><span className="text-gray-400">Senha</span><span className="text-white font-bold">{ok.password}</span></div>
           {ok.storeId && <div className="flex justify-between"><span className="text-gray-400">Store ID</span><span className="text-green-400">{ok.storeId}</span></div>}
