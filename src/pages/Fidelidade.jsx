@@ -1,36 +1,35 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useMemo } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Printer, Copy, Check, MessageCircle, TrendingUp, Users, Zap, ShoppingBag, Star, Gift } from 'lucide-react'
+import { usePrinter } from '../hooks/usePrinter.js'
 
-const PHONE = '5515996604075'
-const NOME  = 'Corta Preços'
-
-const CAMPAIGNS = [
+function buildCampaigns(nome) {
+  return [
   {
     id: 'promo',
     label: '🏷️ Promoção da Semana',
-    msg: `Oi ${NOME}! Quero receber as promoções da semana 🛒`,
+    msg: `Oi ${nome}! Quero receber as promoções da semana 🛒`,
     tip: 'Use na entrada do caixa — cada cliente escaneia antes de pagar.',
   },
   {
     id: 'fidelidade',
     label: '🎁 Clube de Fidelidade',
-    msg: `Oi ${NOME}! Quero entrar no Clube Fidelidade e ganhar desconto 🎉`,
+    msg: `Oi ${nome}! Quero entrar no Clube Fidelidade e ganhar desconto 🎉`,
     tip: 'Ofereça 5% de desconto na próxima compra para quem se cadastrar.',
   },
   {
     id: 'atacado',
     label: '📦 Lista de Atacado',
-    msg: `Oi ${NOME}! Quero receber a lista de preços de atacado 📦`,
+    msg: `Oi ${nome}! Quero receber a lista de preços de atacado 📦`,
     tip: 'Ideal para clientes que compram em quantidade (donos de bar, lanchonete).',
   },
   {
     id: 'aniversario',
     label: '🎂 Cupom Aniversário',
-    msg: `Oi ${NOME}! Quero meu cupom de aniversário 🎂`,
+    msg: `Oi ${nome}! Quero meu cupom de aniversário 🎂`,
     tip: 'Você captura o nome e a data de aniversário do cliente via WhatsApp.',
   },
-]
+]}
 
 const ROADMAP = [
   {
@@ -90,12 +89,19 @@ function WaQR({ value, size = 160 }) {
 }
 
 export default function Fidelidade() {
-  const [activeCampaign, setActiveCampaign] = useState(CAMPAIGNS[0])
+  const { settings }  = usePrinter()
+  const storeName     = settings.storeName  || 'MEU MERCADO'
+  const phone         = settings.phone      || ''
+  const themeColor    = settings.themeColor || '#ea580c'
+  const campaigns     = useMemo(() => buildCampaigns(storeName), [storeName])
+  const waPhone       = phone.replace(/\D/g, '')
+
+  const [activeCampaign, setActiveCampaign] = useState(() => campaigns[0])
   const [copied, setCopied] = useState(false)
   const printRef = useRef(null)
 
-  const waLink = `https://wa.me/${PHONE}?text=${encodeURIComponent(activeCampaign.msg)}`
-  const waLinkShort = `wa.me/${PHONE}`
+  const waLink      = waPhone ? `https://wa.me/55${waPhone}?text=${encodeURIComponent(activeCampaign.msg)}` : '#'
+  const waLinkShort = waPhone ? `wa.me/55${waPhone}` : 'configure o telefone'
 
   const copy = () => {
     navigator.clipboard.writeText(waLink)
@@ -116,12 +122,12 @@ export default function Fidelidade() {
         .sub { font-size: 12px; color: #777; margin-top: 6px; }
         .phone { font-size: 14px; font-weight: 700; color: #22c55e; margin-top: 10px; }
       </style></head><body>
-      <div class="logo">✂ CORTA PREÇO$</div>
+      <div class="logo">✂ ${storeName}</div>
       <div class="tagline">Economia de verdade, variedades todo dia</div>
       <div class="qr-wrap">${printRef.current?.innerHTML || ''}</div>
       <div class="cta">📲 Escaneie e receba nossas PROMOÇÕES!</div>
       <div class="sub">${activeCampaign.msg}</div>
-      <div class="phone">WhatsApp: (15) 99660-4075</div>
+      ${phone ? `<div class="phone">WhatsApp: ${phone}</div>` : ''}
       </body></html>
     `)
     win.document.close()
@@ -169,7 +175,7 @@ export default function Fidelidade() {
           <div>
             <label className="label mb-2">Selecione a campanha:</label>
             <div className="space-y-2">
-              {CAMPAIGNS.map(c => (
+              {campaigns.map(c => (
                 <button
                   key={c.id}
                   onClick={() => setActiveCampaign(c)}

@@ -1,20 +1,24 @@
 import React, { useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
+import { usePrinter } from '../hooks/usePrinter.js'
 
-const WA_LINK = 'https://wa.me/5515996604075?text=Oi%20Corta%20Pre%C3%A7os!%20Quero%20participar%20do%20sorteio!'
 const SORTEIO_DATE = 'Todo último sábado do mês'
 const VALIDADE     = 'Válido até 31/08/2025'
 
-/* ── 3 coupons at the bottom ─────────────────────────────── */
-const COUPONS = [
-  { n: '001' }, { n: '002' }, { n: '003' },
-]
+const COUPONS = [{ n: '001' }, { n: '002' }, { n: '003' }]
 
 export default function Flyer() {
   const printRef = useRef()
+  const { settings } = usePrinter()
+  const storeName  = settings.storeName  || 'MEU MERCADO'
+  const phone      = settings.phone      || ''
+  const instagram  = settings.instagram  ? '@' + settings.instagram.replace(/^@/, '') : ''
+  const themeColor = settings.themeColor || '#f97316'
+  const waPhone    = (phone || '').replace(/\D/g, '')
+  const waLink     = waPhone ? `https://wa.me/55${waPhone}?text=Oi%20${encodeURIComponent(storeName)}!%20Quero%20participar%20do%20sorteio!` : '#'
 
   const handlePrint = () => {
-    document.title = 'Flyer Corta Preços'
+    document.title = `Flyer ${storeName}`
     window.print()
   }
 
@@ -54,11 +58,11 @@ export default function Flyer() {
                 <circle cx="5.5" cy="5.5" r="2.5" strokeWidth="2.5" />
                 <circle cx="5.5" cy="18.5" r="2.5" strokeWidth="2.5" />
               </svg>
-              <span>CORTA PREÇO$</span>
+              <span>{storeName}</span>
             </div>
             <div className="flyer-contact">
-              <span>📍 (15) 99660-4075</span>
-              <span>📱 @mercadocortaprecos</span>
+              {phone    && <span>📍 {phone}</span>}
+              {instagram && <span>📱 {instagram}</span>}
             </div>
           </div>
 
@@ -98,14 +102,14 @@ export default function Flyer() {
 
             <div className="flyer-info-row">
               <div className="flyer-qr-block">
-                <QRCodeSVG value={WA_LINK} size={90} fgColor="#111827" bgColor="#fff" level="M" />
+                <QRCodeSVG value={waLink} size={90} fgColor="#111827" bgColor="#fff" level="M" />
                 <div className="qr-label">Escaneie e receba<br/>as promoções!</div>
               </div>
               <div className="flyer-extra">
                 <div className="extra-item">📅 {SORTEIO_DATE}</div>
                 <div className="extra-item">🎫 1 cupom a cada R$100</div>
                 <div className="extra-item">♾️ Sem limite de cupons</div>
-                <div className="extra-item">📞 (15) 99660-4075</div>
+                {phone && <div className="extra-item">📞 {phone}</div>}
                 <div className="extra-god">🙏 Deus é bom o tempo todo</div>
               </div>
             </div>
@@ -126,7 +130,9 @@ export default function Flyer() {
             <div key={c.n} className="coupon">
               {/* left accent */}
               <div className="coupon-accent">
-                <div className="coupon-logo">CORTA<br/>PREÇO$</div>
+                <div className="coupon-logo" style={{ fontSize: storeName.length > 10 ? '7px' : undefined }}>
+                  {storeName.split(' ').slice(0,2).join('\n').split('\n').map((w,i) => <span key={i}>{w}<br/></span>)}
+                </div>
                 <div className="coupon-prize-tag">R$150</div>
               </div>
               {/* main area */}

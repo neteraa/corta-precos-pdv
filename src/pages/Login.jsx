@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User, MessageCircle, CheckCircle2, ArrowRight, ArrowLeft, Phone, MapPin, ShieldCheck, Zap, Headphones, Bell, BarChart3, Wifi, Store, Truck } from 'lucide-react'
 import { getCredentials, getConfiguredStoreId, saveStoreId } from '../utils/auth.js'
 import { registerStoreId, wipeLegacyFlatKeys } from '../utils/tenantStorage.js'
+import { seedSettingsFromSession } from '../hooks/usePrinter.js'
 import ZatendeStockLogo from '../components/ZatendeStockLogo.jsx'
 
 const ZAP         = '5511985950956'
@@ -312,6 +313,7 @@ export default function Login() {
         localStorage.setItem('cp_session', JSON.stringify({ loggedIn:true, user:u, storeId:data.storeId, storeName:data.storeName, role:'admin' }))
         wipeLegacyFlatKeys()
         registerStoreId(data.storeId)
+        seedSettingsFromSession()          // pre-populate storeName + themeColor
         navigate(from, { replace:true }); return
       }
     } catch {}
@@ -332,6 +334,7 @@ export default function Login() {
       const sid = getConfiguredStoreId()
       localStorage.setItem('cp_session', JSON.stringify({ loggedIn:true, user:u, storeId:sid, role:'admin' }))
       registerStoreId(sid)
+      seedSettingsFromSession()
       navigate(from, { replace:true }); return
     }
 

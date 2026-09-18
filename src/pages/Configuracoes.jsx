@@ -176,12 +176,13 @@ export default function Configuracoes() {
   const { products, sales, customers, importProducts, resetAll, operators, upsertOperator, deleteOperator, syncOperators } = useStore()
   const { settings, setSettings } = usePrinter()
   const [form, setForm] = useState(() => ({
-    storeName:  settings.storeName  || 'CORTA PRECOS',
-    phone:      settings.phone      || '(15) 99660-4075',
+    storeName:  settings.storeName  || '',
+    phone:      settings.phone      || '',
     address:    settings.address    || '',
-    instagram:  settings.instagram  || 'mercadocortaprecos',
+    instagram:  settings.instagram  || '',
     pixKey:     settings.pixKey     || '',
     pixCity:    settings.pixCity    || 'SAO PAULO',
+    themeColor: settings.themeColor || '#f97316',
   }))
   const [saved, setSaved] = useState(false)
 
@@ -309,18 +310,42 @@ export default function Configuracoes() {
       <Section icon={Store} title="Dados da Loja">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Nome da loja">
-            <input className="input" value={form.storeName} onChange={e => set('storeName', e.target.value)} />
+            <input className="input" value={form.storeName} onChange={e => set('storeName', e.target.value)} placeholder="Ex: Mercado do João" />
           </Field>
           <Field label="Telefone / WhatsApp">
-            <input className="input" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(15) 99660-4075" />
+            <input className="input" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(11) 99999-9999" />
           </Field>
           <Field label="Endereço (opcional)">
             <input className="input" value={form.address} onChange={e => set('address', e.target.value)} />
           </Field>
           <Field label="Instagram (sem @)">
-            <input className="input" value={form.instagram} onChange={e => set('instagram', e.target.value)} placeholder="mercadocortaprecos" />
+            <input className="input" value={form.instagram} onChange={e => set('instagram', e.target.value)} placeholder="meumercado" />
           </Field>
         </div>
+
+        {/* Cor do tema */}
+        <div className="mt-4">
+          <label className="label mb-2">🎨 Cor do sistema (sidebar, etiquetas, PDV)</label>
+          <div className="flex flex-wrap gap-2 items-center">
+            {['#f97316','#ef4444','#3b82f6','#8b5cf6','#22c55e','#06b6d4','#f59e0b','#ec4899','#111827'].map(c => (
+              <button key={c} onClick={() => set('themeColor', c)}
+                className="w-8 h-8 rounded-full border-2 transition-all"
+                style={{ background: c, borderColor: form.themeColor === c ? '#111' : 'transparent',
+                  boxShadow: form.themeColor === c ? `0 0 0 2px ${c}` : 'none', transform: form.themeColor === c ? 'scale(1.2)' : 'scale(1)' }}
+              />
+            ))}
+            <input type="color" value={form.themeColor} onChange={e => set('themeColor', e.target.value)}
+              className="w-8 h-8 rounded cursor-pointer border border-gray-200" title="Cor personalizada" />
+            <span className="text-xs text-gray-500 ml-1">Escolha ou use cor personalizada</span>
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <div className="w-32 h-8 rounded-lg flex items-center justify-center text-white text-xs font-black"
+              style={{ background: form.themeColor }}>
+              PRÉVIA DA COR
+            </div>
+          </div>
+        </div>
+
         <button onClick={saveSettings} className={`btn-primary mt-4 ${saved ? 'bg-green-600 hover:bg-green-600' : ''}`}>
           <Save className="w-4 h-4" /> {saved ? '✅ Salvo!' : 'Salvar dados'}
         </button>

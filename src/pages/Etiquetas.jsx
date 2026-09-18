@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import { Search, Tag, Printer, Plus, Minus, Trash2, X, Check, Eye } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
-
-const STORE = 'CORTA PREÇOS'
+import { usePrinter } from '../hooks/usePrinter.js'
 
 /* ── Sizes ─────────────────────────────────────────────── */
 const SIZES = [
@@ -76,8 +75,9 @@ const hex2rgb = hex => [
    PDF DRAWING — all coords in mm (jsPDF unit:'mm')
    setFontSize() always takes pt regardless of unit
 ══════════════════════════════════════════════════════════ */
-function pdfLabel(doc, p, x, y, w, h, tmplId) {
-  const t = TMPL.find(t => t.id === tmplId) || TMPL[0]
+function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList) {
+  const t = (tmplList || TMPL).find(t => t.id === tmplId) || (tmplList || TMPL)[0]
+  const STORE = storeName || 'MEU MERCADO'
   const { int, dec } = splitPrice(p.price)
 
   // FIX 1: strip accents — jsPDF built-in helvetica is ASCII-only
@@ -186,9 +186,10 @@ function pdfLabel(doc, p, x, y, w, h, tmplId) {
 /* ══════════════════════════════════════════════════════════
    BROWSER LIVE PREVIEW — CSS mirror of the PDF template
 ══════════════════════════════════════════════════════════ */
-function LabelPreview({ p, tmplId, sizeId }) {
+function LabelPreview({ p, tmplId, sizeId, storeName, tmplList }) {
   const sz = SIZES.find(s => s.id === sizeId) || SIZES[0]
-  const t  = TMPL.find(t => t.id === tmplId)  || TMPL[0]
+  const t  = (tmplList || TMPL).find(t => t.id === tmplId) || (tmplList || TMPL)[0]
+  const STORE = storeName || 'MEU MERCADO'
 
   // Scale to fit ~220px wide, keep aspect ratio
   const PREVIEW_W = 220
@@ -303,17 +304,20 @@ function LabelPreview({ p, tmplId, sizeId }) {
 /* ══════════════════════════════════════════════════════════
    TEMPLATE THUMBNAIL — small visual chip for template select
 ══════════════════════════════════════════════════════════ */
-function TmplChip({ t, selected, onClick }) {
+function TmplChip({ t, selected, onClick, storeName, themeColor }) {
+  const color = themeColor || '#f97316'
+  const shortName = (storeName || 'MERCADO').split(' ')[0]
   return (
     <button onClick={onClick}
-      className={`relative flex flex-col overflow-hidden rounded-xl border-2 transition-all text-left
-        ${selected ? 'border-orange-500 shadow-md shadow-orange-100' : 'border-gray-200 hover:border-gray-300'}`}
-      style={{ width: 100, height: 64 }}>
+      className="relative flex flex-col overflow-hidden rounded-xl border-2 transition-all text-left"
+      style={{ width: 100, height: 64,
+        borderColor: selected ? color : '#e5e7eb',
+        boxShadow: selected ? `0 4px 12px ${color}30` : undefined }}>
 
       {/* Mini header strip */}
       <div style={{ background: t.strip, height: '35%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ color: t.stripTxt, fontSize: 7, fontWeight: 900, fontFamily: 'Arial', letterSpacing: '0.03em' }}>
-          {t.id === 'oferta' ? '★ OFERTA' : STORE.split(' ')[0]}
+          {t.id === 'oferta' ? '★ OFERTA' : shortName}
         </span>
       </div>
 
@@ -327,9 +331,8 @@ function TmplChip({ t, selected, onClick }) {
         </div>
       </div>
 
-      {/* Selected check */}
       {selected && (
-        <div className="absolute top-1 right-1 bg-orange-500 rounded-full w-4 h-4 flex items-center justify-center">
+        <div className="absolute top-1 right-1 rounded-full w-4 h-4 flex items-center justify-center" style={{ background: color }}>
           <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
         </div>
       )}
@@ -342,6 +345,18 @@ function TmplChip({ t, selected, onClick }) {
 ══════════════════════════════════════════════════════════ */
 export default function Etiquetas() {
   const { products } = useStore()
+  const { settings } = usePrinter()
+  const storeName  = settings.storeName  || 'MEU MERCADO'
+  const themeColor = settings.themeColor || '#f97316'
+
+  // Dynamic template list: 'mercado' uses the client's themeColor
+  const tmplList = useMemo(() => TMPL.map(t => t.id !== 'mercado' ? t : {
+    ...t,
+    strip: themeColor, stripTxt: '#fff',
+    body: '#fff', bodyBorder: themeColor,
+    nameTxt: '#111', priceTxt: themeColor,
+  }), [themeColor])
+
   const [query,    setQuery]    = useState('')
   const [basket,   setBasket]   = useState([])   // [{ product, copies }]
   const [sizeId,   setSizeId]   = useState('60x40')
@@ -412,9 +427,9 @@ export default function Etiquetas() {
         if (y + hMm > pageH - mY) {
           doc.addPage()
           col = 0; row = 0
-          pdfLabel(doc, p, mX, mY, wMm, hMm, tmplId)
+          pdfLabel(doc, p, mX, mY, wMm, hMm, tmplId, storeName, tmplList)
         } else {
-          pdfLabel(doc, p, x, y, wMm, hMm, tmplId)
+          pdfLabel(doc, p, x, y, wMm, hMm, tmplId, storeName, tmplList)
         }
 
         col++
@@ -439,9 +454,10 @@ export default function Etiquetas() {
       <div className="card p-4 space-y-3">
         <label className="label">Modelo de etiqueta</label>
         <div className="flex flex-wrap gap-3">
-          {TMPL.map(t => (
+          {tmplList.map(t => (
             <div key={t.id}>
-              <TmplChip t={t} selected={tmplId === t.id} onClick={() => setTmplId(t.id)} />
+              <TmplChip t={t} selected={tmplId === t.id} onClick={() => setTmplId(t.id)}
+                storeName={storeName} themeColor={themeColor} />
               <div className="mt-1 text-center">
                 <div className="text-xs font-bold text-gray-700">{t.label}</div>
                 <div className="text-[10px] text-gray-400 leading-tight">{t.desc}</div>
@@ -571,7 +587,8 @@ export default function Etiquetas() {
               <div className="flex flex-wrap gap-4 p-4 bg-gray-100 rounded-xl">
                 {basket.flatMap(({ product: p, copies }) =>
                   Array.from({ length: Math.min(copies, 3) }, (_, i) => (
-                    <LabelPreview key={`${p.id}-${i}`} p={p} tmplId={tmplId} sizeId={sizeId} />
+                    <LabelPreview key={`${p.id}-${i}`} p={p} tmplId={tmplId} sizeId={sizeId}
+                      storeName={storeName} tmplList={tmplList} />
                   ))
                 )}
                 {totalLabels > basket.length * 3 && (

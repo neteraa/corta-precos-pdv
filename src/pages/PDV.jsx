@@ -500,8 +500,9 @@ export default function PDV() {
                     : cart.length > 0                   ? 'ocupada'
                     : 'libre'
 
+  const _storeName = printer.settings?.storeName || 'MEU MERCADO'
   const BANNER = {
-    libre:   { bg: '#0a1208', border: '#16a34a', dot: '#22c55e', text: '#4ade80', label: 'CAIXA LIVRE',       sub: 'CAIXA 01  ·  CORTA PREÇOS',       cls: 'banner-libre'   },
+    libre:   { bg: '#0a1208', border: '#16a34a', dot: '#22c55e', text: '#4ade80', label: 'CAIXA LIVRE',       sub: `CAIXA 01  ·  ${_storeName}`,       cls: 'banner-libre'   },
     ocupada: { bg: '#140a00', border: '#c2410c', dot: '#f97316', text: '#fb923c', label: 'EM ATENDIMENTO',    sub: null,                               cls: 'banner-ocupada' },
     done:    { bg: '#00080f', border: '#1d4ed8', dot: '#60a5fa', text: '#93c5fd', label: 'VENDA CONCLUÍDA ✓', sub: 'Obrigado! Próximo por favor...',    cls: 'banner-done'    },
   }[bannerState]

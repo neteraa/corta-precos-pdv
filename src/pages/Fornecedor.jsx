@@ -3897,7 +3897,7 @@ function TabRelatorio({ estoque, offers, orders, markets }) {
 
   function exportCSV() {
     const rows = [
-      ['# RELATÓRIO CORTA PREÇOS — ' + periodLabel],
+      ['# RELATÓRIO ' + (profile.name || 'FORNECEDOR').toUpperCase() + ' — ' + periodLabel],
       ['# Gerado em ' + new Date().toLocaleString('pt-BR')],
       [],
       ['## PEDIDOS RECEBIDOS'],

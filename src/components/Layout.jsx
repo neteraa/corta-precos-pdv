@@ -80,19 +80,18 @@ function filterByRole(items, role) {
 /* ── logo ─────────────────────────────────────────────────── */
 function SidebarLogo() {
   const { settings } = usePrinter()
-  const name = settings.storeName || 'MEU MERCADO'
+  const name  = settings.storeName  || 'MEU MERCADO'
+  const color = settings.themeColor || '#f97316'
+  // Derive a darker shade for the gradient end
+  const colorDk = color + 'cc'
 
   return (
     <div className="px-3 pt-3 pb-2 shrink-0">
       <div className="mb-2 flex items-center justify-center py-1.5 px-3 rounded-xl bg-gray-900/60 border border-gray-800">
         <ZatendeStockLogo variant="wordmark" />
       </div>
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-orange-500 to-orange-700 px-3 py-2.5 shadow-lg shadow-orange-900/40">
-        <svg className="absolute -right-2 -top-2 w-14 h-14 text-black/10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
-          <line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/>
-          <line x1="8.12" y1="8.12" x2="12" y2="12"/>
-        </svg>
+      <div className="relative overflow-hidden rounded-xl px-3 py-2.5 shadow-lg"
+        style={{ background: `linear-gradient(135deg, ${color}, ${colorDk})`, boxShadow: `0 8px 24px ${color}40` }}>
         <div className="relative flex items-center gap-2">
           <div className="w-5 h-5 bg-black/20 rounded-md flex items-center justify-center shrink-0">
             <Scissors className="w-3 h-3 text-white" />
@@ -105,32 +104,31 @@ function SidebarLogo() {
 }
 
 /* ── nav section ──────────────────────────────────────────── */
-function NavSection({ title, items, onClose }) {
+function NavSection({ title, items, onClose, color = '#f97316' }) {
   return (
     <div className="mb-1">
       <div className="px-4 mb-1 text-[9px] font-black text-gray-600 tracking-[0.15em] uppercase">
         {title}
       </div>
       {items.map(({ to, icon: Icon, label, badge, hot }) => (
-        <NavLink
-          key={to} to={to} onClick={onClose}
-          className={({ isActive }) =>
-            'group relative flex items-center gap-3 mx-2 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all duration-150 ' +
-            (isActive
-              ? 'bg-orange-500/15 text-orange-400 shadow-[inset_0_0_0_1px_rgba(249,115,22,0.25)]'
-              : 'text-gray-400 hover:text-gray-100 hover:bg-white/5')
-          }
+        <NavLink key={to} to={to} onClick={onClose}
+          className="group relative flex items-center gap-3 mx-2 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all duration-150"
         >
           {({ isActive }) => (
             <>
-              {/* active left bar */}
+              <span className="absolute inset-0 rounded-xl pointer-events-none transition-all duration-150"
+                style={isActive
+                  ? { background: `${color}22`, boxShadow: `inset 0 0 0 1px ${color}40` }
+                  : {}} />
               {isActive && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-orange-500 rounded-r-full" />
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full" style={{ background: color }} />
               )}
-              <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${isActive ? 'text-orange-400' : 'text-gray-500 group-hover:text-gray-300'}`} />
-              <span className="flex-1">{label}</span>
+              <Icon className="w-4 h-4 flex-shrink-0 transition-colors"
+                style={{ color: isActive ? color : undefined }}
+              />
+              <span className="flex-1" style={{ color: isActive ? color : undefined }}>{label}</span>
               {hot && !badge && (
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: color }} />
               )}
               {badge && (
                 <span className="text-[9px] font-black bg-green-500/20 text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded-full leading-none">
@@ -160,7 +158,8 @@ export default function Layout() {
   const operatorName = getOperatorName()
   const terminalId   = getTerminalId()
   const { settings: storeSettings } = usePrinter()
-  const storeName    = storeSettings.storeName || 'MEU MERCADO'
+  const storeName    = storeSettings.storeName  || 'MEU MERCADO'
+  const themeColor   = storeSettings.themeColor || '#f97316'
 
   const pendingOffersCount = (supplierOffers || []).filter(o => o.status === 'pending').length
 
@@ -213,9 +212,9 @@ export default function Layout() {
 
         {/* nav — min-h-0 is required so flex-1 can actually shrink and overflow-y-auto activates */}
         <nav className="flex-1 min-h-0 overflow-y-auto pb-3 space-y-2">
-          <NavSection title="Caixa"   items={filterByRole(CAIXA, role)}   onClose={() => setOpen(false)} />
-          <NavSection title="Gestão"  items={filterByRole(GESTAO, role)}  onClose={() => setOpen(false)} />
-          {dynamicExtras.length > 0 && <NavSection title="Extras" items={dynamicExtras} onClose={() => setOpen(false)} />}
+          <NavSection title="Caixa"   items={filterByRole(CAIXA, role)}   onClose={() => setOpen(false)} color={themeColor} />
+          <NavSection title="Gestão"  items={filterByRole(GESTAO, role)}  onClose={() => setOpen(false)} color={themeColor} />
+          {dynamicExtras.length > 0 && <NavSection title="Extras" items={dynamicExtras} onClose={() => setOpen(false)} color={themeColor} />}
 
           {/* ── inline shortcuts — inside scroll so nada fica cortado ── */}
           <div className="px-2 pt-1 space-y-1">
@@ -223,10 +222,10 @@ export default function Layout() {
 
             <a href="/terminal" target="_blank" rel="noreferrer"
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all group"
-              style={{ background: 'rgba(234,88,12,0.1)', border: '1px solid rgba(234,88,12,0.2)' }}>
-              <Monitor className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-              <span className="text-orange-300 text-[11px] font-black flex-1 group-hover:text-orange-200">Terminal do Caixa</span>
-              <span className="text-[8px] bg-orange-500 text-black font-black px-1.5 py-0.5 rounded-full">ABRIR</span>
+              style={{ background: `${themeColor}18`, border: `1px solid ${themeColor}33` }}>
+              <Monitor className="w-3.5 h-3.5 shrink-0" style={{ color: themeColor }} />
+              <span className="text-[11px] font-black flex-1" style={{ color: themeColor + 'cc' }}>Terminal do Caixa</span>
+              <span className="text-[8px] text-black font-black px-1.5 py-0.5 rounded-full" style={{ background: themeColor }}>ABRIR</span>
             </a>
 
             <a href={`/scan?storeId=${getMktStoreId()}`} target="_blank" rel="noreferrer"
@@ -239,14 +238,15 @@ export default function Layout() {
 
             {canInstall && (
               <button onClick={install}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-400 transition-colors">
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors"
+                style={{ background: themeColor }}>
                 <Download className="w-3.5 h-3.5 text-black shrink-0" />
                 <span className="text-black text-[11px] font-black">Instalar App (PWA)</span>
               </button>
             )}
 
             <a href="/guia"
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-500 hover:text-orange-400 hover:bg-orange-500/10 transition-all"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-500 transition-all"
               style={{ textDecoration: 'none' }}>
               <span className="text-[13px]">📖</span>
               <span className="text-[11px] font-semibold">Guia do sistema</span>
@@ -277,7 +277,7 @@ export default function Layout() {
           </button>
           <div className="flex items-center gap-2">
             <img src="/icon.svg" alt="logo" className="w-6 h-6" />
-            <span className="font-black text-orange-600 text-base tracking-tight truncate">{storeName}</span>
+            <span className="font-black text-base tracking-tight truncate" style={{ color: themeColor }}>{storeName}</span>
           </div>
         </header>
 

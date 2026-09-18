@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useId } from 'react'
 import { buildReceipt, buildPromoCoupon } from '../utils/escpos.js'
+import { mktKey } from '../utils/tenantStorage.js'
 
 // Promo raffle coupon is only printed for sales >= R$100
 const PROMO_THRESHOLD = 100
@@ -8,19 +9,44 @@ const PROMO_THRESHOLD = 100
  * Hook for Web Serial API (Chrome/Edge ≥ 89) thermal receipt printing.
  * Falls back to window.print() for unsupported browsers.
  * Baud rate: 9600 — works for Knup KP-1020/1021 via USB-CDC.
+ *
+ * Settings are namespaced by storeId via mktKey() so each client
+ * gets its own storeName, themeColor, PIX key, etc.
  */
 
 const BAUD = 9600
-const STORAGE_KEY = 'cp_printer_settings'
+const BASE_KEY = 'cp_printer_settings'
+
+function settingsKey() { return mktKey(BASE_KEY) }
 
 function loadSettings() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {} } catch { return {} }
+  try {
+    const ns  = localStorage.getItem(settingsKey())
+    if (ns) return JSON.parse(ns)
+    // Legacy flat key migration (only for registered stores)
+    const flat = localStorage.getItem(BASE_KEY)
+    return flat ? JSON.parse(flat) : {}
+  } catch { return {} }
 }
+
 export function savePrinterSettings(s, sourceId) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
-    // Notify all OTHER usePrinter instances in this tab to re-sync
+    localStorage.setItem(settingsKey(), JSON.stringify(s))
     window.dispatchEvent(new CustomEvent('cp-settings-saved', { detail: { sourceId } }))
+  } catch {}
+}
+
+/** Seed storeName + themeColor from the auth session (called after login). */
+export function seedSettingsFromSession() {
+  try {
+    const session = JSON.parse(localStorage.getItem('cp_session') || '{}')
+    if (!session.storeId) return
+    const key     = mktKey(BASE_KEY)
+    const current = JSON.parse(localStorage.getItem(key) || '{}')
+    let changed   = false
+    if (!current.storeName && session.storeName) { current.storeName = session.storeName; changed = true }
+    if (!current.themeColor) { current.themeColor = '#f97316'; changed = true }  // default orange
+    if (changed) localStorage.setItem(key, JSON.stringify(current))
   } catch {}
 }
 
@@ -183,9 +209,9 @@ function _printViaIframe(html) {
 ───────────────────────────────────────────────────────────── */
 function _printCombinedHTML(sale, settings, withCoupon = false, withReceipt = true) {
   const BRL   = (n) => 'R$\u00a0' + Number(n).toFixed(2).replace('.', ',')
-  const store = settings.storeName || 'CORTA PRECOS'
-  const phone = settings.phone     || '(15) 99660-4075'
-  const insta = settings.instagram ? '@' + settings.instagram.replace(/^@/, '') : '@mercadocortaprecos'
+  const store = settings.storeName || 'MEU MERCADO'
+  const phone = settings.phone     || ''
+  const insta = settings.instagram ? '@' + settings.instagram.replace(/^@/, '') : ''
   const date  = new Date(sale.date || Date.now())
   const dateStr = date.toLocaleDateString('pt-BR')
   const timeStr = date.toLocaleTimeString('pt-BR')
@@ -207,7 +233,7 @@ function _printCombinedHTML(sale, settings, withCoupon = false, withReceipt = tr
   const receiptHTML = withReceipt ? `
 <section class="receipt">
   <h1>${store}</h1>
-  <div class="sub">${phone} ${insta !== '@' ? '· ' + insta : ''}</div>
+  <div class="sub">${[phone, insta].filter(Boolean).join(' · ')}</div>
   <hr><div class="sub">${dateStr} ${timeStr}</div><hr>
   <table>
     ${itemRows}
@@ -250,7 +276,7 @@ function _printCombinedHTML(sale, settings, withCoupon = false, withReceipt = tr
   </div>
   <div class="sgl"></div>
   <div class="ft">Sorteio: ultimo sabado do mes</div>
-  <div class="ft">${phone} &middot; ${insta}</div>
+  <div class="ft">${[phone, insta].filter(Boolean).join(' \u00b7 ')}</div>
   <div class="god">DEUS E BOM O TEMPO TODO</div>
   <div class="dbl"></div>
 </section>` : ''

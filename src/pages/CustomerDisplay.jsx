@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useBroadcastReceive } from '../hooks/useBroadcast.js'
+import { usePrinter } from '../hooks/usePrinter.js'
 
 const BRL = (n) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
 
@@ -28,6 +29,9 @@ const PROMOS_SCROLL = [
 ]
 
 export default function CustomerDisplay() {
+  const { settings }  = usePrinter()
+  const storeName     = settings.storeName  || 'MEU MERCADO'
+  const themeColor    = settings.themeColor || '#ea580c'
   const [state, setState]       = useState(null)
   const [celebrate, setCelebrate] = useState(null)
   const [promoIdx, setPromoIdx] = useState(0)
@@ -66,10 +70,10 @@ export default function CustomerDisplay() {
     <div className="h-screen bg-gray-950 flex flex-col select-none overflow-hidden" style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
 
       {/* ── Top bar ─────────────────────────────────────────── */}
-      <div className="flex-shrink-0 flex items-center justify-between px-8 py-3" style={{ background: '#ea580c' }}>
+      <div className="flex-shrink-0 flex items-center justify-between px-8 py-3" style={{ background: themeColor }}>
         <div className="flex items-center gap-3">
           <div style={{ fontFamily: "'Courier New', monospace", fontWeight: 900, fontSize: 28, color: '#000', letterSpacing: '-1px' }}>
-            ✕ CORTA PREÇO$
+            ✕ {storeName}
           </div>
           <div style={{ fontSize: 11, color: 'rgba(0,0,0,.55)', fontWeight: 600, lineHeight: 1.3, marginTop: 2 }}>
             Economia de verdade<br/>variedades todo dia

@@ -208,11 +208,12 @@ export default function Terminal() {
   }
 
   // ── Styles (dark terminal palette) ─────────────────────────
+  const _storeName = printer.settings?.storeName  || 'MEU MERCADO'
   const bg   = '#0a0c0f'
   const bg2  = '#111318'
   const bg3  = '#181b22'
   const brd  = '#1f2433'
-  const acc  = '#ea580c'  // orange
+  const acc  = printer.settings?.themeColor || '#ea580c'
   const txt  = '#f1f5f9'
   const txt2 = '#64748b'
 
@@ -223,7 +224,7 @@ export default function Terminal() {
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 24px', background: bg2, borderBottom: `1px solid ${brd}` }}>
         {/* logo */}
         <div style={{ fontFamily: "'Courier New', monospace", fontWeight: 900, fontSize: 20, color: acc, letterSpacing: '-0.5px' }}>
-          ✕ CORTA PREÇO$
+          ✕ {_storeName}
         </div>
         {/* status pills */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

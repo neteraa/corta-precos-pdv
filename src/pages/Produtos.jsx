@@ -6,7 +6,7 @@ import { parseGdoorCsv, parseGenericCsv, downloadCsvTemplate } from '../utils/im
 import { compressImage, savePhoto as dbSavePhoto } from '../utils/photoDb.js'
 import { autoFetchPhotos, fetchProductPhoto, searchProductPhotos, urlToDataUrl } from '../utils/openFoodFacts.js'
 
-const EMPTY = { sku: '', name: '', category: '', cost: '', price: '', stock: '', unit: 'UN', minStock: '', expiryDate: '' }
+const EMPTY = { sku: '', name: '', category: '', cost: '', price: '', stock: '', unit: 'UN', minStock: '', expiryDate: '', priceAtacado: '', qtdAtacado: '' }
 const UNITS = ['UN', 'KG', 'G', 'LT', 'ML', 'CX', 'PC', 'DZ', 'MT']
 
 /* ── Stock badge ─────────────────────────────────────────── */
@@ -191,11 +191,13 @@ export default function Produtos() {
       name:       fd.get('name'),
       category:   fd.get('category'),
       unit:       fd.get('unit'),
-      cost:       Number(fd.get('cost')),
-      price:      Number(fd.get('price')),
-      stock:      Number(fd.get('stock')),
-      minStock:   fd.get('minStock')   ? Number(fd.get('minStock'))   : 0,
-      expiryDate: fd.get('expiryDate') || null,
+      cost:         Number(fd.get('cost')),
+      price:        Number(fd.get('price')),
+      stock:        Number(fd.get('stock')),
+      minStock:     fd.get('minStock')   ? Number(fd.get('minStock'))   : 0,
+      expiryDate:   fd.get('expiryDate') || null,
+      priceAtacado: fd.get('priceAtacado') ? Number(fd.get('priceAtacado')) : 0,
+      qtdAtacado:   fd.get('qtdAtacado')   ? Number(fd.get('qtdAtacado'))   : 0,
     })
     if (photoData)    await saveProductPhoto(id, photoData)
     else if (photoRemoved && editing.id) await saveProductPhoto(editing.id, null)
@@ -415,7 +417,12 @@ export default function Produtos() {
                       <span className="inline-block bg-orange-50 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full">{p.category}</span>
                     </td>
                     <td className="px-4 py-3 text-gray-600">{BRL.format(p.cost)}</td>
-                    <td className="px-4 py-3 font-bold text-gray-800">{BRL.format(p.price)}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-bold text-gray-800">{BRL.format(p.price)}</div>
+                      {p.priceAtacado > 0 && p.qtdAtacado > 0 && (
+                        <div className="text-[10px] text-blue-600 font-bold">📦 {BRL.format(p.priceAtacado)} c/{p.qtdAtacado}+</div>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs font-bold ${parseFloat(margin(p)) >= 20 ? 'text-green-600' : 'text-amber-500'}`}>
                         {margin(p)}%
@@ -624,6 +631,24 @@ export default function Produtos() {
                     <label className="label">Validade</label>
                     <input name="expiryDate" type="date" defaultValue={editing.expiryDate || ''} className="input" />
                   </div>
+                </div>
+
+                {/* Preço atacado */}
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
+                  <p className="text-xs font-bold text-blue-700">📦 Preço Atacado (opcional)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="label">Preço atacado (R$)</label>
+                      <input name="priceAtacado" type="number" step="0.01" min="0"
+                        defaultValue={editing.priceAtacado || ''} placeholder="0,00" className="input" />
+                    </div>
+                    <div>
+                      <label className="label">Qtd mín. atacado</label>
+                      <input name="qtdAtacado" type="number" min="1"
+                        defaultValue={editing.qtdAtacado || ''} placeholder="Ex: 6" className="input" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-blue-600">Quando o cliente levar ≥ qtd mín., o preço atacado é aplicado automaticamente no PDV.</p>
                 </div>
               </form>
             </div>
