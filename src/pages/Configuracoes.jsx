@@ -589,6 +589,46 @@ export default function Configuracoes() {
   }))
   const [saved, setSaved] = useState(false)
 
+  // ── Logo upload ──────────────────────────────────────────
+  const logoFileRef = useRef(null)
+  const [logoState, setLogoState] = useState(null) // null | 'loading' | 'ok' | 'err string'
+
+  const handleLogoFile = useCallback((file) => {
+    if (!file) return
+    if (file.size > 2_000_000) { setLogoState('Arquivo muito grande (máx. 2 MB). Use PNG comprimido ou SVG.'); return }
+    setLogoState('loading')
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const src = ev.target.result
+      // Compress raster images > 300 KB via canvas
+      if (!src.startsWith('data:image/svg') && file.size > 300_000) {
+        const img = new window.Image()
+        img.onload = () => {
+          const MAX = 400
+          const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+          const cv = document.createElement('canvas')
+          cv.width  = Math.round(img.width  * scale)
+          cv.height = Math.round(img.height * scale)
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height)
+          setSettings(s => ({ ...s, logoImage: cv.toDataURL('image/png', 0.85) }))
+          setLogoState('ok')
+        }
+        img.onerror = () => setLogoState('Não foi possível carregar a imagem. Tente PNG ou SVG.')
+        img.src = src
+      } else {
+        setSettings(s => ({ ...s, logoImage: src }))
+        setLogoState('ok')
+      }
+    }
+    reader.onerror = () => setLogoState('Erro ao ler o arquivo. Tente PNG ou SVG.')
+    reader.readAsDataURL(file)
+  }, [setSettings])
+
+  const openLogoPicker = useCallback(() => {
+    setLogoState(null)
+    logoFileRef.current?.click()
+  }, [])
+
   // ── Auth / credentials ────────────────────────────────────
   const [authForm, setAuthForm] = useState(() => {
     const { username } = getCredentials()
@@ -727,50 +767,47 @@ export default function Configuracoes() {
         </div>
 
         {/* Logo da loja */}
-        <div className="mt-4">
+        <div className="mt-4 space-y-2">
           <label className="label mb-1"><Image className="w-3 h-3 inline mr-1" />Logo da Loja</label>
-          <p className="text-xs text-gray-400 mb-2">PNG, JPG ou SVG · tamanho máx. 1 MB · fundo transparente fica melhor na sidebar escura</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            {settings.logoImage
-              ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ padding: 8, background: '#09090b', borderRadius: 10, border: '1px solid #1f2937' }}>
-                    <img src={settings.logoImage} alt="logo preview" style={{ height: 36, maxWidth: 120, objectFit: 'contain' }} />
-                  </div>
-                  <button onClick={() => setSettings(s => ({ ...s, logoImage: '' }))}
-                    className="text-xs text-red-500 hover:text-red-700 font-semibold">
-                    ✕ Remover logo
-                  </button>
+          <p className="text-xs text-gray-400">PNG, JPG ou SVG · máx. 2 MB · fundo transparente fica melhor na sidebar escura</p>
+          <div className="flex items-center gap-4 flex-wrap">
+            {settings.logoImage ? (
+              <div className="flex items-center gap-3">
+                <div style={{ padding: 8, background: '#09090b', borderRadius: 10, border: '1px solid #1f2937' }}>
+                  <img src={settings.logoImage} alt="logo" style={{ height: 40, maxWidth: 130, objectFit: 'contain' }} />
                 </div>
-              ) : (
-                <div style={{ fontSize: 12, color: '#9ca3af' }}>Sem logo — usando ícone padrão ZatendeStok</div>
-              )
-            }
-            <button
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, border: '1px dashed #d1d5db', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#6b7280', background: '#f9fafb' }}
-              onClick={() => document.getElementById('_logo_file_input').click()}
-            >
-              <Upload className="w-3 h-3" />
-              {settings.logoImage ? 'Trocar logo' : 'Enviar logo'}
+                <button onClick={() => { setSettings(s => ({ ...s, logoImage: '' })); setLogoState(null) }}
+                  className="text-xs text-red-500 hover:text-red-700 font-semibold">✕ Remover</button>
+              </div>
+            ) : (
+              <div className="text-xs text-gray-400 italic">Sem logo — ícone padrão ZatendeStok</div>
+            )}
+            <button onClick={openLogoPicker}
+              className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-600 transition-colors">
+              {logoState === 'loading'
+                ? <><span className="w-3.5 h-3.5 border-2 border-gray-400 border-t-gray-700 rounded-full animate-spin" />Carregando...</>
+                : <><Upload className="w-3.5 h-3.5" />{settings.logoImage ? 'Trocar logo' : 'Enviar logo'}</>}
             </button>
-            <input id="_logo_file_input" type="file" accept="image/*,image/svg+xml" style={{ display: 'none' }}
-              onChange={e => {
-                const file = e.target.files?.[0]
-                if (!file) return
-                if (file.size > 1_000_000) { alert('Imagem muito grande (máx. 1 MB).\nDica: use um PNG comprimido ou SVG vetorial.'); return }
-                const reader = new FileReader()
-                reader.onload = () => setSettings(s => ({ ...s, logoImage: reader.result }))
-                reader.onerror = () => alert('Erro ao ler a imagem. Tente outro formato (PNG ou SVG).')
-                reader.readAsDataURL(file)
-              }} />
           </div>
+          {logoState === 'ok' && (
+            <p className="text-xs text-green-600 font-bold">✅ Logo carregada com sucesso!</p>
+          )}
+          {logoState && logoState !== 'ok' && logoState !== 'loading' && (
+            <p className="text-xs text-red-500">{logoState}</p>
+          )}
+          <input ref={logoFileRef} type="file" accept="image/*,image/svg+xml" className="hidden"
+            onChange={e => { handleLogoFile(e.target.files?.[0]); e.target.value = '' }} />
         </div>
 
         {/* Cor do tema */}
         <div className="mt-5">
           <label className="label mb-1"><Palette className="w-3 h-3 inline mr-1" />Identidade Visual — Cor do Sistema</label>
           <p className="text-xs text-gray-400 mb-3">A cor muda botões, sidebar e terminal em tempo real. Clique em Salvar para persistir.</p>
-          <ColorPicker value={form.themeColor} onChange={v => set('themeColor', v)} />
+          <ColorPicker value={form.themeColor} onChange={v => {
+            set('themeColor', v)
+            // Atualiza settings AGORA para Layout.jsx não reverter via useEffect([themeColor])
+            setSettings(s => ({ ...s, themeColor: v }))
+          }} />
         </div>
 
         <button onClick={saveSettings} className={`btn-primary mt-5 ${saved ? '!bg-green-600' : ''}`}>
