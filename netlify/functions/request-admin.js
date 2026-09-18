@@ -13,7 +13,8 @@ import { getStore } from '@netlify/blobs'
 import { createHash, randomBytes } from 'crypto'
 
 const MASTER_KEY = process.env.ZS_MASTER_KEY || 'zatende2026master'
-const APP_SALT   = 'zs_2026_corta'
+const APP_SALT      = 'zs_2026_corta'   // salt para mercados (auth.js)
+const APP_SALT_FORN = 'zs_2026_forn'   // salt para distribuidores (forn-auth.js)
 
 const CORS = {
   'Content-Type': 'application/json',
@@ -35,6 +36,10 @@ function slugify(str = '') {
 
 function hashPwd(pwd, salt) {
   return createHash('sha256').update(`${APP_SALT}:${salt}:${pwd}`).digest('hex')
+}
+
+function hashFornPwd(pwd, salt) {
+  return createHash('sha256').update(`${APP_SALT_FORN}:${salt}:${pwd}`).digest('hex')
 }
 
 function genPass() {
@@ -150,7 +155,7 @@ export default async (req) => {
         fornList.push({
           id, tenantId,
           username:     finalUser,
-          passwordHash: hashPwd(password, salt),
+          passwordHash: hashFornPwd(password, salt),   // must match forn-auth.js salt
           salt,
           storeName:    req2.mercado,
           storePhone:   req2.telefone,
