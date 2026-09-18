@@ -17,6 +17,13 @@ echo "NETLIFY_AUTH_TOKEN=nfp_wuQ15ioS6isEZF3V3kPVL7LixCrPpUMY1ca2" > .env
 echo "NETLIFY_SITE_ID=abd4863b-ef7b-4d7c-b3f2-85547f519485" >> .env
 ```
 
+## Credenciais de produção
+- **ZS_MASTER_KEY** (env var no Netlify): `198556@@Pedro` — acesso ao `/api/markets-admin`
+- **Mercado netetamercado**: username=`netetamercado`, senha=`Zatende2026`
+- Para listar mercados: `curl "https://zatendestock.netlify.app/api/markets-admin?mk=198556@@Pedro"`
+- Para criar mercado: `curl -X POST ".../api/markets-admin?mk=198556@@Pedro" -d '{"storeName":"X","username":"x","password":"y"}'`
+- Para resetar senha: `curl -X POST ".../api/markets-admin?mk=198556@@Pedro" -d '{"action":"reset-pass","id":"mkt_ID","password":"nova"}'`
+
 ## Deploy command (always use this)
 ```bash
 source .env  # ou: export $(cat .env | xargs)
