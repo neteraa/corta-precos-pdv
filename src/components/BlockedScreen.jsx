@@ -42,7 +42,7 @@ export default function BlockedScreen({ reason, daysLeft }) {
 
         {/* CTA */}
         <a
-          href="https://wa.me/5500000000000?text=Preciso+renovar+minha+assinatura+do+Corta+Preços"
+          href="https://wa.me/5515997969303?text=Preciso+renovar+minha+assinatura+do+Corta+Preços"
           target="_blank"
           rel="noopener noreferrer"
           style={{

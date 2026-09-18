@@ -1,5 +1,28 @@
 import React, { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Component } from 'react'
+
+class PageErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(e) { return { error: e } }
+  render() {
+    if (this.state.error)
+      return (
+        <div className="p-8 bg-red-50 rounded-2xl border border-red-200 m-4 max-w-lg">
+          <p className="font-black text-red-700 text-lg mb-1">⚠️ Erro ao carregar esta página</p>
+          <p className="text-sm text-red-600 mb-4">Tente recarregar. Se o problema persistir, entre em contato com o suporte.</p>
+          <div className="flex gap-3">
+            <button onClick={() => this.setState({ error: null })} className="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700">↺ Tentar novamente</button>
+            <a href="https://wa.me/5515997969303?text=Erro+no+sistema+ZatendeStok" target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700">💬 Chamar suporte</a>
+          </div>
+          {process.env.NODE_ENV !== 'production' && (
+            <pre className="text-xs text-red-400 mt-4 whitespace-pre-wrap opacity-70">{String(this.state.error)}</pre>
+          )}
+        </div>
+      )
+    return this.props.children
+  }
+}
 import ZatendeStokLogo from './ZatendeStokLogo.jsx'
 import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
@@ -309,12 +332,12 @@ export default function Layout() {
         {!marketCheck.blocked && marketCheck.daysLeft != null && marketCheck.daysLeft <= 5 && marketCheck.daysLeft >= 0 && (
           <div className="bg-amber-500 px-4 py-2 flex items-center justify-between gap-4 text-sm font-bold text-amber-900">
             <span>⏰ Sua assinatura vence em {marketCheck.daysLeft === 0 ? 'hoje' : `${marketCheck.daysLeft} dia${marketCheck.daysLeft !== 1 ? 's' : ''}`}!</span>
-            <a href="https://wa.me/5500000000000?text=Quero+renovar+minha+assinatura" target="_blank" rel="noopener noreferrer"
+            <a href="https://wa.me/5515997969303?text=Quero+renovar+minha+assinatura" target="_blank" rel="noopener noreferrer"
               className="underline whitespace-nowrap">Renovar agora →</a>
           </div>
         )}
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <Outlet />
+          <PageErrorBoundary><Outlet /></PageErrorBoundary>
         </main>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Printer, Copy, Check, Users, Phone, ExternalLink, QrCode, Gift, Megaphone, MapPin, Clock } from 'lucide-react'
+import { Printer, Copy, Check, MessageCircle, Users, Phone, ExternalLink, QrCode, Gift, Megaphone, MapPin, Clock } from 'lucide-react'
 import { usePrinter } from '../hooks/usePrinter.js'
 import { useStore } from '../store.jsx'
 
@@ -67,7 +67,7 @@ export default function Fidelidade() {
   const { customers } = useStore()
   const storeName     = settings.storeName || 'Meu Mercado'
   const phone         = settings.phone || ''
-  const waPhone       = phone.replace(/\D/g, '')
+  const waPhone       = phone.replace(/\D/g, '').replace(/^0+/, '')
   const campaigns     = useMemo(() => CAMPAIGNS(storeName), [storeName])
 
   const [activeCampaign, setActiveCampaign] = useState(() => campaigns[0])
