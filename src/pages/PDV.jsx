@@ -443,19 +443,27 @@ export default function PDV() {
     return () => window.removeEventListener('keydown', handler)
   }, [cart, total, showFinish, trocoValid]) // eslint-disable-line
 
-  const finish = () => {
+  // finish() accepts an optional paymentOverride for quick-pay buttons
+  const finish = (paymentOverride) => {
     const promoDiscount  = totalPromoDiscount
-    const paymentLabel   = splitMode
-      ? splitPays.map(p => `${p.method} R$${p.amount}`).join(' + ')
-      : payment === 'Crédito' && installments > 1
-        ? `Crédito ${installments}×`
-        : payment
+    const activePayment  = paymentOverride || payment
+    const paymentLabel   = paymentOverride
+      ? paymentOverride
+      : splitMode
+        ? splitPays.map(p => `${p.method} R$${p.amount}`).join(' + ')
+        : payment === 'Crédito' && installments > 1
+          ? `Crédito ${installments}×`
+          : payment
 
     const sale = registerSale({
       items: cart,
       total: Math.max(0, total),
       payment: paymentLabel,
-      payments: splitMode ? splitPays : [{ method: payment, amount: Math.max(0, total) }],
+      payments: paymentOverride
+        ? [{ method: paymentOverride, amount: Math.max(0, total) }]
+        : splitMode
+          ? splitPays
+          : [{ method: payment, amount: Math.max(0, total) }],
       discount: discountAmt,
       promoDiscount,
       atacadoDiscount,
@@ -469,18 +477,22 @@ export default function PDV() {
       payment: paymentLabel,
       promoDiscount,
       atacadoDiscount,
-      received: showTroco ? receivedVal : null,
-      troco:    showTroco ? troco : null,
+      received: !paymentOverride && showTroco ? receivedVal : null,
+      troco:    !paymentOverride && showTroco ? troco : null,
     }
     setLastSale(fullSale)
     setCart([]); setDiscount(0); setPayment('PIX'); setInstallments(1)
     setSplitMode(false); setSplitPays([{ method: 'PIX', amount: '' }])
     setReceived(''); setShowFinish(false)
-    // Broadcast cleared cart to display
     broadcast({ type: 'cart', cart: [], promoResults: [], subtotal: 0, total: 0 })
-
-    // printReceipt: always prints receipt; adds promo coupon only when total >= R$100
     printer.printReceipt(fullSale)
+  }
+
+  // Quick-pay: skip modal, finish immediately with given method
+  const quickPay = (method) => {
+    if (cart.length === 0) return
+    if (method === 'Dinheiro') { setPayment('Dinheiro'); suggestReceived(); setShowFinish(true); return }
+    finish(method)
   }
 
   // ── Caixa banner state ────────────────────────────────────
@@ -968,19 +980,42 @@ export default function PDV() {
             )}
           </div>
 
-          {/* finalizar */}
+          {/* ── QUICK PAY — finaliza sem modal ─────────────── */}
+          {cart.length > 0 && !splitMode && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">⚡ Pagamento rápido</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { m: 'PIX',    emoji: '⚡', bg: '#0ea5e91a', border: '#0ea5e9', text: '#38bdf8' },
+                  { m: 'Débito', emoji: '💳', bg: '#8b5cf61a', border: '#8b5cf6', text: '#a78bfa' },
+                  { m: 'Dinheiro', emoji: '💵', bg: '#22c55e1a', border: '#22c55e', text: '#4ade80' },
+                ].map(({ m, emoji, bg, border, text }) => (
+                  <button key={m}
+                    onClick={() => quickPay(m)}
+                    className="flex flex-col items-center gap-1 py-3 rounded-xl font-black text-xs transition-all active:scale-95"
+                    style={{ background: bg, border: `1.5px solid ${border}55`, color: text }}>
+                    <span style={{ fontSize: 20 }}>{emoji}</span>
+                    {m}
+                  </button>
+                ))}
+              </div>
+              <div className="border-t border-gray-800 pt-2" />
+            </div>
+          )}
+
+          {/* finalizar — abre modal para mais opções */}
           <button
             disabled={cart.length === 0 || !splitValid}
             onClick={() => { suggestReceived(); setShowFinish(true) }}
             className="btn-primary w-full justify-center disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl shadow-lg active:scale-[.98] transition-transform"
-            style={{ minHeight: 64, fontSize: 18, fontWeight: 900, letterSpacing: '.02em' }}
+            style={{ minHeight: 56, fontSize: cart.length > 0 ? 15 : 18, fontWeight: 900, letterSpacing: '.02em' }}
           >
-            <Check className="w-6 h-6" />
+            <Check className="w-5 h-5" />
             {splitMode && !splitValid
               ? `⚠️  Falta ${BRL.format(splitRemain)}`
               : cart.length === 0
                 ? 'Adicione itens para finalizar'
-                : `✅  FINALIZAR — ${payment || 'Selecione pagamento'}`}
+                : `Mais opções / Crédito / Split`}
           </button>
         </div>
       </div>

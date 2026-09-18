@@ -56,6 +56,20 @@ export default function CaixaLogin() {
 
   useEffect(() => { fetchOperators() }, [fetchOperators])
 
+  // Auto-select if only 1 active operator (skip selection screen)
+  useEffect(() => {
+    if (operators.length === 1 && !selected) {
+      const op = operators[0]
+      if (!op.pin) {
+        // No PIN configured — go straight to PDV
+        loginAsOperator(op)
+        navigate(op.role === 'caixa' ? '/pdv' : '/dashboard', { replace: true })
+      } else {
+        setSelected(op)
+      }
+    }
+  }, [operators]) // eslint-disable-line
+
   const handlePin = (k) => {
     if (!selected) return
     if (k === '⌫') { setPin(p => p.slice(0, -1)); setPinErr(false); return }
