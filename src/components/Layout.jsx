@@ -80,7 +80,10 @@ function filterByRole(items, role) {
 /* ── logo ─────────────────────────────────────────────────── */
 function SidebarLogo() {
   const { settings } = usePrinter()
-  const name  = settings.storeName  || 'MEU MERCADO'
+  // Session storeName is always the server-authoritative name (set on login).
+  // usePrinter may still carry a stale value from a previous brand — session wins.
+  const session = (() => { try { return JSON.parse(localStorage.getItem('cp_session') || '{}') } catch { return {} } })()
+  const name  = session.storeName || settings.storeName || 'MEU MERCADO'
   const color = settings.themeColor || '#f97316'
   // Derive a darker shade for the gradient end
   const colorDk = color + 'cc'
@@ -165,7 +168,8 @@ export default function Layout() {
   const operatorName = getOperatorName()
   const terminalId   = getTerminalId()
   const { settings: storeSettings } = usePrinter()
-  const storeName    = storeSettings.storeName  || 'MEU MERCADO'
+  const _session     = (() => { try { return JSON.parse(localStorage.getItem('cp_session') || '{}') } catch { return {} } })()
+  const storeName    = _session.storeName || storeSettings.storeName || 'MEU MERCADO'
   const themeColor   = storeSettings.themeColor || '#f97316'
 
   const pendingOffersCount = (supplierOffers || []).filter(o => o.status === 'pending').length
