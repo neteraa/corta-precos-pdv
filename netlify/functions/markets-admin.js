@@ -103,6 +103,14 @@ export default async (req) => {
       return new Response(JSON.stringify({ ok: true, expiresAt: m.expiresAt }), { headers: CORS })
     }
 
+    if (action === 'set-plan') {
+      const m = markets.find(m => m.id === body.id)
+      if (!m) return new Response(JSON.stringify({ ok: false, error: 'Mercado não encontrado' }), { status: 404, headers: CORS })
+      m.plan = body.plan || null
+      await store.set('markets', JSON.stringify(markets))
+      return new Response(JSON.stringify({ ok: true, plan: m.plan }), { headers: CORS })
+    }
+
     if (action === 'reset-pass') {
       const m = markets.find(m => m.id === body.id)
       if (!m) return new Response(JSON.stringify({ ok: false, error: 'Mercado não encontrado' }), { status: 404, headers: CORS })

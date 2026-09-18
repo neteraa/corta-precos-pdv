@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { Copy, Check, Search, X, MessageCircle, Users, Phone, Plus, Trash2, Flame, ExternalLink, Wifi, WifiOff, Bot } from 'lucide-react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { Copy, Check, Search, MessageCircle, Phone, Plus, Flame, ExternalLink, Wifi, WifiOff, Bot, Users, List, RefreshCw, AlertTriangle, Send } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
 import { getConfiguredStoreId } from '../utils/auth.js'
 
@@ -17,17 +17,20 @@ const renderMsg = (template, customer, store = 'MEU MERCADO') =>
     .replace(/\{\{data\}\}/gi,  new Date().toLocaleDateString('pt-BR'))
 
 /* ── send via nosso proxy (Evolution API server-side) ─────── */
-async function sendViaBot(instance, phone, text) {
+async function sendViaBot(instance, number, text) {
   const res = await fetch('/api/wa-send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ instance, number: phone, text }),
+    body: JSON.stringify({ instance, number, text }),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const d = await res.json()
   if (!d.ok) throw new Error(d.error || 'Erro ao enviar')
   return d
 }
+
+/* ── random delay anti-ban: 1.5s–4s ─────────────────────── */
+const randDelay = () => new Promise(r => setTimeout(r, 1500 + Math.random() * 2500))
 
 /* ── WhatsApp bubble preview ─────────────────────────────── */
 function WaBubble({ text }) {
@@ -94,6 +97,9 @@ export default function Campanhas() {
   }, [instance])
   const botConnected = botStatus === 'open'
 
+  // tabs: 'contatos' | 'grupo' | 'lista'
+  const [activeTab, setActiveTab] = useState('contatos')
+
   // message template
   const [template, setTemplate] = useState(
     'Olá {{nome}}! 👋\n\nTemos ofertas imperdíveis hoje no *{{loja}}*!\n\n'
@@ -106,13 +112,24 @@ export default function Campanhas() {
   const [previewIdx, setPreviewIdx] = useState(0)
 
   // send state
-  const [sending, setSending]       = useState(false)
-  const [results, setResults]       = useState(null) // { ok, fail }
-  const [copied, setCopied]         = useState(false)
+  const [sending, setSending]         = useState(false)
+  const [sendProgress, setSendProgress] = useState({ done: 0, total: 0, pausing: false, pauseSec: 0 })
+  const [results, setResults]         = useState(null) // { ok, fail }
+  const [copied, setCopied]           = useState(false)
+  const [copiedMsg, setCopiedMsg]     = useState(false)
+  const abortRef = useRef(false)
 
   // local wa.me sequential dispatch
   const [localMode, setLocalMode]   = useState(false)
   const [localIdx,  setLocalIdx]    = useState(0)
+
+  // grupos do zap
+  const [groups, setGroups]           = useState([])
+  const [fetchingGroups, setFetchingGroups] = useState(false)
+  const [groupsError, setGroupsError] = useState(null)
+  const [selectedGroup, setSelectedGroup] = useState(null)
+  const [sendingGroup, setSendingGroup]   = useState(false)
+  const [groupResult, setGroupResult]     = useState(null)
 
   /* ── active promos (from store — created in Validade page) ── */
   const activePromos = useMemo(() =>
@@ -194,7 +211,47 @@ export default function Campanhas() {
     window.open(`https://wa.me/${phone}?text=${text}`, '_blank')
   }
 
-  /* ── send via nosso bot (Evolution API via proxy) ── */
+  /* ── buscar grupos do WhatsApp via Evolution API ─────── */
+  const fetchGroups = useCallback(async () => {
+    if (!botConnected) { setGroupsError('Bot não conectado'); return }
+    setFetchingGroups(true)
+    setGroupsError(null)
+    try {
+      const res = await fetch(`/api/wa-groups?instance=${instance}`)
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error)
+      setGroups(data.groups)
+      if (!data.groups.length) setGroupsError('Nenhum grupo encontrado. Crie ou entre em um grupo com o número do bot.')
+    } catch (e) {
+      setGroupsError(e.message || 'Erro ao buscar grupos')
+    }
+    setFetchingGroups(false)
+  }, [botConnected, instance])
+
+  /* ── enviar para grupo ───────────────────────────────── */
+  const sendToGroup = useCallback(async () => {
+    if (!selectedGroup) return
+    setSendingGroup(true)
+    setGroupResult(null)
+    const text = template
+      .replace(/\{\{nome\}\}/gi, 'pessoal')
+      .replace(/\{\{loja\}\}/gi, instance)
+      .replace(/\{\{saldo\}\}/gi, 'R$ 0,00')
+      .replace(/\{\{data\}\}/gi,  new Date().toLocaleDateString('pt-BR'))
+    try {
+      await sendViaBot(instance, selectedGroup.jid, text)
+      setGroupResult({ ok: true, name: selectedGroup.name })
+    } catch (e) {
+      setGroupResult({ ok: false, error: e.message })
+    }
+    setSendingGroup(false)
+  }, [selectedGroup, template, instance])
+
+  /* ── send via nosso bot com anti-ban avançado ─────────── */
+  // Batch: 30 msgs → pausa 5min → repete. Delay aleatório 1.5s-4s entre msgs.
+  const BATCH_SIZE = 30
+  const PAUSE_SECS = 300 // 5 minutos
+
   const sendAll = async () => {
     if (!botConnected) {
       alert('Bot WhatsApp não conectado. Vá em Configurações → Bot WhatsApp para escanear o QR.')
@@ -204,18 +261,40 @@ export default function Campanhas() {
     if (!list.length) return
     setSending(true)
     setResults(null)
+    abortRef.current = false
+    setSendProgress({ done: 0, total: list.length, pausing: false, pauseSec: 0 })
+
     let ok = 0, fail = 0
-    for (const c of list) {
+
+    for (let i = 0; i < list.length; i++) {
+      if (abortRef.current) break
+
+      // Pausa de batch a cada BATCH_SIZE mensagens
+      if (i > 0 && i % BATCH_SIZE === 0) {
+        setSendProgress(p => ({ ...p, pausing: true, pauseSec: PAUSE_SECS }))
+        for (let s = PAUSE_SECS; s > 0; s--) {
+          if (abortRef.current) break
+          setSendProgress(p => ({ ...p, pauseSec: s }))
+          await new Promise(r => setTimeout(r, 1000))
+        }
+        setSendProgress(p => ({ ...p, pausing: false }))
+        if (abortRef.current) break
+      }
+
+      const c = list[i]
       try {
         await sendViaBot(instance, cleanPhone(c.phone), renderMsg(template, c))
         ok++
-        await new Promise(r => setTimeout(r, 1400)) // anti-ban: ~1 msg/1.4s
       } catch {
         fail++
       }
+      setSendProgress(p => ({ ...p, done: i + 1 }))
+      if (i < list.length - 1) await randDelay()
     }
+
     setResults({ ok, fail })
     setSending(false)
+    abortRef.current = false
   }
 
   /* open wa.me for one customer at a time (local mode) */
@@ -227,26 +306,249 @@ export default function Campanhas() {
     setLocalIdx(idx + 1)
   }, [audienceList, template])
 
+  const groupText = template
+    .replace(/\{\{nome\}\}/gi, 'pessoal')
+    .replace(/\{\{loja\}\}/gi, instance)
+    .replace(/\{\{saldo\}\}/gi, 'R$ 0,00')
+    .replace(/\{\{data\}\}/gi, new Date().toLocaleDateString('pt-BR'))
+
+  const phoneList = audienceList.filter(hasPhone)
+  const formattedNumbers = phoneList.map(c => cleanPhone(c.phone)).join('\n')
+
   return (
     <div className="space-y-5 animate-pop max-w-3xl">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-black text-gray-900">Campanhas WhatsApp</h1>
-          <p className="text-gray-500 text-sm">Broadcast de ofertas para seus clientes via bot</p>
+          <p className="text-gray-500 text-sm">Dispare ofertas para contatos, grupos ou lista de transmissão</p>
         </div>
-        {/* Bot status badge */}
         <div className={`flex items-center gap-2 text-sm font-bold px-3 py-2 rounded-xl border ${
           botStatus === null ? 'border-gray-200 bg-gray-50 text-gray-400'
           : botConnected ? 'border-green-300 bg-green-50 text-green-700'
           : 'border-amber-300 bg-amber-50 text-amber-700'
         }`}>
           {botConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-          {botStatus === null ? 'Verificando bot...'
-            : botConnected ? 'Bot conectado'
-            : 'Bot desconectado'}
+          {botStatus === null ? 'Verificando bot...' : botConnected ? 'Bot conectado' : 'Bot desconectado'}
         </div>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+        {[
+          { id: 'contatos', label: 'Contatos individuais', icon: Users },
+          { id: 'grupo',    label: 'Grupo do Zap',         icon: MessageCircle },
+          { id: 'lista',    label: 'Lista de Transmissão', icon: List },
+        ].map(({ id, label, icon: Icon }) => (
+          <button key={id} onClick={() => setActiveTab(id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              activeTab === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            <Icon className="w-4 h-4" />
+            <span className="hidden sm:inline">{label}</span>
+            <span className="sm:hidden">{label.split(' ')[0]}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ════ TAB: GRUPO DO ZAP ════════════════════════════ */}
+      {activeTab === 'grupo' && (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          {/* Left: editor de msg */}
+          <div className="lg:col-span-3 space-y-4">
+            <div className="card p-4 space-y-3">
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide">Mensagem para o Grupo</h2>
+              <div className="flex flex-wrap gap-1.5">
+                <VarChip label="Nome da loja" value="{{loja}}" onInsert={insertVar} />
+                <VarChip label="Data" value="{{data}}" onInsert={insertVar} />
+              </div>
+              <textarea value={template} onChange={e => setTemplate(e.target.value)} rows={8}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-800 font-mono focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none leading-relaxed"
+                placeholder="Mensagem para o grupo... Use {{loja}} e {{data}}" />
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>Grupos têm risco menor de ban — mas evite links encurtados e palavras suspeitas. Máx. 1–2 msgs/dia por grupo.</span>
+              </p>
+            </div>
+
+            {/* Buscar grupos */}
+            <div className="card p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide">Selecionar Grupo</h2>
+                <button onClick={fetchGroups} disabled={fetchingGroups || !botConnected}
+                  className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-xl bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-40 transition-colors">
+                  {fetchingGroups ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  {fetchingGroups ? 'Buscando...' : 'Buscar meus grupos'}
+                </button>
+              </div>
+              {!botConnected && (
+                <p className="text-xs text-amber-600">Bot não conectado — conecte em Configurações primeiro.</p>
+              )}
+              {groupsError && (
+                <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{groupsError}</p>
+              )}
+              {groups.length > 0 && (
+                <div className="max-h-60 overflow-y-auto rounded-xl border border-gray-200 divide-y divide-gray-100">
+                  {groups.map(g => (
+                    <button key={g.jid} onClick={() => setSelectedGroup(g)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-orange-50 transition-colors ${
+                        selectedGroup?.jid === g.jid ? 'bg-orange-50 border-l-2 border-orange-500' : ''
+                      }`}>
+                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 text-green-700 font-black text-xs">
+                        {g.name[0]?.toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-gray-800 truncate">{g.name}</div>
+                        {g.size > 0 && <div className="text-xs text-gray-400">{g.size} participantes</div>}
+                      </div>
+                      {selectedGroup?.jid === g.jid && <Check className="w-4 h-4 text-orange-500 flex-shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {groups.length === 0 && !fetchingGroups && !groupsError && botConnected && (
+                <p className="text-xs text-gray-400 text-center py-4">Clique em "Buscar meus grupos" para listar os grupos do bot.</p>
+              )}
+            </div>
+
+            {/* Ações */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => { navigator.clipboard.writeText(groupText); setCopiedMsg(true); setTimeout(() => setCopiedMsg(false), 2000) }}
+                className="flex items-center gap-2 btn-ghost text-sm px-4 py-2.5 rounded-xl border border-gray-200">
+                {copiedMsg ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                {copiedMsg ? 'Mensagem copiada!' : 'Copiar mensagem (colar manual no grupo)'}
+              </button>
+              <button onClick={sendToGroup} disabled={!selectedGroup || sendingGroup || !botConnected}
+                className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white disabled:opacity-40 transition-colors">
+                {sendingGroup ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {sendingGroup ? 'Enviando...' : `Enviar via bot${selectedGroup ? ` — ${selectedGroup.name}` : ''}`}
+              </button>
+            </div>
+            {groupResult && (
+              <div className={`rounded-xl px-4 py-3 text-sm font-semibold animate-pop ${
+                groupResult.ok ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+              }`}>
+                {groupResult.ok ? `✅ Enviado para "${groupResult.name}" com sucesso!` : `❌ Erro: ${groupResult.error}`}
+              </div>
+            )}
+          </div>
+
+          {/* Right: preview */}
+          <div className="lg:col-span-2 space-y-3">
+            <div className="card p-4 space-y-3">
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide">Preview no grupo</h2>
+              <WaBubble text={groupText} />
+            </div>
+            <div className="card p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 space-y-2">
+              <h3 className="text-xs font-black text-green-800 uppercase tracking-wide">💡 Dicas de grupo</h3>
+              {[
+                '✅ Grupo é mais seguro que lista — contatos já te conhecem',
+                '✅ 1–2 msgs por dia por grupo é o ideal',
+                '✅ Marque produtos em oferta com * negrito *',
+                '✅ Sempre coloque o nome da loja e o contato',
+                '⚠️ Evite links bit.ly — use o número direto',
+                '⚠️ Não envie a mesma msg várias vezes seguidas',
+              ].map(t => (
+                <div key={t} className="text-[11px] text-gray-600 flex items-start gap-2">
+                  <span className="flex-shrink-0">{t.slice(0, 2)}</span>
+                  <span>{t.slice(2)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════ TAB: LISTA DE TRANSMISSÃO ════════════════════ */}
+      {activeTab === 'lista' && (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          <div className="lg:col-span-3 space-y-4">
+            {/* Mensagem */}
+            <div className="card p-4 space-y-3">
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide">Mensagem da Lista</h2>
+              <div className="flex flex-wrap gap-1.5">
+                <VarChip label="Loja" value="{{loja}}" onInsert={insertVar} />
+                <VarChip label="Data" value="{{data}}" onInsert={insertVar} />
+              </div>
+              <textarea value={template} onChange={e => setTemplate(e.target.value)} rows={8}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-800 font-mono focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none leading-relaxed"
+                placeholder="Mensagem da lista... Em lista de transmissão não use {{nome}} pois todos recebem a mesma msg" />
+            </div>
+
+            {/* Audiência */}
+            <div className="card p-4 space-y-3">
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide">Contatos ({phoneList.length} com WhatsApp)</h2>
+              <div className="space-y-2">
+                {[
+                  { id: 'phone', label: 'Com WhatsApp cadastrado', count: customers.filter(hasPhone).length },
+                  { id: 'fiado', label: 'Com fiado em aberto', count: customers.filter(c => hasPhone(c) && fiados[c.id]).length },
+                ].map(o => (
+                  <label key={o.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                    audience === o.id ? 'border-orange-400 bg-orange-50' : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                    <input type="radio" name="aud-lista" value={o.id} checked={audience === o.id}
+                      onChange={() => setAudience(o.id)} className="accent-orange-500" />
+                    <span className="text-sm font-semibold text-gray-700 flex-1">{o.label}</span>
+                    <span className="text-xs font-black bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{o.count}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Números copiáveis */}
+            <div className="card p-4 space-y-3">
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide">Números para a lista</h2>
+              <div className="bg-gray-900 rounded-xl p-3 max-h-40 overflow-y-auto">
+                <pre className="text-xs text-green-400 font-mono leading-loose">{formattedNumbers || '— Nenhum contato com WhatsApp —'}</pre>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => { navigator.clipboard.writeText(formattedNumbers); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+                  className="flex-1 flex items-center justify-center gap-2 btn-ghost text-sm px-4 py-2.5 rounded-xl border border-gray-200">
+                  {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Copiado!' : `Copiar ${phoneList.length} números`}
+                </button>
+                <button onClick={() => { navigator.clipboard.writeText(groupText); setCopiedMsg(true); setTimeout(() => setCopiedMsg(false), 2000) }}
+                  className="flex-1 flex items-center justify-center gap-2 btn-ghost text-sm px-4 py-2.5 rounded-xl border border-gray-200">
+                  {copiedMsg ? <Check className="w-4 h-4 text-green-600" /> : <MessageCircle className="w-4 h-4" />}
+                  {copiedMsg ? 'Mensagem copiada!' : 'Copiar mensagem'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: instruções passo a passo */}
+          <div className="lg:col-span-2 space-y-3">
+            <div className="card p-4 space-y-4">
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide">📋 Como usar a lista</h2>
+              {[
+                { n: '1', t: 'Copie os números', d: 'Clique em "Copiar números" acima — eles já estão no formato correto com DDI 55.' },
+                { n: '2', t: 'Abra o WhatsApp no celular', d: 'Vá em ⋮ → Nova transmissão (Android) ou em Listas → Nova lista (iPhone).' },
+                { n: '3', t: 'Adicione os contatos', d: 'Cole os números um a um ou selecione os contatos salvos. ⚠️ IMPORTANTE: os contatos precisam ter o seu número salvo para receber a msg.' },
+                { n: '4', t: 'Copie e envie a mensagem', d: 'Clique em "Copiar mensagem" e cole na lista de transmissão. Pronto!' },
+              ].map(({ n, t, d }) => (
+                <div key={n} className="flex gap-3">
+                  <div className="w-6 h-6 rounded-full bg-orange-500 text-white flex items-center justify-center font-black text-xs flex-shrink-0 mt-0.5">{n}</div>
+                  <div>
+                    <div className="text-sm font-black text-gray-800">{t}</div>
+                    <div className="text-xs text-gray-500 mt-0.5 leading-relaxed">{d}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="card p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 space-y-2">
+              <h3 className="text-xs font-black text-amber-800 uppercase tracking-wide">⚡ Lista de transmissão vs Grupo</h3>
+              <div className="space-y-1.5 text-[11px] text-gray-600">
+                <div><strong>Lista de transmissão:</strong> cada um recebe como msg individual — mais pessoal, sem expor números. Contato precisa ter você salvo.</div>
+                <div><strong>Grupo:</strong> todos veem a msg e uns aos outros — mais interação, sem necessidade de estar salvo. Ideal para promoções abertas.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════ TAB: CONTATOS INDIVIDUAIS ════════════════════ */}
+      {activeTab === 'contatos' && <>
 
       {/* ── Promoções Prontas (de vencimento) ── */}
       {activePromos.length > 0 && (
@@ -465,23 +767,55 @@ export default function Campanhas() {
             </button>
 
             {/* Automático — via nosso bot */}
-            <button
-              onClick={sendAll}
-              disabled={sending || !audienceList.filter(hasPhone).length}
-              title={!botConnected ? 'Bot não conectado — vá em Configurações para escanear o QR' : ''}
-              className={`flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl transition-colors justify-center
-                ${botConnected
-                  ? 'bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
-              {sending
-                ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Disparando...</>
-                : <><Bot className="w-4 h-4" /> Disparar via Bot</>
-              }
-            </button>
+            {!sending ? (
+              <button
+                onClick={sendAll}
+                disabled={!audienceList.filter(hasPhone).length || !botConnected}
+                title={!botConnected ? 'Bot não conectado — vá em Configurações para escanear o QR' : ''}
+                className={`flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl transition-colors justify-center
+                  ${botConnected
+                    ? 'bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+                <Bot className="w-4 h-4" /> Disparar via Bot ({audienceList.filter(hasPhone).length})
+              </button>
+            ) : (
+              <button onClick={() => { abortRef.current = true }}
+                className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl bg-red-100 text-red-600 hover:bg-red-200 transition-colors">
+                <span className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                Parar disparo
+              </button>
+            )}
           </div>
 
+          {/* Progresso de envio */}
+          {sending && (
+            <div className="card p-4 space-y-3">
+              {sendProgress.pausing ? (
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="text-sm font-bold text-amber-700">⏸ Pausa anti-ban — {Math.floor(sendProgress.pauseSec / 60)}:{String(sendProgress.pauseSec % 60).padStart(2,'0')} restantes</div>
+                    <div className="text-xs text-gray-500">Aguardando para retomar o lote. Isso protege seu número de ban.</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm font-semibold text-gray-700">
+                  🚀 Disparando... {sendProgress.done}/{sendProgress.total}
+                  <span className="text-xs text-gray-400 ml-2">· delay aleatório 1.5–4s entre msgs</span>
+                </div>
+              )}
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-2 bg-orange-500 rounded-full transition-all"
+                  style={{ width: `${sendProgress.total > 0 ? (sendProgress.done / sendProgress.total) * 100 : 0}%` }} />
+              </div>
+              <div className="text-xs text-gray-500">
+                Lote {Math.floor(sendProgress.done / 30) + 1} · Próxima pausa após {30 - (sendProgress.done % 30)} msgs
+              </div>
+            </div>
+          )}
+
           {/* Result banner */}
-          {results && (
+          {results && !sending && (
             <div className={`rounded-xl px-4 py-3 text-sm font-semibold animate-pop ${
               results.fail === 0 ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
             }`}>
@@ -537,13 +871,14 @@ export default function Campanhas() {
             <h3 className="text-xs font-black text-amber-800 uppercase tracking-wide">⚡ Regras Anti-Ban</h3>
             <div className="space-y-1">
               {[
-                ['✅','Delay de 1,4s entre mensagens já aplicado automaticamente'],
-                ['✅','Máx. 50–80 mensagens por sessão de 24h por número'],
-                ['✅','Varie o conteúdo — use {{nome}}, {{saldo}}, {{data}} para personalizar'],
-                ['✅','Envie só para quem salvou seu número (clientes reais)'],
-                ['⚠️','Pause 30–60 min entre lotes de 30 msgs'],
-                ['⚠️','Use número exclusivo para disparos — não o pessoal'],
-                ['❌','Nunca dispare 500+ msgs em série sem pausa — ban garantido'],
+                ['✅','Delay aleatório 1.5–4s entre mensagens (automático)'],
+                ['✅','Pausa automática de 5 min a cada 30 msgs enviadas'],
+                ['✅','Máx. 80–100 mensagens por número por dia'],
+                ['✅','Varie sempre com {{nome}}, {{saldo}}, {{data}} — mensagem idêntica = ban'],
+                ['✅','Envie só para quem te conhece — clientes reais da sua loja'],
+                ['⚠️','Use número dedicado para disparos — nunca o pessoal'],
+                ['⚠️','Não dispare todos os dias — 2–3x por semana é o ideal'],
+                ['❌','Nunca dispare para lista comprada — ban imediato garantido'],
               ].map(([icon, tip]) => (
                 <div key={tip} className="flex items-start gap-2 text-[11px] text-gray-600">
                   <span className="flex-shrink-0 font-bold">{icon}</span>
@@ -554,6 +889,7 @@ export default function Campanhas() {
           </div>
         </div>
       </div>
+      </> }
     </div>
   )
 }

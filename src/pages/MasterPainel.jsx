@@ -155,6 +155,34 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
           </div>
         )}
 
+        {/* Plano */}
+        {(() => {
+          const PLAN_COLORS = { Essencial: '#6366f1', Profissional: '#f97316', Enterprise: '#f59e0b' }
+          const current = market.plan || null
+          const setPlan = async (plan) => {
+            setBusy(true)
+            await api('/api/markets-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'set-plan', id: market.id, plan }) })
+            await onRefresh()
+            setBusy(false)
+          }
+          return (
+            <div className="flex items-center justify-between text-xs pt-1">
+              <span className="text-gray-500">Plano</span>
+              <select
+                value={current || ''}
+                disabled={busy}
+                onChange={e => setPlan(e.target.value || null)}
+                className="bg-gray-700 border border-gray-600 text-xs rounded-lg px-2 py-1 outline-none focus:border-orange-500 disabled:opacity-40"
+                style={{ color: PLAN_COLORS[current] || '#9ca3af' }}>
+                <option value="">— sem plano —</option>
+                <option value="Essencial" style={{ color: PLAN_COLORS.Essencial }}>Essencial — R$297/mês</option>
+                <option value="Profissional" style={{ color: PLAN_COLORS.Profissional }}>Profissional — R$497/mês</option>
+                <option value="Enterprise" style={{ color: PLAN_COLORS.Enterprise }}>Enterprise — Personalizado</option>
+              </select>
+            </div>
+          )
+        })()}
+
         {/* Expiry / payment status */}
         {(() => {
           const exp  = market.expiresAt ? new Date(market.expiresAt) : null

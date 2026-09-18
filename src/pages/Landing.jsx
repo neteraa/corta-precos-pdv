@@ -349,18 +349,19 @@ export default function Landing() {
             {/* ESSENCIAL */}
             <div style={{ background:'#fff', borderRadius:24, padding:'36px 32px', border:'1px solid #e2e8f0', display:'flex', flexDirection:'column' }}>
               <div style={{ fontSize:13, fontWeight:700, color:'#64748b', letterSpacing:'.05em', textTransform:'uppercase', marginBottom:12 }}>Essencial</div>
-              <div style={{ display:'flex', alignItems:'flex-end', gap:4, marginBottom:6 }}>
+              <div style={{ display:'flex', alignItems:'flex-end', gap:4, marginBottom:4 }}>
                 <span style={{ fontSize:13, fontWeight:700, color:'#94a3b8', alignSelf:'flex-start', marginTop:10 }}>R$</span>
-                <span style={{ fontFamily:"'Anton',sans-serif", fontSize:60, lineHeight:1, color:'#0f172a' }}>197</span>
+                <span style={{ fontFamily:"'Anton',sans-serif", fontSize:60, lineHeight:1, color:'#0f172a' }}>297</span>
                 <span style={{ fontSize:14, color:'#94a3b8', marginBottom:8 }}>/mês</span>
               </div>
+              <div style={{ fontSize:11, color:'#22c55e', fontWeight:800, marginBottom:16 }}>menos de R$10 por dia ✅</div>
               <p style={{ color:'#64748b', fontSize:13, marginBottom:28, lineHeight:1.6 }}>Ideal para mercadinhos que estão saindo do papel e do caderno.</p>
               <ul style={{ listStyle:'none', padding:0, margin:'0 0 28px', flex:1, display:'flex', flexDirection:'column', gap:10 }}>
                 {['✅ 1 terminal PDV / Caixa','✅ Estoque + controle de validade','✅ Fiado digital','✅ Relatórios de vendas','✅ Impressora térmica','✅ Funciona offline','❌ Bot WhatsApp de atendimento','❌ Programa de fidelidade','❌ Campanhas WhatsApp'].map(f => (
                   <li key={f} style={{ fontSize:13, color: f.startsWith('❌') ? '#cbd5e1' : '#334155', display:'flex', gap:8 }}>{f}</li>
                 ))}
               </ul>
-              <button onClick={() => openWpp('Quero o plano Essencial')} style={{ padding:'14px', borderRadius:14, border:'2px solid #0f172a', background:'transparent', color:'#0f172a', fontWeight:900, fontSize:15, cursor:'pointer', transition:'all .2s' }}
+              <button onClick={() => openWpp('Quero o plano Essencial (R$297/mês)')} style={{ padding:'14px', borderRadius:14, border:'2px solid #0f172a', background:'transparent', color:'#0f172a', fontWeight:900, fontSize:15, cursor:'pointer', transition:'all .2s' }}
                 onMouseOver={e=>{ e.currentTarget.style.background='#0f172a'; e.currentTarget.style.color='#fff' }}
                 onMouseOut={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#0f172a' }}>
                 Começar com Essencial
@@ -371,40 +372,40 @@ export default function Landing() {
             <div style={{ background:'linear-gradient(160deg,#0f172a,#1e1b4b)', borderRadius:24, padding:'36px 32px', border:'2px solid #6366f1', display:'flex', flexDirection:'column', position:'relative', boxShadow:'0 20px 60px rgba(99,102,241,.25)' }}>
               <div style={{ position:'absolute', top:-14, left:'50%', transform:'translateX(-50%)', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', color:'#fff', fontSize:11, fontWeight:900, padding:'4px 16px', borderRadius:999, letterSpacing:'.06em', textTransform:'uppercase', whiteSpace:'nowrap' }}>⭐ Mais popular</div>
               <div style={{ fontSize:13, fontWeight:700, color:'#a5b4fc', letterSpacing:'.05em', textTransform:'uppercase', marginBottom:12 }}>Profissional</div>
-              <div style={{ display:'flex', alignItems:'flex-end', gap:4, marginBottom:6 }}>
+              <div style={{ display:'flex', alignItems:'flex-end', gap:4, marginBottom:4 }}>
                 <span style={{ fontSize:13, fontWeight:700, color:'#818cf8', alignSelf:'flex-start', marginTop:10 }}>R$</span>
-                <span style={{ fontFamily:"'Anton',sans-serif", fontSize:60, lineHeight:1, color:'#fff' }}>297</span>
+                <span style={{ fontFamily:"'Anton',sans-serif", fontSize:60, lineHeight:1, color:'#fff' }}>497</span>
                 <span style={{ fontSize:14, color:'#818cf8', marginBottom:8 }}>/mês</span>
               </div>
+              <div style={{ fontSize:11, color:'#86efac', fontWeight:800, marginBottom:16 }}>menos de R$17 por dia — até 3 caixas 🚀</div>
               <p style={{ color:'#94a3b8', fontSize:13, marginBottom:28, lineHeight:1.6 }}>Para quem quer atender melhor, fidelizar clientes e vender mais pelo WhatsApp.</p>
               <ul style={{ listStyle:'none', padding:0, margin:'0 0 28px', flex:1, display:'flex', flexDirection:'column', gap:10 }}>
                 {['✅ Até 3 terminais PDV / Caixa','✅ Tudo do plano Essencial','✅ Bot WhatsApp com IA 🤖','✅ Respostas automáticas de promoções','✅ Programa de fidelidade (QR + WhatsApp)','✅ Campanhas de promoção via WhatsApp','✅ Etiquetas de preço automáticas','✅ Multi-caixa em rede'].map(f => (
                   <li key={f} style={{ fontSize:13, color:'#e2e8f0', display:'flex', gap:8 }}>{f}</li>
                 ))}
               </ul>
-              <button onClick={() => openWpp('Quero o plano Profissional')} style={{ padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', color:'#fff', fontWeight:900, fontSize:15, cursor:'pointer', boxShadow:'0 4px 20px rgba(99,102,241,.4)' }}>
+              <button onClick={() => openWpp('Quero o plano Profissional (R$497/mês)')} style={{ padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', color:'#fff', fontWeight:900, fontSize:15, cursor:'pointer', boxShadow:'0 4px 20px rgba(99,102,241,.4)' }}>
                 Quero o Profissional →
               </button>
             </div>
 
-            {/* ILIMITADO */}
+            {/* PERSONALIZADO */}
             <div style={{ background:'#fff', borderRadius:24, padding:'36px 32px', border:'1px solid #e2e8f0', display:'flex', flexDirection:'column' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#64748b', letterSpacing:'.05em', textTransform:'uppercase', marginBottom:12 }}>Ilimitado</div>
-              <div style={{ display:'flex', alignItems:'flex-end', gap:4, marginBottom:6 }}>
-                <span style={{ fontSize:13, fontWeight:700, color:'#94a3b8', alignSelf:'flex-start', marginTop:10 }}>R$</span>
-                <span style={{ fontFamily:"'Anton',sans-serif", fontSize:60, lineHeight:1, color:'#0f172a' }}>397</span>
-                <span style={{ fontSize:14, color:'#94a3b8', marginBottom:8 }}>/mês</span>
+              <div style={{ fontSize:13, fontWeight:700, color:'#64748b', letterSpacing:'.05em', textTransform:'uppercase', marginBottom:12 }}>Rede / Enterprise</div>
+              <div style={{ display:'flex', alignItems:'flex-end', gap:4, marginBottom:4 }}>
+                <span style={{ fontFamily:"'Anton',sans-serif", fontSize:42, lineHeight:1, color:'#0f172a' }}>Personalizado</span>
               </div>
-              <p style={{ color:'#64748b', fontSize:13, marginBottom:28, lineHeight:1.6 }}>Para redes, mercados grandes e quem quer escalar sem limite de caixas.</p>
+              <div style={{ fontSize:11, color:'#f97316', fontWeight:800, marginBottom:16 }}>cotação sob medida para sua operação 🏆</div>
+              <p style={{ color:'#64748b', fontSize:13, marginBottom:28, lineHeight:1.6 }}>Para redes com múltiplas lojas, mercados grandes e quem quer escalar sem limite.</p>
               <ul style={{ listStyle:'none', padding:0, margin:'0 0 28px', flex:1, display:'flex', flexDirection:'column', gap:10 }}>
-                {['✅ Terminais PDV ilimitados','✅ Tudo do plano Profissional','✅ Suporte prioritário (resposta em <1h)','✅ Onboarding dedicado','✅ Treinamento da equipe incluído','✅ Bot WhatsApp personalizado com nome e logo','✅ Relatórios avançados por período'].map(f => (
+                {['✅ Terminais PDV ilimitados','✅ Tudo do plano Profissional','✅ Suporte prioritário (resposta em <1h)','✅ Onboarding dedicado com sua equipe','✅ Treinamento presencial ou remoto','✅ Bot WhatsApp com nome e logo do seu mercado','✅ Relatórios avançados e exportação'].map(f => (
                   <li key={f} style={{ fontSize:13, color:'#334155', display:'flex', gap:8 }}>{f}</li>
                 ))}
               </ul>
-              <button onClick={() => openWpp('Quero o plano Ilimitado')} style={{ padding:'14px', borderRadius:14, border:'2px solid #0f172a', background:'transparent', color:'#0f172a', fontWeight:900, fontSize:15, cursor:'pointer', transition:'all .2s' }}
-                onMouseOver={e=>{ e.currentTarget.style.background='#0f172a'; e.currentTarget.style.color='#fff' }}
-                onMouseOut={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#0f172a' }}>
-                Falar sobre Ilimitado
+              <button onClick={() => openWpp('Quero uma cotação para o plano Enterprise')} style={{ padding:'14px', borderRadius:14, border:'2px solid #f97316', background:'transparent', color:'#f97316', fontWeight:900, fontSize:15, cursor:'pointer', transition:'all .2s' }}
+                onMouseOver={e=>{ e.currentTarget.style.background='#f97316'; e.currentTarget.style.color='#fff' }}
+                onMouseOut={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#f97316' }}>
+                Falar sobre cotação →
               </button>
             </div>
           </div>
