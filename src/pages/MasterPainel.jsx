@@ -341,9 +341,20 @@ function CredSuccess({ title, icon: Icon, iconColor, accentColor, ok, emailResul
           </div>
           <h3 className="text-white font-black text-xl">{title}</h3>
 
-          {emailResult?.sent && mode === 'direct' && (
+          {/* WhatsApp */}
+          {emailResult?.wpp?.ok && (
             <p className="text-green-400 text-sm mt-2 flex items-center justify-center gap-1">
-              <Check className="w-3.5 h-3.5" /> Email enviado direto para {ok.email}
+              <Check className="w-3.5 h-3.5" /> WhatsApp enviado para {ok.storePhone}
+            </p>
+          )}
+          {emailResult?.wpp && !emailResult.wpp.ok && (
+            <p className="text-yellow-400 text-xs mt-2">⚠️ WhatsApp: {emailResult.wpp.error || 'não enviado — verifique o bot'}</p>
+          )}
+
+          {/* Email */}
+          {emailResult?.sent && mode === 'direct' && (
+            <p className="text-green-400 text-sm mt-1 flex items-center justify-center gap-1">
+              <Check className="w-3.5 h-3.5" /> Email enviado para {ok.email}
             </p>
           )}
           {emailResult?.sent && mode === 'admin-notify' && (
@@ -353,10 +364,10 @@ function CredSuccess({ title, icon: Icon, iconColor, accentColor, ok, emailResul
             </div>
           )}
           {!emailResult?.sent && ok.email && (
-            <p className="text-yellow-400 text-xs mt-2">⚠️ {emailResult?.warning || 'Email não enviado'}</p>
+            <p className="text-yellow-400 text-xs mt-1">⚠️ {emailResult?.warning || 'Email não enviado'}</p>
           )}
-          {!ok.email && (
-            <p className="text-gray-500 text-sm mt-1">Passe as credenciais ao cliente</p>
+          {!ok.email && !emailResult?.wpp && (
+            <p className="text-gray-500 text-sm mt-1">Passe as credenciais ao cliente manualmente</p>
           )}
         </div>
 
@@ -389,10 +400,22 @@ function AddMarketModal({ mk, onClose, onCreated }) {
     setBusy(true)
     const res = await api('/api/markets-admin', mk, { method: 'POST', body: JSON.stringify(form) })
     if (!res.ok) { setBusy(false); return setErr(res.error || 'Erro ao criar mercado.') }
-    const creds = { storeId: res.storeId, username: form.username, password: form.password, email: form.email }
-    const eRes  = await sendWelcomeEmail(mk, { to: form.email, type: 'market', storeName: form.storeName, username: form.username, password: form.password })
+    const creds = { storeId: res.storeId, username: form.username, password: form.password, email: form.email, storePhone: form.storePhone }
+
+    // Envio em paralelo: email + WhatsApp (quando telefone preenchido)
+    const [eRes, wRes] = await Promise.all([
+      sendWelcomeEmail(mk, { to: form.email, type: 'market', storeName: form.storeName, username: form.username, password: form.password }),
+      form.storePhone
+        ? fetch('/api/wa-welcome', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mk, phone: form.storePhone, storeName: form.storeName, username: form.username, password: form.password }),
+          }).then(r => r.json()).catch(() => ({ ok: false, error: 'Erro de rede' }))
+        : Promise.resolve(null),
+    ])
+
     setBusy(false)
-    setEmailResult(eRes)
+    setEmailResult({ ...eRes, wpp: wRes })
     setOk(creds)
     onCreated()
   }
