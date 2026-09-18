@@ -1,4 +1,4 @@
-# Corta Preços MVP — Project Notes (v6.0 — 2026-08)
+# ZatendeStok — Project Notes (v8.0 — 2026-09)
 
 ## What this is
 React + Vite + Tailwind MVP platform for retail management (PDV/automação comercial), Brazilian supermarket.
@@ -920,3 +920,62 @@ Campanhas → Disparar via Bot → /api/wa-send → Evolution API → WhatsApp d
 - `OPENAI_API_KEY` no Netlify → sem ela o bot recebe mensagens mas não responde com IA
   - Rotacionar em platform.openai.com → API Keys → invalidar antiga → criar nova
   - Setar: `netlify env:set OPENAI_API_KEY "sk-proj-..." --force --site $NETLIFY_SITE_ID --auth $NETLIFY_AUTH_TOKEN`
+
+---
+
+## Sessão 2026-09-18 (tarde) — Precificação + Ativação + Campanhas Pro
+
+### Commits
+| Hash | Descrição |
+|---|---|
+| `4dfcd1b` | feat: bot por mercado — market-profile.js, MarketBotProfileSection, roteamento Zara vs mercado |
+| `db7c031` | fix: scanner mobile sync barrier + planos R$297/R$497/Personalizado |
+| `a96d402` | feat: pricing atualizado + MasterPainel plano por mercado + Campanhas tabs (grupo/lista) |
+| `b2e3fc3` | feat: wa-welcome.js + ativação via WhatsApp + CSV import + anti-ban diário |
+
+### Arquitetura de planos
+```
+Essencial   → R$297/mês  → 1 PDV
+Profissional → R$497/mês  → até 3 PDVs + bot + fidelidade
+Enterprise  → Personalizado → ilimitado + onboarding
+```
+
+### Fluxo de ativação pós-pagamento
+```
+1. Pedro faz a venda (Zara captura lead → stage:"fechado")
+2. Pedro cria o mercado no MasterPainel (storeName + username + senha)
+3. MasterPainel → "Reenviar acesso" → botão "WhatsApp" → /api/wa-welcome
+4. Zara manda msg com URL + usuário + senha pro WhatsApp do dono do mercado
+5. Dono recebe, acessa zatendestok.com.br, faz login, começa a usar
+```
+
+### wa-welcome.js
+- `POST /api/wa-welcome` — valida master key, formata número DDI 55
+- Usa `EVOLUTION_INSTANCE` (instância principal da Zara) para enviar
+- Mensagem formatada com credenciais em negrito + link + saudação
+
+### Campanhas — funcionalidades completas
+- **Tab Contatos**: disparo individual com delay 1.5–4s + pausa 5min/30msgs + limite 80/dia (localStorage) + import CSV
+- **Tab Grupo do Zap**: busca grupos via `/api/wa-groups`, seleciona, envia ou copia msg
+- **Tab Lista de Transmissão**: copia números + copia msg + guia passo-a-passo
+- **wa-groups.js**: `GET /api/wa-groups?instance=X` → Evolution API `/group/fetchAllGroups`
+- **Import CSV**: aceita `,` `;` `|` `tab` como separador, detecta ordem nome/fone automaticamente
+- Botão "Baixar modelo CSV" gera arquivo de exemplo
+
+### Scanner Mobile — fix race condition
+- **Problema**: mobile sem sessão iniciava com products=[] → cadastro sobrescrevia servidor
+- **Fix**: `syncReady` state — bloqueia câmera até primeiro sync do servidor completar
+- Loader visual "Sincronizando estoque..." aparece por 1–3s no primeiro acesso
+- Funciona em ambos os modos: `?mode=pdv` e `?mode=estoque`
+
+### MasterPainel — plano por mercado
+- Dropdown na MarketCard: Essencial / Profissional / Enterprise
+- Chama `POST /api/markets-admin?action=set-plan`
+- Campo `plan` salvo no blob `markets` na Netlify
+
+### Anti-ban WhatsApp
+- Delay **aleatório 1.5s–4s** (antes era fixo 1.4s)
+- **Pausa 5 min** a cada 30 mensagens com countdown visual
+- **Contador diário** por instância em localStorage (chave: data + instance)
+- Limite **80 msgs/dia** — bloqueia e alerta quando atingido
+- Botão "Parar disparo" a qualquer momento via `abortRef`
