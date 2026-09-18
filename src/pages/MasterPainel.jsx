@@ -210,7 +210,7 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
       {showResend && (
         <div className="px-4 pb-3 space-y-2">
           {resendStatus === 'ok'  && <p className="text-green-400 text-xs font-bold">✅ Email enviado!</p>}
-          {resendStatus === 'err' && <p className="text-yellow-400 text-xs">⚠️ Não enviado (configure GMAIL_APP_PASSWORD)</p>}
+          {resendStatus === 'err' && <p className="text-yellow-400 text-xs">⚠️ Não enviado (configure RESEND_API_KEY em resend.com)</p>}
           {!resendStatus && <>
             <input className="w-full bg-gray-700 border border-gray-600 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-orange-500"
               placeholder="Email do cliente" type="email" value={resendEmail} onChange={e => setResendEmail(e.target.value)} />
@@ -494,7 +494,7 @@ function DistCard({ dist, mk, onRefresh }) {
       {showResend && (
         <div className="space-y-2">
           {resendStatus === 'ok'  && <p className="text-green-400 text-xs font-bold">✅ Email enviado!</p>}
-          {resendStatus === 'err' && <p className="text-yellow-400 text-xs">⚠️ Não enviado (configure GMAIL_APP_PASSWORD)</p>}
+          {resendStatus === 'err' && <p className="text-yellow-400 text-xs">⚠️ Não enviado (configure RESEND_API_KEY em resend.com)</p>}
           {!resendStatus && <>
             <input className="w-full bg-gray-700 border border-gray-600 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-emerald-400"
               placeholder="Email do distribuidor" type="email" value={resendEmail} onChange={e => setResendEmail(e.target.value)} />

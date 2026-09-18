@@ -11,15 +11,21 @@
  *   supportPhone?: string        — WhatsApp support number (digits only)
  * }
  *
- * Requires GMAIL_APP_PASSWORD env var (Netlify Site Settings → Env vars).
- * When not set, returns previewHtml so admin can copy the content manually.
+ * Uses Resend API (resend.com) — free 3000 emails/month.
+ * Requires RESEND_API_KEY env var (Netlify Site Settings → Env vars).
+ * Without it: returns previewHtml so admin can copy manually.
+ *
+ * Setup (2 minutos):
+ *   1. Criar conta grátis em resend.com
+ *   2. API Keys → Create API Key → copiar
+ *   3. Netlify → Site config → Env vars → RESEND_API_KEY = re_xxxx
+ *   4. Trigger redeploy
  */
-import nodemailer from 'nodemailer'
 
 const MASTER_KEY    = process.env.ZS_MASTER_KEY    || 'zatende2026master'
-const FROM_EMAIL    = 'zatendeapi@gmail.com'
-const GMAIL_PASS    = process.env.GMAIL_APP_PASSWORD || ''
-const SUPPORT_PHONE = process.env.SUPPORT_WHATSAPP  || '5500000000000'
+const RESEND_KEY    = process.env.RESEND_API_KEY   || ''
+const FROM_EMAIL    = process.env.FROM_EMAIL        || 'ZatendeStock <onboarding@resend.dev>'
+const SUPPORT_PHONE = process.env.SUPPORT_WHATSAPP  || '5511985950956'
 
 const CORS = {
   'Content-Type': 'application/json',
@@ -183,28 +189,28 @@ export default async (req) => {
     ? `✅ Seu acesso ao ZatendeStock PDV está pronto — ${storeName}`
     : `✅ Portal do Distribuidor ZatendeStock — Acesso criado para ${storeName}`
 
-  // ── Try to send via Gmail SMTP ──────────────────────────
-  if (GMAIL_PASS) {
+  // ── Send via Resend API (fetch only, no npm package) ────
+  if (RESEND_KEY) {
     try {
-      const transporter = nodemailer.createTransport({
-        host:   'smtp.gmail.com',
-        port:   465,
-        secure: true,
-        auth:   { user: FROM_EMAIL, pass: GMAIL_PASS },
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: FROM_EMAIL, to: [to], subject, text, html }),
       })
-      await transporter.sendMail({ from: `"ZatendeStock" <${FROM_EMAIL}>`, to, subject, text, html })
-      return new Response(JSON.stringify({ ok: true, sent: true }), { headers: CORS })
+      const data = await res.json()
+      if (res.ok) return new Response(JSON.stringify({ ok: true, sent: true, id: data.id }), { headers: CORS })
+      console.error('Resend error:', data)
+      return new Response(JSON.stringify({ ok: false, sent: false, error: data.message || 'Resend error', previewHtml: html }), { headers: CORS })
     } catch (err) {
-      // Fall through to previewHtml — don't hard-fail
-      console.error('SMTP error:', err.message)
+      console.error('Resend fetch error:', err.message)
       return new Response(JSON.stringify({ ok: false, sent: false, error: err.message, previewHtml: html }), { headers: CORS })
     }
   }
 
-  // ── No SMTP configured — return preview so admin can copy ──
+  // ── No key configured — return preview so admin can copy ──
   return new Response(JSON.stringify({
     ok: true, sent: false,
-    warning: 'GMAIL_APP_PASSWORD não configurada. Configure em Netlify → Site Settings → Environment Variables.',
+    warning: 'RESEND_API_KEY não configurada. Acesse resend.com → crie conta grátis → API Keys → adicione em Netlify → Env vars.',
     previewHtml: html,
   }), { headers: CORS })
 }
