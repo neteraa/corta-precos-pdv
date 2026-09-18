@@ -683,11 +683,49 @@ Topbar: nome da loja via usePrinter() + storeId visivel para confirmar.
 - [x] Fix duplicate key 'border' em Fornecedor.jsx Btn component ✅
 - [x] Servidor local com base JSON + auth SHA-256 + scripts iniciar.bat/sh ✅
 
+### Features implementadas (sessao 2026-09-16)
+- [x] Auth separada para distribuidores: forn-auth.js + forn-admin.js + forn-check.js ✅ (commit 67a9d81)
+- [x] MasterPainel: tabs Visão Geral | Mercados | Distribuidores ✅ (commit 67a9d81)
+- [x] Fornecedor.jsx: senhas removidas do bundle JS — auth 100% server-side ✅ (commit 67a9d81)
+- [x] Guia.jsx: credenciais demo removidas do bundle ✅ (commit 67a9d81)
+- [x] /scan agora exige auth (tinha upsertProduct aberto) ✅ (commit 67a9d81)
+- [x] usePrinter event bus: storeName no menu atualiza instantaneamente ✅ (commit 67a9d81)
+- [x] send-email.js: nodemailer + Gmail SMTP, template HTML profissional ✅ (commit 0f5c22a)
+- [x] Campo email em AddMarketModal + AddDistModal — envia boas-vindas ao criar ✅ (commit 0f5c22a)
+- [x] Botão reenviar acesso (📧) em MarketCard e DistCard — reset senha + envia email ✅ (commit 0f5c22a)
+
+### Arquitetura separada: Mercado ≠ Distribuidor (v7.0)
+- **Mercados** (PDV): auth via `auth.js` → Netlify Blob `zs-markets`
+- **Distribuidores**: auth via `forn-auth.js` → Netlify Blob `zs-forn-auth`
+- **Admin (nós)**: MasterPainel `/painel` com ZS_MASTER_KEY — gerencia ambos
+- `forn-auth.js` faz seed automático do "megatudo" na primeira chamada (sem perda de dados)
+- Senha `mega2024` agora está hasheada no Blob — mudar via Distribuidores tab do MasterPainel
+
+### Email (send-email.js)
+- POST `/api/send-email?mk=...` — protegido por ZS_MASTER_KEY
+- Requer env var: `GMAIL_APP_PASSWORD` (Netlify → Site Settings → Environment Variables)
+- Remetente: `zatendeapi@gmail.com`
+- Número suporte WhatsApp: env var `SUPPORT_WHATSAPP` (ex: `5511999990000`)
+- Sem GMAIL_APP_PASSWORD: retorna `previewHtml` para cópia manual, nunca bloqueia
+
+### Env vars necessárias no Netlify
+- `ZS_MASTER_KEY` — chave do MasterPainel (setada)
+- `GMAIL_APP_PASSWORD` — App Password do Gmail (PENDENTE — ver abaixo)
+- `SUPPORT_WHATSAPP` — número WhatsApp suporte (opcional, padrão `5500000000000`)
+
+### Como configurar GMAIL_APP_PASSWORD
+1. Acesse myaccount.google.com → Segurança → Verificação em duas etapas (ativar)
+2. Pesquise "Senhas de app" → selecione "Outro" → digitar "ZatendeStock"
+3. Copie a senha gerada (16 chars)
+4. Netlify → zatendestock → Site configuration → Environment variables → Add: GMAIL_APP_PASSWORD = ...
+5. Trigger redeploy (Deploys → Trigger deploy)
+
 ### Features pendentes (proxima sessao)
 - [ ] Scanner mobile: promoGroup (seletor) no form de novo produto
 - [ ] Filtro por data/validade no Estoque (deixado pra depois pelo cliente)
 - [ ] Backup automático diário (export JSON com timestamp)
 - [ ] Relatório de fechamento de caixa por operador/turno
+- [ ] Página de preços/planos pública para vendas (landing page)
 
 ### Preço Atacado — Arquitetura (v6.2 — 2026-09)
 - Campos no produto: `priceAtacado` (Number) + `qtdAtacado` (Number, inteiro)
