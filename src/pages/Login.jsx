@@ -51,10 +51,18 @@ function Inp({ label, icon: Icon, right, topRight, ...props }) {
 }
 
 const FEATS = [
-  { icon:Bell,          color:'#fbbf24', text:'Alertas antes do estoque acabar'   },
-  { icon:MessageCircle, color:'#4ade80', text:'Pedidos automáticos via WhatsApp'  },
-  { icon:BarChart3,     color:'#818cf8', text:'Relatórios e vendas em tempo real' },
-  { icon:Wifi,          color:'#38bdf8', text:'Funciona 24h no celular, sem app'  },
+  { icon:Bell,          color:'#fbbf24', text:'Alertas antes do estoque acabar'         },
+  { icon:MessageCircle, color:'#4ade80', text:'Bot de vendas e promoções via WhatsApp'   },
+  { icon:BarChart3,     color:'#818cf8', text:'Relatórios e caixa do dia em tempo real'  },
+  { icon:Wifi,          color:'#38bdf8', text:'Funciona 24h no celular, sem instalar app'},
+]
+
+const NICHES_FOR = [
+  { emoji:'🏪', label:'Mercado'    },
+  { emoji:'🥖', label:'Padaria'    },
+  { emoji:'🥩', label:'Açougue'   },
+  { emoji:'🍽️', label:'Restaurante'},
+  { emoji:'🚚', label:'Distribuid.'},
 ]
 
 function LeftPanel() {
@@ -67,7 +75,14 @@ function LeftPanel() {
         <ZatendeStokLogo variant="full" />
         <div style={{ marginTop:40 }}>
           <div style={{ color:'rgba(255,255,255,.45)', fontSize:11, fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', marginBottom:10 }}>Por que nos escolher</div>
-          <h2 style={{ color:'#fff', fontSize:27, fontWeight:900, lineHeight:1.25, marginBottom:28 }}>Chega de falta<br/>no mercado.</h2>
+          <h2 style={{ color:'#fff', fontSize:27, fontWeight:900, lineHeight:1.25, marginBottom:8 }}>Gestão pra quem<br/>vende de verdade.</h2>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:28 }}>
+            {NICHES_FOR.map(n => (
+              <span key={n.label} style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'3px 10px', background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.12)', borderRadius:999, fontSize:11, fontWeight:700, color:'rgba(255,255,255,.65)' }}>
+                {n.emoji} {n.label}
+              </span>
+            ))}
+          </div>
           <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
             {FEATS.map(({ icon:Icon, color, text }) => (
               <div key={text} style={{ display:'flex', alignItems:'center', gap:14 }}>
@@ -119,19 +134,61 @@ function RecoverPanel({ username, onClose }) {
   )
 }
 
+/* ── Configs de nicho ──────────────────────────────────────── */
+const NICHE_CFG = [
+  {
+    id:'mercado',     tipo:'mercado',
+    emoji:'🏪', label:'Mercado / Loja',
+    color:B.blue, bg:'#eef2ff', brd:'#c7d2fe',
+    desc:'Estoque FIFO, PDV, validade, fiado e pedidos ao distribuidor',
+    nomePlaceholder:'Ex: Mercado Central',   nomeLabel:'Nome do mercado',
+  },
+  {
+    id:'padaria',     tipo:'mercado',
+    emoji:'🥖', label:'Padaria / Confeitaria',
+    color:'#d97706', bg:'#fffbeb', brd:'#fde68a',
+    desc:'Controle de insumos, PDV no balcão e campanhas via WhatsApp',
+    nomePlaceholder:'Ex: Padaria São José',  nomeLabel:'Nome da padaria',
+  },
+  {
+    id:'açougue',     tipo:'mercado',
+    emoji:'🥩', label:'Açougue / Frigorífico',
+    color:'#dc2626', bg:'#fef2f2', brd:'#fecaca',
+    desc:'Validade por lote, PDV por peso e controle de cortes',
+    nomePlaceholder:'Ex: Açougue do Zé',    nomeLabel:'Nome do açougue',
+  },
+  {
+    id:'restaurante', tipo:'mercado',
+    emoji:'🍽️', label:'Restaurante / Lanchonete',
+    color:'#7c3aed', bg:'#f5f3ff', brd:'#ddd6fe',
+    desc:'Estoque de insumos, caixa do dia e captação de clientes',
+    nomePlaceholder:'Ex: Restaurante Bela Vista', nomeLabel:'Nome do restaurante',
+  },
+  {
+    id:'distribuidor', tipo:'distribuidor',
+    emoji:'🚚', label:'Distribuidora / Atacado',
+    color:B.green, bg:'#f0fdf4', brd:'#bbf7d0',
+    desc:'Portal de ofertas, gestão de pedidos e conexão com mercados',
+    nomePlaceholder:'Ex: Distribuidora São Paulo', nomeLabel:'Nome da distribuidora',
+  },
+]
+
 /* ── Cadastro multi-step COM seleção de tipo ─────────────── */
 function CadastroFlow() {
-  const [tipo,   setTipo]   = useState(null)   // null | 'mercado' | 'distribuidor'
+  const [niche,  setNiche]  = useState(null)   // null | id de NICHE_CFG
   const [step,   setStep]   = useState(1)
   const [form,   setForm]   = useState({ nome:'', empresa:'', cidade:'', telefone:'', email:'' })
   const [sent,   setSent]   = useState(false)
   const [errs,   setErrs]   = useState({})
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
+  const cfg  = NICHE_CFG.find(n => n.id === niche)
+  const tipo = cfg?.tipo || 'mercado'
+
   const validate = () => {
     const e = {}
     if (!form.nome.trim())     e.nome     = 'Informe seu nome'
-    if (!form.empresa.trim())  e.empresa  = tipo === 'mercado' ? 'Informe o nome do mercado' : 'Informe o nome da distribuidora'
+    if (!form.empresa.trim())  e.empresa  = cfg ? `Informe o ${cfg.nomeLabel.toLowerCase()}` : 'Informe o nome do negócio'
     if (!form.cidade.trim())   e.cidade   = 'Informe a cidade'
     if (!form.telefone.trim()) e.telefone = 'Informe o WhatsApp'
     setErrs(e); return Object.keys(e).length === 0
@@ -143,43 +200,53 @@ function CadastroFlow() {
       await fetch('/api/request-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, mercado: form.empresa, tipo }),
+        body: JSON.stringify({ ...form, mercado: form.empresa, tipo, niche }),
       })
     } catch {}
-    const tipoLabel = tipo === 'distribuidor' ? 'distribuidora' : 'mercado'
-    openWpp(`🛒 *Solicitação de cadastro — ZatendeStok*\n\n👤 Nome: *${form.nome}*\n🏪 ${tipoLabel}: *${form.empresa}*\n📍 Cidade: *${form.cidade}*\n📱 WhatsApp: *${form.telefone}*\n🏷 Tipo: *${tipo === 'distribuidor' ? 'Distribuidora/Atacado' : 'Mercado/Loja'}*\n\nQuero começar a usar o ZatendeStok! 🚀`)
+    openWpp(`🛒 *Solicitação de cadastro — ZatendeStok*\n\n👤 Nome: *${form.nome}*\n🏪 ${cfg?.nomeLabel||'Negócio'}: *${form.empresa}*\n📍 Cidade: *${form.cidade}*\n📱 WhatsApp: *${form.telefone}*\n🏷 Tipo: *${cfg?.label||'Negócio'}*\n\nQuero começar a usar o ZatendeStok! 🚀`)
   }
 
   /* Passo 0 — escolha do tipo */
-  if (!tipo) return (
+  if (!niche) return (
     <div style={{ animation:'fadeUp .25s ease' }}>
-      <div style={{ marginBottom:24 }}>
-        <h1 style={{ fontSize:22, fontWeight:900, color:B.text, marginBottom:4 }}>O que você quer cadastrar?</h1>
-        <p style={{ color:B.muted, fontSize:14 }}>Escolha o tipo de negócio para continuar</p>
+      <div style={{ marginBottom:22 }}>
+        <h1 style={{ fontSize:21, fontWeight:900, color:B.text, marginBottom:4 }}>O que você quer cadastrar?</h1>
+        <p style={{ color:B.muted, fontSize:13 }}>Escolha o tipo de negócio para continuar</p>
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-        <button className="tipo-card" onClick={() => setTipo('mercado')}
-          style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12, padding:'24px 16px', border:`2px solid ${B.border}`, borderRadius:16, background:'#fff', boxShadow:'0 2px 8px rgba(0,0,0,.06)' }}>
-          <div style={{ width:52, height:52, borderRadius:14, background:'#eef2ff', border:'1.5px solid #c7d2fe', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <Store size={26} color={B.blue} />
-          </div>
-          <div style={{ textAlign:'center' }}>
-            <div style={{ fontWeight:800, fontSize:15, color:B.text, marginBottom:4 }}>Mercado / Loja</div>
-            <div style={{ fontSize:12, color:B.muted, lineHeight:1.5 }}>Gestão de estoque, PDV, validade e pedidos ao distribuidor</div>
-          </div>
-        </button>
-        <button className="tipo-card" onClick={() => setTipo('distribuidor')}
-          style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12, padding:'24px 16px', border:`2px solid ${B.border}`, borderRadius:16, background:'#fff', boxShadow:'0 2px 8px rgba(0,0,0,.06)' }}>
-          <div style={{ width:52, height:52, borderRadius:14, background:'#f0fdf4', border:'1.5px solid #bbf7d0', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <Truck size={26} color={B.green} />
-          </div>
-          <div style={{ textAlign:'center' }}>
-            <div style={{ fontWeight:800, fontSize:15, color:B.text, marginBottom:4 }}>Distribuidora</div>
-            <div style={{ fontSize:12, color:B.muted, lineHeight:1.5 }}>Portal de ofertas, gestão de pedidos e conexão com mercados</div>
-          </div>
-        </button>
+
+      {/* 3 colunas: mercado, padaria, açougue */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:10 }}>
+        {NICHE_CFG.slice(0,3).map(n => (
+          <button key={n.id} className="tipo-card" onClick={() => setNiche(n.id)}
+            style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10, padding:'18px 10px', border:`2px solid ${B.border}`, borderRadius:14, background:'#fff', boxShadow:'0 2px 8px rgba(0,0,0,.05)' }}>
+            <div style={{ width:46, height:46, borderRadius:12, background:n.bg, border:`1.5px solid ${n.brd}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>
+              {n.emoji}
+            </div>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontWeight:800, fontSize:12, color:B.text, lineHeight:1.3 }}>{n.label}</div>
+              <div style={{ fontSize:10.5, color:B.muted, lineHeight:1.4, marginTop:3 }}>{n.desc}</div>
+            </div>
+          </button>
+        ))}
       </div>
-      <div style={{ marginTop:16, padding:'12px 14px', background:'#f8fafc', border:`1px solid ${B.border}`, borderRadius:12 }}>
+
+      {/* 2 colunas: restaurante, distribuidora */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+        {NICHE_CFG.slice(3).map(n => (
+          <button key={n.id} className="tipo-card" onClick={() => setNiche(n.id)}
+            style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10, padding:'18px 16px', border:`2px solid ${B.border}`, borderRadius:14, background:'#fff', boxShadow:'0 2px 8px rgba(0,0,0,.05)' }}>
+            <div style={{ width:46, height:46, borderRadius:12, background:n.bg, border:`1.5px solid ${n.brd}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>
+              {n.emoji}
+            </div>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontWeight:800, fontSize:13, color:B.text, marginBottom:3 }}>{n.label}</div>
+              <div style={{ fontSize:11, color:B.muted, lineHeight:1.4 }}>{n.desc}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <div style={{ marginTop:14, padding:'10px 14px', background:'#f8fafc', border:`1px solid ${B.border}`, borderRadius:12 }}>
         <p style={{ color:B.muted, fontSize:12, textAlign:'center' }}>Acesso criado em até 2 horas · Sem contrato · Suporte via WhatsApp</p>
       </div>
     </div>
@@ -206,17 +273,15 @@ function CadastroFlow() {
   )
 
   /* Badge de tipo selecionado */
-  const tipoBadge = (
+  const tipoBadge = cfg ? (
     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
-      <div style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 12px', background: tipo==='mercado' ? '#eef2ff' : '#f0fdf4', border:`1px solid ${tipo==='mercado'?'#c7d2fe':'#bbf7d0'}`, borderRadius:999 }}>
-        {tipo==='mercado' ? <Store size={13} color={B.blue} /> : <Truck size={13} color={B.green} />}
-        <span style={{ fontSize:12, fontWeight:700, color: tipo==='mercado'?B.blue:B.green }}>
-          {tipo==='mercado' ? 'Mercado / Loja' : 'Distribuidora / Atacado'}
-        </span>
+      <div style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 12px', background:cfg.bg, border:`1px solid ${cfg.brd}`, borderRadius:999 }}>
+        <span style={{ fontSize:14 }}>{cfg.emoji}</span>
+        <span style={{ fontSize:12, fontWeight:700, color:cfg.color }}>{cfg.label}</span>
       </div>
-      <button onClick={() => { setTipo(null); setStep(1) }} style={{ background:'none', border:'none', cursor:'pointer', color:B.muted, fontSize:12, fontWeight:600 }}>trocar</button>
+      <button onClick={() => { setNiche(null); setStep(1) }} style={{ background:'none', border:'none', cursor:'pointer', color:B.muted, fontSize:12, fontWeight:600 }}>trocar</button>
     </div>
-  )
+  ) : null
 
   /* Steps bar */
   const stepsBar = (
@@ -244,11 +309,11 @@ function CadastroFlow() {
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <p style={{ color:B.muted, fontSize:13 }}>Preencha abaixo — nossa equipe cria seu acesso em até 2 horas.</p>
           {[
-            { key:'nome',     icon:User,        label:'Seu nome completo', placeholder:'Ex: João Silva'      },
-            { key:'empresa',  icon:tipo==='mercado'?Store:Truck, label: tipo==='mercado'?'Nome do mercado':'Nome da distribuidora', placeholder: tipo==='mercado'?'Ex: Mercado Central':'Ex: Distribuidora São Paulo' },
-            { key:'cidade',   icon:MapPin,      label:'Cidade / Estado',   placeholder:'Ex: São Paulo – SP'  },
-            { key:'telefone', icon:Phone,       label:'WhatsApp',          placeholder:'(11) 99999-0000'     },
-            { key:'email',    icon:null,        label:'Email (opcional)',   placeholder:'seu@email.com'       },
+            { key:'nome',     icon:User,                label:'Seu nome completo',          placeholder:'Ex: João Silva'               },
+            { key:'empresa',  icon:tipo==='distribuidor'?Truck:Store, label:cfg?.nomeLabel||'Nome do negócio', placeholder:cfg?.nomePlaceholder||'Nome do negócio' },
+            { key:'cidade',   icon:MapPin,              label:'Cidade / Estado',             placeholder:'Ex: São Paulo – SP'           },
+            { key:'telefone', icon:Phone,               label:'WhatsApp',                    placeholder:'(11) 99999-0000'              },
+            { key:'email',    icon:null,                label:'Email (opcional)',             placeholder:'seu@email.com'                },
           ].map(f => (
             <div key={f.key}>
               <Inp label={f.label} icon={f.icon} value={form[f.key]} onChange={set(f.key)} placeholder={f.placeholder} type={f.key==='email'?'email':'text'} />
@@ -266,7 +331,7 @@ function CadastroFlow() {
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <p style={{ color:B.muted, fontSize:13 }}>Confira os dados e solicite o cadastro.</p>
           <div style={{ border:`1px solid ${B.border}`, borderRadius:12, overflow:'hidden' }}>
-            {[['Nome',form.nome],[tipo==='mercado'?'Mercado':'Distribuidora',form.empresa],['Cidade',form.cidade],['WhatsApp',form.telefone],form.email?['Email',form.email]:null].filter(Boolean).map(([k,v]) => (
+            {[['Nome',form.nome],[cfg?.nomeLabel||'Negócio',form.empresa],['Cidade',form.cidade],['WhatsApp',form.telefone],form.email?['Email',form.email]:null].filter(Boolean).map(([k,v]) => (
               <div key={k} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'11px 16px', borderBottom:`1px solid ${B.border}`, background:'#fff' }}>
                 <span style={{ color:B.muted, fontSize:13 }}>{k}</span>
                 <span style={{ color:B.text, fontWeight:700, fontSize:14 }}>{v}</span>
@@ -369,7 +434,7 @@ export default function Login() {
                   <>
                     <div style={{ marginBottom:24 }}>
                       <h1 style={{ fontSize:22, fontWeight:900, color:B.text, marginBottom:4 }}>Bem-vindo de volta</h1>
-                      <p style={{ color:B.muted, fontSize:14 }}>Funciona para mercados e distribuidoras</p>
+                      <p style={{ color:B.muted, fontSize:14 }}>Mercados, padarias, açougues, restaurantes e distribuidoras</p>
                     </div>
                     <form onSubmit={submit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
                       <Inp label="Usuário" icon={User} value={user} onChange={e => { setUser(e.target.value); setErr('') }} placeholder="seu usuário" autoComplete="username" />
