@@ -50,7 +50,7 @@ async function sendText(phone, message) {
   const res = await fetch(`${EVO_URL()}/message/sendText/${INSTANCE()}`, {
     method:  'POST',
     headers: { 'apikey': EVO_KEY(), 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ number: phone, textMessage: { text: message } }),
+    body:    JSON.stringify({ number: phone, text: message }),
   })
   const data = await res.json().catch(() => ({}))
   return { ok: res.ok, status: res.status, data }
