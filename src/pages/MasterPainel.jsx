@@ -783,6 +783,13 @@ export default function MasterPainel() {
   const [addingSearchStatus, setAddingSearchStatus] = useState(null) // 'validating' | 'adding' | null
   const [showCityDrop,       setShowCityDrop]       = useState(false)
 
+  const [campaigns,         setCampaigns]         = useState([])
+  const [campsLoading,      setCampsLoading]      = useState(false)
+  const [prospLeads,        setProspLeads]        = useState([])
+  const [prospLeadsLoading, setProspLeadsLoading] = useState(false)
+  const [leadsView,         setLeadsView]         = useState('pipeline') // 'pipeline' | 'list'
+  const [sendCountdown,     setSendCountdown]     = useState(null)       // segundos restantes no delay
+
   const [approving,    setApproving]     = useState(null) // id being processed
 
   const load = useCallback(async (key = mk) => {
@@ -930,6 +937,25 @@ export default function MasterPainel() {
   }, [queue, mk, queueApi, loadQueue])
 
   // Disparo com delay anti-ban real (45-90s) e template rotativo
+  const loadProspLeads = useCallback(async () => {
+    setProspLeadsLoading(true)
+    try {
+      const res = await fetch(`/api/wa-leads?mk=${encodeURIComponent(mk)}`, { headers: { 'x-master-key': mk } })
+      const d = await res.json()
+      setProspLeads(d.leads || [])
+    } catch { setProspLeads([]) }
+    finally { setProspLeadsLoading(false) }
+  }, [mk])
+
+  const loadCampaigns = useCallback(async () => {
+    setCampsLoading(true)
+    try {
+      const d = await queueApi({ action: 'get-campaigns' })
+      setCampaigns(d.campaigns || [])
+    } catch { setCampaigns([]) }
+    finally { setCampsLoading(false) }
+  }, [queueApi])
+
   const startQueueSend = useCallback(async () => {
     const pending = queue.filter(c => c.status === 'pending')
     if (!pending.length) return
@@ -944,6 +970,9 @@ export default function MasterPainel() {
     stopRef.current = false
     setSendProgress({ current: 0, total: canSend })
     setSendLog([])
+    setSendCountdown(null)
+    const startedAt = new Date().toISOString()
+    let totalSent = 0, totalFailed = 0
 
     const baseTemplateIdx = Math.floor(Math.random() * 6)
 
@@ -951,6 +980,7 @@ export default function MasterPainel() {
       if (stopRef.current) break
       const contact = pending[i]
 
+      setSendProgress(prev => ({ ...prev, current: i, sending: contact.name || contact.phone }))
       try {
         const res = await fetch('/api/wa-prospect', {
           method: 'POST',
@@ -960,26 +990,38 @@ export default function MasterPainel() {
         const data = await res.json()
         const success = data.sent > 0
         await queueApi({ action: 'update', id: contact.id, status: success ? 'sent' : 'failed', error: success ? null : (data.results?.[0]?.error || 'falhou') })
-        setSendLog(prev => [...prev, { phone: contact.phone, name: contact.name, success }])
+        setSendLog(prev => [...prev, { phone: contact.phone, name: contact.name, success, ts: new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) }])
+        if (success) totalSent++; else totalFailed++
       } catch (e) {
         await queueApi({ action: 'update', id: contact.id, status: 'failed', error: e.message })
-        setSendLog(prev => [...prev, { phone: contact.phone, name: contact.name, success: false }])
+        setSendLog(prev => [...prev, { phone: contact.phone, name: contact.name, success: false, ts: new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) }])
+        totalFailed++
       }
 
-      setSendProgress({ current: i + 1, total: canSend })
+      setSendProgress(prev => ({ ...prev, current: i + 1, sending: null }))
 
       if (i < canSend - 1 && !stopRef.current) {
-        // Anti-ban: 45-90s entre mensagens (recomendação pra cold outreach no WA)
         const waitMs = 45000 + Math.floor(Math.random() * 45000)
-        setSendProgress(prev => ({ ...prev, nextIn: Math.round(waitMs / 1000) }))
-        await new Promise(r => setTimeout(r, waitMs))
-        setSendProgress(prev => prev ? { ...prev, nextIn: null } : null)
+        const endTime = Date.now() + waitMs
+        // Countdown em tempo real
+        await new Promise(resolve => {
+          const tick = () => {
+            const left = Math.max(0, Math.round((endTime - Date.now()) / 1000))
+            setSendCountdown(left)
+            if (left <= 0 || stopRef.current) { setSendCountdown(null); resolve() }
+            else setTimeout(tick, 1000)
+          }
+          tick()
+        })
       }
     }
 
+    setSendCountdown(null)
     setSendProgress(null)
-    await loadQueue()
-  }, [queue, queueStats, mk, queueApi, loadQueue])
+    // Salvar histórico da campanha
+    await queueApi({ action: 'save-campaign', sent: totalSent, failed: totalFailed, startedAt, endedAt: new Date().toISOString() })
+    await Promise.all([loadQueue(), loadCampaigns()])
+  }, [queue, queueStats, mk, queueApi, loadQueue, loadCampaigns])
 
   // ── Google Places Search ───────────────────────────────────
   const checkGoogleKey = useCallback(async () => {
@@ -992,7 +1034,9 @@ export default function MasterPainel() {
 
   useEffect(() => {
     if (tab === 'prospect' && prospInnerTab === 'search' && mk && googleKey === null) checkGoogleKey()
-  }, [tab, prospInnerTab, mk, googleKey, checkGoogleKey])
+    if (tab === 'prospect' && prospInnerTab === 'leads'  && mk) loadProspLeads()
+    if (tab === 'prospect' && prospInnerTab === 'queue'  && mk) loadCampaigns()
+  }, [tab, prospInnerTab, mk, googleKey, checkGoogleKey, loadProspLeads, loadCampaigns])
 
   const runSearch = useCallback(async (pageToken = null) => {
     setSearchLoading(true)
@@ -1703,6 +1747,7 @@ export default function MasterPainel() {
               { id:'search',  label:'🔍 Buscar Automático' },
               { id:'capture', label:'➕ Adicionar' },
               { id:'queue',   label:`📋 Fila (${queueStats.pending||0})` },
+              { id:'leads',   label:`🎯 Leads (${prospLeads.length||0})` },
             ].map(t => (
               <button key={t.id} onClick={() => setProspInnerTab(t.id)}
                 className={`px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${prospInnerTab===t.id ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
@@ -2009,33 +2054,98 @@ export default function MasterPainel() {
                 </div>
               ) : (
                 <div className="bg-gray-900 rounded-2xl border border-orange-500/30 p-5 space-y-3">
+                  {/* Header */}
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-bold text-orange-400 flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {sendProgress.nextIn
-                        ? `⏱ Aguardando ${sendProgress.nextIn}s (anti-ban)...`
-                        : `Zara enviando... ${sendProgress.current}/${sendProgress.total}`}
-                    </p>
-                    <button onClick={() => { stopRef.current = true }} className="text-xs text-red-400 hover:text-red-300 font-bold px-3 py-1.5 bg-red-500/10 rounded-lg">
+                    <div>
+                      <p className="text-sm font-black text-orange-400 flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {sendCountdown != null
+                          ? `⏱ Anti-ban: aguardando ${sendCountdown}s...`
+                          : sendProgress.sending
+                          ? `📤 Enviando para ${sendProgress.sending}...`
+                          : `Zara disparando — ${sendProgress.current}/${sendProgress.total}`}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        ✅ {sendLog.filter(l=>l.success).length} enviadas · ❌ {sendLog.filter(l=>!l.success).length} falhas · {sendProgress.total - sendProgress.current} restantes
+                      </p>
+                    </div>
+                    <button onClick={() => { stopRef.current = true; setSendCountdown(null) }}
+                      className="text-xs text-red-400 hover:text-red-300 font-bold px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors border border-red-500/20">
                       ⏹ Parar
                     </button>
                   </div>
-                  <div className="w-full bg-gray-800 rounded-full h-2">
-                    <div className="h-2 rounded-full bg-orange-500 transition-all"
+
+                  {/* Barra de progresso */}
+                  <div className="w-full bg-gray-800 rounded-full h-2.5">
+                    <div className="h-2.5 rounded-full bg-gradient-to-r from-orange-600 to-orange-400 transition-all duration-500"
                       style={{ width: `${(sendProgress.current/sendProgress.total)*100}%` }} />
                   </div>
-                  {sendLog.length > 0 && (
-                    <div className="max-h-32 overflow-y-auto space-y-1 mt-2">
-                      {sendLog.slice(-5).reverse().map((l,i) => (
-                        <div key={i} className={`flex items-center gap-2 text-xs ${l.success?'text-green-400':'text-red-400'}`}>
-                          {l.success ? <CheckCircle2 className="w-3 h-3 flex-shrink-0"/> : <XCircle className="w-3 h-3 flex-shrink-0"/>}
-                          <span className="font-mono">+{l.phone.slice(0,2)} ({l.phone.slice(2,4)}) {l.phone.slice(4,9)}-{l.phone.slice(9)}</span>
-                          {l.name && <span className="text-gray-500 ml-1">— {l.name}</span>}
-                        </div>
-                      ))}
+
+                  {/* Countdown visual */}
+                  {sendCountdown != null && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 bg-gray-800 rounded-full h-1.5">
+                        <div className="h-1.5 rounded-full bg-yellow-500/60 transition-all duration-1000"
+                          style={{ width: `${(sendCountdown / 90) * 100}%` }} />
+                      </div>
+                      <span className="text-xs text-yellow-500 font-mono font-bold w-12 text-right">{sendCountdown}s</span>
                     </div>
                   )}
-                  <p className="text-xs text-gray-600">Não feche o navegador. Cada mensagem usa um texto diferente.</p>
+
+                  {/* Log completo de envios */}
+                  {sendLog.length > 0 && (
+                    <div className="bg-gray-950 rounded-xl border border-gray-800 max-h-48 overflow-y-auto">
+                      <div className="p-3 space-y-1.5">
+                        {[...sendLog].reverse().map((l, i) => (
+                          <div key={i} className={`flex items-center gap-2 text-xs ${l.success ? 'text-green-400' : 'text-red-400'}`}>
+                            {l.success
+                              ? <CheckCircle2 className="w-3 h-3 flex-shrink-0"/>
+                              : <XCircle className="w-3 h-3 flex-shrink-0"/>}
+                            <span className="font-mono text-gray-500">{l.ts}</span>
+                            <span className="font-mono">+{l.phone.slice(0,2)} ({l.phone.slice(2,4)}) {l.phone.slice(4,9)}-{l.phone.slice(9)}</span>
+                            {l.name && <span className="text-gray-600 truncate">— {l.name}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-600 text-center">🔒 Não feche esta aba. Templates diferentes em cada envio.</p>
+                </div>
+              )}
+
+              {/* Histórico de campanhas */}
+              {!sendProgress && campaigns.length > 0 && (
+                <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-wider">📊 Histórico de campanhas</p>
+                    <button onClick={loadCampaigns} className="text-xs text-gray-600 hover:text-gray-400">
+                      <RefreshCw className="w-3 h-3"/>
+                    </button>
+                  </div>
+                  <div className="divide-y divide-gray-800/60 max-h-48 overflow-y-auto">
+                    {campaigns.slice(0, 20).map(c => {
+                      const start = c.startedAt ? new Date(c.startedAt) : null
+                      const end   = c.endedAt   ? new Date(c.endedAt)   : null
+                      const dur   = start && end ? Math.round((end - start) / 60000) : null
+                      const total = (c.sent || 0) + (c.failed || 0)
+                      return (
+                        <div key={c.id} className="px-4 py-2.5 flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-gray-400">
+                              {start ? start.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—'}
+                            </p>
+                            <p className="text-xs text-gray-600">{dur != null ? `${dur} min · ${total} msgs` : `${total} msgs`}</p>
+                          </div>
+                          <span className="text-xs font-bold text-green-400">✅ {c.sent}</span>
+                          {c.failed > 0 && <span className="text-xs font-bold text-red-400">❌ {c.failed}</span>}
+                          <div className="w-16 bg-gray-800 rounded-full h-1.5">
+                            <div className="h-1.5 rounded-full bg-green-500"
+                              style={{ width: total > 0 ? `${(c.sent/total)*100}%` : '0%' }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -2083,6 +2193,149 @@ export default function MasterPainel() {
                                 <a href={waLink} target="_blank" rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 text-xs font-bold">
                                   <MessageCircle className="w-3 h-3" /> WA
+                                </a>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── SUB: LEADS PIPELINE ────────────────────────────── */}
+          {prospInnerTab === 'leads' && (
+            <div className="space-y-4">
+              {/* Header + view toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-black text-white">🎯 Pipeline de Leads</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Leads que responderam à Zara — atualizado em tempo real</p>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <button onClick={loadProspLeads} disabled={prospLeadsLoading}
+                    className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors">
+                    <RefreshCw className={`w-4 h-4 ${prospLeadsLoading ? 'animate-spin' : ''}`}/>
+                  </button>
+                  {['pipeline','list'].map(v => (
+                    <button key={v} onClick={() => setLeadsView(v)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${leadsView===v ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                      {v === 'pipeline' ? '⬛ Pipeline' : '☰ Lista'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {leadsLoading ? (
+                <div className="text-center py-16 text-gray-600"><Loader2 className="w-6 h-6 mx-auto animate-spin mb-2"/><p className="text-sm">Carregando leads...</p></div>
+              ) : prospLeads.length === 0 ? (
+                <div className="text-center py-16 text-gray-600 bg-gray-900 rounded-2xl border border-gray-800">
+                  <Users className="w-10 h-10 mx-auto mb-3 opacity-30"/>
+                  <p className="font-semibold">Nenhum lead ainda</p>
+                  <p className="text-sm mt-1 text-gray-700">Quando um mercado responder à Zara, aparece aqui automaticamente</p>
+                </div>
+              ) : leadsView === 'pipeline' ? (
+                /* ── PIPELINE VIEW ── */
+                <div className="space-y-3">
+                  {/* Métricas rápidas */}
+                  {(() => {
+                    const byStage = { novo:0, curioso:0, interessado:0, demo:0, fechado:0 }
+                    prospLeads.forEach(l => { const s = l.stage || 'novo'; byStage[s] = (byStage[s]||0)+1 })
+                    const stages = [
+                      { id:'novo',        label:'Novo',        color:'text-gray-400',   bg:'bg-gray-700/40 border-gray-700',    dot:'bg-gray-500' },
+                      { id:'curioso',     label:'Curioso',     color:'text-blue-400',   bg:'bg-blue-500/10 border-blue-500/20', dot:'bg-blue-500' },
+                      { id:'interessado', label:'Interessado', color:'text-yellow-400', bg:'bg-yellow-500/10 border-yellow-500/20', dot:'bg-yellow-500' },
+                      { id:'demo',        label:'Demo',        color:'text-orange-400', bg:'bg-orange-500/10 border-orange-500/20', dot:'bg-orange-500' },
+                      { id:'fechado',     label:'Fechado 🎉',  color:'text-green-400',  bg:'bg-green-500/10 border-green-500/20', dot:'bg-green-500' },
+                    ]
+                    return (
+                      <>
+                        <div className="grid grid-cols-5 gap-2">
+                          {stages.map(s => (
+                            <div key={s.id} className={`rounded-xl border p-3 text-center ${s.bg}`}>
+                              <p className={`text-2xl font-black ${s.color}`}>{byStage[s.id]||0}</p>
+                              <p className={`text-[10px] font-bold mt-0.5 ${s.color}`}>{s.label}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {stages.map(s => {
+                          const stagLeads = prospLeads.filter(l => (l.stage||'novo') === s.id)
+                          if (!stagLeads.length) return null
+                          return (
+                            <div key={s.id} className={`rounded-2xl border overflow-hidden ${s.bg}`}>
+                              <div className="px-4 py-2.5 flex items-center gap-2 border-b border-gray-800/40">
+                                <span className={`w-2 h-2 rounded-full ${s.dot}`}/>
+                                <span className={`text-xs font-black uppercase tracking-wider ${s.color}`}>{s.label}</span>
+                                <span className={`text-xs font-bold ml-auto ${s.color}`}>{stagLeads.length}</span>
+                              </div>
+                              <div className="divide-y divide-gray-800/30">
+                                {stagLeads.map(l => (
+                                  <div key={l.phone} className="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800/20">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-bold text-white truncate">{l.name || l.waName || '—'}</p>
+                                      <p className="text-xs text-gray-500 truncate">{l.market || ''}{l.city ? ` · ${l.city}` : ''}</p>
+                                    </div>
+                                    <span className="text-xs text-gray-600 font-mono whitespace-nowrap">
+                                      {l.updatedAt ? new Date(l.updatedAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}
+                                    </span>
+                                    <a href={`https://wa.me/${l.phone}`} target="_blank" rel="noopener noreferrer"
+                                      className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 text-xs font-bold transition-colors">
+                                      <MessageCircle className="w-3 h-3"/> Responder
+                                    </a>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </>
+                    )
+                  })()}
+                </div>
+              ) : (
+                /* ── LIST VIEW ── */
+                <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                  <div className="overflow-x-auto max-h-[560px] overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-gray-900 border-b border-gray-800">
+                        <tr>
+                          <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider">Nome / Mercado</th>
+                          <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider hidden sm:table-cell">Cidade</th>
+                          <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider">Estágio</th>
+                          <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">Atualizado</th>
+                          <th className="px-4 py-3"/>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800/60">
+                        {prospLeads.map(l => {
+                          const stageMap = {
+                            novo:        { label:'Novo',        cls:'bg-gray-700/50 text-gray-400' },
+                            curioso:     { label:'Curioso',     cls:'bg-blue-500/20 text-blue-300' },
+                            interessado: { label:'Interessado', cls:'bg-yellow-500/20 text-yellow-300' },
+                            demo:        { label:'Demo',        cls:'bg-orange-500/20 text-orange-300' },
+                            fechado:     { label:'Fechado 🎉',  cls:'bg-green-500/20 text-green-300' },
+                          }
+                          const st = stageMap[l.stage] || stageMap.novo
+                          return (
+                            <tr key={l.phone} className="hover:bg-gray-800/30">
+                              <td className="px-4 py-3">
+                                <p className="font-bold text-white text-sm truncate">{l.name || l.waName || '—'}</p>
+                                {l.market && <p className="text-xs text-gray-500 truncate">{l.market}</p>}
+                              </td>
+                              <td className="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{l.city || '—'}</td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${st.cls}`}>{st.label}</span>
+                              </td>
+                              <td className="px-4 py-3 text-gray-600 text-xs hidden md:table-cell">
+                                {l.updatedAt ? new Date(l.updatedAt).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <a href={`https://wa.me/${l.phone}`} target="_blank" rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 text-xs font-bold">
+                                  <MessageCircle className="w-3 h-3"/> WA
                                 </a>
                               </td>
                             </tr>

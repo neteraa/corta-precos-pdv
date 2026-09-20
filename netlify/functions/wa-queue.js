@@ -128,6 +128,29 @@ export default async (req) => {
     return new Response(JSON.stringify({ ok: true, removed: before - queue.length, remaining: queue.length }), { headers: CORS })
   }
 
+  // ── SAVE-CAMPAIGN: salvar resumo de um disparo concluído ────────────────
+  if (action === 'save-campaign') {
+    const { sent = 0, failed = 0, startedAt, endedAt } = body
+    const CAMP_KEY = 'campaign-history'
+    let campaigns = []
+    try { const raw = await store().get(CAMP_KEY); campaigns = raw ? JSON.parse(raw) : [] } catch {}
+    campaigns.unshift({ id: uid(), sent, failed, startedAt, endedAt })
+    if (campaigns.length > 100) campaigns = campaigns.slice(0, 100)
+    await store().set(CAMP_KEY, JSON.stringify(campaigns))
+    return new Response(JSON.stringify({ ok: true }), { headers: CORS })
+  }
+
+  // ── GET-CAMPAIGNS: histórico de disparos ─────────────────────────────────
+  if (action === 'get-campaigns') {
+    try {
+      const raw = await store().get('campaign-history')
+      const campaigns = raw ? JSON.parse(raw) : []
+      return new Response(JSON.stringify({ ok: true, campaigns }), { headers: CORS })
+    } catch {
+      return new Response(JSON.stringify({ ok: true, campaigns: [] }), { headers: CORS })
+    }
+  }
+
   return new Response(JSON.stringify({ error: 'action inválida' }), { status: 400, headers: CORS })
 }
 
