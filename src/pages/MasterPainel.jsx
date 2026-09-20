@@ -6,6 +6,32 @@ import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 const MK_KEY  = 'zs_master_key'
 const BRL     = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
+// Cidades da região de Itapeva SP e entorno — para o combobox de busca
+const CITIES_LIST = [
+  // ── Microregião de Itapeva ─────────────────────────────────
+  'Itapeva SP', 'Capão Bonito SP', 'Guapiara SP', 'Buri SP', 'Apiaí SP',
+  'Itaberá SP', 'Taquarivaí SP', 'Ribeira SP', 'Nova Campina SP',
+  'Barão de Antonina SP', 'Coronel Macedo SP',
+  // ── Microregião de Ourinhos ────────────────────────────────
+  'Ourinhos SP', 'Piraju SP', 'Taquarituba SP', 'Salto Grande SP',
+  'Chavantes SP', 'Ribeirão do Sul SP', 'Sarutaiá SP',
+  'Santa Cruz do Rio Pardo SP', 'Bernardino de Campos SP',
+  // ── Microregião de Avaré ───────────────────────────────────
+  'Avaré SP', 'Cerqueira César SP', 'Paranapanema SP', 'Itaporanga SP',
+  'Fartura SP', 'Manduri SP',
+  // ── Microregião de Botucatu ────────────────────────────────
+  'Botucatu SP', 'São Manuel SP', 'Itatinga SP', 'Pratânia SP',
+  // ── Microregião de Assis ──────────────────────────────────
+  'Assis SP', 'Cândido Mota SP', 'Palmital SP', 'Tarumã SP', 'Ibirarema SP',
+  // ── Paraná (vizinhos) ─────────────────────────────────────
+  'Siqueira Campos PR', 'Tomazina PR', 'Jaboti PR', 'Andirá PR',
+  'Cambará PR', 'Bandeirantes PR', 'Cornélio Procópio PR',
+  'Santo Antônio da Platina PR', 'Jacarezinho PR',
+  // ── Grandes cidades SP ────────────────────────────────────
+  'Sorocaba SP', 'Itapetininga SP', 'Itu SP', 'Tatui SP', 'Boituva SP',
+  'São Paulo SP', 'Campinas SP', 'São José dos Campos SP',
+]
+
 function getMK() { return localStorage.getItem(MK_KEY) || '' }
 function api(path, mk, opts = {}) {
   const sep = path.includes('?') ? '&' : '?'
@@ -755,6 +781,7 @@ export default function MasterPainel() {
   const [googleKey,      setGoogleKey]      = useState(null) // null=pendente, true/false
   const [addingSearch,       setAddingSearch]       = useState(false)
   const [addingSearchStatus, setAddingSearchStatus] = useState(null) // 'validating' | 'adding' | null
+  const [showCityDrop,       setShowCityDrop]       = useState(false)
 
   const [approving,    setApproving]     = useState(null) // id being processed
 
@@ -1750,12 +1777,31 @@ export default function MasterPainel() {
                           ))}
                         </select>
                       </div>
-                      <div className="sm:col-span-2">
+                      <div className="sm:col-span-2 relative">
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Cidade / região</label>
-                        <input value={searchCity} onChange={e => setSearchCity(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && runSearch()}
-                          placeholder="Itapeva SP"
+                        <input value={searchCity}
+                          onChange={e => { setSearchCity(e.target.value); setShowCityDrop(true) }}
+                          onFocus={() => setShowCityDrop(true)}
+                          onBlur={() => setTimeout(() => setShowCityDrop(false), 150)}
+                          onKeyDown={e => { if (e.key === 'Enter') { setShowCityDrop(false); runSearch() } if (e.key === 'Escape') setShowCityDrop(false) }}
+                          placeholder="Buscar cidade da região..."
                           className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 text-sm transition-colors" />
+                        {showCityDrop && (() => {
+                          const q = searchCity.toLowerCase().trim()
+                          const hits = CITIES_LIST.filter(c => !q || c.toLowerCase().includes(q)).slice(0, 25)
+                          return hits.length > 0 ? (
+                            <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto">
+                              {hits.map(city => (
+                                <button key={city} type="button"
+                                  onMouseDown={() => { setSearchCity(city); setShowCityDrop(false) }}
+                                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-orange-500/10 hover:text-orange-300 text-gray-300 transition-colors border-b border-gray-700/50 last:border-0">
+                                  <span className="font-bold">{city.split(' ').slice(0,-1).join(' ')}</span>
+                                  <span className="text-gray-500 ml-1">{city.split(' ').slice(-1)}</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : null
+                        })()}
                       </div>
                     </div>
                     <button onClick={() => runSearch()} disabled={searchLoading || !searchCity.trim()}

@@ -74,7 +74,12 @@ async function searchGooglePlaces(query, city, pageToken) {
 
   const results = withDetails
     .filter(Boolean)
-    .filter(r => r.phone && r.phone.length >= 12) // só quem tem telefone válido
+    .filter(r => {
+      if (!r.phone) return false
+      // Brasil: celular = 55 + DDD(2) + 9XXXXXXXX = 13 dígitos, começando com '9' na pos. 4
+      // Fixo   = 55 + DDD(2) + XXXXXXXX  = 12 dígitos — WhatsApp não funciona em fixo
+      return r.phone.length >= 13 && r.phone[4] === '9'
+    })
 
   return { results, nextPageToken: searchData.next_page_token || null }
 }
