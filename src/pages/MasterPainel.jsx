@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, TrendingUp, AlertTriangle, CalendarClock, Mail, ClipboardList, CheckCircle2, XCircle, MessageCircle, Phone, MapPin, Bot, Users, Building2, Flame, Send, Loader2 } from 'lucide-react'
 import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 
@@ -701,13 +701,17 @@ export default function MasterPainel() {
   const [leads,        setLeads]         = useState([])
   const [leadsLoading, setLeadsLoading]  = useState(false)
 
-  // ── Prospecção ──────────────────────────────────────────────
-  const [prospPhone,   setProspPhone]    = useState('')
-  const [prospName,    setProspName]     = useState('')
-  const [prospBulk,    setProspBulk]     = useState('')
-  const [prospMode,    setProspMode]     = useState('single') // 'single' | 'bulk'
-  const [prospSending, setProspSending]  = useState(false)
-  const [prospResults, setProspResults]  = useState(null)
+  // ── Prospecção — fila ──────────────────────────────────────
+  const [prospInnerTab, setProspInnerTab] = useState('capture')
+  const [captureText,   setCaptureText]   = useState('')
+  const [parsedPhones,  setParsedPhones]  = useState([])
+  const [addingQueue,   setAddingQueue]   = useState(false)
+  const [queue,         setQueue]         = useState([])
+  const [queueStats,    setQueueStats]    = useState({ pending:0, sent:0, failed:0, dailySent:0, dailyLimit:30 })
+  const [queueLoading,  setQueueLoading]  = useState(false)
+  const [sendProgress,  setSendProgress]  = useState(null)
+  const [sendLog,       setSendLog]       = useState([])
+  const stopRef = useRef(false)
   const [approving,    setApproving]     = useState(null) // id being processed
 
   const load = useCallback(async (key = mk) => {
@@ -749,40 +753,111 @@ export default function MasterPainel() {
   // Carrega leads ao entrar na aba
   useEffect(() => { if (tab === 'leads' && mk) loadLeads() }, [tab, mk, loadLeads])
 
-  // ── Envia prospecção via Zara ─────────────────────────────
-  const sendProspect = useCallback(async () => {
-    if (prospSending) return
-    setProspSending(true)
-    setProspResults(null)
+
+
+  // ── Helpers da Fila ────────────────────────────────────────
+  const queueApi = useCallback((body) =>
+    fetch('/api/wa-queue', {
+      method: body ? 'POST' : 'GET',
+      headers: { 'Content-Type': 'application/json', 'x-master-key': mk },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    }).then(r => r.json()),
+  [mk])
+
+  const loadQueue = useCallback(async () => {
+    setQueueLoading(true)
     try {
-      let contacts = []
-      if (prospMode === 'single') {
-        if (!prospPhone.trim()) return
-        contacts = [{ phone: prospPhone.trim(), name: prospName.trim() }]
-      } else {
-        contacts = prospBulk.split('\n')
-          .map(l => l.trim()).filter(Boolean)
-          .map(l => {
-            const parts = l.split(/[,;\t]/)
-            return { phone: parts[0]?.trim(), name: parts[1]?.trim() || '' }
-          }).filter(c => c.phone)
-      }
-      const res = await fetch('/api/wa-prospect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-master-key': mk },
-        body: JSON.stringify({ contacts }),
-      })
-      const data = await res.json()
-      setProspResults(data)
-      if (prospMode === 'single' && data.sent > 0) {
-        setProspPhone(''); setProspName('')
-      }
-    } catch (e) {
-      setProspResults({ ok: false, error: e.message })
-    } finally {
-      setProspSending(false)
+      const data = await queueApi(null)
+      if (data.ok) { setQueue(data.queue || []); setQueueStats(data.stats || {}) }
+    } finally { setQueueLoading(false) }
+  }, [queueApi])
+
+  useEffect(() => { if (tab === 'prospect' && mk) loadQueue() }, [tab, mk, loadQueue])
+
+  const parsePhones = useCallback((text) => {
+    const found = new Set()
+    // Pattern 1: (15) 99999-9999 ou (15) 3523-4567
+    const p1 = /\(([1-9]\d)\)\s*([0-9]{4,5})[-\s]([0-9]{4})/g
+    let m
+    while ((m = p1.exec(text)) !== null) {
+      const n = `55${m[1]}${m[2]}${m[3]}`
+      if (n.length >= 12 && n.length <= 13) found.add(n)
     }
-  }, [prospSending, prospMode, prospPhone, prospName, prospBulk, mk])
+    // Pattern 2: 15 99999-9999 (sem parênteses)
+    const p2 = /\b([1-9]\d)\s+([0-9]{4,5})[-\s]([0-9]{4})\b/g
+    while ((m = p2.exec(text)) !== null) {
+      const n = `55${m[1]}${m[2]}${m[3]}`
+      if (n.length >= 12 && n.length <= 13) found.add(n)
+    }
+    // Pattern 3: número cru 10-11 dígitos
+    const p3 = /\b([1-9]\d)(\d{8,9})\b/g
+    while ((m = p3.exec(text)) !== null) {
+      const n = `55${m[1]}${m[2]}`
+      if (n.length >= 12 && n.length <= 13) found.add(n)
+    }
+    return [...found].map(phone => ({ phone, name: '' }))
+  }, [])
+
+  const handleParseText = useCallback(() => {
+    const phones = parsePhones(captureText)
+    const existingPhones = new Set(queue.map(c => c.phone))
+    const newPhones = phones.filter(p => !existingPhones.has(p.phone))
+    setParsedPhones(newPhones)
+  }, [captureText, parsePhones, queue])
+
+  const addParsedToQueue = useCallback(async () => {
+    if (!parsedPhones.length) return
+    setAddingQueue(true)
+    try {
+      const res = await queueApi({ action: 'add', contacts: parsedPhones })
+      if (res.ok) {
+        setCaptureText(''); setParsedPhones([])
+        await loadQueue()
+        setProspInnerTab('queue')
+      }
+    } finally { setAddingQueue(false) }
+  }, [parsedPhones, queueApi, loadQueue])
+
+  const startQueueSend = useCallback(async () => {
+    const pending = queue.filter(c => c.status === 'pending')
+    if (!pending.length) return
+    const canSend = Math.min(pending.length, queueStats.dailyLimit - queueStats.dailySent)
+    if (canSend <= 0) return
+
+    stopRef.current = false
+    setSendProgress({ current: 0, total: canSend })
+    setSendLog([])
+
+    for (let i = 0; i < canSend; i++) {
+      if (stopRef.current) break
+      const contact = pending[i]
+
+      try {
+        const res = await fetch('/api/wa-prospect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-master-key': mk },
+          body: JSON.stringify({ contacts: [{ phone: contact.phone, name: contact.name }] }),
+        })
+        const data = await res.json()
+        const success = data.sent > 0
+        await queueApi({ action: 'update', id: contact.id, status: success ? 'sent' : 'failed', error: success ? null : (data.results?.[0]?.error || 'falhou') })
+        setSendLog(prev => [...prev, { phone: contact.phone, name: contact.name, success }])
+      } catch (e) {
+        await queueApi({ action: 'update', id: contact.id, status: 'failed', error: e.message })
+        setSendLog(prev => [...prev, { phone: contact.phone, name: contact.name, success: false }])
+      }
+
+      setSendProgress({ current: i + 1, total: canSend })
+
+      if (i < canSend - 1 && !stopRef.current) {
+        // Anti-ban: delay aleatório 15-28s
+        await new Promise(r => setTimeout(r, 15000 + Math.floor(Math.random() * 13000)))
+      }
+    }
+
+    setSendProgress(null)
+    await loadQueue()
+  }, [queue, queueStats, mk, queueApi, loadQueue])
 
   const accessMarket = (market) => {
     localStorage.setItem('zs_master_session', JSON.stringify({ mk, returnTo: '/painel' }))
@@ -1329,148 +1404,215 @@ export default function MasterPainel() {
 
       {/* ── ABA PROSPECÇÃO ──────────────────────────────────── */}
       {tab === 'prospect' && (
-        <div className="space-y-6">
+        <div className="space-y-5">
 
-          {/* Header */}
-          <div>
-            <h2 className="text-xl font-black text-white flex items-center gap-2">
-              <Send className="w-5 h-5 text-orange-400" /> Prospectar com Zara
-            </h2>
-            <p className="text-gray-500 text-sm mt-0.5">
-              Zara manda a primeira mensagem pelo WhatsApp — quando responderem, ela já assume a conversa automaticamente.
-            </p>
+          {/* Header + stats */}
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="text-xl font-black text-white flex items-center gap-2">
+                <Send className="w-5 h-5 text-orange-400" /> Prospectar com Zara
+              </h2>
+              <p className="text-gray-500 text-sm mt-0.5">Cole qualquer texto com telefones — a Zara extrai e envia com delay anti-ban automático.</p>
+            </div>
+            <button onClick={loadQueue} disabled={queueLoading} className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-xs font-bold text-gray-400 transition-all disabled:opacity-50">
+              <RefreshCw className={`w-3.5 h-3.5 ${queueLoading ? 'animate-spin' : ''}`} /> Atualizar
+            </button>
           </div>
 
-          {/* Modo single / bulk */}
+          {/* Barra de limite diário */}
+          <div className="bg-gray-900 rounded-2xl border border-gray-800 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Limite diário de envios</span>
+              <span className="text-xs font-black text-white">{queueStats.dailySent || 0} / {queueStats.dailyLimit || 30} enviados hoje</span>
+            </div>
+            <div className="w-full bg-gray-800 rounded-full h-2.5">
+              <div className="h-2.5 rounded-full bg-gradient-to-r from-orange-500 to-orange-400 transition-all"
+                style={{ width: `${Math.min(100, ((queueStats.dailySent||0)/(queueStats.dailyLimit||30))*100)}%` }} />
+            </div>
+            <div className="flex gap-4 mt-3 text-xs text-gray-500">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block" />{queueStats.pending||0} pendentes</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />{queueStats.sent||0} enviados</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" />{queueStats.failed||0} falharam</span>
+            </div>
+          </div>
+
+          {/* Inner tabs */}
           <div className="flex gap-2">
-            {[{ id: 'single', label: '1 contato' }, { id: 'bulk', label: 'Lista (vários)' }].map(m => (
-              <button key={m.id} onClick={() => { setProspMode(m.id); setProspResults(null) }}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                  prospMode === m.id ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
-                {m.label}
+            {[{ id:'capture', label:'📥 Capturar Contatos' }, { id:'queue', label:`📋 Fila (${queueStats.pending||0})` }].map(t => (
+              <button key={t.id} onClick={() => setProspInnerTab(t.id)}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${prospInnerTab===t.id ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                {t.label}
               </button>
             ))}
           </div>
 
-          {/* Card principal */}
-          <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 space-y-5">
+          {/* ── SUB: CAPTURAR ─────────────────────────────────── */}
+          {prospInnerTab === 'capture' && (
+            <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 space-y-5">
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">
+                  Cole qualquer texto com telefones aqui 👇
+                </label>
+                <textarea value={captureText} onChange={e => { setCaptureText(e.target.value); setParsedPhones([]) }}
+                  rows={9} placeholder={`Cole texto de qualquer fonte — Google Maps, site, lista, WhatsApp...\n\nExemplos que funcionam:\n  Mercado São José · (15) 3522-1234 · Aberto\n  Minimercado: 15 99988-7766\n  +55 (15) 98765-4321\n  15987654321`}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm font-mono resize-none" />
+              </div>
 
-            {prospMode === 'single' ? (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">
-                      WhatsApp do mercado *
-                    </label>
-                    <input value={prospPhone} onChange={e => setProspPhone(e.target.value)}
-                      placeholder="(15) 99999-9999"
-                      className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">
-                      Nome do mercado (opcional)
-                    </label>
-                    <input value={prospName} onChange={e => setProspName(e.target.value)}
-                      placeholder="Mercado São José"
-                      className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm" />
-                  </div>
-                </div>
+              <button onClick={handleParseText} disabled={!captureText.trim()}
+                className="w-full py-3 rounded-xl bg-gray-700 hover:bg-gray-600 disabled:opacity-40 text-white font-bold text-sm transition-all flex items-center justify-center gap-2">
+                🔍 Extrair telefones do texto
+              </button>
 
-                {/* Preview da mensagem */}
-                <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700/50">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">📱 Preview — mensagem que a Zara vai mandar:</p>
-                  <div className="bg-[#005c4b] rounded-2xl rounded-tl-sm p-4 max-w-xs text-sm text-white leading-relaxed font-light space-y-1.5">
-                    <p>{prospName ? `Oi, *${prospName}*! 👋` : 'Oi! 👋'}</p>
-                    <p className="opacity-0 select-none text-[2px]">.</p>
-                    <p>Vi o mercado de vocês aqui na região e queria apresentar uma coisa rápida.</p>
-                    <p className="opacity-0 select-none text-[2px]">.</p>
-                    <p>Tenho um sistema que ajuda mercadinhos a:<br/>✅ Controlar estoque pelo celular<br/>✅ Fazer vendas sem papel<br/>✅ Vender mais pelo WhatsApp</p>
-                    <p className="opacity-0 select-none text-[2px]">.</p>
-                    <p>Tudo por menos de *R$10 por dia* — e começa a funcionar no mesmo dia.</p>
-                    <p className="opacity-0 select-none text-[2px]">.</p>
-                    <p>Posso te mostrar em 10 minutinhos? Sem compromisso 😊</p>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">
-                    Lista de contatos — um por linha (telefone, nome do mercado)
-                  </label>
-                  <textarea value={prospBulk} onChange={e => setProspBulk(e.target.value)} rows={8}
-                    placeholder={"(15) 99111-2222, Mercado São José\n(15) 98333-4444, Minimercado da Dona Rosa\n(15) 97555-6666\n(11) 99777-8888, Mercearia Central"}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm font-mono resize-none" />
-                  <p className="text-xs text-gray-600 mt-2">
-                    Formato: <code className="text-orange-400">telefone, Nome do Mercado</code> — nome é opcional. Máximo 30 por vez. Delay automático entre envios pra não cair no ban.
+              {parsedPhones.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-sm font-bold text-green-400 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" /> {parsedPhones.length} telefone{parsedPhones.length>1?'s':''} encontrado{parsedPhones.length>1?'s':''}
                   </p>
-                </div>
-                {prospBulk.trim() && (
-                  <div className="flex items-center gap-2 text-sm text-gray-400 bg-gray-800/50 rounded-xl px-4 py-2.5">
-                    <Users className="w-4 h-4 text-orange-400" />
-                    <span><b className="text-white">{Math.min(prospBulk.split('\n').filter(l => l.trim()).length, 30)}</b> contatos prontos pra envio</span>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Botão enviar */}
-            <button onClick={sendProspect} disabled={prospSending || (prospMode === 'single' ? !prospPhone.trim() : !prospBulk.trim())}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-base transition-all shadow-lg shadow-orange-500/20">
-              {prospSending
-                ? <><Loader2 className="w-5 h-5 animate-spin" /> Zara está enviando{prospMode === 'bulk' ? ' (aguarde, tem delay anti-ban)' : '...'}</>
-                : <><Send className="w-5 h-5" /> {prospMode === 'single' ? 'Zara mandar mensagem agora' : 'Zara disparar para toda a lista'}</>
-              }
-            </button>
-
-            {/* Resultado */}
-            {prospResults && (
-              <div className={`rounded-xl p-4 border ${prospResults.sent > 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-                {prospResults.sent > 0 && (
-                  <p className="text-green-400 font-bold flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="w-4 h-4" /> {prospResults.sent} mensagem{prospResults.sent > 1 ? 'ns' : ''} enviada{prospResults.sent > 1 ? 's' : ''} com sucesso!
-                  </p>
-                )}
-                {prospResults.failed > 0 && (
-                  <p className="text-red-400 font-bold flex items-center gap-2 mb-2">
-                    <XCircle className="w-4 h-4" /> {prospResults.failed} falhou
-                  </p>
-                )}
-                {prospResults.error && (
-                  <p className="text-red-400 text-sm">{prospResults.error}</p>
-                )}
-                {Array.isArray(prospResults.results) && prospResults.results.length > 1 && (
-                  <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
-                    {prospResults.results.map((r, i) => (
-                      <div key={i} className={`flex items-center gap-2 text-xs py-1 ${r.ok ? 'text-gray-400' : 'text-red-400'}`}>
-                        {r.ok ? <CheckCircle2 className="w-3 h-3 text-green-400 flex-shrink-0" /> : <XCircle className="w-3 h-3 flex-shrink-0" />}
-                        <span className="font-mono">{r.phone}</span>
-                        {r.name && <span className="text-gray-500">— {r.name}</span>}
-                        {!r.ok && r.error && <span className="ml-auto text-red-400/70">{r.error}</span>}
+                  <div className="bg-gray-800 rounded-xl max-h-48 overflow-y-auto divide-y divide-gray-700/50">
+                    {parsedPhones.map((p, i) => (
+                      <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                        <Phone className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
+                        <span className="font-mono text-sm text-white">+{p.phone.slice(0,2)} ({p.phone.slice(2,4)}) {p.phone.slice(4,9)}-{p.phone.slice(9)}</span>
                       </div>
                     ))}
                   </div>
-                )}
-                {prospResults.sent > 0 && (
-                  <p className="text-xs text-gray-500 mt-3">
-                    💡 Quando responderem, a Zara assume a conversa automaticamente. Acompanhe na aba <b className="text-orange-400">Leads Bot</b>.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
+                  <button onClick={addParsedToQueue} disabled={addingQueue}
+                    className="w-full py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20">
+                    {addingQueue
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Adicionando...</>
+                      : <><Plus className="w-4 h-4" /> Adicionar {parsedPhones.length} à fila de disparo</>}
+                  </button>
+                </div>
+              )}
 
-          {/* Dica */}
-          <div className="bg-gray-900/50 rounded-2xl border border-gray-800 p-5 space-y-3">
-            <p className="text-sm font-black text-gray-300">💡 Como usar pra fechar sua primeira venda</p>
-            <ol className="text-sm text-gray-500 space-y-2 list-decimal list-inside">
-              <li>Pesquisa <span className="text-white">"mercado Itapeva SP"</span> no Google Maps → pega o WhatsApp</li>
-              <li>Cola o número aqui em cima → Zara manda a mensagem</li>
-              <li>Quando o dono responder → Zara qualifica automaticamente</li>
-              <li>Quando aparece <span className="text-yellow-400 font-bold">Quer demo</span> na aba Leads → você entra na conversa e fecha</li>
-            </ol>
-            <p className="text-xs text-gray-600">Anti-ban ativo: delay aleatório de 12-25s entre envios em massa. Máximo 30/rodada.</p>
-          </div>
+              {parsedPhones.length === 0 && captureText.trim() && (
+                <p className="text-sm text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
+                  ⚠️ Nenhum telefone reconhecido. Tente colar texto com números no formato (15) 9999-9999 ou 15999999999.
+                </p>
+              )}
+
+              {/* Como capturar do Google Maps */}
+              <div className="border-t border-gray-800 pt-4 space-y-3">
+                <p className="text-xs font-black text-gray-500 uppercase tracking-wider">📍 Como pegar contatos do Google Maps grátis</p>
+                <ol className="text-sm text-gray-400 space-y-2">
+                  <li className="flex gap-2"><span className="text-orange-400 font-black flex-shrink-0">1.</span> Pesquisa <span className="bg-gray-800 px-1.5 py-0.5 rounded text-white font-mono text-xs">"mercado Itapeva SP"</span> no Google Maps</li>
+                  <li className="flex gap-2"><span className="text-orange-400 font-black flex-shrink-0">2.</span> Clica num mercado → aparece o telefone no painel</li>
+                  <li className="flex gap-2"><span className="text-orange-400 font-black flex-shrink-0">3.</span> Copia o telefone (ou seleciona todo o texto da página)</li>
+                  <li className="flex gap-2"><span className="text-orange-400 font-black flex-shrink-0">4.</span> Cola aqui em cima → clica em extrair → adiciona à fila</li>
+                  <li className="flex gap-2"><span className="text-orange-400 font-black flex-shrink-0">5.</span> Repete pra cada mercado (leva ~2 min pra 20 contatos)</li>
+                </ol>
+                <p className="text-xs text-gray-600">💡 Dica: <a href="https://outscraper.com" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:underline">outscraper.com</a> exporta 100 contatos de uma vez por ~R$5. Vale muito a pena quando tiver mais tempo.</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── SUB: FILA ─────────────────────────────────────── */}
+          {prospInnerTab === 'queue' && (
+            <div className="space-y-4">
+
+              {/* Botão disparar / parar */}
+              {!sendProgress ? (
+                <div className="flex gap-3">
+                  <button onClick={startQueueSend}
+                    disabled={!queueStats.pending || queueStats.dailySent >= queueStats.dailyLimit}
+                    className="flex-1 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20">
+                    <Send className="w-4 h-4" />
+                    {queueStats.dailySent >= queueStats.dailyLimit
+                      ? 'Limite diário atingido (volta amanhã)'
+                      : `🚀 Zara disparar ${Math.min(queueStats.pending||0, (queueStats.dailyLimit||30)-(queueStats.dailySent||0))} agora`}
+                  </button>
+                  {(queueStats.sent > 0 || queueStats.failed > 0) && (
+                    <button onClick={() => queueApi({ action:'clear', mode:'done' }).then(loadQueue)}
+                      className="px-4 py-3.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs font-bold transition-all">
+                      Limpar enviados
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-gray-900 rounded-2xl border border-orange-500/30 p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-orange-400 flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Zara enviando... {sendProgress.current}/{sendProgress.total}
+                    </p>
+                    <button onClick={() => { stopRef.current = true }} className="text-xs text-red-400 hover:text-red-300 font-bold px-3 py-1.5 bg-red-500/10 rounded-lg">
+                      ⏹ Parar
+                    </button>
+                  </div>
+                  <div className="w-full bg-gray-800 rounded-full h-2">
+                    <div className="h-2 rounded-full bg-orange-500 transition-all"
+                      style={{ width: `${(sendProgress.current/sendProgress.total)*100}%` }} />
+                  </div>
+                  <p className="text-xs text-gray-600">Delay de 15-28s entre envios (anti-ban). Não feche o navegador.</p>
+                  {sendLog.length > 0 && (
+                    <div className="max-h-32 overflow-y-auto space-y-1 mt-2">
+                      {sendLog.slice(-5).reverse().map((l,i) => (
+                        <div key={i} className={`flex items-center gap-2 text-xs ${l.success?'text-green-400':'text-red-400'}`}>
+                          {l.success ? <CheckCircle2 className="w-3 h-3 flex-shrink-0"/> : <XCircle className="w-3 h-3 flex-shrink-0"/>}
+                          <span className="font-mono">+{l.phone.slice(0,2)} ({l.phone.slice(2,4)}) {l.phone.slice(4,9)}-{l.phone.slice(9)}</span>
+                          {l.name && <span className="text-gray-500">— {l.name}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Lista da fila */}
+              {queueLoading ? (
+                <div className="text-center py-10 text-gray-600"><Loader2 className="w-6 h-6 mx-auto animate-spin mb-2" /><p className="text-sm">Carregando fila...</p></div>
+              ) : queue.length === 0 ? (
+                <div className="text-center py-16 text-gray-600 bg-gray-900 rounded-2xl border border-gray-800">
+                  <Send className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="font-semibold">Fila vazia</p>
+                  <p className="text-sm mt-1">Vai em <button onClick={() => setProspInnerTab('capture')} className="text-orange-400 hover:underline">Capturar Contatos</button> e adiciona os primeiros</p>
+                </div>
+              ) : (
+                <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-gray-900 border-b border-gray-800">
+                        <tr>
+                          <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider">Telefone</th>
+                          <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider hidden sm:table-cell">Nome</th>
+                          <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider">Status</th>
+                          <th className="px-4 py-3" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800/60">
+                        {queue.map(c => {
+                          const statusMap = {
+                            pending: { label:'Pendente', color:'bg-yellow-500/20 text-yellow-300' },
+                            sent:    { label:'Enviado ✓', color:'bg-green-500/20 text-green-300' },
+                            failed:  { label:'Falhou', color:'bg-red-500/20 text-red-300' },
+                          }
+                          const st = statusMap[c.status] || statusMap.pending
+                          const waLink = `https://wa.me/${c.phone}`
+                          return (
+                            <tr key={c.id} className="hover:bg-gray-800/30">
+                              <td className="px-4 py-3 font-mono text-sm text-white">
+                                +{c.phone.slice(0,2)} ({c.phone.slice(2,4)}) {c.phone.slice(4,9)}-{c.phone.slice(9)}
+                              </td>
+                              <td className="px-4 py-3 text-gray-400 hidden sm:table-cell">{c.name || <span className="text-gray-700 italic">—</span>}</td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${st.color}`}>{st.label}</span>
+                                {c.error && <p className="text-xs text-red-400/70 mt-0.5">{c.error}</p>}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <a href={waLink} target="_blank" rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 text-xs font-bold">
+                                  <MessageCircle className="w-3 h-3" /> WA
+                                </a>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
