@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, TrendingUp, AlertTriangle, CalendarClock, Mail, ClipboardList, CheckCircle2, XCircle, MessageCircle, Phone, MapPin, Bot, Users, Building2, Flame, Send, Loader2 } from 'lucide-react'
+import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, TrendingUp, AlertTriangle, CalendarClock, Mail, ClipboardList, CheckCircle2, XCircle, MessageCircle, Phone, MapPin, Bot, Users, Building2, Flame, Send, Loader2, Menu, LogOut } from 'lucide-react'
 import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 
 /* ─── constants ──────────────────────────────────────────── */
@@ -707,6 +707,7 @@ export default function MasterPainel() {
   const [err,          setErr]           = useState(null)
   const [showAdd,      setShowAdd]       = useState(false)
   const [tab,          setTab]           = useState('overview')
+  const [sidebarOpen,  setSidebarOpen]   = useState(false)
   const [leads,        setLeads]         = useState([])
   const [leadsLoading, setLeadsLoading]  = useState(false)
 
@@ -1092,50 +1093,96 @@ export default function MasterPainel() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      {/* sticky header */}
-      <div className="bg-gray-900/80 border-b border-gray-800 sticky top-0 z-10 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <ZatendeStokLogo variant="wordmark" />
-            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30 hidden sm:block">
-              PAINEL MASTER
-            </span>
-          </div>
+    <div className="min-h-screen bg-gray-950 text-white flex">
 
-          {/* tabs */}
-          <div className="flex items-center gap-1 bg-gray-800/80 rounded-xl p-1 flex-1 max-w-md">
-            {TABS.map(t => {
-              const Icon = t.icon
-              return (
-                <button key={t.id} onClick={() => setTab(t.id)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-                    tab === t.id ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}>
-                  <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="hidden sm:block truncate">{t.label}</span>
-                </button>
-              )
-            })}
+      {/* ── SIDEBAR DESKTOP ─────────────────────────────────── */}
+      <aside className="hidden lg:flex flex-col w-[240px] fixed inset-y-0 left-0 bg-gray-900 border-r border-gray-800 z-30">
+        <div className="px-5 py-5 border-b border-gray-800/60">
+          <ZatendeStokLogo variant="wordmark" />
+          <div className="mt-2">
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/20">PAINEL MASTER</span>
           </div>
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {TABS.map(t => {
+            const Icon = t.icon
+            const active = tab === t.id
+            return (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all relative ' + (active ? 'bg-orange-500/10 text-orange-400' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-300')}>
+                {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-orange-500 rounded-r-full" />}
+                <Icon className={'w-4 h-4 flex-shrink-0 ' + (active ? 'text-orange-400' : 'text-gray-600')} />
+                <span className="flex-1 text-left truncate">{t.label}</span>
+              </button>
+            )
+          })}
+        </nav>
+        <div className="px-3 pb-4 pt-3 border-t border-gray-800/60 space-y-1">
+          <button onClick={() => load()} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-600 hover:bg-gray-800 hover:text-gray-400 transition-all">
+            <RefreshCw className={'w-4 h-4 ' + (loading ? 'animate-spin' : '')} />
+            <span className="font-bold">Atualizar dados</span>
+          </button>
+          <button onClick={() => { localStorage.removeItem(MK_KEY); window.location.reload() }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-red-500/10 hover:text-red-400 transition-all">
+            <LogOut className="w-4 h-4" />
+            <span className="font-bold">Sair</span>
+          </button>
+        </div>
+      </aside>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={() => load()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs transition-colors">
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:block">Atualizar</span>
+      {/* ── SIDEBAR MOBILE OVERLAY ──────────────────────────── */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden flex">
+          <aside className="w-[240px] bg-gray-900 border-r border-gray-800 flex flex-col">
+            <div className="px-5 py-4 border-b border-gray-800/60 flex items-center justify-between">
+              <ZatendeStokLogo variant="wordmark" />
+              <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-500">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+              {TABS.map(t => {
+                const Icon = t.icon
+                const active = tab === t.id
+                return (
+                  <button key={t.id} onClick={() => { setTab(t.id); setSidebarOpen(false) }}
+                    className={'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ' + (active ? 'bg-orange-500/10 text-orange-400' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-300')}>
+                    <Icon className={'w-4 h-4 flex-shrink-0 ' + (active ? 'text-orange-400' : 'text-gray-600')} />
+                    <span className="flex-1 text-left">{t.label}</span>
+                  </button>
+                )
+              })}
+            </nav>
+          </aside>
+          <div className="flex-1 bg-black/60" onClick={() => setSidebarOpen(false)} />
+        </div>
+      )}
+
+      {/* ── ÁREA PRINCIPAL ──────────────────────────────────── */}
+      <div className="flex-1 lg:ml-[240px] flex flex-col min-h-screen">
+
+        {/* Top bar mobile */}
+        <div className="sticky top-0 z-20 bg-gray-950/90 backdrop-blur-sm border-b border-gray-800 px-4 py-3 flex items-center gap-3 lg:px-6">
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-lg hover:bg-gray-800 text-gray-400">
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="lg:hidden"><ZatendeStokLogo variant="wordmark" /></div>
+          <div className="hidden lg:block flex-1">
+            <span className="text-sm font-bold text-gray-500">{TABS.find(t => t.id === tab)?.label}</span>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <button onClick={() => load()} className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs font-bold transition-colors">
+              <RefreshCw className={'w-3.5 h-3.5 ' + (loading ? 'animate-spin' : '')} /> Atualizar
             </button>
             {(tab === 'markets' || tab === 'dist') && (
-              <button onClick={() => setShowAdd(tab === 'markets' ? 'market' : 'dist')}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black transition-colors">
+              <button onClick={() => setShowAdd(tab === 'markets' ? 'market' : 'dist')} className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-white text-xs font-black transition-colors shadow-lg shadow-orange-500/20">
                 <Plus className="w-3.5 h-3.5" />
-                <span className="hidden sm:block">{tab === 'markets' ? 'Novo Mercado' : 'Novo Distribuidor'}</span>
+                {tab === 'markets' ? 'Novo Mercado' : 'Nova Distribuidora'}
               </button>
             )}
           </div>
         </div>
-      </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8 w-full">
 
         {/* ── VISÃO GERAL ── */}
         {tab === 'overview' && (
@@ -1971,6 +2018,7 @@ export default function MasterPainel() {
       {showAdd === 'dist' && (
         <AddDistModal mk={mk} onClose={() => setShowAdd(false)} onCreated={() => { setShowAdd(false); load() }} />
       )}
+      </div>
     </div>
   )
 }
