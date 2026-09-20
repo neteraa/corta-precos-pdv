@@ -16,13 +16,22 @@ function api(path, mk, opts = {}) {
 }
 
 /* ─── sub-components (module scope → no remount bug) ──── */
-function StatCard({ label, value, sub, color = '#f97316' }) {
+function StatCard({ label, value, sub, color = '#f97316', icon: Icon, onClick }) {
+  const Tag = onClick ? 'button' : 'div'
   return (
-    <div className="bg-gray-800/60 border border-gray-700 rounded-2xl p-5">
-      <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{label}</div>
-      <div className="text-3xl font-black" style={{ color }}>{value}</div>
-      {sub && <div className="text-xs text-gray-500 mt-1">{sub}</div>}
-    </div>
+    <Tag onClick={onClick}
+      className={`relative overflow-hidden rounded-2xl border border-gray-800/80 bg-gray-900 p-5 text-left w-full transition-all duration-200 group ${onClick ? 'hover:scale-[1.02] hover:border-gray-700 cursor-pointer' : ''}`}>
+      {/* radial glow on hover */}
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+        style={{ background: `radial-gradient(ellipse at top right, ${color}18 0%, transparent 65%)` }} />
+      {/* corner decoration */}
+      <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-10 blur-xl"
+        style={{ background: color }} />
+      {Icon && <Icon className="w-5 h-5 mb-3 opacity-60" style={{ color }} />}
+      <div className="text-3xl font-black tracking-tight leading-none" style={{ color }}>{value}</div>
+      <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-2">{label}</div>
+      {sub && <div className="text-xs text-gray-600 mt-1">{sub}</div>}
+    </Tag>
   )
 }
 
@@ -702,7 +711,7 @@ export default function MasterPainel() {
   const [leadsLoading, setLeadsLoading]  = useState(false)
 
   // ── Prospecção — fila ──────────────────────────────────────
-  const [prospInnerTab, setProspInnerTab]   = useState('capture')
+  const [prospInnerTab, setProspInnerTab]   = useState('search')
   // entrada manual
   const [manualPhone,   setManualPhone]     = useState('')
   const [manualName,    setManualName]      = useState('')
@@ -721,6 +730,16 @@ export default function MasterPainel() {
   const [sendProgress,  setSendProgress]    = useState(null)
   const [sendLog,       setSendLog]         = useState([])
   const stopRef = useRef(false)
+  // Google Places search
+  const [searchQuery,    setSearchQuery]    = useState('mercado')
+  const [searchCity,     setSearchCity]     = useState('Itapeva SP')
+  const [searchLoading,  setSearchLoading]  = useState(false)
+  const [searchResults,  setSearchResults]  = useState([])
+  const [searchNextPage, setSearchNextPage] = useState(null)
+  const [searchSelected, setSearchSelected] = useState(new Set())
+  const [googleKey,      setGoogleKey]      = useState(null) // null=pendente, true/false
+  const [addingSearch,   setAddingSearch]   = useState(false)
+
   const [approving,    setApproving]     = useState(null) // id being processed
 
   const load = useCallback(async (key = mk) => {
@@ -919,6 +938,60 @@ export default function MasterPainel() {
     await loadQueue()
   }, [queue, queueStats, mk, queueApi, loadQueue])
 
+  // ── Google Places Search ───────────────────────────────────
+  const checkGoogleKey = useCallback(async () => {
+    try {
+      const res = await fetch('/api/wa-places', { headers: { 'x-master-key': mk } })
+      const d = await res.json()
+      setGoogleKey(d.configured === true)
+    } catch { setGoogleKey(false) }
+  }, [mk])
+
+  useEffect(() => {
+    if (tab === 'prospect' && prospInnerTab === 'search' && mk && googleKey === null) checkGoogleKey()
+  }, [tab, prospInnerTab, mk, googleKey, checkGoogleKey])
+
+  const runSearch = useCallback(async (pageToken = null) => {
+    setSearchLoading(true)
+    if (!pageToken) { setSearchResults([]); setSearchSelected(new Set()) }
+    try {
+      const res = await fetch('/api/wa-places', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-master-key': mk },
+        body: JSON.stringify({ query: searchQuery, city: searchCity, pageToken }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setSearchResults(prev => pageToken ? [...prev, ...data.results] : data.results)
+        setSearchNextPage(data.nextPageToken || null)
+      }
+    } finally { setSearchLoading(false) }
+  }, [searchQuery, searchCity, mk])
+
+  const toggleSelect = useCallback((phone) => {
+    setSearchSelected(prev => {
+      const n = new Set(prev)
+      n.has(phone) ? n.delete(phone) : n.add(phone)
+      return n
+    })
+  }, [])
+
+  const addSearchToQueue = useCallback(async () => {
+    const contacts = searchResults
+      .filter(r => searchSelected.has(r.phone))
+      .map(r => ({ phone: r.phone, name: r.name }))
+    if (!contacts.length) return
+    setAddingSearch(true)
+    try {
+      const res = await queueApi({ action: 'add', contacts })
+      if (res.ok) {
+        setSearchSelected(new Set())
+        await loadQueue()
+        setProspInnerTab('queue')
+      }
+    } finally { setAddingSearch(false) }
+  }, [searchResults, searchSelected, queueApi, loadQueue])
+
   const accessMarket = (market) => {
     localStorage.setItem('zs_master_session', JSON.stringify({ mk, returnTo: '/painel' }))
     localStorage.setItem('cp_session', JSON.stringify({
@@ -1066,77 +1139,80 @@ export default function MasterPainel() {
 
         {/* ── VISÃO GERAL ── */}
         {tab === 'overview' && (
-          <div className="space-y-8">
-            {/* summary cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard label="Clientes ativos"   value={allActive}         sub={`de ${totalAll} cadastrados`}      color="#f97316" />
-              <StatCard label="Mercados"           value={markets.length}    sub={`${mActive.length} ativos`}        color="#8b5cf6" />
-              <StatCard label="Distribuidores"     value={distributors.length} sub={`${dActive.length} ativos`}     color="#10b981" />
-              <button onClick={() => setTab('requests')} className="text-left hover:scale-105 transition-transform">
-                <StatCard label="Solicitações"     value={pendingCount}      sub={pendingCount > 0 ? '⏳ aguardando aprovação' : 'nenhuma pendente'} color={pendingCount > 0 ? '#eab308' : '#64748b'} />
-              </button>
+          <div className="space-y-6">
+
+            {/* KPI cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <StatCard label="Clientes ativos" value={allActive}            sub={`de ${totalAll} cadastrados`}      color="#f97316" icon={Users}         />
+              <StatCard label="Mercados"         value={markets.length}       sub={`${mActive.length} ativos`}        color="#a78bfa" icon={Store}         />
+              <StatCard label="Distribuidores"   value={distributors.length}  sub={`${dActive.length} ativos`}        color="#34d399" icon={Truck}         />
+              <StatCard label="Solicitações"     value={pendingCount}         sub={pendingCount > 0 ? '⏳ aguardando' : 'nenhuma pendente'}
+                color={pendingCount > 0 ? '#fbbf24' : '#64748b'} icon={ClipboardList} onClick={() => setTab('requests')} />
             </div>
 
-            {/* alert rows */}
-            {expiring7.length > 0 && (
-              <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-5">
-                <div className="flex items-center gap-2 text-yellow-400 font-black text-sm mb-4">
-                  <CalendarClock className="w-4 h-4" /> Vencendo em 7 dias ({expiring7.length})
-                </div>
-                <div className="space-y-2">
-                  {expiring7.map(x => {
-                    const d = Math.ceil((new Date(x.expiresAt) - now) / 86_400_000)
-                    return (
-                      <div key={x.id} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-300">{x.storeName || x.username}</span>
-                        <span className="text-yellow-400 font-bold text-xs">{d === 0 ? 'hoje' : `${d}d`}</span>
-                      </div>
-                    )
-                  })}
-                </div>
+            {/* Alertas */}
+            {(expiring7.length > 0 || expired.length > 0) && (
+              <div className="space-y-3">
+                {expiring7.length > 0 && (
+                  <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4">
+                    <p className="flex items-center gap-2 text-yellow-400 font-black text-sm mb-3">
+                      <CalendarClock className="w-4 h-4" /> {expiring7.length} vencendo em 7 dias
+                    </p>
+                    <div className="space-y-2">
+                      {expiring7.map(x => {
+                        const d = Math.ceil((new Date(x.expiresAt) - now) / 86_400_000)
+                        return (
+                          <div key={x.id} className="flex items-center justify-between">
+                            <span className="text-gray-300 text-sm">{x.storeName || x.username}</span>
+                            <span className="text-yellow-400 font-black text-xs bg-yellow-500/10 px-2 py-0.5 rounded-full">{d === 0 ? 'hoje' : `${d}d`}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+                {expired.length > 0 && (
+                  <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4">
+                    <p className="flex items-center gap-2 text-red-400 font-black text-sm mb-3">
+                      <AlertTriangle className="w-4 h-4" /> {expired.length} licença{expired.length>1?'s':''} vencida{expired.length>1?'s':''} — cobrar ou desativar
+                    </p>
+                    <div className="space-y-2">
+                      {expired.map(x => {
+                        const d = Math.abs(Math.ceil((new Date(x.expiresAt) - now) / 86_400_000))
+                        return (
+                          <div key={x.id} className="flex items-center justify-between">
+                            <span className="text-gray-300 text-sm">{x.storeName || x.username}</span>
+                            <span className="text-red-400 font-black text-xs bg-red-500/10 px-2 py-0.5 rounded-full">{d}d atrás</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {expired.length > 0 && (
-              <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-5">
-                <div className="flex items-center gap-2 text-red-400 font-black text-sm mb-4">
-                  <AlertTriangle className="w-4 h-4" /> Licenças vencidas ({expired.length}) — cobrar ou desativar
-                </div>
-                <div className="space-y-2">
-                  {expired.map(x => {
-                    const d = Math.abs(Math.ceil((new Date(x.expiresAt) - now) / 86_400_000))
-                    return (
-                      <div key={x.id} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-300">{x.storeName || x.username}</span>
-                        <span className="text-red-400 font-bold text-xs">{d}d atrás</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* recent activity */}
-            <div>
-              <div className="text-xs font-black text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <TrendingUp className="w-3.5 h-3.5" /> Atividade recente
+            {/* Atividade recente */}
+            <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-gray-800 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-green-400" />
+                <span className="text-xs font-black text-gray-400 uppercase tracking-wider">Atividade recente (24h)</span>
               </div>
               {recent24.length === 0 ? (
-                <p className="text-gray-600 text-sm">Nenhum acesso nas últimas 24h</p>
+                <div className="px-5 py-8 text-center text-gray-600 text-sm">Nenhum acesso nas últimas 24h</div>
               ) : (
-                <div className="space-y-2">
+                <div className="divide-y divide-gray-800/60">
                   {recent24.map(x => {
-                    const diff = now - new Date(x.lastLogin)
-                    const label = diff < 3_600_000
-                      ? `${Math.floor(diff / 60000)}min`
-                      : `${Math.floor(diff / 3_600_000)}h`
+                    const diff  = now - new Date(x.lastLogin)
+                    const label = diff < 3_600_000 ? `${Math.floor(diff/60000)}min` : `${Math.floor(diff/3_600_000)}h`
+                    const isDist = !!x.tenantId
                     return (
-                      <div key={x.id} className="flex items-center gap-3 py-2 border-b border-gray-800/60">
-                        <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
-                        <span className="text-gray-300 text-sm flex-1">{x.storeName || x.username}</span>
+                      <div key={x.id} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-800/30 transition-colors">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isDist ? 'bg-emerald-400' : 'bg-purple-400'}`} />
+                        <span className="text-gray-200 text-sm flex-1 font-medium">{x.storeName || x.username}</span>
                         <span className="text-gray-600 text-xs">{label} atrás</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${x.tenantId ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-purple-500/10 text-purple-400 border-purple-500/20'}`}>
-                          {x.tenantId ? 'DIST' : 'MERC'}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDist ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'}`}>
+                          {isDist ? 'DIST' : 'MERC'}
                         </span>
                       </div>
                     )
@@ -1145,25 +1221,38 @@ export default function MasterPainel() {
               )}
             </div>
 
-            {/* quick nav */}
-            <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => setTab('markets')}
-                className="flex items-center gap-3 p-5 rounded-2xl border border-gray-700 bg-gray-800/40 hover:bg-gray-800 transition-all text-left group">
-                <Store className="w-8 h-8 text-purple-400" />
-                <div>
-                  <div className="font-black text-white">Mercados</div>
-                  <div className="text-gray-500 text-xs">{markets.length} cadastrados · {mActive.length} ativos</div>
-                </div>
-              </button>
-              <button onClick={() => setTab('dist')}
-                className="flex items-center gap-3 p-5 rounded-2xl border border-gray-700 bg-gray-800/40 hover:bg-gray-800 transition-all text-left group">
-                <Truck className="w-8 h-8 text-emerald-400" />
-                <div>
-                  <div className="font-black text-white">Distribuidores</div>
-                  <div className="text-gray-500 text-xs">{distributors.length} cadastrados · {dActive.length} ativos</div>
-                </div>
-              </button>
+            {/* Quick nav */}
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { tab:'markets', icon: Store, label:'Mercados', sub:`${markets.length} cadastrados · ${mActive.length} ativos`, color:'#a78bfa' },
+                { tab:'dist',    icon: Truck, label:'Distribuidores', sub:`${distributors.length} cadastrados · ${dActive.length} ativos`, color:'#34d399' },
+              ].map(c => (
+                <button key={c.tab} onClick={() => setTab(c.tab)}
+                  className="flex items-center gap-4 p-5 rounded-2xl border border-gray-800 bg-gray-900 hover:bg-gray-800 hover:border-gray-700 transition-all text-left group">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: `${c.color}18`, border: `1px solid ${c.color}30` }}>
+                    <c.icon className="w-5 h-5" style={{ color: c.color }} />
+                  </div>
+                  <div>
+                    <div className="font-black text-white text-sm">{c.label}</div>
+                    <div className="text-gray-500 text-xs mt-0.5">{c.sub}</div>
+                  </div>
+                </button>
+              ))}
             </div>
+
+            {/* CTA Prospectar */}
+            <button onClick={() => setTab('prospect')}
+              className="w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-orange-500/10 to-orange-600/5 border border-orange-500/20 hover:border-orange-500/40 transition-all text-left group">
+              <div className="w-11 h-11 rounded-xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center flex-shrink-0">
+                <Send className="w-5 h-5 text-orange-400" />
+              </div>
+              <div className="flex-1">
+                <div className="font-black text-white text-sm flex items-center gap-2">Prospectar com Zara <span className="text-orange-400">🚀</span></div>
+                <div className="text-gray-500 text-xs mt-0.5">Busca mercados automaticamente e dispara mensagens com a Zara</div>
+              </div>
+              <div className="text-gray-600 text-sm group-hover:text-orange-400 transition-colors">→</div>
+            </button>
           </div>
         )}
 
@@ -1497,14 +1586,160 @@ export default function MasterPainel() {
           </div>
 
           {/* Inner tabs */}
-          <div className="flex gap-2">
-            {[{ id:'capture', label:'📥 Capturar Contatos' }, { id:'queue', label:`📋 Fila (${queueStats.pending||0})` }].map(t => (
+          <div className="flex gap-2 overflow-x-auto pb-0.5">
+            {[
+              { id:'search',  label:'🔍 Buscar Automático' },
+              { id:'capture', label:'➕ Adicionar' },
+              { id:'queue',   label:`📋 Fila (${queueStats.pending||0})` },
+            ].map(t => (
               <button key={t.id} onClick={() => setProspInnerTab(t.id)}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${prospInnerTab===t.id ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${prospInnerTab===t.id ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
                 {t.label}
               </button>
             ))}
           </div>
+
+          {/* ── SUB: BUSCAR AUTOMÁTICO ────────────────────────── */}
+          {prospInnerTab === 'search' && (
+            <div className="space-y-4">
+              {googleKey === null && (
+                <div className="text-center py-10 text-gray-600"><Loader2 className="w-6 h-6 mx-auto animate-spin mb-2" /><p className="text-sm">Verificando configuração...</p></div>
+              )}
+
+              {googleKey === false && (
+                <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 space-y-5">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0 text-2xl">🗺️</div>
+                    <div>
+                      <h3 className="text-white font-black text-lg">Ativar busca automática de mercados</h3>
+                      <p className="text-gray-400 text-sm mt-1">Integra com o Google Maps e busca automaticamente os contatos de mercadinhos perto de qualquer cidade — com nome, telefone e avaliação.</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-800/50 rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-wider">✅ Como ativar (grátis, ~5 minutos)</p>
+                    {[
+                      { n:'1', text:'Acesse', link:'https://console.cloud.google.com', linkText:'console.cloud.google.com' },
+                      { n:'2', text:'Crie um projeto → ative "Places API (New)"' },
+                      { n:'3', text:'Credenciais → criar chave de API → copie a chave' },
+                      { n:'4', text:'Netlify → seu site → Variables → adicione:', code:'GOOGLE_PLACES_API_KEY = sua-chave-aqui' },
+                      { n:'5', text:'Redeploy automático → volte aqui e clique "Verificar novamente"' },
+                    ].map(s => (
+                      <div key={s.n} className="flex gap-2.5 text-sm text-gray-400">
+                        <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">{s.n}</span>
+                        <span>
+                          {s.text}{' '}
+                          {s.link && <a href={s.link} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:underline">{s.linkText}</a>}
+                          {s.code && <code className="block mt-1 bg-gray-900 px-3 py-1.5 rounded-lg text-xs text-green-400 font-mono">{s.code}</code>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button onClick={checkGoogleKey} className="flex-1 py-3 rounded-xl bg-orange-500 hover:bg-orange-400 text-white font-black text-sm transition-all">
+                      🔄 Verificar novamente
+                    </button>
+                    <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" rel="noopener noreferrer"
+                      className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-bold text-sm text-center transition-all">
+                      Ir para Google Cloud →
+                    </a>
+                  </div>
+
+                  <p className="text-xs text-gray-600 text-center">💡 Google dá $200/mês grátis → equivale a ~6.000 buscas grátis (~120.000 contatos por mês)</p>
+                </div>
+              )}
+
+              {googleKey === true && (
+                <div className="space-y-4">
+                  {/* Barra de busca */}
+                  <div className="bg-gray-900 rounded-2xl border border-gray-800 p-5 space-y-4">
+                    <p className="text-sm font-black text-white">🔍 Buscar estabelecimentos</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-1">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">O que buscar</label>
+                        <select value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 text-sm transition-colors">
+                          {['mercado','supermercado','mercearia','mini mercado','mercadinho','padaria','açougue','distribuidora','atacado'].map(q => (
+                            <option key={q} value={q}>{q}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Cidade / região</label>
+                        <input value={searchCity} onChange={e => setSearchCity(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && runSearch()}
+                          placeholder="Itapeva SP"
+                          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 text-sm transition-colors" />
+                      </div>
+                    </div>
+                    <button onClick={() => runSearch()} disabled={searchLoading || !searchCity.trim()}
+                      className="w-full py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20">
+                      {searchLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Buscando no Google Maps...</> : <><Send className="w-4 h-4" /> Buscar mercados agora</>}
+                    </button>
+                  </div>
+
+                  {/* Resultados */}
+                  {searchResults.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-bold text-white">{searchResults.length} encontrado{searchResults.length>1?'s':''} com telefone</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => setSearchSelected(new Set(searchResults.map(r => r.phone)))}
+                            className="text-xs text-orange-400 hover:text-orange-300 font-bold">
+                            Selecionar todos
+                          </button>
+                          <span className="text-gray-700">·</span>
+                          <button onClick={() => setSearchSelected(new Set())}
+                            className="text-xs text-gray-500 hover:text-gray-400 font-bold">
+                            Limpar
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {searchResults.map(r => {
+                          const selected = searchSelected.has(r.phone)
+                          return (
+                            <button key={r.phone} onClick={() => toggleSelect(r.phone)}
+                              className={`flex items-start gap-3 p-4 rounded-xl border text-left transition-all ${selected ? 'border-orange-500/50 bg-orange-500/10' : 'border-gray-800 bg-gray-900 hover:border-gray-700'}`}>
+                              <div className={`w-5 h-5 rounded-md border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${selected ? 'border-orange-500 bg-orange-500' : 'border-gray-600'}`}>
+                                {selected && <Check className="w-3 h-3 text-white" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white font-bold text-sm truncate">{r.name}</p>
+                                {r.rating && (
+                                  <p className="text-yellow-400 text-xs mt-0.5">⭐ {r.rating.toFixed(1)} <span className="text-gray-600">({r.reviews})</span></p>
+                                )}
+                                <p className="text-green-400 text-xs font-mono mt-0.5">{r.phone}</p>
+                                {r.address && <p className="text-gray-600 text-xs mt-0.5 truncate">📍 {r.address.split(',').slice(0,2).join(',')}</p>}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      {searchNextPage && (
+                        <button onClick={() => runSearch(searchNextPage)} disabled={searchLoading}
+                          className="w-full py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-bold transition-all disabled:opacity-50">
+                          {searchLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Carregar mais resultados'}
+                        </button>
+                      )}
+
+                      {searchSelected.size > 0 && (
+                        <button onClick={addSearchToQueue} disabled={addingSearch}
+                          className="w-full py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 sticky bottom-4">
+                          {addingSearch
+                            ? <><Loader2 className="w-4 h-4 animate-spin" /> Adicionando à fila...</>
+                            : <><Plus className="w-4 h-4" /> Adicionar {searchSelected.size} selecionado{searchSelected.size>1?'s':''} à fila de disparo</>}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── SUB: CAPTURAR ─────────────────────────────────── */}
           {prospInnerTab === 'capture' && (
