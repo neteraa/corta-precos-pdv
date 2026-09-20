@@ -62,6 +62,10 @@ export default async (req) => {
   if (req.method === 'OPTIONS') return new Response('', { status: 204, headers: CORS })
   if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'POST only' }), { status: 405, headers: CORS })
 
+  const mk = req.headers.get('x-master-key') || ''
+  if (mk !== (process.env.ZS_MASTER_KEY || 'zatende2026master'))
+    return new Response(JSON.stringify({ error: 'Não autorizado' }), { status: 401, headers: CORS })
+
   let body
   try { body = await req.json() } catch { return new Response(JSON.stringify({ error: 'JSON inválido' }), { status: 400, headers: CORS }) }
 
