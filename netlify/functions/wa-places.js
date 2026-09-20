@@ -1,67 +1,82 @@
 /**
- * wa-places — Busca automática de estabelecimentos via Google Places API
+ * wa-places — Busca automática de estabelecimentos via Google Places API (Legacy)
  *
  * POST /api/wa-places
- * Body: { query: "mercado", city: "Itapeva SP", radius?: 5000, pageToken? }
+ * Body: { query: "mercado", city: "Itapeva SP", pageToken? }
  * Returns: { ok, results: [{name, phone, address, rating, reviews}], nextPageToken? }
  *
+ * Usa Places API Legacy (Text Search + Place Details) — compatível com chaves
+ * restritas a "Places API" no Google Cloud Console.
  * Requer: GOOGLE_PLACES_API_KEY no Netlify env
  */
 
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+const BASE  = 'https://maps.googleapis.com/maps/api/place'
 
 function authOk(req) {
   return (req.headers.get('x-master-key') || '') === (process.env.ZS_MASTER_KEY || 'zatende2026master')
 }
 
-// ── Google Places API (New) ──────────────────────────────────────────────────
+// ── Google Places API Legacy: Text Search + Place Details ────────────────────
 async function searchGooglePlaces(query, city, pageToken) {
   const key = process.env.GOOGLE_PLACES_API_KEY
   if (!key) throw new Error('NO_KEY')
 
-  const body = {
-    textQuery:      `${query} em ${city}`,
-    languageCode:   'pt-BR',
-    regionCode:     'BR',
-    maxResultCount: 20,
-    ...(pageToken ? { pageToken } : {}),
+  // 1) Text Search — retorna lista de lugares (sem telefone)
+  const searchUrl = new URL(`${BASE}/textsearch/json`)
+  searchUrl.searchParams.set('query',    `${query} em ${city}`)
+  searchUrl.searchParams.set('key',      key)
+  searchUrl.searchParams.set('language', 'pt-BR')
+  searchUrl.searchParams.set('region',   'br')
+  if (pageToken) searchUrl.searchParams.set('pagetoken', pageToken)
+
+  const searchRes = await fetch(searchUrl.toString())
+  if (!searchRes.ok) throw new Error(`TextSearch HTTP ${searchRes.status}`)
+
+  const searchData = await searchRes.json()
+  if (searchData.status !== 'OK' && searchData.status !== 'ZERO_RESULTS') {
+    throw new Error(searchData.error_message || searchData.status || 'SEARCH_ERROR')
   }
 
-  const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
-    method:  'POST',
-    headers: {
-      'Content-Type':    'application/json',
-      'X-Goog-Api-Key':  key,
-      'X-Goog-FieldMask': [
-        'places.displayName',
-        'places.formattedAddress',
-        'places.nationalPhoneNumber',
-        'places.internationalPhoneNumber',
-        'places.rating',
-        'places.userRatingCount',
-        'places.id',
-        'nextPageToken',
-      ].join(','),
-    },
-    body: JSON.stringify(body),
-  })
+  const places = searchData.results || []
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err?.error?.message || `Google API ${res.status}`)
-  }
+  // 2) Place Details em paralelo — busca telefone de cada lugar
+  const withDetails = await Promise.all(
+    places.map(async (place) => {
+      try {
+        const detailUrl = new URL(`${BASE}/details/json`)
+        detailUrl.searchParams.set('place_id', place.place_id)
+        detailUrl.searchParams.set('fields',   'formatted_phone_number,international_phone_number')
+        detailUrl.searchParams.set('key',      key)
+        detailUrl.searchParams.set('language', 'pt-BR')
 
-  const data = await res.json()
-  const results = (data.places || []).map(p => ({
-    id:      p.id,
-    name:    p.displayName?.text || '(sem nome)',
-    phone:   p.nationalPhoneNumber || p.internationalPhoneNumber || null,
-    address: p.formattedAddress || '',
-    rating:  p.rating || null,
-    reviews: p.userRatingCount || 0,
-  })).filter(r => r.phone)  // só quem tem telefone
+        const detailRes  = await fetch(detailUrl.toString())
+        const detailData = await detailRes.json()
+        const r          = detailData.result || {}
 
-  return { results, nextPageToken: data.nextPageToken || null }
+        // Normaliza telefone: remove tudo que não for dígito, adiciona 55 se não tiver
+        let phone = (r.formatted_phone_number || r.international_phone_number || '').replace(/\D/g, '')
+        if (phone && !phone.startsWith('55')) phone = '55' + phone
+
+        return {
+          id:      place.place_id,
+          name:    place.name || '(sem nome)',
+          phone:   phone || null,
+          address: place.formatted_address || '',
+          rating:  place.rating  || null,
+          reviews: place.user_ratings_total || 0,
+        }
+      } catch {
+        return null
+      }
+    })
+  )
+
+  const results = withDetails
+    .filter(Boolean)
+    .filter(r => r.phone && r.phone.length >= 12) // só quem tem telefone válido
+
+  return { results, nextPageToken: searchData.next_page_token || null }
 }
 
 export default async (req) => {
