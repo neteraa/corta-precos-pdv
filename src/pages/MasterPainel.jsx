@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, TrendingUp, AlertTriangle, CalendarClock, Mail, ClipboardList, CheckCircle2, XCircle, MessageCircle, Phone, MapPin, Bot, Users, Building2, Flame } from 'lucide-react'
+import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, TrendingUp, AlertTriangle, CalendarClock, Mail, ClipboardList, CheckCircle2, XCircle, MessageCircle, Phone, MapPin, Bot, Users, Building2, Flame, Send, Loader2 } from 'lucide-react'
 import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 
 /* ─── constants ──────────────────────────────────────────── */
@@ -700,6 +700,14 @@ export default function MasterPainel() {
   const [tab,          setTab]           = useState('overview')
   const [leads,        setLeads]         = useState([])
   const [leadsLoading, setLeadsLoading]  = useState(false)
+
+  // ── Prospecção ──────────────────────────────────────────────
+  const [prospPhone,   setProspPhone]    = useState('')
+  const [prospName,    setProspName]     = useState('')
+  const [prospBulk,    setProspBulk]     = useState('')
+  const [prospMode,    setProspMode]     = useState('single') // 'single' | 'bulk'
+  const [prospSending, setProspSending]  = useState(false)
+  const [prospResults, setProspResults]  = useState(null)
   const [approving,    setApproving]     = useState(null) // id being processed
 
   const load = useCallback(async (key = mk) => {
@@ -740,6 +748,41 @@ export default function MasterPainel() {
 
   // Carrega leads ao entrar na aba
   useEffect(() => { if (tab === 'leads' && mk) loadLeads() }, [tab, mk, loadLeads])
+
+  // ── Envia prospecção via Zara ─────────────────────────────
+  const sendProspect = useCallback(async () => {
+    if (prospSending) return
+    setProspSending(true)
+    setProspResults(null)
+    try {
+      let contacts = []
+      if (prospMode === 'single') {
+        if (!prospPhone.trim()) return
+        contacts = [{ phone: prospPhone.trim(), name: prospName.trim() }]
+      } else {
+        contacts = prospBulk.split('\n')
+          .map(l => l.trim()).filter(Boolean)
+          .map(l => {
+            const parts = l.split(/[,;\t]/)
+            return { phone: parts[0]?.trim(), name: parts[1]?.trim() || '' }
+          }).filter(c => c.phone)
+      }
+      const res = await fetch('/api/wa-prospect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-master-key': mk },
+        body: JSON.stringify({ contacts }),
+      })
+      const data = await res.json()
+      setProspResults(data)
+      if (prospMode === 'single' && data.sent > 0) {
+        setProspPhone(''); setProspName('')
+      }
+    } catch (e) {
+      setProspResults({ ok: false, error: e.message })
+    } finally {
+      setProspSending(false)
+    }
+  }, [prospSending, prospMode, prospPhone, prospName, prospBulk, mk])
 
   const accessMarket = (market) => {
     localStorage.setItem('zs_master_session', JSON.stringify({ mk, returnTo: '/painel' }))
@@ -837,6 +880,7 @@ export default function MasterPainel() {
     { id: 'markets',   label: `Mercados (${markets.length})`,                         icon: Store         },
     { id: 'dist',      label: `Distribuidores (${distributors.length})`,              icon: Truck         },
     { id: 'leads',     label: leads.length > 0 ? `Leads Bot (${leads.length})` : 'Leads Bot', icon: Bot },
+    { id: 'prospect',  label: 'Prospectar 🚀',  icon: Send },
   ]
 
   return (
@@ -1282,6 +1326,153 @@ export default function MasterPainel() {
           </div>
         )}
       </div>
+
+      {/* ── ABA PROSPECÇÃO ──────────────────────────────────── */}
+      {tab === 'prospect' && (
+        <div className="space-y-6">
+
+          {/* Header */}
+          <div>
+            <h2 className="text-xl font-black text-white flex items-center gap-2">
+              <Send className="w-5 h-5 text-orange-400" /> Prospectar com Zara
+            </h2>
+            <p className="text-gray-500 text-sm mt-0.5">
+              Zara manda a primeira mensagem pelo WhatsApp — quando responderem, ela já assume a conversa automaticamente.
+            </p>
+          </div>
+
+          {/* Modo single / bulk */}
+          <div className="flex gap-2">
+            {[{ id: 'single', label: '1 contato' }, { id: 'bulk', label: 'Lista (vários)' }].map(m => (
+              <button key={m.id} onClick={() => { setProspMode(m.id); setProspResults(null) }}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                  prospMode === m.id ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Card principal */}
+          <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 space-y-5">
+
+            {prospMode === 'single' ? (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">
+                      WhatsApp do mercado *
+                    </label>
+                    <input value={prospPhone} onChange={e => setProspPhone(e.target.value)}
+                      placeholder="(15) 99999-9999"
+                      className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">
+                      Nome do mercado (opcional)
+                    </label>
+                    <input value={prospName} onChange={e => setProspName(e.target.value)}
+                      placeholder="Mercado São José"
+                      className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm" />
+                  </div>
+                </div>
+
+                {/* Preview da mensagem */}
+                <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700/50">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">📱 Preview — mensagem que a Zara vai mandar:</p>
+                  <div className="bg-[#005c4b] rounded-2xl rounded-tl-sm p-4 max-w-xs text-sm text-white leading-relaxed font-light space-y-1.5">
+                    <p>{prospName ? `Oi, *${prospName}*! 👋` : 'Oi! 👋'}</p>
+                    <p className="opacity-0 select-none text-[2px]">.</p>
+                    <p>Vi o mercado de vocês aqui na região e queria apresentar uma coisa rápida.</p>
+                    <p className="opacity-0 select-none text-[2px]">.</p>
+                    <p>Tenho um sistema que ajuda mercadinhos a:<br/>✅ Controlar estoque pelo celular<br/>✅ Fazer vendas sem papel<br/>✅ Vender mais pelo WhatsApp</p>
+                    <p className="opacity-0 select-none text-[2px]">.</p>
+                    <p>Tudo por menos de *R$10 por dia* — e começa a funcionar no mesmo dia.</p>
+                    <p className="opacity-0 select-none text-[2px]">.</p>
+                    <p>Posso te mostrar em 10 minutinhos? Sem compromisso 😊</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">
+                    Lista de contatos — um por linha (telefone, nome do mercado)
+                  </label>
+                  <textarea value={prospBulk} onChange={e => setProspBulk(e.target.value)} rows={8}
+                    placeholder={"(15) 99111-2222, Mercado São José\n(15) 98333-4444, Minimercado da Dona Rosa\n(15) 97555-6666\n(11) 99777-8888, Mercearia Central"}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm font-mono resize-none" />
+                  <p className="text-xs text-gray-600 mt-2">
+                    Formato: <code className="text-orange-400">telefone, Nome do Mercado</code> — nome é opcional. Máximo 30 por vez. Delay automático entre envios pra não cair no ban.
+                  </p>
+                </div>
+                {prospBulk.trim() && (
+                  <div className="flex items-center gap-2 text-sm text-gray-400 bg-gray-800/50 rounded-xl px-4 py-2.5">
+                    <Users className="w-4 h-4 text-orange-400" />
+                    <span><b className="text-white">{Math.min(prospBulk.split('\n').filter(l => l.trim()).length, 30)}</b> contatos prontos pra envio</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Botão enviar */}
+            <button onClick={sendProspect} disabled={prospSending || (prospMode === 'single' ? !prospPhone.trim() : !prospBulk.trim())}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-base transition-all shadow-lg shadow-orange-500/20">
+              {prospSending
+                ? <><Loader2 className="w-5 h-5 animate-spin" /> Zara está enviando{prospMode === 'bulk' ? ' (aguarde, tem delay anti-ban)' : '...'}</>
+                : <><Send className="w-5 h-5" /> {prospMode === 'single' ? 'Zara mandar mensagem agora' : 'Zara disparar para toda a lista'}</>
+              }
+            </button>
+
+            {/* Resultado */}
+            {prospResults && (
+              <div className={`rounded-xl p-4 border ${prospResults.sent > 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                {prospResults.sent > 0 && (
+                  <p className="text-green-400 font-bold flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="w-4 h-4" /> {prospResults.sent} mensagem{prospResults.sent > 1 ? 'ns' : ''} enviada{prospResults.sent > 1 ? 's' : ''} com sucesso!
+                  </p>
+                )}
+                {prospResults.failed > 0 && (
+                  <p className="text-red-400 font-bold flex items-center gap-2 mb-2">
+                    <XCircle className="w-4 h-4" /> {prospResults.failed} falhou
+                  </p>
+                )}
+                {prospResults.error && (
+                  <p className="text-red-400 text-sm">{prospResults.error}</p>
+                )}
+                {Array.isArray(prospResults.results) && prospResults.results.length > 1 && (
+                  <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
+                    {prospResults.results.map((r, i) => (
+                      <div key={i} className={`flex items-center gap-2 text-xs py-1 ${r.ok ? 'text-gray-400' : 'text-red-400'}`}>
+                        {r.ok ? <CheckCircle2 className="w-3 h-3 text-green-400 flex-shrink-0" /> : <XCircle className="w-3 h-3 flex-shrink-0" />}
+                        <span className="font-mono">{r.phone}</span>
+                        {r.name && <span className="text-gray-500">— {r.name}</span>}
+                        {!r.ok && r.error && <span className="ml-auto text-red-400/70">{r.error}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {prospResults.sent > 0 && (
+                  <p className="text-xs text-gray-500 mt-3">
+                    💡 Quando responderem, a Zara assume a conversa automaticamente. Acompanhe na aba <b className="text-orange-400">Leads Bot</b>.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Dica */}
+          <div className="bg-gray-900/50 rounded-2xl border border-gray-800 p-5 space-y-3">
+            <p className="text-sm font-black text-gray-300">💡 Como usar pra fechar sua primeira venda</p>
+            <ol className="text-sm text-gray-500 space-y-2 list-decimal list-inside">
+              <li>Pesquisa <span className="text-white">"mercado Itapeva SP"</span> no Google Maps → pega o WhatsApp</li>
+              <li>Cola o número aqui em cima → Zara manda a mensagem</li>
+              <li>Quando o dono responder → Zara qualifica automaticamente</li>
+              <li>Quando aparece <span className="text-yellow-400 font-bold">Quer demo</span> na aba Leads → você entra na conversa e fecha</li>
+            </ol>
+            <p className="text-xs text-gray-600">Anti-ban ativo: delay aleatório de 12-25s entre envios em massa. Máximo 30/rodada.</p>
+          </div>
+        </div>
+      )}
 
       {showAdd === 'market' && (
         <AddMarketModal mk={mk} onClose={() => setShowAdd(false)} onCreated={() => { setShowAdd(false); load() }} />
