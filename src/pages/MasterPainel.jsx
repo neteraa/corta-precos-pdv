@@ -702,15 +702,24 @@ export default function MasterPainel() {
   const [leadsLoading, setLeadsLoading]  = useState(false)
 
   // ── Prospecção — fila ──────────────────────────────────────
-  const [prospInnerTab, setProspInnerTab] = useState('capture')
-  const [captureText,   setCaptureText]   = useState('')
-  const [parsedPhones,  setParsedPhones]  = useState([])
-  const [addingQueue,   setAddingQueue]   = useState(false)
-  const [queue,         setQueue]         = useState([])
-  const [queueStats,    setQueueStats]    = useState({ pending:0, sent:0, failed:0, dailySent:0, dailyLimit:30 })
-  const [queueLoading,  setQueueLoading]  = useState(false)
-  const [sendProgress,  setSendProgress]  = useState(null)
-  const [sendLog,       setSendLog]       = useState([])
+  const [prospInnerTab, setProspInnerTab]   = useState('capture')
+  // entrada manual
+  const [manualPhone,   setManualPhone]     = useState('')
+  const [manualName,    setManualName]      = useState('')
+  // colar texto em massa
+  const [captureText,   setCaptureText]     = useState('')
+  const [parsedPhones,  setParsedPhones]    = useState([])
+  const [addingQueue,   setAddingQueue]     = useState(false)
+  // fila
+  const [queue,         setQueue]           = useState([])
+  const [queueStats,    setQueueStats]      = useState({ pending:0, sent:0, failed:0, dailySent:0, dailyLimit:20 })
+  const [queueLoading,  setQueueLoading]    = useState(false)
+  // validação WA
+  const [validating,    setValidating]      = useState(false)
+  const [validResult,   setValidResult]     = useState(null)
+  // disparo
+  const [sendProgress,  setSendProgress]    = useState(null)
+  const [sendLog,       setSendLog]         = useState([])
   const stopRef = useRef(false)
   const [approving,    setApproving]     = useState(null) // id being processed
 
@@ -774,22 +783,40 @@ export default function MasterPainel() {
 
   useEffect(() => { if (tab === 'prospect' && mk) loadQueue() }, [tab, mk, loadQueue])
 
+  // Normaliza telefone no frontend (igual ao backend)
+  const normalizePhone = useCallback((raw) => {
+    const d = raw.replace(/\D/g, '').replace(/^0+/, '')
+    if (d.startsWith('55') && d.length >= 12) return d
+    if (d.length === 11) return `55${d}`
+    if (d.length === 10) return `55${d}`
+    return null
+  }, [])
+
+  // Entrada manual — adiciona um número direto à fila
+  const addManual = useCallback(async () => {
+    const phone = normalizePhone(manualPhone)
+    if (!phone) return
+    setAddingQueue(true)
+    try {
+      const res = await queueApi({ action: 'add', contacts: [{ phone, name: manualName.trim() }] })
+      if (res.ok) { setManualPhone(''); setManualName(''); await loadQueue() }
+    } finally { setAddingQueue(false) }
+  }, [manualPhone, manualName, normalizePhone, queueApi, loadQueue])
+
+  // Parser de texto em massa
   const parsePhones = useCallback((text) => {
     const found = new Set()
-    // Pattern 1: (15) 99999-9999 ou (15) 3523-4567
     const p1 = /\(([1-9]\d)\)\s*([0-9]{4,5})[-\s]([0-9]{4})/g
     let m
     while ((m = p1.exec(text)) !== null) {
       const n = `55${m[1]}${m[2]}${m[3]}`
       if (n.length >= 12 && n.length <= 13) found.add(n)
     }
-    // Pattern 2: 15 99999-9999 (sem parênteses)
     const p2 = /\b([1-9]\d)\s+([0-9]{4,5})[-\s]([0-9]{4})\b/g
     while ((m = p2.exec(text)) !== null) {
       const n = `55${m[1]}${m[2]}${m[3]}`
       if (n.length >= 12 && n.length <= 13) found.add(n)
     }
-    // Pattern 3: número cru 10-11 dígitos
     const p3 = /\b([1-9]\d)(\d{8,9})\b/g
     while ((m = p3.exec(text)) !== null) {
       const n = `55${m[1]}${m[2]}`
@@ -801,8 +828,7 @@ export default function MasterPainel() {
   const handleParseText = useCallback(() => {
     const phones = parsePhones(captureText)
     const existingPhones = new Set(queue.map(c => c.phone))
-    const newPhones = phones.filter(p => !existingPhones.has(p.phone))
-    setParsedPhones(newPhones)
+    setParsedPhones(phones.filter(p => !existingPhones.has(p.phone)))
   }, [captureText, parsePhones, queue])
 
   const addParsedToQueue = useCallback(async () => {
@@ -810,23 +836,54 @@ export default function MasterPainel() {
     setAddingQueue(true)
     try {
       const res = await queueApi({ action: 'add', contacts: parsedPhones })
-      if (res.ok) {
-        setCaptureText(''); setParsedPhones([])
-        await loadQueue()
-        setProspInnerTab('queue')
-      }
+      if (res.ok) { setCaptureText(''); setParsedPhones([]); await loadQueue(); setProspInnerTab('queue') }
     } finally { setAddingQueue(false) }
   }, [parsedPhones, queueApi, loadQueue])
 
+  // Validação WhatsApp — verifica se números têm WA antes de enviar
+  const validateQueueWA = useCallback(async () => {
+    const pending = queue.filter(c => c.status === 'pending')
+    if (!pending.length) return
+    setValidating(true)
+    setValidResult(null)
+    try {
+      const res = await fetch('/api/wa-validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-master-key': mk },
+        body: JSON.stringify({ phones: pending.map(c => c.phone) }),
+      })
+      const data = await res.json()
+      setValidResult(data)
+      // Remove da fila quem não tem WhatsApp
+      if (data.ok && data.results) {
+        const noWA = data.results.filter(r => !r.exists).map(r => r.phone)
+        for (const c of pending) {
+          if (noWA.includes(c.phone)) {
+            await queueApi({ action: 'update', id: c.id, status: 'failed', error: 'Sem WhatsApp' })
+          }
+        }
+        await loadQueue()
+      }
+    } finally { setValidating(false) }
+  }, [queue, mk, queueApi, loadQueue])
+
+  // Disparo com delay anti-ban real (45-90s) e template rotativo
   const startQueueSend = useCallback(async () => {
     const pending = queue.filter(c => c.status === 'pending')
     if (!pending.length) return
-    const canSend = Math.min(pending.length, queueStats.dailyLimit - queueStats.dailySent)
+    const canSend = Math.min(pending.length, (queueStats.dailyLimit || 20) - (queueStats.dailySent || 0))
     if (canSend <= 0) return
+
+    const hour = new Date().getHours()
+    if (hour < 8 || hour >= 19) {
+      if (!window.confirm('São ' + hour + 'h — fora do horário comercial (8h-19h). WhatsApp detecta envios noturnos como spam. Quer continuar mesmo assim?')) return
+    }
 
     stopRef.current = false
     setSendProgress({ current: 0, total: canSend })
     setSendLog([])
+
+    const baseTemplateIdx = Math.floor(Math.random() * 6)
 
     for (let i = 0; i < canSend; i++) {
       if (stopRef.current) break
@@ -836,7 +893,7 @@ export default function MasterPainel() {
         const res = await fetch('/api/wa-prospect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-master-key': mk },
-          body: JSON.stringify({ contacts: [{ phone: contact.phone, name: contact.name }] }),
+          body: JSON.stringify({ contacts: [{ phone: contact.phone, name: contact.name, templateIdx: baseTemplateIdx + i }] }),
         })
         const data = await res.json()
         const success = data.sent > 0
@@ -850,8 +907,11 @@ export default function MasterPainel() {
       setSendProgress({ current: i + 1, total: canSend })
 
       if (i < canSend - 1 && !stopRef.current) {
-        // Anti-ban: delay aleatório 15-28s
-        await new Promise(r => setTimeout(r, 15000 + Math.floor(Math.random() * 13000)))
+        // Anti-ban: 45-90s entre mensagens (recomendação pra cold outreach no WA)
+        const waitMs = 45000 + Math.floor(Math.random() * 45000)
+        setSendProgress(prev => ({ ...prev, nextIn: Math.round(waitMs / 1000) }))
+        await new Promise(r => setTimeout(r, waitMs))
+        setSendProgress(prev => prev ? { ...prev, nextIn: null } : null)
       }
     }
 
@@ -1448,61 +1508,91 @@ export default function MasterPainel() {
 
           {/* ── SUB: CAPTURAR ─────────────────────────────────── */}
           {prospInnerTab === 'capture' && (
-            <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 space-y-5">
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">
-                  Cole qualquer texto com telefones aqui 👇
-                </label>
-                <textarea value={captureText} onChange={e => { setCaptureText(e.target.value); setParsedPhones([]) }}
-                  rows={9} placeholder={`Cole texto de qualquer fonte — Google Maps, site, lista, WhatsApp...\n\nExemplos que funcionam:\n  Mercado São José · (15) 3522-1234 · Aberto\n  Minimercado: 15 99988-7766\n  +55 (15) 98765-4321\n  15987654321`}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm font-mono resize-none" />
-              </div>
+            <div className="space-y-4">
 
-              <button onClick={handleParseText} disabled={!captureText.trim()}
-                className="w-full py-3 rounded-xl bg-gray-700 hover:bg-gray-600 disabled:opacity-40 text-white font-bold text-sm transition-all flex items-center justify-center gap-2">
-                🔍 Extrair telefones do texto
-              </button>
-
-              {parsedPhones.length > 0 && (
-                <div className="space-y-3">
-                  <p className="text-sm font-bold text-green-400 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" /> {parsedPhones.length} telefone{parsedPhones.length>1?'s':''} encontrado{parsedPhones.length>1?'s':''}
-                  </p>
-                  <div className="bg-gray-800 rounded-xl max-h-48 overflow-y-auto divide-y divide-gray-700/50">
-                    {parsedPhones.map((p, i) => (
-                      <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                        <Phone className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
-                        <span className="font-mono text-sm text-white">+{p.phone.slice(0,2)} ({p.phone.slice(2,4)}) {p.phone.slice(4,9)}-{p.phone.slice(9)}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <button onClick={addParsedToQueue} disabled={addingQueue}
-                    className="w-full py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20">
-                    {addingQueue
-                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Adicionando...</>
-                      : <><Plus className="w-4 h-4" /> Adicionar {parsedPhones.length} à fila de disparo</>}
+              {/* ── ENTRADA MANUAL (primária) ─── */}
+              <div className="bg-gray-900 rounded-2xl border border-gray-800 p-5 space-y-4">
+                <div>
+                  <p className="text-sm font-black text-white mb-0.5">➕ Adicionar número manualmente</p>
+                  <p className="text-xs text-gray-500">Abre o Google Maps → clica num mercado → copia o telefone → cola aqui</p>
+                </div>
+                <div className="flex gap-2">
+                  <input value={manualPhone} onChange={e => setManualPhone(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addManual()}
+                    placeholder="(15) 99999-9999"
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm" />
+                  <input value={manualName} onChange={e => setManualName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addManual()}
+                    placeholder="Nome do mercado (opcional)"
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm hidden sm:block" />
+                  <button onClick={addManual} disabled={addingQueue || !normalizePhone(manualPhone)}
+                    className="px-5 py-3 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white font-black text-lg transition-all">
+                    {addingQueue ? <Loader2 className="w-5 h-5 animate-spin" /> : '+'}
                   </button>
                 </div>
-              )}
+                {/* campo de nome no mobile */}
+                <input value={manualName} onChange={e => setManualName(e.target.value)}
+                  placeholder="Nome do mercado (opcional)"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm sm:hidden" />
 
-              {parsedPhones.length === 0 && captureText.trim() && (
-                <p className="text-sm text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
-                  ⚠️ Nenhum telefone reconhecido. Tente colar texto com números no formato (15) 9999-9999 ou 15999999999.
-                </p>
-              )}
-
-              {/* Como capturar do Google Maps */}
-              <div className="border-t border-gray-800 pt-4 space-y-3">
-                <p className="text-xs font-black text-gray-500 uppercase tracking-wider">📍 Como pegar contatos do Google Maps grátis</p>
-                <ol className="text-sm text-gray-400 space-y-2">
-                  <li className="flex gap-2"><span className="text-orange-400 font-black flex-shrink-0">1.</span> Pesquisa <span className="bg-gray-800 px-1.5 py-0.5 rounded text-white font-mono text-xs">"mercado Itapeva SP"</span> no Google Maps</li>
-                  <li className="flex gap-2"><span className="text-orange-400 font-black flex-shrink-0">2.</span> Clica num mercado → aparece o telefone no painel</li>
-                  <li className="flex gap-2"><span className="text-orange-400 font-black flex-shrink-0">3.</span> Copia o telefone (ou seleciona todo o texto da página)</li>
-                  <li className="flex gap-2"><span className="text-orange-400 font-black flex-shrink-0">4.</span> Cola aqui em cima → clica em extrair → adiciona à fila</li>
-                  <li className="flex gap-2"><span className="text-orange-400 font-black flex-shrink-0">5.</span> Repete pra cada mercado (leva ~2 min pra 20 contatos)</li>
-                </ol>
-                <p className="text-xs text-gray-600">💡 Dica: <a href="https://outscraper.com" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:underline">outscraper.com</a> exporta 100 contatos de uma vez por ~R$5. Vale muito a pena quando tiver mais tempo.</p>
+                {/* Dica passo-a-passo */}
+                <div className="bg-gray-800/50 rounded-xl p-3 space-y-1.5">
+                  <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">📍 Workflow: Google Maps → aqui</p>
+                  {[
+                    'Abre o Google Maps no celular ou computador',
+                    'Pesquisa "mercado Itapeva SP" (ou sua cidade)',
+                    'Clica em qualquer mercado da lista',
+                    'Copia o número de telefone que aparece',
+                    'Cola no campo acima + clica "+"',
+                    'Repete pra cada mercado — leva 30 seg por contato',
+                  ].map((s, i) => (
+                    <div key={i} className="flex gap-2 text-xs text-gray-500">
+                      <span className="text-orange-400 font-black flex-shrink-0">{i+1}.</span> {s}
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              {/* ── COLAR TEXTO EM MASSA (secundário) ─── */}
+              <details className="group bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                <summary className="px-5 py-4 cursor-pointer flex items-center justify-between text-sm font-bold text-gray-400 hover:text-white select-none">
+                  <span>📋 Colar lista de texto com vários números de uma vez</span>
+                  <span className="text-gray-600 group-open:rotate-180 transition-transform inline-block">▼</span>
+                </summary>
+                <div className="px-5 pb-5 space-y-4 border-t border-gray-800">
+                  <p className="text-xs text-gray-600 pt-4">Cole aqui qualquer texto que contenha telefones — CSV, lista do WhatsApp, texto copiado de sites. O sistema extrai os números automaticamente.</p>
+                  <textarea value={captureText} onChange={e => { setCaptureText(e.target.value); setParsedPhones([]) }}
+                    rows={6} placeholder={`(15) 3522-1234\n(15) 99988-7766\nMercado Central: (15) 3523-9999\n15 99777-8888`}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm font-mono resize-none" />
+                  <button onClick={handleParseText} disabled={!captureText.trim()}
+                    className="w-full py-3 rounded-xl bg-gray-700 hover:bg-gray-600 disabled:opacity-40 text-white font-bold text-sm transition-all">
+                    🔍 Extrair telefones do texto
+                  </button>
+                  {parsedPhones.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-sm font-bold text-green-400">✅ {parsedPhones.length} encontrado{parsedPhones.length>1?'s':''} — nenhum duplicado</p>
+                      <div className="bg-gray-800 rounded-xl max-h-36 overflow-y-auto divide-y divide-gray-700/40">
+                        {parsedPhones.map((p, i) => (
+                          <div key={i} className="flex items-center gap-3 px-3 py-2">
+                            <Phone className="w-3 h-3 text-green-400 flex-shrink-0" />
+                            <span className="font-mono text-xs text-white">+{p.phone.slice(0,2)} ({p.phone.slice(2,4)}) {p.phone.slice(4,9)}-{p.phone.slice(9)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <button onClick={addParsedToQueue} disabled={addingQueue}
+                        className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-black text-sm transition-all flex items-center justify-center gap-2">
+                        {addingQueue ? <><Loader2 className="w-4 h-4 animate-spin" /> Adicionando...</> : <><Plus className="w-4 h-4" /> Adicionar {parsedPhones.length} à fila</>}
+                      </button>
+                    </div>
+                  )}
+                  {parsedPhones.length === 0 && captureText.trim() && (
+                    <p className="text-sm text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
+                      ⚠️ Nenhum número encontrado. Os números precisam ter DDD: (15) 9999-9999 ou 15999999999.
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-600">Dica avançada: <a href="https://outscraper.com" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:underline">outscraper.com</a> exporta 100 contatos do Maps por ~R$5</p>
+                </div>
+              </details>
             </div>
           )}
 
@@ -1510,29 +1600,53 @@ export default function MasterPainel() {
           {prospInnerTab === 'queue' && (
             <div className="space-y-4">
 
-              {/* Botão disparar / parar */}
+              {/* Botões de ação */}
               {!sendProgress ? (
-                <div className="flex gap-3">
-                  <button onClick={startQueueSend}
-                    disabled={!queueStats.pending || queueStats.dailySent >= queueStats.dailyLimit}
-                    className="flex-1 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20">
-                    <Send className="w-4 h-4" />
-                    {queueStats.dailySent >= queueStats.dailyLimit
-                      ? 'Limite diário atingido (volta amanhã)'
-                      : `🚀 Zara disparar ${Math.min(queueStats.pending||0, (queueStats.dailyLimit||30)-(queueStats.dailySent||0))} agora`}
-                  </button>
-                  {(queueStats.sent > 0 || queueStats.failed > 0) && (
-                    <button onClick={() => queueApi({ action:'clear', mode:'done' }).then(loadQueue)}
-                      className="px-4 py-3.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs font-bold transition-all">
-                      Limpar enviados
+                <div className="space-y-3">
+                  {/* Validar WA primeiro */}
+                  {(queueStats.pending || 0) > 0 && (
+                    <button onClick={validateQueueWA} disabled={validating}
+                      className="w-full py-3 rounded-xl bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white font-bold text-sm transition-all flex items-center justify-center gap-2 border border-gray-700">
+                      {validating
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Verificando números no WhatsApp...</>
+                        : <><CheckCircle2 className="w-4 h-4 text-green-400" /> ① Verificar quais têm WhatsApp</>}
                     </button>
                   )}
+
+                  {validResult && (
+                    <div className={`rounded-xl px-4 py-3 text-sm border ${validResult.ok ? 'bg-gray-800/50 border-gray-700' : 'bg-red-500/10 border-red-500/30'}`}>
+                      {validResult.ok
+                        ? <span className="text-gray-300">✅ <b className="text-green-400">{validResult.valid}</b> têm WhatsApp · <b className="text-red-400">{validResult.invalid}</b> removidos da fila (sem WA)</span>
+                        : <span className="text-red-400">{validResult.error}</span>}
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button onClick={startQueueSend}
+                      disabled={!queueStats.pending || (queueStats.dailySent||0) >= (queueStats.dailyLimit||20)}
+                      className="flex-1 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20">
+                      <Send className="w-4 h-4" />
+                      {(queueStats.dailySent||0) >= (queueStats.dailyLimit||20)
+                        ? '🚫 Limite diário atingido — volta amanhã'
+                        : `② Zara disparar ${Math.min(queueStats.pending||0, (queueStats.dailyLimit||20)-(queueStats.dailySent||0))} mensagens agora`}
+                    </button>
+                    {((queueStats.sent||0) > 0 || (queueStats.failed||0) > 0) && (
+                      <button onClick={() => queueApi({ action:'clear', mode:'done' }).then(loadQueue)}
+                        className="px-4 py-3.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs font-bold transition-all">
+                        Limpar enviados
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-600 text-center">Anti-ban: delay 45-90s entre envios • max 20/dia • 6 versões diferentes da mensagem • só horário comercial</p>
                 </div>
               ) : (
                 <div className="bg-gray-900 rounded-2xl border border-orange-500/30 p-5 space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-bold text-orange-400 flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Zara enviando... {sendProgress.current}/{sendProgress.total}
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {sendProgress.nextIn
+                        ? `⏱ Aguardando ${sendProgress.nextIn}s (anti-ban)...`
+                        : `Zara enviando... ${sendProgress.current}/${sendProgress.total}`}
                     </p>
                     <button onClick={() => { stopRef.current = true }} className="text-xs text-red-400 hover:text-red-300 font-bold px-3 py-1.5 bg-red-500/10 rounded-lg">
                       ⏹ Parar
@@ -1542,18 +1656,18 @@ export default function MasterPainel() {
                     <div className="h-2 rounded-full bg-orange-500 transition-all"
                       style={{ width: `${(sendProgress.current/sendProgress.total)*100}%` }} />
                   </div>
-                  <p className="text-xs text-gray-600">Delay de 15-28s entre envios (anti-ban). Não feche o navegador.</p>
                   {sendLog.length > 0 && (
                     <div className="max-h-32 overflow-y-auto space-y-1 mt-2">
                       {sendLog.slice(-5).reverse().map((l,i) => (
                         <div key={i} className={`flex items-center gap-2 text-xs ${l.success?'text-green-400':'text-red-400'}`}>
                           {l.success ? <CheckCircle2 className="w-3 h-3 flex-shrink-0"/> : <XCircle className="w-3 h-3 flex-shrink-0"/>}
                           <span className="font-mono">+{l.phone.slice(0,2)} ({l.phone.slice(2,4)}) {l.phone.slice(4,9)}-{l.phone.slice(9)}</span>
-                          {l.name && <span className="text-gray-500">— {l.name}</span>}
+                          {l.name && <span className="text-gray-500 ml-1">— {l.name}</span>}
                         </div>
                       ))}
                     </div>
                   )}
+                  <p className="text-xs text-gray-600">Não feche o navegador. Cada mensagem usa um texto diferente.</p>
                 </div>
               )}
 

@@ -12,7 +12,7 @@ import { getStore } from '@netlify/blobs'
 
 const QUEUE_KEY  = 'prospect-queue'
 const DAILY_KEY  = () => `prospect-daily-${new Date().toISOString().slice(0, 10)}`
-const DAILY_LIMIT = 30
+const DAILY_LIMIT = 20  // mais seguro pra cold outreach em número novo
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
 
 function authOk(req) {

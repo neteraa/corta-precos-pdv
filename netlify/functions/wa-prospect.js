@@ -2,48 +2,48 @@
  * wa-prospect — Zara manda a primeira mensagem pra prospects (outbound)
  *
  * POST /api/wa-prospect
- * Body: { mk, contacts: [{phone, name}], template? }
+ * Body: { contacts: [{phone, name, templateIdx?}] }
  *
- * Anti-ban: máx 30/dia, delay aleatório 12-25s entre envios
+ * Anti-ban: delay 45-90s, 6 templates rotativos, max 20/dia
  */
 
 const EVO_URL = () => (process.env.EVOLUTION_API_URL || '').replace(/\/$/, '')
 const EVO_KEY = () => process.env.EVOLUTION_API_KEY || ''
 const INSTANCE = () => process.env.EVOLUTION_INSTANCE || 'zatendeapi'
 
-const DAILY_LIMIT = 30
-const DELAY_MIN   = 12_000
-const DELAY_MAX   = 25_000
+// Anti-ban: delay realista pra cold outreach (45-90s)
+const DELAY_MIN = 45_000
+const DELAY_MAX = 90_000
 
 function delay(ms) { return new Promise(r => setTimeout(r, ms)) }
-
-function randomDelay() {
-  return DELAY_MIN + Math.floor(Math.random() * (DELAY_MAX - DELAY_MIN))
-}
+function randomDelay() { return DELAY_MIN + Math.floor(Math.random() * (DELAY_MAX - DELAY_MIN)) }
 
 function cleanPhone(raw) {
-  const digits = raw.replace(/\D/g, '').replace(/^0+/, '')
-  // Garante formato 55 + DDD (2) + número (8 ou 9)
-  if (digits.startsWith('55') && digits.length >= 12) return digits
-  if (digits.length === 11) return `55${digits}`
-  if (digits.length === 10) return `55${digits}`
+  const d = raw.replace(/\D/g, '').replace(/^0+/, '')
+  if (d.startsWith('55') && d.length >= 12) return d
+  if (d.length === 11) return `55${d}`
+  if (d.length === 10) return `55${d}`
   return null
 }
 
-function buildMessage(name) {
-  const greet = name ? `Oi, *${name}*! 👋` : 'Oi! 👋'
-  return `${greet}
+// 6 templates variados — mesmo contexto, texto diferente (evita padrão detectado pelo WA)
+const TEMPLATES = [
+  (n) => `Oi${n ? `, *${n}*` : ''}! 👋\n\nVi o mercado de vocês aqui na região. Trabalho com um sistema simples que ajuda mercadinhos a controlar o estoque e vender mais pelo WhatsApp — tudo no celular, menos de R$10/dia.\n\nTem uns minutinhos pra eu mostrar? Sem compromisso 😊`,
 
-Vi o mercado de vocês aqui na região e queria apresentar uma coisa rápida.
+  (n) => `Olá${n ? `, *${n}*` : ''}! 🤝\n\nSou Pedro, desenvolvi um sistema de gestão especialmente pra mercados como o de vocês.\n\n📦 Controle de estoque pelo celular\n💰 Relatório de vendas no dia\n📲 Clientes pelo WhatsApp\n\nMenos de R$10/dia, sem instalação nenhuma. Tem 10 min pra ver como funciona?`,
 
-Tenho um sistema que ajuda mercadinhos a:
-✅ Controlar estoque pelo celular
-✅ Fazer vendas sem papel
-✅ Vender mais pelo WhatsApp
+  (n) => `Bom dia${n ? `, *${n}*` : ''}! ☀️\n\nPassei aqui pra apresentar uma coisa que desenvolvemos pra mercadinhos da região.\n\nControla estoque, registra vendas e ainda captura clientes pelo WhatsApp — tudo pelo celular, simples e rápido.\n\nPosso te mostrar num videozinho rápido? 🙂`,
 
-Tudo por menos de *R$10 por dia* — e começa a funcionar no mesmo dia.
+  (n) => `Oi${n ? `, *${n}*` : ''}! Tudo bem? 😊\n\nTrabalho com tecnologia pra mercadinhos e vi vocês aqui na região. Tenho um sistema que muitos mercadinhos tão usando pra:\n\n✅ Saber o estoque em tempo real\n✅ Ver o caixa do dia\n✅ Mandar promoções pelo WhatsApp\n\nFunciona no celular mesmo. Custa menos que uma pizza por dia. Quer ver?`,
 
-Posso te mostrar em 10 minutinhos? Sem compromisso 😊`
+  (n) => `Boa tarde${n ? `, *${n}*` : ''}! 👋\n\nSou Pedro, trabalho com um sistema de gestão feito pro mercadinho brasileiro. Vi o mercado de vocês e queria te mostrar uma coisa.\n\nÉ simples: você controla estoque, vê as vendas e ainda manda oferta pros clientes pelo WhatsApp. Tudo pelo celular, sem papel.\n\nTem um tempinho pra eu te mostrar como funciona?`,
+
+  (n) => `Oi${n ? `, *${n}*` : ''}! 🛒\n\nVi o mercado de vocês no Maps e queria apresentar um sisteminha que desenvolvemos especialmente pra mercados como o de vocês.\n\nAjuda a controlar estoque, registrar vendas e capturar clientes pelo WhatsApp. Tudo simples, sem instalar nada, funciona no celular.\n\nPostei ser menos de R$10 por dia. Posso te mostrar rapidinho? 😊`,
+]
+
+function buildMessage(name, idx) {
+  const template = TEMPLATES[idx % TEMPLATES.length]
+  return template(name?.trim() || '')
 }
 
 async function sendText(phone, message) {
@@ -69,18 +69,18 @@ export default async (req) => {
   let body
   try { body = await req.json() } catch { return new Response(JSON.stringify({ error: 'JSON inválido' }), { status: 400, headers: CORS }) }
 
-  const { contacts = [], template } = body
+  const { contacts = [] } = body
   if (!contacts.length) return new Response(JSON.stringify({ error: 'contacts[] vazio' }), { status: 400, headers: CORS })
 
-  // Checa limite diário via Netlify Blob
   let sent = 0, failed = 0
   const results = []
+  const toSend  = contacts.slice(0, 20)  // hard cap anti-ban
 
-  // Limita ao máximo diário
-  const toSend = contacts.slice(0, DAILY_LIMIT)
+  // índice global de template — rota entre os 6 pra nunca mandar o mesmo duas vezes seguidas
+  const baseIdx = Math.floor(Math.random() * TEMPLATES.length)
 
   for (let i = 0; i < toSend.length; i++) {
-    const { phone: rawPhone, name = '' } = toSend[i]
+    const { phone: rawPhone, name = '', templateIdx } = toSend[i]
     const phone = cleanPhone(rawPhone)
 
     if (!phone) {
@@ -89,7 +89,9 @@ export default async (req) => {
       continue
     }
 
-    const message = template || buildMessage(name)
+    // Usa templateIdx do contato se disponível, senão rota pelo índice global
+    const tIdx   = templateIdx !== undefined ? templateIdx : (baseIdx + i)
+    const message = buildMessage(name, tIdx)
 
     try {
       const result = await sendText(phone, message)
