@@ -34,24 +34,40 @@ function greeting() {
   return 'Boa noite'
 }
 
-// 6 templates variados — mesmo contexto, texto diferente (evita padrão detectado pelo WA)
+// Mapeia o niche buscado para um termo amigável na mensagem
+const NICHE_LABEL = {
+  mercado:       'mercado', supermercado:    'supermercado', mercearia:     'mercearia',
+  'mini mercado':'mercadinho', mercadinho:   'mercadinho',   conveniência:  'conveniência',
+  padaria:       'padaria',   confeitaria:   'padaria',      sorveteria:    'sorveteria',
+  rotisseria:    'rotisseria',
+  açougue:       'açougue',   frigorífico:   'açougue',
+  restaurante:   'restaurante', lanchonete:  'lanchonete',   espetinho:     'espeteria',
+  pizzaria:      'pizzaria',  bar:           'bar',          choperia:      'choperia',
+  distribuidora: 'distribuidora', atacado:   'distribuidora',
+}
+
+function nicheLabel(niche) {
+  return NICHE_LABEL[(niche||'').toLowerCase().trim()] || 'estabelecimento'
+}
+
+// 6 templates adaptativos — variam o texto E adaptam pra qualquer nicho
 const TEMPLATES = [
-  (n) => `Oi${n ? `, *${n}*` : ''}! 👋\n\nVi o mercado de vocês aqui na região. Trabalho com um sistema simples que ajuda mercadinhos a controlar o estoque e vender mais pelo WhatsApp — tudo no celular, menos de R$10/dia.\n\nTem uns minutinhos pra eu mostrar? Sem compromisso 😊`,
+  (n, ni) => `Oi${n ? `, *${n}*` : ''}! 👋\n\nVi ${(['distribuidora','atacado'].includes(ni) ? 'a distribuidora' : `o ${nicheLabel(ni)}`)} de vocês aqui na região. Trabalho com um sistema simples que ajuda a controlar o estoque e vender mais pelo WhatsApp — tudo no celular, menos de R$10/dia.\n\nTem uns minutinhos pra eu mostrar? Sem compromisso 😊`,
 
-  (n) => `Olá${n ? `, *${n}*` : ''}! 🤝\n\nSou Pedro, desenvolvi um sistema de gestão especialmente pra mercados como o de vocês.\n\n📦 Controle de estoque pelo celular\n💰 Relatório de vendas no dia\n📲 Clientes pelo WhatsApp\n\nMenos de R$10/dia, sem instalação nenhuma. Tem 10 min pra ver como funciona?`,
+  (n, ni) => `Olá${n ? `, *${n}*` : ''}! 🤝\n\nSou Pedro, desenvolvi um sistema de gestão especialmente pra ${nicheLabel(ni)}s como o de vocês.\n\n📦 Controle de estoque pelo celular\n💰 Relatório de vendas no dia\n📲 Clientes pelo WhatsApp\n\nMenos de R$10/dia, sem instalação. Tem 10 min pra ver como funciona?`,
 
-  (n) => `${greeting()}${n ? `, *${n}*` : ''}! ☀️\n\nPassei aqui pra apresentar uma coisa que desenvolvemos pra mercadinhos da região.\n\nControla estoque, registra vendas e ainda captura clientes pelo WhatsApp — tudo pelo celular, simples e rápido.\n\nPosso te mostrar num videozinho rápido? 🙂`,
+  (n, ni) => `${greeting()}${n ? `, *${n}*` : ''}! ☀️\n\nPassei aqui pra apresentar uma coisa que desenvolvemos pra ${nicheLabel(ni)}s da região.\n\nControla estoque, registra vendas e ainda captura clientes pelo WhatsApp — tudo pelo celular, simples e rápido.\n\nPosso te mostrar num videozinho rápido? 🙂`,
 
-  (n) => `Oi${n ? `, *${n}*` : ''}! Tudo bem? 😊\n\nTrabalho com tecnologia pra mercadinhos e vi vocês aqui na região. Tenho um sistema que muitos mercadinhos tão usando pra:\n\n✅ Saber o estoque em tempo real\n✅ Ver o caixa do dia\n✅ Mandar promoções pelo WhatsApp\n\nFunciona no celular mesmo. Custa menos que uma pizza por dia. Quer ver?`,
+  (n, ni) => `Oi${n ? `, *${n}*` : ''}! Tudo bem? 😊\n\nTrabalho com tecnologia pra pequenos negócios e vi ${(['distribuidora','atacado'].includes(ni) ? 'a distribuidora' : `o ${nicheLabel(ni)}`)} de vocês aqui na região. Tenho um sistema que muita gente tá usando pra:\n\n✅ Saber o estoque em tempo real\n✅ Ver o caixa do dia\n✅ Mandar promoções pelo WhatsApp\n\nFunciona no celular. Custa menos que uma pizza por dia. Quer ver?`,
 
-  (n) => `${greeting()}${n ? `, *${n}*` : ''}! 👋\n\nSou Pedro, trabalho com um sistema de gestão feito pro mercadinho brasileiro. Vi o mercado de vocês e queria te mostrar uma coisa.\n\nÉ simples: você controla estoque, vê as vendas e ainda manda oferta pros clientes pelo WhatsApp. Tudo pelo celular, sem papel.\n\nTem um tempinho pra eu te mostrar como funciona?`,
+  (n, ni) => `${greeting()}${n ? `, *${n}*` : ''}! 👋\n\nSou Pedro, trabalho com sistema de gestão feito pro pequeno negócio brasileiro. Vi ${(['distribuidora','atacado'].includes(ni) ? 'a distribuidora' : `o ${nicheLabel(ni)}`)} de vocês e queria te mostrar uma coisa.\n\nControla estoque, vê as vendas e ainda manda oferta pros clientes pelo WhatsApp. Tudo no celular, sem papel.\n\nTem um tempinho pra eu te mostrar?`,
 
-  (n) => `Oi${n ? `, *${n}*` : ''}! 🛒\n\nVi o mercado de vocês no Maps e queria apresentar um sisteminha que desenvolvemos especialmente pra mercados como o de vocês.\n\nAjuda a controlar estoque, registrar vendas e capturar clientes pelo WhatsApp. Tudo simples, sem instalar nada, funciona no celular.\n\nPode ser menos de R$10 por dia. Posso te mostrar rapidinho? 😊`,
+  (n, ni) => `Oi${n ? `, *${n}*` : ''}! 🛒\n\nVi ${(['distribuidora','atacado'].includes(ni) ? 'a distribuidora' : `o ${nicheLabel(ni)}`)} de vocês no Maps e queria apresentar um sisteminha que desenvolvemos especialmente pro seu tipo de negócio.\n\nAjuda a controlar estoque, registrar vendas e capturar clientes pelo WhatsApp. Sem instalar nada, funciona no celular.\n\nPode ser menos de R$10 por dia. Posso te mostrar rapidinho? 😊`,
 ]
 
-function buildMessage(name, idx) {
+function buildMessage(name, idx, niche) {
   const template = TEMPLATES[idx % TEMPLATES.length]
-  return template(name?.trim() || '')
+  return template(name?.trim() || '', niche || 'mercado')
 }
 
 async function sendText(phone, message) {
@@ -88,7 +104,7 @@ export default async (req) => {
   const baseIdx = Math.floor(Math.random() * TEMPLATES.length)
 
   for (let i = 0; i < toSend.length; i++) {
-    const { phone: rawPhone, name = '', templateIdx } = toSend[i]
+    const { phone: rawPhone, name = '', niche = 'mercado', templateIdx } = toSend[i]
     const phone = cleanPhone(rawPhone)
 
     if (!phone) {
@@ -99,7 +115,7 @@ export default async (req) => {
 
     // Usa templateIdx do contato se disponível, senão rota pelo índice global
     const tIdx   = templateIdx !== undefined ? templateIdx : (baseIdx + i)
-    const message = buildMessage(name, tIdx)
+    const message = buildMessage(name, tIdx, niche)
 
     try {
       const result = await sendText(phone, message)

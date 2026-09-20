@@ -789,6 +789,7 @@ export default function MasterPainel() {
   const [prospLeadsLoading, setProspLeadsLoading] = useState(false)
   const [leadsView,         setLeadsView]         = useState('pipeline') // 'pipeline' | 'list'
   const [sendCountdown,     setSendCountdown]     = useState(null)       // segundos restantes no delay
+  const [contactedPhones,   setContactedPhones]   = useState(new Set())  // já contatados (dedup)
 
   const [approving,    setApproving]     = useState(null) // id being processed
 
@@ -937,6 +938,13 @@ export default function MasterPainel() {
   }, [queue, mk, queueApi, loadQueue])
 
   // Disparo com delay anti-ban real (45-90s) e template rotativo
+  const loadContactedPhones = useCallback(async () => {
+    try {
+      const d = await queueApi({ action: 'get-contacted' })
+      setContactedPhones(new Set(d.phones || []))
+    } catch {}
+  }, [queueApi])
+
   const loadProspLeads = useCallback(async () => {
     setProspLeadsLoading(true)
     try {
@@ -1033,10 +1041,13 @@ export default function MasterPainel() {
   }, [mk])
 
   useEffect(() => {
-    if (tab === 'prospect' && prospInnerTab === 'search' && mk && googleKey === null) checkGoogleKey()
-    if (tab === 'prospect' && prospInnerTab === 'leads'  && mk) loadProspLeads()
-    if (tab === 'prospect' && prospInnerTab === 'queue'  && mk) loadCampaigns()
-  }, [tab, prospInnerTab, mk, googleKey, checkGoogleKey, loadProspLeads, loadCampaigns])
+    if (tab === 'prospect' && mk) {
+      if (prospInnerTab === 'search' && googleKey === null) checkGoogleKey()
+      if (prospInnerTab === 'search') loadContactedPhones()
+      if (prospInnerTab === 'leads')  loadProspLeads()
+      if (prospInnerTab === 'queue')  loadCampaigns()
+    }
+  }, [tab, prospInnerTab, mk, googleKey, checkGoogleKey, loadContactedPhones, loadProspLeads, loadCampaigns])
 
   const runSearch = useCallback(async (pageToken = null) => {
     setSearchLoading(true)
@@ -1079,7 +1090,7 @@ export default function MasterPainel() {
       const validSet = new Set(
         (valData.results || []).filter(r => r.exists).map(r => r.phone)
       )
-      const contacts = candidates.filter(r => validSet.has(r.phone)).map(r => ({ phone: r.phone, name: r.name }))
+      const contacts = candidates.filter(r => validSet.has(r.phone)).map(r => ({ phone: r.phone, name: r.name, niche: searchQuery }))
       const skipped  = candidates.length - contacts.length
 
       if (!contacts.length) {
@@ -1092,7 +1103,7 @@ export default function MasterPainel() {
       const res = await queueApi({ action: 'add', contacts })
       if (res.ok) {
         setSearchSelected(new Set())
-        await loadQueue()
+        await Promise.all([loadQueue(), loadContactedPhones()])
         setProspInnerTab('queue')
         if (skipped > 0) alert(`✅ ${contacts.length} adicionados à fila\n⚠️ ${skipped} sem WhatsApp — pulados automaticamente`)
       }
@@ -1100,7 +1111,7 @@ export default function MasterPainel() {
       setAddingSearch(false)
       setAddingSearchStatus(null)
     }
-  }, [searchResults, searchSelected, queueApi, loadQueue, mk])
+  }, [searchResults, searchSelected, searchQuery, queueApi, loadQueue, loadContactedPhones, mk])
 
   const accessMarket = (market) => {
     localStorage.setItem('zs_master_session', JSON.stringify({ mk, returnTo: '/painel' }))
@@ -1817,9 +1828,14 @@ export default function MasterPainel() {
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">O que buscar</label>
                         <select value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                           className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 text-sm transition-colors">
-                          {['mercado','supermercado','mercearia','mini mercado','mercadinho','padaria','açougue','distribuidora','atacado'].map(q => (
-                            <option key={q} value={q}>{q}</option>
-                          ))}
+                          {[
+                            '── Mercados ──','mercado','supermercado','mercearia','mini mercado','mercadinho','conveniência',
+                            '── Alimentação ──','padaria','confeitaria','açougue','restaurante','lanchonete','espetinho','pizzaria','bar','sorveteria',
+                            '── Distribuição ──','distribuidora','atacado',
+                          ].map(q => q.startsWith('──')
+                            ? <option key={q} disabled style={{ color:'#666', fontStyle:'italic' }}>{q}</option>
+                            : <option key={q} value={q}>{q}</option>
+                          )}
                         </select>
                       </div>
                       <div className="sm:col-span-2 relative">
@@ -1859,11 +1875,14 @@ export default function MasterPainel() {
                   {searchResults.length > 0 && (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-bold text-white">{searchResults.length} encontrado{searchResults.length>1?'s':''} com telefone</p>
+                        <div>
+                          <p className="text-sm font-bold text-white">{searchResults.length} encontrado{searchResults.length>1?'s':''} com telefone</p>
+                          {contactedPhones.size > 0 && (() => { const dup = searchResults.filter(r=>contactedPhones.has(r.phone)).length; return dup > 0 ? <p className="text-xs text-gray-600 mt-0.5">⚠️ {dup} já contatado{dup>1?'s':''} — marcados em cinza</p> : null })()}
+                        </div>
                         <div className="flex gap-2">
-                          <button onClick={() => setSearchSelected(new Set(searchResults.map(r => r.phone)))}
+                          <button onClick={() => setSearchSelected(new Set(searchResults.filter(r => !contactedPhones.has(r.phone)).map(r => r.phone)))}
                             className="text-xs text-orange-400 hover:text-orange-300 font-bold">
-                            Selecionar todos
+                            Selecionar novos
                           </button>
                           <span className="text-gray-700">·</span>
                           <button onClick={() => setSearchSelected(new Set())}
@@ -1875,19 +1894,27 @@ export default function MasterPainel() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {searchResults.map(r => {
-                          const selected = searchSelected.has(r.phone)
+                          const selected  = searchSelected.has(r.phone)
+                          const contacted = contactedPhones.has(r.phone)
                           return (
                             <button key={r.phone} onClick={() => toggleSelect(r.phone)}
-                              className={`flex items-start gap-3 p-4 rounded-xl border text-left transition-all ${selected ? 'border-orange-500/50 bg-orange-500/10' : 'border-gray-800 bg-gray-900 hover:border-gray-700'}`}>
-                              <div className={`w-5 h-5 rounded-md border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${selected ? 'border-orange-500 bg-orange-500' : 'border-gray-600'}`}>
+                              className={`flex items-start gap-3 p-4 rounded-xl border text-left transition-all relative ${
+                                contacted ? 'border-gray-700/50 bg-gray-900/40 opacity-60'
+                                : selected ? 'border-orange-500/50 bg-orange-500/10'
+                                : 'border-gray-800 bg-gray-900 hover:border-gray-700'}`}>
+                              <div className={`w-5 h-5 rounded-md border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${
+                                selected ? 'border-orange-500 bg-orange-500' : 'border-gray-600'}`}>
                                 {selected && <Check className="w-3 h-3 text-white" />}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-white font-bold text-sm truncate">{r.name}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className={`font-bold text-sm truncate ${contacted ? 'text-gray-500' : 'text-white'}`}>{r.name}</p>
+                                  {contacted && <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-500 flex-shrink-0">Já enviado</span>}
+                                </div>
                                 {r.rating && (
                                   <p className="text-yellow-400 text-xs mt-0.5">⭐ {r.rating.toFixed(1)} <span className="text-gray-600">({r.reviews})</span></p>
                                 )}
-                                <p className="text-green-400 text-xs font-mono mt-0.5">{r.phone}</p>
+                                <p className={`text-xs font-mono mt-0.5 ${contacted ? 'text-gray-600' : 'text-green-400'}`}>{r.phone}</p>
                                 {r.address && <p className="text-gray-600 text-xs mt-0.5 truncate">📍 {r.address.split(',').slice(0,2).join(',')}</p>}
                               </div>
                             </button>

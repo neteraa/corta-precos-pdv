@@ -10,9 +10,10 @@
 
 import { getStore } from '@netlify/blobs'
 
-const QUEUE_KEY  = 'prospect-queue'
-const DAILY_KEY  = () => `prospect-daily-${new Date().toISOString().slice(0, 10)}`
-const DAILY_LIMIT = 20  // mais seguro pra cold outreach em número novo
+const QUEUE_KEY     = 'prospect-queue'
+const CONTACTED_KEY = 'contacted-phones'  // registro permanente de todos já contatados
+const DAILY_KEY     = () => `prospect-daily-${new Date().toISOString().slice(0, 10)}`
+const DAILY_LIMIT   = 20
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
 
 function authOk(req) {
@@ -33,6 +34,17 @@ async function loadQueue() {
 
 async function saveQueue(q) {
   await store().set(QUEUE_KEY, JSON.stringify(q))
+}
+
+async function loadContacted() {
+  try { const r = await store().get(CONTACTED_KEY); return r ? new Set(JSON.parse(r)) : new Set() }
+  catch { return new Set() }
+}
+
+async function addContacted(phones) {
+  const set = await loadContacted()
+  phones.forEach(p => set.add(p))
+  await store().set(CONTACTED_KEY, JSON.stringify([...set]))
 }
 
 async function getDailySent() {
@@ -89,20 +101,29 @@ export default async (req) => {
   // ── ADD: adicionar contatos ──────────────────────────────────────────────
   if (action === 'add') {
     const { contacts = [] } = body
-    const queue = await loadQueue()
+    const queue    = await loadQueue()
     const existing = new Set(queue.map(c => c.phone))
     let added = 0, dupes = 0
+    const newPhones = []
 
-    for (const { phone: rawPhone, name = '' } of contacts) {
+    for (const { phone: rawPhone, name = '', niche = '' } of contacts) {
       const phone = normalizePhone(rawPhone)
       if (!phone) continue
       if (existing.has(phone)) { dupes++; continue }
-      queue.push({ id: uid(), phone, name: name.trim(), status: 'pending', addedAt: new Date().toISOString(), sentAt: null, error: null })
+      queue.push({ id: uid(), phone, name: name.trim(), niche: niche.trim(), status: 'pending', addedAt: new Date().toISOString(), sentAt: null, error: null })
       existing.add(phone)
+      newPhones.push(phone)
       added++
     }
     await saveQueue(queue)
+    if (newPhones.length) await addContacted(newPhones)
     return new Response(JSON.stringify({ ok: true, added, dupes, total: queue.length }), { headers: CORS })
+  }
+
+  // ── GET-CONTACTED: todos os telefones já contatados (deduplicação) ────────
+  if (action === 'get-contacted') {
+    const set = await loadContacted()
+    return new Response(JSON.stringify({ ok: true, phones: [...set], total: set.size }), { headers: CORS })
   }
 
   // ── UPDATE: marcar enviado/falhou ────────────────────────────────────────

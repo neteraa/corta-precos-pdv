@@ -5,7 +5,7 @@ import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 import { isLoggedIn } from '../utils/auth.js'
 
 const ZAP     = '5515997969303'
-const ZAP_MSG = 'Olá! Quero conhecer o ZatendeStok para meu mercado.'
+const ZAP_MSG = 'Olá! Quero conhecer o ZatendeStok para meu negócio.'
 const openWpp = (msg) => window.open(`https://wa.me/${ZAP}?text=${encodeURIComponent(msg || ZAP_MSG)}`, '_blank')
 
 const CSS = `
@@ -92,28 +92,40 @@ const DIFS = [
 /* ─── PERSONAS ─── */
 const PERSONAS = [
   {
-    emoji: '🏘️',
-    tipo: 'Mercearia de bairro',
-    desc: 'Você conhece cada cliente pelo nome, mas não tem como lembrar de tudo que entra e sai. O ZatendeStok faz esse controle por você — sem complicação, sem treinamento longo.',
-    items: ['Controle de fiado digital', 'Alertas de estoque mínimo', 'PDV simples para funcionários', 'Relatório de produtos mais vendidos'],
-  },
-  {
     emoji: '🏪',
-    tipo: 'Mercado de médio porte',
-    desc: 'Você já tem movimento, já tem funcionários — e precisa de visibilidade real sobre o estoque antes que a ruptura vire rotina. FIFO, validade e reposição automática resolvem isso.',
-    items: ['FIFO por lote e data de validade', 'Multi-caixa com PDV em rede', 'Pedido automático ao distribuidor', 'Painel gerencial com métricas'],
+    tipo: 'Mercado & Mercearia',
+    desc: 'Controle o que entra e sai, evite vencimento, mantenha o estoque sem ruptura e venda pelo WhatsApp sem complicação.',
+    items: ['FIFO por lote e data de validade', 'PDV integrado multi-caixa', 'Pedido automático ao distribuidor', 'Alertas de validade em tempo real'],
   },
   {
-    emoji: '🏗️',
-    tipo: 'Atacarejo e armazém',
-    desc: 'Volume grande, margem apertada, giro alto. Qualquer produto encalhado ou vencimento perdido sangra o resultado. O sistema foi feito para quem não pode se dar ao luxo de perder.',
-    items: ['Gestão de grandes volumes FIFO', 'Múltiplos distribuidores conectados', 'Alertas de validade em lote', 'Relatórios de giro por categoria'],
+    emoji: '🥖',
+    tipo: 'Padaria & Confeitaria',
+    desc: 'Controle insumos, precifique por receita e use o bot pra mandar promoções de pão quentinho direto no WhatsApp dos clientes.',
+    items: ['Controle de insumos por receita', 'Alerta de estoque mínimo de farinha etc.', 'Bot WhatsApp pra promoções diárias', 'PDV rápido no balcão'],
+  },
+  {
+    emoji: '🥩',
+    tipo: 'Açougue & Frigorífico',
+    desc: 'Gerencie cortes, pesos e datas de validade. Nunca mais perde carne por vencimento ou falta de controle por lote.',
+    items: ['Validade por lote e corte', 'PDV por peso integrado', 'Histórico de compras ao fornecedor', 'Relatório de giro por categoria'],
+  },
+  {
+    emoji: '🍽️',
+    tipo: 'Restaurante & Lanchonete',
+    desc: 'Controle o estoque do dia, veja o caixa em tempo real e capture mais clientes com o bot no WhatsApp — tudo conectado.',
+    items: ['Estoque de insumos em tempo real', 'Caixa do dia integrado ao PDV', 'Bot WhatsApp para pedidos e promoções', 'Relatório de venda por período'],
+  },
+  {
+    emoji: '🚚',
+    tipo: 'Distribuidora & Atacado',
+    desc: 'Volume grande exige controle grande. Gerencie múltiplos clientes, emita pedidos e controle validade de todo o estoque.',
+    items: ['Gestão de grandes volumes FIFO', 'Múltiplos clientes e pedidos', 'Alertas de validade em lote', 'Relatórios de giro por categoria'],
   },
 ]
 
 /* ─── COMO FUNCIONA ─── */
 const STEPS = [
-  { n:'01', color:'#5462D8', title:'Solicita o acesso', desc:'Preenche o formulário com o nome do seu mercado. Nossa equipe recebe e configura tudo.' },
+  { n:'01', color:'#5462D8', title:'Solicita o acesso', desc:'Preenche o formulário com o nome do seu negócio. Nossa equipe recebe e configura tudo.' },
   { n:'02', color:'#22c55e', title:'Recebe as credenciais', desc:'Em até 2 horas você tem usuário e senha. Sem instalação, abre no navegador do celular.' },
   { n:'03', color:'#f59e0b', title:'Começa a gerenciar', desc:'Cadastra os produtos, conecta o distribuidor e o estoque começa a trabalhar por você.' },
 ]
@@ -158,23 +170,23 @@ export default function Landing() {
           {/* badge */}
           <div className={`fade-in d1 ${vis?'':'opacity-0'}`} style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(84,98,216,.2)', border:'1px solid rgba(84,98,216,.4)', borderRadius:999, padding:'6px 16px', marginBottom:36 }}>
             <span style={{ width:7, height:7, borderRadius:'50%', background:'#4ade80', display:'inline-block', animation:'pulse 2s ease infinite' }} />
-            <span style={{ color:'rgba(255,255,255,.7)', fontSize:12, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase' }}>Para mercearias · armazéns · supermercados</span>
+            <span style={{ color:'rgba(255,255,255,.7)', fontSize:12, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase' }}>Mercados · Padarias · Açougues · Restaurantes · Distribuidoras</span>
           </div>
 
           <h1 className={`fade-in d2 ${vis?'':'opacity-0'}`} style={{ fontFamily:"'Anton',sans-serif", fontSize:'clamp(52px,9vw,110px)', lineHeight:.92, letterSpacing:'-.01em', marginBottom:28, color:'#fff' }}>
             <span style={{ display:'block' }}>GESTÃO QUE</span>
-            <span style={{ display:'block', background:'linear-gradient(135deg,#5462D8,#4ade80)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>SEU MERCADO</span>
+            <span style={{ display:'block', background:'linear-gradient(135deg,#5462D8,#4ade80)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>SEU NEGÓCIO</span>
             <span style={{ display:'block', color:'rgba(255,255,255,.9)' }}>PRECISAVA.</span>
           </h1>
 
           <p className={`fade-in d3 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(16px,2vw,19px)', color:'rgba(255,255,255,.6)', lineHeight:1.7, maxWidth:560, margin:'0 auto 40px' }}>
-            Controle de estoque com FIFO, alertas de validade, pedidos automáticos ao distribuidor e frente de caixa — tudo conectado, tudo no celular.
+            Controle de estoque com FIFO, alertas de validade, frente de caixa e bot de vendas no WhatsApp — tudo conectado, tudo no celular. Para qualquer negócio de alimentação.
           </p>
 
           <div className={`fade-in d4 ${vis?'':'opacity-0'}`} style={{ display:'flex', gap:14, justifyContent:'center', flexWrap:'wrap' }}>
             <button className="btn-wpp" onClick={() => openWpp()}
               style={{ display:'flex', alignItems:'center', gap:10, padding:'16px 32px', borderRadius:13, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#22c55e,#16a34a)', color:'#fff', fontSize:16, fontWeight:900, boxShadow:'0 4px 24px rgba(34,197,94,.35)' }}>
-              <MessageCircle size={20} /> Quero meu mercado aqui
+              <MessageCircle size={20} /> Quero conhecer o sistema
             </button>
             <button onClick={() => navigate('/login')}
               style={{ display:'flex', alignItems:'center', gap:8, padding:'16px 26px', borderRadius:13, border:'1px solid rgba(255,255,255,.15)', background:'rgba(255,255,255,.06)', color:'rgba(255,255,255,.8)', fontSize:15, fontWeight:700, cursor:'pointer' }}>
@@ -192,7 +204,7 @@ export default function Landing() {
         <div style={{ display:'flex', animation:'ticker 28s linear infinite', whiteSpace:'nowrap', width:'max-content' }}>
           {[...Array(2)].map((_,i) => (
             <span key={i} style={{ display:'inline-flex', alignItems:'center' }}>
-              {['Controle FIFO','Alertas de validade','Ruptura zero','Pedido ao distribuidor','PDV integrado','Funciona no celular','Sem instalar app','Suporte pelo WhatsApp','Gestão profissional','Estoque em tempo real'].map(t => (
+              {['Controle FIFO','Alertas de validade','Ruptura zero','Pedido ao distribuidor','PDV integrado','Funciona no celular','Sem instalar app','Suporte pelo WhatsApp','Gestão profissional','Estoque em tempo real','Mercado','Padaria','Açougue','Restaurante','Distribuidora'].map(t => (
                 <span key={t} style={{ display:'inline-flex', alignItems:'center', gap:20, paddingRight:48 }}>
                   <span style={{ color:'#c7d2fe', fontSize:14 }}>✦</span>
                   <span style={{ color:'#64748b', fontSize:12, fontWeight:600, letterSpacing:'.08em', textTransform:'uppercase' }}>{t}</span>
@@ -355,7 +367,7 @@ export default function Landing() {
                 <span style={{ fontSize:14, color:'#94a3b8', marginBottom:8 }}>/mês</span>
               </div>
               <div style={{ fontSize:11, color:'#22c55e', fontWeight:800, marginBottom:16 }}>menos de R$10 por dia ✅</div>
-              <p style={{ color:'#64748b', fontSize:13, marginBottom:28, lineHeight:1.6 }}>Ideal para mercadinhos que estão saindo do papel e do caderno.</p>
+              <p style={{ color:'#64748b', fontSize:13, marginBottom:28, lineHeight:1.6 }}>Ideal para quem está saindo do papel e do caderno.</p>
               <ul style={{ listStyle:'none', padding:0, margin:'0 0 28px', flex:1, display:'flex', flexDirection:'column', gap:10 }}>
                 {['✅ 1 terminal PDV / Caixa','✅ Estoque + controle de validade','✅ Fiado digital','✅ Relatórios de vendas','✅ Impressora térmica','✅ Funciona offline','❌ Bot WhatsApp de atendimento','❌ Programa de fidelidade','❌ Campanhas WhatsApp'].map(f => (
                   <li key={f} style={{ fontSize:13, color: f.startsWith('❌') ? '#cbd5e1' : '#334155', display:'flex', gap:8 }}>{f}</li>
@@ -398,7 +410,7 @@ export default function Landing() {
               <div style={{ fontSize:11, color:'#f97316', fontWeight:800, marginBottom:16 }}>cotação sob medida para sua operação 🏆</div>
               <p style={{ color:'#64748b', fontSize:13, marginBottom:28, lineHeight:1.6 }}>Para redes com múltiplas lojas, mercados grandes e quem quer escalar sem limite.</p>
               <ul style={{ listStyle:'none', padding:0, margin:'0 0 28px', flex:1, display:'flex', flexDirection:'column', gap:10 }}>
-                {['✅ Terminais PDV ilimitados','✅ Tudo do plano Profissional','✅ Suporte prioritário (resposta em <1h)','✅ Onboarding dedicado com sua equipe','✅ Treinamento presencial ou remoto','✅ Bot WhatsApp com nome e logo do seu mercado','✅ Relatórios avançados e exportação'].map(f => (
+                {['✅ Terminais PDV ilimitados','✅ Tudo do plano Profissional','✅ Suporte prioritário (resposta em <1h)','✅ Onboarding dedicado com sua equipe','✅ Treinamento presencial ou remoto','✅ Bot WhatsApp com nome e logo do seu negócio','✅ Relatórios avançados e exportação'].map(f => (
                   <li key={f} style={{ fontSize:13, color:'#334155', display:'flex', gap:8 }}>{f}</li>
                 ))}
               </ul>
