@@ -26,19 +26,27 @@ function cleanPhone(raw) {
   return null
 }
 
+// Saudação dinâmica baseada no horário de Brasília
+function greeting() {
+  const h = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })).getHours()
+  if (h >= 5  && h < 12) return 'Bom dia'
+  if (h >= 12 && h < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
 // 6 templates variados — mesmo contexto, texto diferente (evita padrão detectado pelo WA)
 const TEMPLATES = [
   (n) => `Oi${n ? `, *${n}*` : ''}! 👋\n\nVi o mercado de vocês aqui na região. Trabalho com um sistema simples que ajuda mercadinhos a controlar o estoque e vender mais pelo WhatsApp — tudo no celular, menos de R$10/dia.\n\nTem uns minutinhos pra eu mostrar? Sem compromisso 😊`,
 
   (n) => `Olá${n ? `, *${n}*` : ''}! 🤝\n\nSou Pedro, desenvolvi um sistema de gestão especialmente pra mercados como o de vocês.\n\n📦 Controle de estoque pelo celular\n💰 Relatório de vendas no dia\n📲 Clientes pelo WhatsApp\n\nMenos de R$10/dia, sem instalação nenhuma. Tem 10 min pra ver como funciona?`,
 
-  (n) => `Bom dia${n ? `, *${n}*` : ''}! ☀️\n\nPassei aqui pra apresentar uma coisa que desenvolvemos pra mercadinhos da região.\n\nControla estoque, registra vendas e ainda captura clientes pelo WhatsApp — tudo pelo celular, simples e rápido.\n\nPosso te mostrar num videozinho rápido? 🙂`,
+  (n) => `${greeting()}${n ? `, *${n}*` : ''}! ☀️\n\nPassei aqui pra apresentar uma coisa que desenvolvemos pra mercadinhos da região.\n\nControla estoque, registra vendas e ainda captura clientes pelo WhatsApp — tudo pelo celular, simples e rápido.\n\nPosso te mostrar num videozinho rápido? 🙂`,
 
   (n) => `Oi${n ? `, *${n}*` : ''}! Tudo bem? 😊\n\nTrabalho com tecnologia pra mercadinhos e vi vocês aqui na região. Tenho um sistema que muitos mercadinhos tão usando pra:\n\n✅ Saber o estoque em tempo real\n✅ Ver o caixa do dia\n✅ Mandar promoções pelo WhatsApp\n\nFunciona no celular mesmo. Custa menos que uma pizza por dia. Quer ver?`,
 
-  (n) => `Boa tarde${n ? `, *${n}*` : ''}! 👋\n\nSou Pedro, trabalho com um sistema de gestão feito pro mercadinho brasileiro. Vi o mercado de vocês e queria te mostrar uma coisa.\n\nÉ simples: você controla estoque, vê as vendas e ainda manda oferta pros clientes pelo WhatsApp. Tudo pelo celular, sem papel.\n\nTem um tempinho pra eu te mostrar como funciona?`,
+  (n) => `${greeting()}${n ? `, *${n}*` : ''}! 👋\n\nSou Pedro, trabalho com um sistema de gestão feito pro mercadinho brasileiro. Vi o mercado de vocês e queria te mostrar uma coisa.\n\nÉ simples: você controla estoque, vê as vendas e ainda manda oferta pros clientes pelo WhatsApp. Tudo pelo celular, sem papel.\n\nTem um tempinho pra eu te mostrar como funciona?`,
 
-  (n) => `Oi${n ? `, *${n}*` : ''}! 🛒\n\nVi o mercado de vocês no Maps e queria apresentar um sisteminha que desenvolvemos especialmente pra mercados como o de vocês.\n\nAjuda a controlar estoque, registrar vendas e capturar clientes pelo WhatsApp. Tudo simples, sem instalar nada, funciona no celular.\n\nPostei ser menos de R$10 por dia. Posso te mostrar rapidinho? 😊`,
+  (n) => `Oi${n ? `, *${n}*` : ''}! 🛒\n\nVi o mercado de vocês no Maps e queria apresentar um sisteminha que desenvolvemos especialmente pra mercados como o de vocês.\n\nAjuda a controlar estoque, registrar vendas e capturar clientes pelo WhatsApp. Tudo simples, sem instalar nada, funciona no celular.\n\nPode ser menos de R$10 por dia. Posso te mostrar rapidinho? 😊`,
 ]
 
 function buildMessage(name, idx) {
