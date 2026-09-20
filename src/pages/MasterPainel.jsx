@@ -85,6 +85,11 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
   }
 
   const setExpiry = async (dateStr) => {
+    // Ignora enquanto o usuário está digitando o ano (ex: "0002", "0020")
+    if (dateStr) {
+      const year = parseInt(dateStr.slice(0, 4), 10)
+      if (year < 2020 || year > 2099) return
+    }
     setBusy(true)
     const expiresAt = dateStr ? new Date(dateStr + 'T23:59:59').toISOString() : null
     await api('/api/markets-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'set-expiry', id: market.id, expiresAt }) })
@@ -212,7 +217,8 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
 
         {/* Expiry / payment status */}
         {(() => {
-          const exp  = market.expiresAt ? new Date(market.expiresAt) : null
+          const _raw = market.expiresAt ? new Date(market.expiresAt) : null
+          const exp  = _raw && _raw.getFullYear() >= 2020 ? _raw : null
           const days = exp ? Math.ceil((exp - Date.now()) / 86_400_000) : null
           const expired = exp && days < 0
           const warn    = exp && days >= 0 && days <= 5
@@ -229,7 +235,8 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
               <div className="flex items-center gap-2">
                 <input
                   type="date"
-                  defaultValue={exp ? exp.toISOString().slice(0,10) : ''}
+                  defaultValue={exp && exp.getFullYear() >= 2020 ? exp.toISOString().slice(0,10) : ''}
+                  min="2020-01-01" max="2099-12-31"
                   disabled={busy}
                   onChange={e => setExpiry(e.target.value)}
                   className="flex-1 bg-gray-700 border border-gray-600 text-gray-200 text-xs rounded-lg px-2 py-1.5 outline-none focus:border-orange-500 disabled:opacity-40"
@@ -519,6 +526,10 @@ function DistCard({ dist, mk, onRefresh }) {
   }
 
   const setExpiry = async (dateStr) => {
+    if (dateStr) {
+      const year = parseInt(dateStr.slice(0, 4), 10)
+      if (year < 2020 || year > 2099) return
+    }
     const expiresAt = dateStr ? new Date(dateStr + 'T23:59:59').toISOString() : null
     await api('/api/forn-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'set-expiry', id: dist.id, expiresAt }) })
     await onRefresh()
@@ -533,8 +544,9 @@ function DistCard({ dist, mk, onRefresh }) {
     setTimeout(() => { setShowResend(false); setResendStatus(null); setResendPass('') }, 3000)
   }
 
-  const exp    = dist.expiresAt ? new Date(dist.expiresAt) : null
-  const days   = exp ? Math.ceil((exp - Date.now()) / 86_400_000) : null
+  const _rawExp = dist.expiresAt ? new Date(dist.expiresAt) : null
+  const exp     = _rawExp && _rawExp.getFullYear() >= 2020 ? _rawExp : null
+  const days    = exp ? Math.ceil((exp - Date.now()) / 86_400_000) : null
   const expired = days !== null && days < 0
 
   const badge = expired
@@ -571,7 +583,9 @@ function DistCard({ dist, mk, onRefresh }) {
       {/* expiry picker */}
       <div>
         <label className="text-[10px] text-gray-600 uppercase font-bold block mb-1">Vencimento</label>
-        <input type="date" defaultValue={dist.expiresAt?.slice(0, 10) || ''}
+        <input type="date"
+          defaultValue={dist.expiresAt && parseInt(dist.expiresAt.slice(0,4),10) >= 2020 ? dist.expiresAt.slice(0,10) : ''}
+          min="2020-01-01" max="2099-12-31"
           className="w-full text-xs bg-gray-700/50 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 focus:outline-none focus:border-orange-500"
           onChange={e => setExpiry(e.target.value)} />
       </div>
@@ -739,7 +753,8 @@ export default function MasterPainel() {
   const [searchNextPage, setSearchNextPage] = useState(null)
   const [searchSelected, setSearchSelected] = useState(new Set())
   const [googleKey,      setGoogleKey]      = useState(null) // null=pendente, true/false
-  const [addingSearch,   setAddingSearch]   = useState(false)
+  const [addingSearch,       setAddingSearch]       = useState(false)
+  const [addingSearchStatus, setAddingSearchStatus] = useState(null) // 'validating' | 'adding' | null
 
   const [approving,    setApproving]     = useState(null) // id being processed
 
@@ -978,20 +993,43 @@ export default function MasterPainel() {
   }, [])
 
   const addSearchToQueue = useCallback(async () => {
-    const contacts = searchResults
-      .filter(r => searchSelected.has(r.phone))
-      .map(r => ({ phone: r.phone, name: r.name }))
-    if (!contacts.length) return
+    const candidates = searchResults.filter(r => searchSelected.has(r.phone))
+    if (!candidates.length) return
     setAddingSearch(true)
+    setAddingSearchStatus('validating')
     try {
+      // 1) Valida quais têm WhatsApp ativo antes de adicionar
+      const valRes  = await fetch('/api/wa-validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-master-key': mk },
+        body: JSON.stringify({ phones: candidates.map(r => r.phone) }),
+      })
+      const valData = await valRes.json()
+      const validSet = new Set(
+        (valData.results || []).filter(r => r.exists).map(r => r.phone)
+      )
+      const contacts = candidates.filter(r => validSet.has(r.phone)).map(r => ({ phone: r.phone, name: r.name }))
+      const skipped  = candidates.length - contacts.length
+
+      if (!contacts.length) {
+        alert(`❌ Nenhum dos ${candidates.length} selecionados tem WhatsApp ativo.\nTente outros leads ou outra cidade.`)
+        return
+      }
+
+      // 2) Adiciona só os válidos
+      setAddingSearchStatus('adding')
       const res = await queueApi({ action: 'add', contacts })
       if (res.ok) {
         setSearchSelected(new Set())
         await loadQueue()
         setProspInnerTab('queue')
+        if (skipped > 0) alert(`✅ ${contacts.length} adicionados à fila\n⚠️ ${skipped} sem WhatsApp — pulados automaticamente`)
       }
-    } finally { setAddingSearch(false) }
-  }, [searchResults, searchSelected, queueApi, loadQueue])
+    } finally {
+      setAddingSearch(false)
+      setAddingSearchStatus(null)
+    }
+  }, [searchResults, searchSelected, queueApi, loadQueue, mk])
 
   const accessMarket = (market) => {
     localStorage.setItem('zs_master_session', JSON.stringify({ mk, returnTo: '/painel' }))
@@ -1776,9 +1814,11 @@ export default function MasterPainel() {
                       {searchSelected.size > 0 && (
                         <button onClick={addSearchToQueue} disabled={addingSearch}
                           className="w-full py-3.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 sticky bottom-4">
-                          {addingSearch
+                          {addingSearchStatus === 'validating'
+                            ? <><Loader2 className="w-4 h-4 animate-spin" /> Verificando WhatsApp ({searchSelected.size})...</>
+                            : addingSearchStatus === 'adding'
                             ? <><Loader2 className="w-4 h-4 animate-spin" /> Adicionando à fila...</>
-                            : <><Plus className="w-4 h-4" /> Adicionar {searchSelected.size} selecionado{searchSelected.size>1?'s':''} à fila de disparo</>}
+                            : <><Plus className="w-4 h-4" /> Adicionar {searchSelected.size} à fila — valida WA auto</>}
                         </button>
                       )}
                     </div>
