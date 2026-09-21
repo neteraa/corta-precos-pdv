@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Database, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, Fingerprint, Copy, Check, Image, Palette, MessageCircle, Wifi, WifiOff, RefreshCw, LogOut, Bot, Clock, MapPin, CreditCard, Tag, Phone as PhoneIcon } from 'lucide-react'
 import { useStore } from '../store.jsx'
 import { parseGdoorCsv } from '../utils/importCsv.js'
-import { usePrinter } from '../hooks/usePrinter.js'
+import { usePrinter, getNicheMeta } from '../hooks/usePrinter.js'
 import PixQR from '../components/PixQR.jsx'
 import { getCredentials, saveCredentials, getConfiguredStoreId, saveStoreId, slugify } from '../utils/auth.js'
 
@@ -801,7 +801,27 @@ export default function Configuracoes() {
 
         {/* Cor do tema */}
         <div className="mt-5">
-          <label className="label mb-1"><Palette className="w-3 h-3 inline mr-1" />Identidade Visual — Cor do Sistema</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="label"><Palette className="w-3 h-3 inline mr-1" />Identidade Visual — Cor do Sistema</label>
+            {(() => {
+              try {
+                const session = JSON.parse(localStorage.getItem('cp_session') || '{}')
+                const meta    = getNicheMeta(session.niche || 'mercado')
+                const applyNiche = () => {
+                  set('themeColor', meta.color)
+                  setSettings(s => ({ ...s, themeColor: meta.color }))
+                }
+                return (
+                  <button onClick={applyNiche} title={`Cor padrão: ${meta.label}`}
+                    className="text-[10px] font-bold px-2 py-1 rounded-lg border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-all flex items-center gap-1">
+                    <span>{meta.emoji}</span>
+                    <span>Cor do {meta.label}</span>
+                    <span style={{ display:'inline-block', width:10, height:10, borderRadius:'50%', background:meta.color }} />
+                  </button>
+                )
+              } catch { return null }
+            })()}
+          </div>
           <p className="text-xs text-gray-400 mb-3">A cor muda botões, sidebar e terminal em tempo real. Clique em Salvar para persistir.</p>
           <ColorPicker value={form.themeColor} onChange={v => {
             set('themeColor', v)

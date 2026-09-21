@@ -257,6 +257,7 @@ export default async (req) => {
         storePhone:   req2.telefone,
         active:       true,
         plan:         'basic',
+        niche:        req2.niche || req2.tipo || 'mercado',
         createdAt:    new Date().toISOString(),
         requestId:    req2.id,
       }

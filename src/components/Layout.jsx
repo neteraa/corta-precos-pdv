@@ -32,7 +32,7 @@ import {
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import { useOnlineStatus } from '../hooks/useOnlineStatus.js'
-import { usePrinter, seedSettingsFromSession } from '../hooks/usePrinter.js'
+import { usePrinter, seedSettingsFromSession, getNicheMeta } from '../hooks/usePrinter.js'
 import { useMarketCheck } from '../hooks/useMarketCheck.js'
 import BlockedScreen from './BlockedScreen.jsx'
 import { logout, getRole, getOperatorName, getTerminalId } from '../utils/auth.js'
@@ -103,9 +103,10 @@ function filterByRole(items, role) {
 /* ── logo ─────────────────────────────────────────────────── */
 function SidebarLogo() {
   const { settings } = usePrinter()
-  const session = (() => { try { return JSON.parse(localStorage.getItem('cp_session') || '{}') } catch { return {} } })()
-  const name    = session.storeName || settings.storeName || 'MEU MERCADO'
-  const logoImg = settings.logoImage
+  const session    = (() => { try { return JSON.parse(localStorage.getItem('cp_session') || '{}') } catch { return {} } })()
+  const name       = session.storeName || settings.storeName || 'MEU MERCADO'
+  const logoImg    = settings.logoImage
+  const nicheMeta  = getNicheMeta(session.niche || 'mercado')
 
   return (
     <div className="px-3 pt-3 pb-2 shrink-0">
@@ -116,14 +117,15 @@ function SidebarLogo() {
           : <ZatendeStokLogo variant="wordmark" />
         }
       </div>
-      {/* store name badge — uses CSS var so it follows the picker live */}
+      {/* store badge — niche emoji + name + segment label */}
       <div className="relative overflow-hidden rounded-xl px-3 py-2.5 shadow-lg"
         style={{ background: 'linear-gradient(135deg, var(--zs-theme), color-mix(in srgb, var(--zs-theme) 70%, black))', boxShadow: '0 8px 24px color-mix(in srgb, var(--zs-theme) 35%, transparent)' }}>
         <div className="relative flex items-center gap-2">
-          <div className="w-5 h-5 bg-black/20 rounded-md flex items-center justify-center shrink-0">
-            <Store className="w-3 h-3 text-white" />
+          <span className="text-base leading-none shrink-0" aria-hidden="true">{nicheMeta.emoji}</span>
+          <div className="flex-1 min-w-0">
+            <span className="text-white font-black text-sm tracking-tight leading-none truncate block">{name}</span>
+            <span className="text-white/50 font-semibold text-[9px] tracking-widest uppercase leading-none block mt-0.5">{nicheMeta.label}</span>
           </div>
-          <span className="text-white font-black text-sm tracking-tight leading-none truncate">{name}</span>
         </div>
       </div>
     </div>
@@ -194,6 +196,7 @@ export default function Layout() {
   const _session     = (() => { try { return JSON.parse(localStorage.getItem('cp_session') || '{}') } catch { return {} } })()
   const storeName    = _session.storeName || storeSettings.storeName || 'MEU MERCADO'
   const themeColor   = storeSettings.themeColor || '#f97316'
+  const nicheMeta    = getNicheMeta(_session.niche || 'mercado')
 
   // Keep CSS variable in sync so ALL --zs-theme consumers (btn-primary, inputs, etc.) update instantly
   useEffect(() => {
@@ -316,6 +319,7 @@ export default function Layout() {
           </button>
           <div className="flex items-center gap-2">
             <img src="/icon.svg" alt="logo" className="w-6 h-6" />
+            <span className="text-base leading-none" aria-hidden="true">{nicheMeta.emoji}</span>
             <span className="font-black text-base tracking-tight truncate" style={{ color: themeColor }}>{storeName}</span>
           </div>
         </header>

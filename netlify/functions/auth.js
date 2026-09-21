@@ -42,6 +42,7 @@ export default async (req) => {
       storeId:    market.storeId,
       storeName:  market.storeName,
       storePhone: market.storePhone || '',
+      niche:      market.niche || 'mercado',
     }), { headers: CORS })
 
   } catch (err) {

@@ -241,6 +241,35 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
           )
         })()}
 
+        {/* Nicho */}
+        {(() => {
+          const NICHE_OPTS = [
+            { v:'mercado',       e:'🏪', l:'Mercado' },
+            { v:'padaria',       e:'🥖', l:'Padaria' },
+            { v:'acougue',       e:'🥩', l:'Açougue' },
+            { v:'restaurante',   e:'🍽️', l:'Restaurante' },
+            { v:'lanchonete',    e:'🌯', l:'Lanchonete' },
+            { v:'distribuidora', e:'🚚', l:'Distribuidora' },
+          ]
+          const cur = market.niche || 'mercado'
+          const setNiche = async (niche) => {
+            setBusy(true)
+            await api('/api/markets-admin', mk, { method: 'POST', body: JSON.stringify({ action: 'set-niche', id: market.id, niche }) })
+            await onRefresh()
+            setBusy(false)
+          }
+          return (
+            <div className="flex items-center justify-between text-xs pt-0.5">
+              <span className="text-gray-500">Nicho</span>
+              <select value={cur} disabled={busy}
+                onChange={e => setNiche(e.target.value)}
+                className="bg-gray-700 border border-gray-600 text-xs rounded-lg px-2 py-1 outline-none focus:border-indigo-500 disabled:opacity-40 text-gray-200">
+                {NICHE_OPTS.map(o => <option key={o.v} value={o.v}>{o.e} {o.l}</option>)}
+              </select>
+            </div>
+          )
+        })()}
+
         {/* Expiry / payment status */}
         {(() => {
           const _raw = market.expiresAt ? new Date(market.expiresAt) : null

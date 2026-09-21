@@ -17,6 +17,27 @@ const PROMO_THRESHOLD = 100
 const BAUD = 9600
 const BASE_KEY = 'cp_printer_settings'
 
+/** Cor padrão e metadata visual por nicho. Usada no seed do primeiro login. */
+export const NICHE_META = {
+  mercado:      { color: '#f97316', emoji: '🏪', label: 'Mercado' },
+  padaria:      { color: '#d97706', emoji: '🥖', label: 'Padaria' },
+  acougue:      { color: '#dc2626', emoji: '🥩', label: 'Açougue' },
+  restaurante:  { color: '#0891b2', emoji: '🍽️', label: 'Restaurante' },
+  lanchonete:   { color: '#16a34a', emoji: '🌯', label: 'Lanchonete' },
+  distribuidora:{ color: '#1d4ed8', emoji: '🚚', label: 'Distribuidora' },
+}
+
+export function getNicheMeta(raw = '') {
+  const key = raw.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z]+/g, '')
+  // partial match (e.g. 'acougue' matches 'açougue')
+  const found = Object.keys(NICHE_META).find(k =>
+    k === key || key.startsWith(k) || k.startsWith(key)
+  )
+  return NICHE_META[found] || NICHE_META.mercado
+}
+
 function settingsKey() { return mktKey(BASE_KEY) }
 
 function loadSettings() {
@@ -38,7 +59,7 @@ export function savePrinterSettings(s, sourceId) {
 
 /** Sync storeName/storePhone/themeColor from the auth session (called after login).
  *  storeName always comes from session (server source of truth).
- *  themeColor is only seeded once (user can customise freely in Configurações). */
+ *  themeColor seeds from the niche palette on FIRST login; user can override in Configurações. */
 export function seedSettingsFromSession() {
   try {
     const session = JSON.parse(localStorage.getItem('cp_session') || '{}')
@@ -48,7 +69,10 @@ export function seedSettingsFromSession() {
     let changed   = false
     if (session.storeName) { current.storeName = session.storeName; changed = true }
     if (session.storePhone && !current.phone) { current.phone = session.storePhone; changed = true }
-    if (!current.themeColor) { current.themeColor = '#f97316'; changed = true }
+    if (!current.themeColor) {
+      current.themeColor = getNicheMeta(session.niche || 'mercado').color
+      changed = true
+    }
     if (changed) localStorage.setItem(key, JSON.stringify(current))
   } catch {}
 }
