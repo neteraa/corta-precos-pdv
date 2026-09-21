@@ -121,16 +121,20 @@ const NICHES = {
 }
 
 const NAV = [
-  { icon: LayoutDashboard, label: 'Dashboard' },
-  { icon: ShoppingCart,    label: 'PDV', active: true },
-  { icon: Package,         label: 'Produtos' },
-  { icon: TrendingUp,      label: 'Vendas' },
-  { icon: BarChart2,       label: 'Estoque' },
-  { icon: Users,           label: 'Clientes' },
-  { icon: Star,            label: 'Fidelidade' },
-  { icon: FileText,        label: 'Relatório' },
-  { icon: BadgePercent,    label: 'Promoções' },
-  { icon: Settings,        label: 'Configurações' },
+  { icon: LayoutDashboard, label: 'Dashboard',    features: ['Vendas de hoje em tempo real','Top 5 produtos do dia','Gráfico semanal de faturamento','Alertas de estoque crítico'] },
+  { icon: ShoppingCart,    label: 'PDV',          active: true },
+  { icon: Package,         label: 'Produtos',     features: ['Cadastro com foto e código de barras','Importação em massa via planilha','Precificação por margem de lucro','Variações (tamanho, sabor, peso)'] },
+  { icon: TrendingUp,      label: 'Vendas',       features: ['Histórico completo com filtro de data','Cancelamento de venda com estorno','Exportar relatório em PDF','Detalhes por forma de pagamento'] },
+  { icon: BarChart2,       label: 'Estoque',      features: ['Entrada e saída de mercadorias','Alerta automático de estoque mínimo','Inventário com leitura de código de barras','Histórico de movimentações'] },
+  { icon: Users,           label: 'Clientes',     features: ['Cadastro completo com histórico','Filtro por frequência de compra','Envio de promoção via WhatsApp','Aniversariantes do mês'] },
+  { icon: Star,            label: 'Fidelidade',   features: ['Pontuação automática por compra','Resgates configuráveis pelo dono','Cashback em dinheiro ou desconto','Ranking dos clientes VIP'] },
+  { icon: FileText,        label: 'Fiado',        features: ['Controle de crédito por cliente','Cobrança automática via WhatsApp','Limite de fiado configurável','Relatório de inadimplência'] },
+  { icon: BadgePercent,    label: 'Promoções',    features: ['Leve 3 Pague 2 automático','Combo com desconto por grupo','Promoção relâmpago com timer','Desconto progressivo por quantidade'] },
+  { icon: Receipt,         label: 'Relatório',    features: ['Faturamento por período','Ticket médio e margem de lucro','Produtos campeões de vendas','Exportação em Excel e PDF'] },
+  { icon: Tag,             label: 'Etiquetas',    features: ['Impressão de etiqueta de preço','Código de barras gerado na hora','Layout personalizável com logo','Impressão em lote por categoria'] },
+  { icon: Clock,           label: 'Validade',     features: ['Controle de vencimento de produtos','Alerta antecipado por e-mail/WhatsApp','Lista de produtos a vencer em 7 dias','Relatório de perdas evitadas'] },
+  { icon: MessageCircle,   label: 'Campanhas',    features: ['Disparo em massa via WhatsApp','Segmentação por nicho ou histórico','Agendamento de mensagem','Templates de promoção prontos'] },
+  { icon: Settings,        label: 'Configurações',features: ['Logo e cor da loja personalizados','Chave PIX e impressora térmica','Múltiplos operadores com perfil','Integração WhatsApp Business'] },
 ]
 
 const PAYMENTS = [
@@ -243,13 +247,14 @@ function DemoPDV({ niche }) {
   const n = NICHES[niche] || NICHES.mercado
   const { color, emoji, label, storeName, owner, products, promoTrigger } = n
 
-  const [search,   setSearch]   = useState('')
-  const [cart,     setCart]     = useState([])
-  const [payment,  setPayment]  = useState(null)
-  const [stage,    setStage]    = useState('pdv') // pdv | processing | success
-  const [saleNum,  setSaleNum]  = useState(47)
-  const [cartOpen, setCartOpen] = useState(false)
-  const [promoFired, setPromoFired] = useState(false)
+  const [search,    setSearch]    = useState('')
+  const [cart,      setCart]      = useState([])
+  const [payment,   setPayment]   = useState(null)
+  const [stage,     setStage]     = useState('pdv') // pdv | processing | success
+  const [saleNum,   setSaleNum]   = useState(47)
+  const [cartOpen,  setCartOpen]  = useState(false)
+  const [promoFired,setPromoFired]= useState(false)
+  const [navModal,  setNavModal]  = useState(null) // { label, features }
 
   const filtered = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
 
@@ -334,19 +339,27 @@ function DemoPDV({ niche }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-xs font-bold text-gray-200 truncate">{owner}</div>
-          <div className="text-[10px] font-semibold text-orange-400">Admin</div>
+          <div className="text-[10px] font-semibold" style={{ color }}>Admin</div>
         </div>
       </div>
       <div className="mx-4 mb-2 h-px bg-white/5" />
 
       {/* nav */}
-      <nav className="flex-1 min-h-0 overflow-y-auto px-2 space-y-0.5">
-        {NAV.map(({ icon: Icon, label: l, active: a }) => (
-          <div key={l} className="flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-all"
-            style={a ? { background:`${color}18`, border:`1px solid ${color}33` } : { color:'#9ca3af' }}>
+      <nav className="flex-1 min-h-0 overflow-y-auto px-2 space-y-0.5 pb-2">
+        {NAV.map(({ icon: Icon, label: l, active: a, features: f }) => (
+          <div key={l}
+            onClick={() => !a && f && setNavModal({ label: l, features: f })}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
+            style={{
+              cursor: a ? 'default' : 'pointer',
+              ...(a
+                ? { background:`${color}18`, border:`1px solid ${color}33` }
+                : { color:'#6b7280' }),
+            }}>
             <Icon className="w-3.5 h-3.5 shrink-0" style={a ? { color } : {}} />
-            <span className="text-[12px] font-bold" style={a ? { color } : {}}>{l}</span>
-            {a && <div className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background:color }} />}
+            <span className="text-[12px] font-bold flex-1" style={a ? { color } : {}}>{l}</span>
+            {a  && <div className="w-1.5 h-1.5 rounded-full" style={{ background:color }} />}
+            {!a && f && <ChevronRight className="w-3 h-3 opacity-30" />}
           </div>
         ))}
       </nav>
@@ -418,9 +431,48 @@ function DemoPDV({ niche }) {
     </div>
   )
 
+  /* ── Feature preview modal ── */
+  const FeatureModal = navModal && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background:'rgba(0,0,0,0.7)' }}
+      onClick={() => setNavModal(null)}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="font-black text-gray-900 text-xl">{navModal.label}</div>
+            <div className="text-xs text-gray-400 mt-0.5">Funcionalidade incluída no plano</div>
+          </div>
+          <button onClick={() => setNavModal(null)} className="p-1.5 rounded-xl hover:bg-gray-100 transition-colors">
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+        <div className="space-y-2.5 mb-5">
+          {navModal.features.map((f, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background:`${color}20` }}>
+                <Check className="w-3 h-3" style={{ color }} />
+              </div>
+              <span className="text-sm text-gray-700">{f}</span>
+            </div>
+          ))}
+        </div>
+        <a href={`https://wa.me/5515997969303?text=Oi!+Quero+ver+a+tela+de+${encodeURIComponent(navModal.label)}+do+ZatendeStok+para+${encodeURIComponent(label)}`}
+          target="_blank" rel="noopener noreferrer"
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-black text-white text-sm transition-all active:scale-95"
+          style={{ background: color }}>
+          <MessageCircle className="w-4 h-4" /> Quero ver essa tela → WhatsApp
+        </a>
+        <button onClick={() => setNavModal(null)}
+          className="w-full text-center text-xs text-gray-400 mt-3 py-1.5 hover:text-gray-600 transition-colors">
+          Continuar no demo
+        </button>
+      </div>
+    </div>
+  )
+
   /* ── Main PDV ── */
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
+      {FeatureModal}
       <Sidebar />
 
       {/* mobile sidebar overlay */}
