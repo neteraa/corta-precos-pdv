@@ -6,6 +6,10 @@
 [functions]
   node_bundler = "esbuild"
 
+# wa-bot precisa de mais tempo: Railway(~3.5s) + OpenAI(~3s) + Blobs(~1s) = ~7.5s
+[functions."wa-bot"]
+  timeout = 26
+
 # /ofertas → função Node.js que injeta OG tags corretos por ?s=TENANT_ID
 # Funciona para browser E bots (WhatsApp, Telegram, Google)
 [[redirects]]

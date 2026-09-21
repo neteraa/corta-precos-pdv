@@ -211,13 +211,13 @@ function extractText(data) {
   )
 }
 
-/** Envia mensagem de texto via Evolution API
- *  instance: vem do payload do webhook (multi-tenant — cada loja usa a própria instância)
+/** Envia mensagem de texto via Evolution API.
+ *  Fire-and-forget: não bloqueia a função aguardando Railway.
+ *  Usa AbortController para não segurar a conexão infinitamente.
  */
-async function sendReply(number, text, instance) {
-  const url = process.env.EVOLUTION_API_URL?.replace(/\/$/, '')
-  const key = process.env.EVOLUTION_API_KEY
-  // Usa a instância do payload; fallback para env var legada
+function sendReply(number, text, instance) {
+  const url  = process.env.EVOLUTION_API_URL?.replace(/\/$/, '')
+  const key  = process.env.EVOLUTION_API_KEY
   const inst = instance || process.env.EVOLUTION_INSTANCE
 
   if (!url || !key || !inst) {
@@ -225,15 +225,18 @@ async function sendReply(number, text, instance) {
     return
   }
 
-  const res = await fetch(`${url}/message/sendText/${inst}`, {
+  const ac = new AbortController()
+  setTimeout(() => ac.abort(), 8000) // desiste em 8s
+
+  fetch(`${url}/message/sendText/${inst}`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', 'apikey': key },
     body:    JSON.stringify({ number, text }),
-  })
-  if (!res.ok) {
-    const body = await res.text()
-    console.error(`wa-bot: sendText failed ${res.status} — ${body}`)
-  }
+    signal:  ac.signal,
+  }).then(r => {
+    if (!r.ok) r.text().then(b => console.error(`wa-bot: sendText ${r.status} — ${b.slice(0,200)}`))
+    else console.log(`wa-bot: sendText OK → ${number}`)
+  }).catch(e => console.error('wa-bot: sendReply error:', e.message))
 }
 
 // ─── Perfil público do mercado ────────────────────────────────────────────────
@@ -298,13 +301,16 @@ async function askOpenAI(userMessage, senderNum, systemMsg) {
   if (!key) throw new Error('OPENAI_API_KEY not set')
 
   const history = getHistory(senderNum)
+  const ac = new AbortController()
+  setTimeout(() => ac.abort(), 12000) // 12s timeout no OpenAI
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    signal:  ac.signal,
     body:    JSON.stringify({
       model:       'gpt-4o-mini',
-      max_tokens:  600,
+      max_tokens:  350,      // 350 suficiente para WhatsApp (máx 4 linhas)
       temperature: 0.75,
       messages: [
         { role: 'system', content: systemMsg },
@@ -473,7 +479,7 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
         await saveLead(senderNum, { waName: senderName, stage: leadProfile.stage || 'novo' })
       }
 
-      await sendReply(senderNum, reply, instanceName)
+      sendReply(senderNum, reply, instanceName)
       console.log(`wa-bot [Zara]: respondeu ${senderNum}: ${reply.slice(0, 80)}`)
 
     } else {
@@ -492,7 +498,7 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
 
       // Bot do mercado não usa <zs_lead> — resposta direta
       pushHistory(senderNum, 'assistant', rawReply)
-      await sendReply(senderNum, rawReply, instanceName)
+      sendReply(senderNum, rawReply, instanceName)
       console.log(`wa-bot [${instanceName}]: respondeu ${senderNum}: ${rawReply.slice(0, 80)}`)
     }
 
