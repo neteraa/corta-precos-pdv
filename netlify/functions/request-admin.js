@@ -271,33 +271,35 @@ export default async (req) => {
       list[idx].storeId    = storeId
       await store.set('pending-requests', JSON.stringify(list))
 
-      const base = new URL(req.url).origin
+      // 1) Seed produtos iniciais — escrita direta no blob store
+      try {
+        const products  = seedProducts(req2.niche || req2.tipo)
+        const dataStore = getStore('corta-precos')
+        await dataStore.set(`${storeId}:cp_products`, JSON.stringify(products))
+      } catch (e) { console.error('seed-products failed:', e.message) }
 
-      // 1) Seed produtos iniciais por nicho (não-bloqueante)
-      const products = seedProducts(req2.niche || req2.tipo)
-      fetch(`${base}/api/persist`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ key: 'cp_products', value: JSON.stringify(products), storeId }),
-      }).catch(() => {})
-
-      // 2) Creditar afiliado se veio com ?ref (não-bloqueante)
+      // 2) Creditar afiliado — escrita direta no blob store de afiliados
       if (req2.ref) {
-        const planValues = { basic: 0, essencial: 297, profissional: 497 }
-        const valorPlano = planValues[newMarket.plan] || 0
-        fetch(`${base}/api/affiliates?mk=${MASTER_KEY}`, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            action:    'credit',
-            codigo:    req2.ref,
-            requestId: req2.id,
-            mercado:   req2.mercado,
-            niche:     req2.niche || 'mercado',
-            plano:     newMarket.plan || 'basic',
-            valorPlano,
-          }),
-        }).catch(() => {})
+        try {
+          const affStore = getStore({ name: 'zs-affiliates', consistency: 'strong' })
+          const affRaw   = await affStore.get('affiliates')
+          const affList  = affRaw ? JSON.parse(affRaw) : []
+          const aff      = affList.find(a => a.codigo === req2.ref)
+          if (aff) {
+            const planValues = { basic: 0, essencial: 297, profissional: 497 }
+            const valorPlano = planValues[newMarket.plan] || 0
+            aff.vendas.push({
+              requestId:  req2.id,
+              mercado:    req2.mercado,
+              niche:      req2.niche || 'mercado',
+              plano:      newMarket.plan || 'basic',
+              valorPlano,
+              comissao:   Math.round(valorPlano * aff.comissaoPct * 100) / 100,
+              creditedAt: new Date().toISOString(),
+            })
+            await affStore.set('affiliates', JSON.stringify(affList))
+          }
+        } catch (e) { console.error('credit-affiliate failed:', e.message) }
       }
 
       // 3) Enviar email de boas-vindas se endereço fornecido
