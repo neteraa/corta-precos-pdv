@@ -1,79 +1,79 @@
 import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Loader2, Copy, CheckCircle2, Link2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Loader2, CheckCircle2, Link2, ChevronDown, ChevronUp, Copy } from 'lucide-react'
 import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 
 const BASE_URL  = 'https://zatendestok.com.br'
 const ZAP_PEDRO = '5515997969303'
+const wppOpen   = (msg) => window.open(`https://wa.me/${ZAP_PEDRO}?text=${encodeURIComponent(msg)}`, '_blank')
 
-function openWpp(msg) {
-  window.open(`https://wa.me/${ZAP_PEDRO}?text=${encodeURIComponent(msg)}`, '_blank')
+/* ── helpers ─────────────────────────────────────────────── */
+function Btn({ children, onClick, color = '#22c55e', style = {} }) {
+  return (
+    <button onClick={onClick} style={{
+      display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+      width:'100%', padding:'16px', border:'none', borderRadius:14,
+      background:color, color:'#fff', fontWeight:900, fontSize:16,
+      cursor:'pointer', transition:'filter .15s', ...style }}
+      onMouseOver={e=>e.currentTarget.style.filter='brightness(1.1)'}
+      onMouseOut={e=>e.currentTarget.style.filter='brightness(1)'}>
+      {children}
+    </button>
+  )
 }
 
 function CopyBtn({ value, label, full }) {
   const [ok, setOk] = useState(false)
-  const go = () => navigator.clipboard.writeText(value).then(() => { setOk(true); setTimeout(() => setOk(false), 2200) })
+  const go = () => navigator.clipboard.writeText(value).then(() => { setOk(true); setTimeout(()=>setOk(false),2000) })
   return (
     <button onClick={go} style={{
-      display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-      padding:'11px 18px', border:`1.5px solid ${ok?'#22c55e':'#e2e8f0'}`, borderRadius:10,
+      display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+      padding:'10px 16px', border:`1.5px solid ${ok?'#22c55e':'#e2e8f0'}`, borderRadius:10,
       background:ok?'#f0fdf4':'#fff', cursor:'pointer', color:ok?'#16a34a':'#0f172a',
-      fontSize:13, fontWeight:700, transition:'all .2s', width:full?'100%':'auto' }}>
-      <CheckCircle2 size={15} color={ok?'#22c55e':'#94a3b8'} />
+      fontSize:13, fontWeight:700, width:full?'100%':'auto', transition:'all .2s' }}>
+      <CheckCircle2 size={14} color={ok?'#22c55e':'#94a3b8'}/>
       {ok ? 'Copiado!' : label}
     </button>
   )
 }
 
-function StatCard({ emoji, label, value, sub }) {
-  return (
-    <div style={{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:16, padding:'16px 18px' }}>
-      <div style={{ fontSize:22, marginBottom:6 }}>{emoji}</div>
-      <p style={{ fontSize:26, fontWeight:900, color:'#0f172a', margin:'0 0 2px' }}>{value}</p>
-      <p style={{ fontSize:11, fontWeight:700, color:'#64748b', margin:'0 0 2px', textTransform:'uppercase', letterSpacing:'.06em' }}>{label}</p>
-      {sub && <p style={{ fontSize:11, color:'#94a3b8', margin:0 }}>{sub}</p>}
-    </div>
-  )
-}
-
+/* ── conteúdo de vendas ──────────────────────────────────── */
 const SCRIPTS = [
-  {
-    nicho: '🏪 Mercado / Mercearia',
-    texto: 'Oi [Nome]! Vi que voc\u00ea tem um mercadinho aqui na regi\u00e3o. Tenho uma solu\u00e7\u00e3o que t\u00e1 ajudando v\u00e1rios mercados da cidade a controlar estoque, emitir fiado e mandar promo\u00e7\u00e3o autom\u00e1tica no WhatsApp dos clientes. Posso te explicar rapidinho?',
-    dica:  'Foca no fiado digital e no controle de validade \u2014 essas s\u00e3o as duas maiores dores de mercado.',
-  },
-  {
-    nicho: '🥖 Padaria / Confeitaria',
-    texto: 'Oi [Nome]! Voc\u00ea tem a padaria aqui n\u00e9? Trabalho com um sistema que ajuda padarias a controlar insumos, emitir fiado e divulgar promo\u00e7\u00f5es do dia via WhatsApp. Posso te mostrar?',
-    dica:  'Foca no controle de insumos e nas campanhas de fim de dia (p\u00e3o que sobrou vira promo\u00e7\u00e3o autom\u00e1tica).',
-  },
-  {
-    nicho: '🥩 A\u00e7ougue / Frigor\u00edfico',
-    texto: 'Oi [Nome]! Trabalho com um sistema pra a\u00e7ougue que controla o vencimento da carne por lote, organiza o fiado e manda oferta da semana no WhatsApp dos clientes. Tem interesse?',
-    dica:  'Foca na validade por lote (dor enorme) e no fiado digitalizado \u2014 muitos a\u00e7ougues ainda usam caderno.',
-  },
-  {
-    nicho: '🍽️ Restaurante / Lanchonete',
-    texto: 'Oi [Nome]! Vi seu restaurante aqui na regi\u00e3o. Tenho um sistema que controla o estoque de insumos, faz o caixa do dia e capta clientes via WhatsApp automaticamente. Posso te mostrar?',
-    dica:  'Foca no caixa do dia e controle de insumos \u2014 restaurante sangra dinheiro sem controle do que entra e sai.',
-  },
+  { nicho:'Mercado / Mercearia',  emoji:'🏪',
+    texto:'Oi [Nome]! Vi que você tem um mercadinho aqui na região. Tenho uma solução que tá ajudando vários mercados da cidade a controlar estoque, emitir fiado e mandar promoção automática no WhatsApp dos clientes. Posso te explicar rapidinho?',
+    dica:'Foca no fiado digital e no controle de validade — essas são as duas maiores dores de mercado.' },
+  { nicho:'Padaria / Confeitaria', emoji:'🥖',
+    texto:'Oi [Nome]! Você tem a padaria aqui né? Trabalho com um sistema que ajuda padarias a controlar insumos, emitir fiado e divulgar promoções do dia via WhatsApp. Posso te mostrar?',
+    dica:'Foca no controle de insumos e campanhas de fim de dia — pão que sobrou vira promoção automática.' },
+  { nicho:'Açougue / Frigorífico', emoji:'🥩',
+    texto:'Oi [Nome]! Trabalho com um sistema pra açougue que controla o vencimento da carne por lote, organiza o fiado e manda oferta da semana no WhatsApp dos clientes. Tem interesse?',
+    dica:'Foca na validade por lote (dor enorme) e no fiado digitalizado — muitos açougues ainda usam caderno.' },
+  { nicho:'Restaurante / Lanchonete', emoji:'🍽️',
+    texto:'Oi [Nome]! Vi seu restaurante aqui na região. Tenho um sistema que controla estoque de insumos, faz o caixa do dia e capta clientes via WhatsApp automaticamente. Posso te mostrar?',
+    dica:'Foca no caixa do dia e controle de insumos — restaurante sangra dinheiro sem controlar o que entra e sai.' },
 ]
 
 const OBJECOES = [
-  { q: '"J\u00e1 tenho sistema"',               a: 'Qual voc\u00ea usa? Pergunto porque a maioria dos nossos clientes veio de outro sistema. O que te incomoda mais no atual? \u00c0s vezes a gente resolve exatamente isso.' },
-  { q: '"T\u00e1 caro"',                         a: 'Entendo! S\u00e3o R$9,90 por dia \u2014 menos que um caf\u00e9 por funcion\u00e1rio. A maioria dos clientes recupera o investimento no primeiro m\u00eas s\u00f3 com a redu\u00e7\u00e3o de perda por vencimento.' },
-  { q: '"N\u00e3o sei mexer com tecnologia"',    a: '\u00c9 tudo pelo celular, igual usar WhatsApp. Em 10 minutos t\u00e1 funcionando. Nossa equipe faz o onboarding junto com voc\u00ea, sem press\u00e3o.' },
-  { q: '"Vou pensar"',                             a: 'Claro! S\u00f3 me fala: tem alguma d\u00favida espec\u00edfica? \u00c0s vezes \u00e9 uma coisa simples que a gente resolve agora e fica muito mais f\u00e1cil de decidir.' },
-  { q: '"Preciso falar com meu s\u00f3cio"',     a: 'Faz sentido! Quer que eu te mande um resuminho com o sistema e pre\u00e7o pra voc\u00ea mostrar pra ele? Fica muito mais f\u00e1cil de apresentar assim.' },
+  { q:'"Já tenho sistema"',
+    a:'Qual você usa? Pergunto porque a maioria dos nossos clientes veio de outro sistema. O que te incomoda mais no atual? Às vezes a gente resolve exatamente isso.' },
+  { q:'"Tá caro"',
+    a:'Entendo! São R$9,90 por dia — menos que um café por funcionário. A maioria dos clientes recupera o investimento no primeiro mês só com a redução de perda por vencimento.' },
+  { q:'"Não sei mexer com tecnologia"',
+    a:'É tudo pelo celular, igual usar WhatsApp. Em 10 minutos tá funcionando. Nossa equipe faz o onboarding junto com você, sem pressão.' },
+  { q:'"Vou pensar"',
+    a:'Claro! Só me fala: tem alguma dúvida específica? Às vezes é uma coisa simples que a gente resolve agora e fica muito mais fácil de decidir.' },
+  { q:'"Preciso falar com meu sócio"',
+    a:'Faz sentido! Quer que eu te mande um resuminho com o sistema e preço pra você mostrar pra ele? Fica muito mais fácil de apresentar assim.' },
 ]
 
+/* ════════════════════════════════════════════════════════════ */
 export default function Afiliado() {
   const [params]  = useSearchParams()
-  const [code,    setCode]    = useState(params.get('code') || '')
   const [input,   setInput]   = useState(params.get('code') || '')
   const [aff,     setAff]     = useState(null)
   const [loading, setLoading] = useState(!!params.get('code'))
   const [error,   setError]   = useState('')
+  const [clients, setClients] = useState(5)
   const [tabKit,  setTabKit]  = useState(0)
   const [openObj, setOpenObj] = useState(null)
 
@@ -83,223 +83,291 @@ export default function Afiliado() {
     try {
       const res = await fetch(`/api/affiliates?code=${encodeURIComponent(c.toLowerCase())}`)
       const d   = await res.json()
-      if (d.ok) { setAff(d.affiliate); setCode(c.toLowerCase()) }
-      else setError('C\u00f3digo n\u00e3o encontrado. Confira e tente novamente.')
-    } catch { setError('Erro de conex\u00e3o. Tente novamente.') }
+      if (d.ok) setAff(d.affiliate)
+      else setError('Código não encontrado. Confira e tente novamente.')
+    } catch { setError('Erro de conexão. Tente novamente.') }
     setLoading(false)
   }
 
   useEffect(() => { if (params.get('code')) load(params.get('code')) }, [])
 
-  const totalComissao = aff?.vendas?.reduce((s, v) => s + (v.comissao || 0), 0) ?? 0
+  const totalComissao = aff?.vendas?.reduce((s,v) => s+(v.comissao||0), 0) ?? 0
   const totalVendas   = aff?.vendas?.length ?? 0
-  const pct           = aff ? Math.round((aff.comissaoPct || 0.20) * 100) : 20
+  const pct           = aff ? Math.round((aff.comissaoPct||0.20)*100) : 20
   const link          = aff ? `${BASE_URL}/login?ref=${aff.codigo}` : ''
+  const calcRenda     = clients * 89  // média ponderada R$89/cliente
+
+  const MSG_RECRUTA = 'Olá Pedro! Vi o programa de afiliados do ZatendeStok e quero me cadastrar como vendedor. Como funciona?'
 
   const CSS = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Inter',system-ui,sans-serif;background:#f8fafc}
-    @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
-    .aff-tab{transition:all .18s;cursor:pointer}
-    .aff-tab:hover{background:rgba(79,91,213,.06)!important}
+    body{font-family:'Inter',system-ui,sans-serif;background:#0a0a0f}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes glow{0%,100%{opacity:.6}50%{opacity:1}}
+    @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+    .aff-tab{cursor:pointer;transition:all .2s}
+    .aff-tab:hover{opacity:.8}
+    .script-card{transition:transform .15s,box-shadow .15s}
+    .script-card:hover{transform:translateY(-2px)}
+    input:focus{outline:2px solid #22c55e!important;border-color:transparent!important}
+    input::placeholder{color:#64748b}
+    .slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:linear-gradient(90deg,#22c55e var(--val,50%),#1e2433 var(--val,50%));outline:none;cursor:pointer}
+    .slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#22c55e;cursor:pointer;box-shadow:0 0 0 4px rgba(34,197,94,.2)}
   `
 
-  const wppRecruta = 'Ol\u00e1 Pedro! Vi o programa de afiliados do ZatendeStok e quero me cadastrar como vendedor. Como funciona?'
-
+  /* ────────────────────────────────────────────── */
   return (
-    <div style={{ minHeight:'100vh', background:'#f8fafc', fontFamily:"'Inter',system-ui,sans-serif" }}>
+    <div style={{ minHeight:'100vh', background:'#0a0a0f', fontFamily:"'Inter',system-ui,sans-serif", color:'#fff' }}>
       <style>{CSS}</style>
 
-      {/* HERO */}
-      <div style={{ background:'linear-gradient(155deg,#1e1b4b 0%,#312e81 50%,#1e3a8a 100%)', padding:'32px 20px 40px', position:'relative', overflow:'hidden' }}>
-        <div aria-hidden style={{ position:'absolute',top:-60,right:-60,width:240,height:240,borderRadius:'50%',background:'rgba(99,102,241,.25)',filter:'blur(60px)',pointerEvents:'none' }} />
-        <div style={{ maxWidth:520, margin:'0 auto' }}>
+      {/* ── HERO dark ───────────────────────────── */}
+      <div style={{ background:'linear-gradient(160deg,#0f0c1e 0%,#0d1b2a 60%,#071a12 100%)', padding:'36px 20px 52px', position:'relative', overflow:'hidden', borderBottom:'1px solid #1a2030' }}>
+        {/* blobs */}
+        <div aria-hidden style={{ position:'absolute',top:-80,left:-80,width:320,height:320,borderRadius:'50%',background:'rgba(34,197,94,.07)',filter:'blur(80px)',pointerEvents:'none' }}/>
+        <div aria-hidden style={{ position:'absolute',bottom:-60,right:-60,width:260,height:260,borderRadius:'50%',background:'rgba(99,102,241,.08)',filter:'blur(70px)',pointerEvents:'none' }}/>
+
+        <div style={{ maxWidth:520, margin:'0 auto', position:'relative', zIndex:1 }}>
           <ZatendeStokLogo variant="full" />
+
           {!aff && (
-            <div style={{ marginTop:28, animation:'fadeUp .35s ease' }}>
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:16 }}>
-                {['💰 Renda extra real','📱 Vende pelo celular','🏆 Sem investimento','📊 Rastreia tudo'].map(t => (
-                  <span key={t} style={{ padding:'4px 12px', background:'rgba(255,255,255,.1)', border:'1px solid rgba(255,255,255,.15)', borderRadius:999, fontSize:11, fontWeight:700, color:'rgba(255,255,255,.8)' }}>{t}</span>
+            <div style={{ marginTop:32, animation:'fadeUp .4s ease' }}>
+              {/* badge */}
+              <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'6px 14px', background:'rgba(34,197,94,.1)', border:'1px solid rgba(34,197,94,.25)', borderRadius:999, fontSize:12, fontWeight:700, color:'#4ade80', marginBottom:24 }}>
+                <span style={{ width:7,height:7,borderRadius:'50%',background:'#22c55e',display:'inline-block',animation:'glow 2s ease infinite' }}/>
+                Programa de afiliados ativo — vagas abertas
+              </div>
+
+              <h1 style={{ fontSize:32, fontWeight:900, lineHeight:1.1, marginBottom:16, letterSpacing:'-.02em' }}>
+                Indique.{' '}
+                <span style={{ color:'#22c55e', display:'block' }}>Feche. Receba.</span>
+                <span style={{ color:'rgba(255,255,255,.5)', fontSize:22, fontWeight:700 }}>Todo mês, pra sempre.</span>
+              </h1>
+
+              <p style={{ color:'rgba(255,255,255,.55)', fontSize:15, lineHeight:1.7, marginBottom:28 }}>
+                Cada negócio que você indicar gera uma comissão <strong style={{color:'#4ade80'}}>recorrente</strong> pra você.
+                Não é bônus único. É renda mensal enquanto o cliente ficar ativo.
+              </p>
+
+              {/* 3 pilares */}
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:32 }}>
+                {[
+                  { n:'20%', s:'de comissão', d:'recorrente' },
+                  { n:'R$89', s:'média/cliente', d:'por mês' },
+                  { n:'∞', s:'sem teto', d:'de indicações' },
+                ].map(p => (
+                  <div key={p.n} style={{ background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.08)', borderRadius:14, padding:'16px 10px', textAlign:'center' }}>
+                    <p style={{ fontSize:26, fontWeight:900, color:'#22c55e', margin:'0 0 2px' }}>{p.n}</p>
+                    <p style={{ fontSize:11, fontWeight:800, color:'#fff', margin:'0 0 2px' }}>{p.s}</p>
+                    <p style={{ fontSize:10, color:'rgba(255,255,255,.35)' }}>{p.d}</p>
+                  </div>
                 ))}
               </div>
-              <h1 style={{ color:'#fff', fontSize:28, fontWeight:900, lineHeight:1.2, marginBottom:10 }}>
-                Ganhe at\u00e9 <span style={{ color:'#a5f3fc' }}>R$99/m\u00eas</span><br/>por cada cliente indicado.
-              </h1>
-              <p style={{ color:'rgba(255,255,255,.65)', fontSize:14, lineHeight:1.65 }}>
-                Indique mercados, padarias, a\u00e7ougues e restaurantes da sua regi\u00e3o para o ZatendeStok.
-                Voc\u00ea recebe <strong style={{ color:'#a5f3fc' }}>20% de comiss\u00e3o</strong> e acompanha tudo pelo celular \u2014 sem sair de casa.
-              </p>
+
+              {/* calculadora */}
+              <div style={{ background:'rgba(255,255,255,.04)', border:'1px solid rgba(255,255,255,.1)', borderRadius:18, padding:'22px 20px', marginBottom:28 }}>
+                <p style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,.4)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:12 }}>Simule sua renda</p>
+                <div style={{ display:'flex', alignItems:'baseline', gap:6, marginBottom:6 }}>
+                  <span style={{ fontSize:48, fontWeight:900, color:'#22c55e', lineHeight:1 }}>R${calcRenda}</span>
+                  <span style={{ fontSize:18, fontWeight:700, color:'rgba(255,255,255,.5)' }}>/mês</span>
+                </div>
+                <p style={{ fontSize:13, color:'rgba(255,255,255,.4)', marginBottom:18 }}>com <strong style={{color:'#fff'}}>{clients} cliente{clients>1?'s':''} ativo{clients>1?'s':''}</strong></p>
+                <input type="range" min="1" max="20" value={clients}
+                  onChange={e=>setClients(Number(e.target.value))}
+                  className="slider"
+                  style={{'--val': `${((clients-1)/19)*100}%`} }/>
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'rgba(255,255,255,.25)', marginTop:6 }}>
+                  <span>1 cliente</span><span>10 clientes</span><span>20 clientes</span>
+                </div>
+              </div>
+
+              <Btn onClick={() => wppOpen(MSG_RECRUTA)} color="#22c55e"
+                style={{ boxShadow:'0 4px 24px rgba(34,197,94,.35)', marginBottom:12, fontSize:17, padding:'18px' }}>
+                📲 Quero ser afiliado — falar com Pedro agora
+              </Btn>
+              <p style={{ textAlign:'center', fontSize:12, color:'rgba(255,255,255,.3)' }}>Grátis · Sem contrato · Comece hoje</p>
             </div>
           )}
+
           {aff && (
-            <div style={{ marginTop:20, animation:'fadeUp .3s ease' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                <span style={{ width:8,height:8,borderRadius:'50%',background:'#4ade80',display:'inline-block',animation:'pulse 2s ease infinite' }} />
-                <span style={{ color:'rgba(255,255,255,.5)', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em' }}>Vendedor ativo</span>
-                <span style={{ padding:'2px 8px', background:'rgba(255,255,255,.12)', borderRadius:999, fontSize:11, fontWeight:800, color:'#a5f3fc' }}>{pct}% comiss\u00e3o</span>
+            <div style={{ marginTop:24, animation:'fadeUp .3s ease' }}>
+              <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'5px 12px', background:'rgba(34,197,94,.1)', border:'1px solid rgba(34,197,94,.25)', borderRadius:999, fontSize:11, fontWeight:700, color:'#4ade80', marginBottom:16 }}>
+                <span style={{ width:7,height:7,borderRadius:'50%',background:'#22c55e',display:'inline-block',animation:'glow 2s ease infinite' }}/>
+                Vendedor ativo · {pct}% comissão
               </div>
-              <h1 style={{ color:'#fff', fontSize:24, fontWeight:900 }}>Ol\u00e1, {aff.nome.split(' ')[0]}! 👋</h1>
-              <p style={{ color:'rgba(255,255,255,.55)', fontSize:13, marginTop:4 }}>C\u00f3digo: <strong style={{ color:'#a5f3fc', fontFamily:'monospace' }}>{aff.codigo}</strong></p>
+              <h1 style={{ fontSize:26, fontWeight:900 }}>Olá, {aff.nome.split(' ')[0]}! 👋</h1>
+              <p style={{ color:'rgba(255,255,255,.4)', fontSize:13, marginTop:6 }}>Código: <span style={{ fontFamily:'monospace', color:'#4ade80', fontWeight:800 }}>{aff.codigo}</span></p>
             </div>
           )}
         </div>
       </div>
 
-      <div style={{ maxWidth:520, margin:'0 auto', padding:'24px 16px 48px' }}>
+      <div style={{ maxWidth:520, margin:'0 auto', padding:'28px 16px 56px' }}>
 
-        {/* SEM LOGIN */}
+        {/* ── SEM LOGIN ──────────────────────────── */}
         {!aff && (
           <>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:20 }}>
-              {[
-                { n:'R$59', s:'plano essencial', l:'por cliente/m\u00eas' },
-                { n:'R$99', s:'plano profissional', l:'por cliente/m\u00eas' },
-                { n:'\u221e',   s:'de clientes',   l:'sem limite' },
-              ].map(c => (
-                <div key={c.n} style={{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:14, padding:'14px 10px', textAlign:'center' }}>
-                  <p style={{ fontSize:22, fontWeight:900, color:'#4F5BD5', margin:'0 0 2px' }}>{c.n}</p>
-                  <p style={{ fontSize:11, fontWeight:800, color:'#0f172a', margin:'0 0 2px' }}>{c.l}</p>
-                  <p style={{ fontSize:10, color:'#94a3b8' }}>{c.s}</p>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ background:'#fff', borderRadius:18, border:'1px solid #e2e8f0', padding:'22px 20px', marginBottom:20 }}>
-              <h2 style={{ fontSize:17, fontWeight:900, color:'#0f172a', marginBottom:4 }}>J\u00e1 \u00e9 vendedor?</h2>
-              <p style={{ fontSize:13, color:'#64748b', marginBottom:16 }}>Digite seu c\u00f3digo para acessar seu painel.</p>
+            {/* login card */}
+            <div style={{ background:'#111827', border:'1px solid #1f2937', borderRadius:18, padding:'22px 20px', marginBottom:16 }}>
+              <h3 style={{ fontSize:16, fontWeight:900, color:'#fff', marginBottom:4 }}>Já é vendedor?</h3>
+              <p style={{ fontSize:13, color:'rgba(255,255,255,.4)', marginBottom:16 }}>Entre com seu código e acesse seu painel completo.</p>
               <div style={{ display:'flex', gap:10 }}>
-                <input value={input} onChange={e => setInput(e.target.value.toLowerCase())}
-                  onKeyDown={e => e.key === 'Enter' && load(input)}
-                  placeholder="seu c\u00f3digo (ex: pedro)"
-                  style={{ flex:1, padding:'12px 14px', border:'1.5px solid #e2e8f0', borderRadius:10, fontSize:15, color:'#0f172a', fontFamily:'inherit', outline:'none' }} />
-                <button onClick={() => load(input)} disabled={loading || !input.trim()}
-                  style={{ padding:'12px 20px', background:'#4F5BD5', border:'none', borderRadius:10, color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', opacity: loading||!input.trim()?0.55:1 }}>
-                  {loading ? <Loader2 size={16} style={{ animation:'spin 1s linear infinite' }}/> : 'Entrar'}
+                <input value={input} onChange={e=>setInput(e.target.value.toLowerCase())}
+                  onKeyDown={e=>e.key==='Enter'&&load(input)}
+                  placeholder="seu código (ex: pedro)"
+                  style={{ flex:1, padding:'13px 14px', border:'1.5px solid #1f2937', borderRadius:10, fontSize:15, color:'#fff', fontFamily:'inherit', background:'#0d1117' }}/>
+                <button onClick={()=>load(input)} disabled={loading||!input.trim()}
+                  style={{ padding:'13px 22px', background:'#4F5BD5', border:'none', borderRadius:10, color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', opacity:loading||!input.trim()?0.5:1 }}>
+                  {loading ? <Loader2 size={16} style={{animation:'spin 1s linear infinite'}}/> : 'Entrar'}
                 </button>
               </div>
-              {error && <p style={{ color:'#ef4444', fontSize:12, marginTop:8 }}>\u26a0 {error}</p>}
+              {error && <p style={{ color:'#f87171', fontSize:12, marginTop:8 }}>⚠ {error}</p>}
             </div>
 
-            <div style={{ background:'linear-gradient(135deg,#4F5BD5,#3730A3)', borderRadius:18, padding:'22px 20px', marginBottom:20, color:'#fff' }}>
-              <p style={{ fontSize:13, fontWeight:700, color:'rgba(255,255,255,.7)', marginBottom:6 }}>Ainda n\u00e3o \u00e9 vendedor?</p>
-              <h3 style={{ fontSize:18, fontWeight:900, marginBottom:8, lineHeight:1.25 }}>Comece a ganhar hoje.<br/>\u00c9 de gra\u00e7a, sem investimento.</h3>
-              <p style={{ fontSize:13, color:'rgba(255,255,255,.7)', lineHeight:1.6, marginBottom:18 }}>
-                Entre em contato com Pedro e receba seu c\u00f3digo exclusivo, seu link de indica\u00e7\u00e3o e o kit completo de vendas \u2014 tudo pelo WhatsApp, agora.
-              </p>
-              <button onClick={() => openWpp(wppRecruta)}
-                style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, width:'100%', padding:'14px', border:'none', borderRadius:12, background:'#22c55e', color:'#fff', fontWeight:800, fontSize:15, cursor:'pointer', boxShadow:'0 4px 16px rgba(34,197,94,.35)' }}>
-                📲 Quero ser afiliado \u2014 falar agora
-              </button>
-            </div>
-
-            <div style={{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:18, padding:'20px', marginBottom:20 }}>
-              <h3 style={{ fontSize:15, fontWeight:900, color:'#0f172a', marginBottom:16 }}>Como funciona em 4 passos</h3>
+            {/* por que ser afiliado */}
+            <div style={{ background:'linear-gradient(135deg,#0f1e12,#0a2015)', border:'1px solid rgba(34,197,94,.15)', borderRadius:18, padding:'22px 20px', marginBottom:16 }}>
+              <p style={{ fontSize:11, fontWeight:800, color:'#4ade80', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:14 }}>Por que ser afiliado?</p>
               {[
-                { emoji:'📋', title:'Recebe seu c\u00f3digo e link',   desc:'Pedro te cadastra e voc\u00ea recebe um link \u00fanico. Ex: zatendestok.com.br/login?ref=seucodigo' },
-                { emoji:'📲', title:'Indica pelo celular',              desc:'Manda por WhatsApp, Instagram, pessoalmente. N\u00e3o precisa explicar nada t\u00e9cnico.' },
-                { emoji:'\u2705',    title:'Cliente se cadastra',              desc:'O cliente acessa seu link e solicita o acesso. Nossa equipe ativa em at\u00e9 2 horas.' },
-                { emoji:'💰', title:'Voc\u00ea recebe a comiss\u00e3o', desc:'20% do plano contratado. Pagamento combinado diretamente com Pedro.' },
-              ].map((s, i) => (
-                <div key={i} style={{ display:'flex', gap:14, marginBottom:14 }}>
-                  <div style={{ width:36, height:36, borderRadius:10, background:'#eef2ff', border:'1.5px solid #c7d2fe', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>{s.emoji}</div>
+                { e:'💰', t:'Renda 100% recorrente', d:'Diferente de comissão única, você recebe todo mês enquanto o cliente usar o sistema.' },
+                { e:'📱', t:'Vende só pelo celular', d:'Seu link chega em qualquer lugar. WhatsApp, Instagram, pessoalmente — sem visita técnica.' },
+                { e:'⚡', t:'Ativação em 2 horas', d:'Cliente solicita pelo seu link, nossa equipe ativa em até 2 horas. Sem burocracia.' },
+                { e:'📊', t:'Painel em tempo real', d:'Veja suas conversões, comissão acumulada e link de indicação a qualquer hora.' },
+              ].map((b,i) => (
+                <div key={i} style={{ display:'flex', gap:14, marginBottom:i<3?16:0 }}>
+                  <div style={{ width:38,height:38,borderRadius:10,background:'rgba(34,197,94,.1)',border:'1px solid rgba(34,197,94,.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0 }}>{b.e}</div>
                   <div>
-                    <p style={{ fontSize:13, fontWeight:800, color:'#0f172a', margin:'3px 0 2px' }}>{s.title}</p>
-                    <p style={{ fontSize:12, color:'#64748b', margin:0, lineHeight:1.5 }}>{s.desc}</p>
+                    <p style={{ fontSize:13, fontWeight:800, color:'#fff', margin:'3px 0 3px' }}>{b.t}</p>
+                    <p style={{ fontSize:12, color:'rgba(255,255,255,.4)', margin:0, lineHeight:1.5 }}>{b.d}</p>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div style={{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:18, padding:'20px', marginBottom:20 }}>
-              <h3 style={{ fontSize:15, fontWeight:900, color:'#0f172a', marginBottom:4 }}>Para quem voc\u00ea indica?</h3>
-              <p style={{ fontSize:13, color:'#64748b', marginBottom:14 }}>Qualquer neg\u00f3cio de alimenta\u00e7\u00e3o que ainda n\u00e3o usa o sistema.</p>
+            {/* como funciona */}
+            <div style={{ background:'#111827', border:'1px solid #1f2937', borderRadius:18, padding:'22px 20px', marginBottom:16 }}>
+              <p style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,.4)', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:18 }}>Como funciona</p>
+              {[
+                { n:'01', t:'Pedro te cadastra', d:'Você chama, ele cria seu código e manda seu link único. Leva 5 minutos.' },
+                { n:'02', t:'Você indica pelo celular', d:'Manda seu link pra qualquer comerciante da região. O cliente acessa e solicita o acesso.' },
+                { n:'03', t:'A gente ativa o cliente', d:'Nossa equipe ativa o sistema em até 2 horas. Cliente começa a usar na mesma hora.' },
+                { n:'04', t:'Recebe todo mês', d:'20% do plano cai na sua conta. Todo mês enquanto o cliente ficar ativo. Para sempre.' },
+              ].map((s,i) => (
+                <div key={i} style={{ display:'flex', gap:16, marginBottom:i<3?18:0 }}>
+                  <div style={{ minWidth:36, height:36, borderRadius:10, background:'rgba(79,91,213,.15)', border:'1px solid rgba(79,91,213,.25)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <span style={{ fontSize:11, fontWeight:900, color:'#818cf8', fontFamily:'monospace' }}>{s.n}</span>
+                  </div>
+                  <div style={{ paddingTop:2 }}>
+                    <p style={{ fontSize:13, fontWeight:800, color:'#fff', margin:'0 0 3px' }}>{s.t}</p>
+                    <p style={{ fontSize:12, color:'rgba(255,255,255,.4)', margin:0, lineHeight:1.5 }}>{s.d}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* quem pode indicar */}
+            <div style={{ background:'#111827', border:'1px solid #1f2937', borderRadius:18, padding:'22px 20px', marginBottom:20 }}>
+              <p style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,.4)', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:14 }}>Quem você pode indicar</p>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                {[['🏪','Mercados'],['🥖','Padarias'],['🥩','A\u00e7ougues'],['🍽️','Restaurantes'],['🌯','Lanchonetes'],['🚚','Distribuidoras']].map(([e,t]) => (
-                  <div key={t} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:10 }}>
+                {[['🏪','Mercados'],['🥖','Padarias'],['🥩','Açougues'],['🍽️','Restaurantes'],['🌯','Lanchonetes'],['🚚','Distribuidoras']].map(([e,t]) => (
+                  <div key={t} style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 13px', background:'rgba(255,255,255,.03)', border:'1px solid #1f2937', borderRadius:10 }}>
                     <span style={{ fontSize:20 }}>{e}</span>
                     <div>
-                      <p style={{ fontSize:13, fontWeight:700, color:'#0f172a', margin:0 }}>{t}</p>
-                      <p style={{ fontSize:10, color:'#22c55e', fontWeight:700, margin:0 }}>R$59\u2013R$99/cliente</p>
+                      <p style={{ fontSize:13, fontWeight:700, color:'#fff', margin:0 }}>{t}</p>
+                      <p style={{ fontSize:10, color:'#4ade80', fontWeight:700, margin:0 }}>R$59–R$99/cliente</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <button onClick={() => openWpp(wppRecruta)}
-              style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, width:'100%', padding:'16px', border:'none', borderRadius:14, background:'linear-gradient(135deg,#22c55e,#16a34a)', color:'#fff', fontWeight:900, fontSize:16, cursor:'pointer', boxShadow:'0 4px 20px rgba(34,197,94,.3)', marginBottom:10 }}>
+            <Btn onClick={()=>wppOpen(MSG_RECRUTA)} color="#22c55e"
+              style={{ boxShadow:'0 4px 24px rgba(34,197,94,.3)', marginBottom:10, fontSize:17, padding:'18px' }}>
               📲 Quero ser afiliado agora
-            </button>
-            <p style={{ textAlign:'center', fontSize:12, color:'#94a3b8', marginBottom:8 }}>Gr\u00e1tis \u00b7 Sem contrato \u00b7 20% de comiss\u00e3o</p>
+            </Btn>
+            <p style={{ textAlign:'center', fontSize:12, color:'rgba(255,255,255,.25)', marginBottom:4 }}>Grátis · Sem contrato · 20% de comissão recorrente</p>
           </>
         )}
 
-        {/* DASHBOARD */}
+        {/* ── DASHBOARD ──────────────────────────── */}
         {aff && (
           <div style={{ animation:'fadeUp .3s ease' }}>
+
+            {/* stats */}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
-              <StatCard emoji="🏆" label="Convers\u00f5es"     value={totalVendas}   sub={`${totalVendas} cliente${totalVendas!==1?'s':''} ativo${totalVendas!==1?'s':''}`} />
-              <StatCard emoji="💰" label="Comiss\u00e3o total" value={`R$${totalComissao.toFixed(2).replace('.',',')}`} sub="a receber do Pedro" />
+              {[
+                { e:'🏆', l:'Conversões', v: String(totalVendas), s:`${totalVendas} cliente${totalVendas!==1?'s':''} ativo${totalVendas!==1?'s':''}` },
+                { e:'💰', l:'Comissão total', v:`R$${totalComissao.toFixed(2).replace('.',',')}`, s:'a receber do Pedro' },
+              ].map(c => (
+                <div key={c.l} style={{ background:'#111827', border:'1px solid #1f2937', borderRadius:16, padding:'16px 18px' }}>
+                  <div style={{ fontSize:22, marginBottom:6 }}>{c.e}</div>
+                  <p style={{ fontSize:26, fontWeight:900, color:'#22c55e', margin:'0 0 2px' }}>{c.v}</p>
+                  <p style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,.4)', margin:'0 0 2px', textTransform:'uppercase', letterSpacing:'.06em' }}>{c.l}</p>
+                  {c.s && <p style={{ fontSize:11, color:'rgba(255,255,255,.3)', margin:0 }}>{c.s}</p>}
+                </div>
+              ))}
             </div>
 
+            {/* projeção */}
             {totalVendas > 0 && (
-              <div style={{ background:'linear-gradient(135deg,#4F5BD5,#3730A3)', borderRadius:14, padding:'14px 18px', marginBottom:14, display:'flex', alignItems:'center', gap:14 }}>
-                <span style={{ fontSize:24 }}>📈</span>
+              <div style={{ background:'linear-gradient(135deg,#0f1e12,#0a2015)', border:'1px solid rgba(34,197,94,.2)', borderRadius:14, padding:'16px 18px', marginBottom:14, display:'flex', alignItems:'center', gap:14 }}>
+                <span style={{ fontSize:26 }}>📈</span>
                 <div>
-                  <p style={{ color:'rgba(255,255,255,.7)', fontSize:11, fontWeight:700, margin:'0 0 2px' }}>PROJE\u00c7\u00c3O</p>
+                  <p style={{ color:'rgba(255,255,255,.4)', fontSize:11, fontWeight:800, margin:'0 0 3px', textTransform:'uppercase', letterSpacing:'.06em' }}>Projeção</p>
                   <p style={{ color:'#fff', fontSize:15, fontWeight:900, margin:0 }}>
-                    Mais {Math.max(1,5-totalVendas)} indica\u00e7\u00e3o{5-totalVendas!==1?'s':''} e voc\u00ea chega a{' '}
-                    <span style={{ color:'#a5f3fc' }}>R${Math.round(totalComissao + Math.max(1,5-totalVendas)*99)}/m\u00eas</span>
+                    {'Mais '}{Math.max(1,5-totalVendas)}{' indicação'}{5-totalVendas!==1?'s':''}{' e você chega a '}
+                    <span style={{ color:'#4ade80' }}>{'R$'}{Math.round(totalComissao + Math.max(1,5-totalVendas)*89)}{'/mês'}</span>
                   </p>
                 </div>
               </div>
             )}
 
-            <div style={{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:16, padding:'18px 20px', marginBottom:14 }}>
+            {/* link */}
+            <div style={{ background:'#111827', border:'1px solid #1f2937', borderRadius:16, padding:'18px 20px', marginBottom:14 }}>
               <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-                <Link2 size={15} color="#4F5BD5" />
-                <span style={{ fontSize:13, fontWeight:800, color:'#0f172a' }}>Seu link de indica\u00e7\u00e3o</span>
+                <Link2 size={15} color="#4ade80"/>
+                <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Seu link de indicação</span>
               </div>
-              <div style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:8, padding:'10px 12px', fontSize:12, color:'#4F5BD5', wordBreak:'break-all', marginBottom:12, fontFamily:'monospace', fontWeight:600 }}>
+              <div style={{ background:'#0d1117', border:'1px solid #1f2937', borderRadius:8, padding:'10px 12px', fontSize:12, color:'#4ade80', wordBreak:'break-all', marginBottom:12, fontFamily:'monospace', fontWeight:600 }}>
                 {link}
               </div>
               <div style={{ display:'flex', gap:8 }}>
-                <CopyBtn value={link} label="Copiar link" />
-                <button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent('Ei! Conhe\u00e7a o ZatendeStok \u2014 sistema de gest\u00e3o pra neg\u00f3cios de alimenta\u00e7\u00e3o. Acesse pelo meu link: ' + link)}`, '_blank')}
+                <CopyBtn value={link} label="Copiar link"/>
+                <button onClick={()=>window.open(`https://wa.me/?text=${encodeURIComponent('Ei! Conheça o ZatendeStok — sistema de gestão pra negócios de alimentação. Acesse pelo meu link: '+link)}`, '_blank')}
                   style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'11px', border:'none', borderRadius:10, background:'#22c55e', cursor:'pointer', color:'#fff', fontSize:13, fontWeight:800 }}>
                   📲 Compartilhar
                 </button>
               </div>
             </div>
 
-            {/* Kit de vendas */}
-            <div style={{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:16, overflow:'hidden', marginBottom:14 }}>
-              <div style={{ borderBottom:'1px solid #e2e8f0', display:'flex' }}>
-                {['🎯 Scripts','💬 Obje\u00e7\u00f5es','📋 Msgs WA'].map((t, i) => (
-                  <button key={i} onClick={() => setTabKit(i)} className="aff-tab"
-                    style={{ flex:1, padding:'12px 4px', border:'none', background: tabKit===i?'#eef2ff':'transparent',
-                      color: tabKit===i?'#4F5BD5':'#64748b', fontWeight: tabKit===i?800:600, fontSize:11, cursor:'pointer',
-                      borderBottom: tabKit===i?'2px solid #4F5BD5':'2px solid transparent' }}>
+            {/* kit de vendas */}
+            <div style={{ background:'#111827', border:'1px solid #1f2937', borderRadius:16, overflow:'hidden', marginBottom:14 }}>
+              <div style={{ display:'flex', borderBottom:'1px solid #1f2937' }}>
+                {['🎯 Scripts','💬 Objeções','📋 Msgs WA'].map((t,i) => (
+                  <button key={i} onClick={()=>setTabKit(i)} className="aff-tab"
+                    style={{ flex:1, padding:'13px 4px', border:'none',
+                      background: tabKit===i?'rgba(34,197,94,.08)':'transparent',
+                      color: tabKit===i?'#4ade80':'rgba(255,255,255,.35)',
+                      fontWeight: tabKit===i?800:600, fontSize:11.5, cursor:'pointer',
+                      borderBottom: tabKit===i?'2px solid #22c55e':'2px solid transparent' }}>
                     {t}
                   </button>
                 ))}
               </div>
-              <div style={{ padding:'16px' }}>
+
+              <div style={{ padding:'18px 16px' }}>
 
                 {tabKit===0 && (
                   <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                    <p style={{ fontSize:12, color:'#64748b' }}>Copie, adapte o nome e mande. Funciona por WA e pessoalmente.</p>
+                    <p style={{ fontSize:12, color:'rgba(255,255,255,.35)' }}>Copie, adapte o nome e mande. Funciona por WA e pessoalmente.</p>
                     {SCRIPTS.map(s => (
-                      <div key={s.nicho} style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:12, padding:'14px' }}>
-                        <p style={{ fontSize:12, fontWeight:800, color:'#4F5BD5', marginBottom:8 }}>{s.nicho}</p>
-                        <p style={{ fontSize:12.5, color:'#334155', lineHeight:1.6, marginBottom:10, fontStyle:'italic' }}>"{s.texto}"</p>
-                        <div style={{ background:'#eef2ff', borderRadius:8, padding:'8px 12px', marginBottom:10 }}>
-                          <p style={{ fontSize:11, fontWeight:700, color:'#4F5BD5', margin:'0 0 2px' }}>DICA:</p>
-                          <p style={{ fontSize:11, color:'#4F5BD5', margin:0, lineHeight:1.5 }}>{s.dica}</p>
+                      <div key={s.nicho} className="script-card" style={{ background:'rgba(255,255,255,.03)', border:'1px solid #1f2937', borderRadius:12, padding:'14px' }}>
+                        <p style={{ fontSize:12, fontWeight:800, color:'#4ade80', marginBottom:8 }}>{s.emoji} {s.nicho}</p>
+                        <p style={{ fontSize:12.5, color:'rgba(255,255,255,.7)', lineHeight:1.65, marginBottom:10, fontStyle:'italic' }}>"{s.texto}"</p>
+                        <div style={{ background:'rgba(34,197,94,.06)', border:'1px solid rgba(34,197,94,.1)', borderRadius:8, padding:'8px 12px', marginBottom:10 }}>
+                          <p style={{ fontSize:11, fontWeight:700, color:'#4ade80', margin:'0 0 2px' }}>DICA:</p>
+                          <p style={{ fontSize:11, color:'#86efac', margin:0, lineHeight:1.5 }}>{s.dica}</p>
                         </div>
-                        <CopyBtn value={s.texto.replace('[Nome]', '')} label="Copiar script" full />
+                        <CopyBtn value={s.texto.replace('[Nome]','')} label="Copiar script" full/>
                       </div>
                     ))}
                   </div>
@@ -307,18 +375,18 @@ export default function Afiliado() {
 
                 {tabKit===1 && (
                   <div>
-                    <p style={{ fontSize:12, color:'#64748b', marginBottom:12 }}>O que fazer quando o cliente resistir.</p>
-                    {OBJECOES.map((o, i) => (
-                      <div key={i} style={{ border:'1px solid #e2e8f0', borderRadius:10, overflow:'hidden', marginBottom:8 }}>
-                        <button onClick={() => setOpenObj(openObj===i ? null : i)}
-                          style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px', background: openObj===i?'#eef2ff':'#fff', border:'none', cursor:'pointer' }}>
-                          <span style={{ fontSize:13, fontWeight:700, color:'#0f172a', textAlign:'left' }}>{o.q}</span>
-                          {openObj===i ? <ChevronUp size={15} color="#64748b"/> : <ChevronDown size={15} color="#64748b"/>}
+                    <p style={{ fontSize:12, color:'rgba(255,255,255,.35)', marginBottom:14 }}>O que falar quando o cliente resistir.</p>
+                    {OBJECOES.map((o,i) => (
+                      <div key={i} style={{ border:'1px solid #1f2937', borderRadius:10, overflow:'hidden', marginBottom:8 }}>
+                        <button onClick={()=>setOpenObj(openObj===i?null:i)}
+                          style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'13px 14px', background: openObj===i?'rgba(34,197,94,.06)':'transparent', border:'none', cursor:'pointer' }}>
+                          <span style={{ fontSize:13, fontWeight:700, color:'#fff', textAlign:'left' }}>{o.q}</span>
+                          {openObj===i ? <ChevronUp size={15} color="#4ade80"/> : <ChevronDown size={15} color="rgba(255,255,255,.3)"/>}
                         </button>
                         {openObj===i && (
-                          <div style={{ padding:'0 14px 14px', background:'#f8fafc' }}>
-                            <p style={{ fontSize:13, color:'#334155', lineHeight:1.6, margin:'8px 0 10px', fontStyle:'italic' }}>"{o.a}"</p>
-                            <CopyBtn value={o.a} label="Copiar resposta" full />
+                          <div style={{ padding:'0 14px 14px', background:'rgba(0,0,0,.2)' }}>
+                            <p style={{ fontSize:13, color:'rgba(255,255,255,.65)', lineHeight:1.65, margin:'8px 0 12px', fontStyle:'italic' }}>"{o.a}"</p>
+                            <CopyBtn value={o.a} label="Copiar resposta" full/>
                           </div>
                         )}
                       </div>
@@ -328,27 +396,21 @@ export default function Afiliado() {
 
                 {tabKit===2 && (() => {
                   const msgs = [
-                    {
-                      label: '1\u00aa abordagem',
-                      msg: 'Oi [Nome]! Tudo bem? 👋\n\nPassei pra te apresentar o ZatendeStok \u2014 sistema de gest\u00e3o que t\u00e1 ajudando muito neg\u00f3cio da regi\u00e3o.\n\nControla estoque, faz o caixa, gerencia fiado e ainda manda promo\u00e7\u00e3o autom\u00e1tica no WhatsApp dos clientes. Tudo no celular, sem instalar nada.\n\nTem interesse em conhecer? Posso te mandar mais detalhes! 😊',
-                    },
-                    {
-                      label: 'Seguimento (n\u00e3o respondeu)',
-                      msg: 'Oi [Nome]! 😊 S\u00f3 passando pra ver se voc\u00ea chegou a ver minha mensagem.\n\nN\u00e3o precisa decidir nada agora \u2014 posso s\u00f3 te mostrar como funciona em 5 minutos?\n\nA maioria das pessoas que v\u00ea fica surpresa com o quanto \u00e9 simples. Qual dia fica melhor?',
-                    },
-                    {
-                      label: 'Envio do link',
-                      msg: '[Nome], aqui est\u00e1 o link pra conhecer e solicitar o acesso:\n\n' + link + '\n\nNossa equipe ativa em at\u00e9 2 horas, sem burocracia. Qualquer d\u00favida \u00e9 s\u00f3 chamar! 🚀',
-                    },
+                    { label:'1ª abordagem',
+                      msg:'Oi [Nome]! Tudo bem? 👋\n\nPassei pra te apresentar o ZatendeStok — sistema de gestão que tá ajudando muito negócio da região.\n\nControla estoque, faz o caixa, gerencia fiado e ainda manda promoção automática no WhatsApp dos clientes. Tudo no celular, sem instalar nada.\n\nTem interesse em conhecer? Posso te mandar mais detalhes! 😊' },
+                    { label:'Seguimento (não respondeu)',
+                      msg:'Oi [Nome]! 😊 Só passando pra ver se você chegou a ver minha mensagem.\n\nNão precisa decidir nada agora — posso só te mostrar como funciona em 5 minutos?\n\nA maioria das pessoas que vê fica surpresa com o quanto é simples. Qual dia fica melhor?' },
+                    { label:'Envio do link',
+                      msg:'[Nome], aqui está o link pra conhecer e solicitar o acesso:\n\n'+ link +'\n\nNossa equipe ativa em até 2 horas, sem burocracia. Qualquer dúvida é só chamar! 🚀' },
                   ]
                   return (
                     <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                      <p style={{ fontSize:12, color:'#64748b' }}>Mensagens prontas. Copie e edite o nome do cliente.</p>
+                      <p style={{ fontSize:12, color:'rgba(255,255,255,.35)' }}>Mensagens prontas. Copie e edite o nome.</p>
                       {msgs.map(m => (
-                        <div key={m.label} style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:12, padding:'14px' }}>
-                          <p style={{ fontSize:11, fontWeight:800, color:'#4F5BD5', marginBottom:8, textTransform:'uppercase', letterSpacing:'.06em' }}>{m.label}</p>
-                          <p style={{ fontSize:12.5, color:'#334155', lineHeight:1.6, marginBottom:10, whiteSpace:'pre-line' }}>{m.msg}</p>
-                          <CopyBtn value={m.msg} label="Copiar mensagem" full />
+                        <div key={m.label} style={{ background:'rgba(255,255,255,.03)', border:'1px solid #1f2937', borderRadius:12, padding:'14px' }}>
+                          <p style={{ fontSize:11, fontWeight:800, color:'#4ade80', marginBottom:8, textTransform:'uppercase', letterSpacing:'.06em' }}>{m.label}</p>
+                          <p style={{ fontSize:12.5, color:'rgba(255,255,255,.65)', lineHeight:1.65, marginBottom:12, whiteSpace:'pre-line' }}>{m.msg}</p>
+                          <CopyBtn value={m.msg} label="Copiar mensagem" full/>
                         </div>
                       ))}
                     </div>
@@ -357,42 +419,43 @@ export default function Afiliado() {
               </div>
             </div>
 
+            {/* histórico */}
             {aff.vendas?.length > 0 && (
-              <div style={{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:16, overflow:'hidden', marginBottom:14 }}>
-                <div style={{ padding:'14px 18px', borderBottom:'1px solid #e2e8f0' }}>
-                  <p style={{ fontSize:13, fontWeight:800, color:'#0f172a', margin:0 }}>Hist\u00f3rico de convers\u00f5es</p>
+              <div style={{ background:'#111827', border:'1px solid #1f2937', borderRadius:16, overflow:'hidden', marginBottom:14 }}>
+                <div style={{ padding:'14px 18px', borderBottom:'1px solid #1f2937' }}>
+                  <p style={{ fontSize:13, fontWeight:800, color:'#fff', margin:0 }}>Histórico de conversões</p>
                 </div>
-                {[...aff.vendas].reverse().map((v, i) => (
-                  <div key={i} style={{ padding:'12px 18px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                {[...aff.vendas].reverse().map((v,i) => (
+                  <div key={i} style={{ padding:'12px 18px', borderBottom:'1px solid #0d1117', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                     <div>
-                      <p style={{ fontSize:13, fontWeight:700, color:'#0f172a', margin:'0 0 2px' }}>{v.mercado}</p>
-                      <p style={{ fontSize:11, color:'#94a3b8', margin:0 }}>{v.niche} \u00b7 {v.plano} \u00b7 {v.creditedAt ? new Date(v.creditedAt).toLocaleDateString('pt-BR') : '\u2014'}</p>
+                      <p style={{ fontSize:13, fontWeight:700, color:'#fff', margin:'0 0 2px' }}>{v.mercado}</p>
+                      <p style={{ fontSize:11, color:'rgba(255,255,255,.3)', margin:0 }}>{v.niche} · {v.plano} · {v.creditedAt?new Date(v.creditedAt).toLocaleDateString('pt-BR'):'—'}</p>
                     </div>
-                    <span style={{ fontSize:14, fontWeight:900, color: v.comissao > 0 ? '#22c55e' : '#94a3b8' }}>
-                      {v.comissao > 0 ? `R$${v.comissao.toFixed(2).replace('.',',')}` : 'pendente'}
+                    <span style={{ fontSize:14, fontWeight:900, color: v.comissao>0?'#4ade80':'rgba(255,255,255,.3)' }}>
+                      {v.comissao>0?`R$${v.comissao.toFixed(2).replace('.',',')}`:'pendente'}
                     </span>
                   </div>
                 ))}
-                <div style={{ padding:'12px 18px', background:'#f8fafc', display:'flex', justifyContent:'space-between' }}>
-                  <span style={{ fontSize:12, fontWeight:700, color:'#64748b' }}>Total acumulado</span>
+                <div style={{ padding:'12px 18px', display:'flex', justifyContent:'space-between' }}>
+                  <span style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,.35)' }}>Total acumulado</span>
                   <span style={{ fontSize:15, fontWeight:900, color:'#22c55e' }}>R${totalComissao.toFixed(2).replace('.',',')}</span>
                 </div>
               </div>
             )}
 
-            <button onClick={() => openWpp(`Oi Pedro! Sou o ${aff.nome}, c\u00f3digo ${aff.codigo}. Tenho uma d\u00favida sobre o programa de afiliados.`)}
-              style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, width:'100%', padding:'14px', border:'none', borderRadius:12, background:'#22c55e', color:'#fff', fontWeight:800, fontSize:14, cursor:'pointer', marginBottom:10 }}>
+            <Btn onClick={()=>wppOpen(`Oi Pedro! Sou o ${aff.nome}, código ${aff.codigo}. Tenho uma dúvida sobre o programa de afiliados.`)} color="#22c55e"
+              style={{ marginBottom:10 }}>
               💬 Falar com Pedro
-            </button>
-            <button onClick={() => { setAff(null); setCode(''); setInput('') }}
-              style={{ display:'block', width:'100%', padding:'11px', background:'none', border:'1px solid #e2e8f0', borderRadius:12, color:'#64748b', fontSize:13, fontWeight:600, cursor:'pointer' }}>
-              \u2190 Sair
+            </Btn>
+            <button onClick={()=>{setAff(null);setInput('')}}
+              style={{ display:'block',width:'100%',padding:'12px',background:'none',border:'1px solid #1f2937',borderRadius:12,color:'rgba(255,255,255,.35)',fontSize:13,fontWeight:600,cursor:'pointer' }}>
+              ← Sair
             </button>
           </div>
         )}
 
-        <p style={{ textAlign:'center', fontSize:11, color:'#cbd5e1', marginTop:28 }}>
-          ZatendeStok \u00b7 Portal do Vendedor \u00b7 <a href="/" style={{ color:'#94a3b8' }}>P\u00e1gina inicial</a>
+        <p style={{ textAlign:'center', fontSize:11, color:'rgba(255,255,255,.15)', marginTop:32 }}>
+          ZatendeStok · Portal do Vendedor · <a href="/" style={{ color:'rgba(255,255,255,.25)' }}>Página inicial</a>
         </p>
       </div>
     </div>
