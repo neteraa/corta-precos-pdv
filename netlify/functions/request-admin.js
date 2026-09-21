@@ -12,9 +12,68 @@
 import { getStore } from '@netlify/blobs'
 import { createHash, randomBytes } from 'crypto'
 
-const MASTER_KEY = process.env.ZS_MASTER_KEY || 'zatende2026master'
-const APP_SALT      = 'zs_2026_corta'   // salt para mercados (auth.js)
-const APP_SALT_FORN = 'zs_2026_forn'   // salt para distribuidores (forn-auth.js)
+const MASTER_KEY    = process.env.ZS_MASTER_KEY || 'zatende2026master'
+const APP_SALT      = 'zs_2026_corta'
+const APP_SALT_FORN = 'zs_2026_forn'
+
+/* ── Seed de produtos iniciais por nicho ─────────────────────────────────── */
+function seedProducts(niche) {
+  const ts = Date.now()
+  const p  = (i, name, cat, unit, price, cost, stock, minStock) => ({
+    id: `p${ts}${i}`, sku: '', name, category: cat, unit,
+    price, cost, stock, minStock, expiryDate: null, priceAtacado: 0, qtdAtacado: 0,
+  })
+  const n = (niche || '').toLowerCase()
+  if (n === 'padaria' || n === 'confeitaria' || n === 'sorveteria') return [
+    p(1,  'Farinha de Trigo 5kg',   'Insumos',    'sc', 22.90, 16.00, 10, 3),
+    p(2,  'Açúcar Refinado 1kg',    'Insumos',    'un',  5.90,  3.80, 10, 3),
+    p(3,  'Fermento Biológico 15g', 'Insumos',    'un',  3.50,  2.00, 20, 5),
+    p(4,  'Manteiga 200g',          'Insumos',    'un',  9.90,  7.00,  8, 2),
+    p(5,  'Pão Francês (kg)',        'Produtos',   'kg', 18.00,  8.00,  5, 1),
+    p(6,  'Pão de Forma',            'Produtos',   'un',  8.90,  5.00,  8, 2),
+    p(7,  'Croissant',               'Confeitaria','un',  6.50,  2.80, 10, 3),
+    p(8,  'Bolo de Fubá 500g',       'Confeitaria','un', 22.00, 10.00,  4, 1),
+    p(9,  'Coxinha',                 'Salgados',   'un',  4.50,  1.80, 15, 5),
+    p(10, 'Café Preto 50ml',         'Bebidas',    'un',  3.00,  0.80,  0, 0),
+  ]
+  if (n === 'açougue' || n === 'frigorifico' || n === 'frigorífico') return [
+    p(1,  'Picanha (kg)',          'Bovino',    'kg', 75.00, 55.00, 3, 1),
+    p(2,  'Fraldinha (kg)',        'Bovino',    'kg', 55.00, 40.00, 3, 1),
+    p(3,  'Maminha (kg)',          'Bovino',    'kg', 48.00, 35.00, 3, 1),
+    p(4,  'Patinho Moído (kg)',    'Bovino',    'kg', 38.00, 28.00, 5, 2),
+    p(5,  'Costela Bovina (kg)',   'Bovino',    'kg', 35.00, 25.00, 4, 1),
+    p(6,  'Frango Inteiro (kg)',   'Frango',    'kg', 14.90, 10.00, 8, 2),
+    p(7,  'Coxa e Sobrecoxa (kg)','Frango',    'kg', 12.90,  8.50, 6, 2),
+    p(8,  'Costela Suína (kg)',    'Suíno',     'kg', 32.00, 22.00, 3, 1),
+    p(9,  'Linguiça Toscana (kg)','Embutidos', 'kg', 28.00, 19.00, 4, 1),
+    p(10, 'Carne Seca (kg)',       'Especiais', 'kg', 65.00, 48.00, 2, 1),
+  ]
+  if (['restaurante','lanchonete','espetinho','pizzaria','bar','choperia'].includes(n)) return [
+    p(1,  'Arroz Agulhinha 5kg',  'Insumos',  'sc', 29.90, 22.00,  5, 1),
+    p(2,  'Feijão Carioca 1kg',   'Insumos',  'un',  8.90,  6.50,  5, 2),
+    p(3,  'Óleo de Soja 900ml',   'Insumos',  'un',  8.49,  6.50,  6, 2),
+    p(4,  'Frango Inteiro (kg)',   'Proteína', 'kg', 14.90, 10.00, 10, 3),
+    p(5,  'Patinho Moído (kg)',    'Proteína', 'kg', 38.00, 28.00,  3, 1),
+    p(6,  'Refrigerante Lata',    'Bebidas',  'un',  6.00,  3.50, 24, 6),
+    p(7,  'Água Mineral 500ml',   'Bebidas',  'un',  3.00,  1.50, 24,12),
+    p(8,  'Prato Executivo',      'Pratos',   'un', 20.00,  8.00,  0, 0),
+    p(9,  'Marmita P',            'Pratos',   'un', 12.00,  5.00,  0, 0),
+    p(10, 'Refrigerante 2L',      'Bebidas',  'un',  9.00,  6.50, 12, 3),
+  ]
+  // default: mercado/supermercado/mercearia/conveniência
+  return [
+    p(1,  'Arroz Agulhinha 5kg',     'Mercearia',       'un', 29.90, 22.00, 20, 5),
+    p(2,  'Feijão Carioca 1kg',      'Mercearia',       'un',  8.90,  6.50, 20, 8),
+    p(3,  'Açúcar Cristal 1kg',      'Mercearia',       'un',  5.90,  4.20, 25, 8),
+    p(4,  'Óleo de Soja 900ml',      'Mercearia',       'un',  8.49,  6.80, 20, 5),
+    p(5,  'Macarrão Espaguete 500g', 'Mercearia',       'un',  4.49,  3.20, 30,10),
+    p(6,  'Leite Integral 1L',       'Frios/Laticínios','un',  5.99,  4.80, 24,12),
+    p(7,  'Refrigerante 2L',         'Bebidas',         'un',  8.99,  6.50, 24, 6),
+    p(8,  'Sabão em Pó 1kg',         'Limpeza',         'un', 12.90,  9.50, 15, 5),
+    p(9,  'Detergente 500ml',        'Limpeza',         'un',  3.49,  2.30, 20, 8),
+    p(10, 'Farinha de Trigo 1kg',    'Mercearia',       'un',  4.90,  3.50, 15, 5),
+  ]
+}
 
 const CORS = {
   'Content-Type': 'application/json',
@@ -59,7 +118,7 @@ export default async (req) => {
       return new Response(JSON.stringify({ ok: false, error: 'JSON inválido' }), { status: 400, headers: CORS })
     }
 
-    const { nome, mercado, cidade, telefone, email, tipo } = body
+    const { nome, mercado, cidade, telefone, email, tipo, niche, ref } = body
     if (!nome || !mercado || !cidade || !telefone) {
       return new Response(JSON.stringify({ ok: false, error: 'Campos obrigatórios: nome, mercado, cidade, telefone' }), { status: 400, headers: CORS })
     }
@@ -74,7 +133,9 @@ export default async (req) => {
       cidade:    cidade.trim(),
       telefone:  telefone.trim(),
       email:     (email || '').trim(),
-      tipo:      tipo || 'mercado',   // 'mercado' | 'distribuidor'
+      tipo:      tipo   || 'mercado',   // 'mercado' | 'distribuidor'
+      niche:     niche  || tipo || 'mercado', // nicho específico (padaria, açougue, etc.)
+      ref:       (ref   || '').trim().toLowerCase(), // código do afiliado
       status:    'pending',
       createdAt: new Date().toISOString(),
     }
@@ -210,11 +271,39 @@ export default async (req) => {
       list[idx].storeId    = storeId
       await store.set('pending-requests', JSON.stringify(list))
 
-      // Try to send welcome email if address provided
+      const base = new URL(req.url).origin
+
+      // 1) Seed produtos iniciais por nicho (não-bloqueante)
+      const products = seedProducts(req2.niche || req2.tipo)
+      fetch(`${base}/api/persist`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ key: 'cp_products', value: JSON.stringify(products), storeId }),
+      }).catch(() => {})
+
+      // 2) Creditar afiliado se veio com ?ref (não-bloqueante)
+      if (req2.ref) {
+        const planValues = { basic: 0, essencial: 297, profissional: 497 }
+        const valorPlano = planValues[newMarket.plan] || 0
+        fetch(`${base}/api/affiliates?mk=${MASTER_KEY}`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            action:    'credit',
+            codigo:    req2.ref,
+            requestId: req2.id,
+            mercado:   req2.mercado,
+            niche:     req2.niche || 'mercado',
+            plano:     newMarket.plan || 'basic',
+            valorPlano,
+          }),
+        }).catch(() => {})
+      }
+
+      // 3) Enviar email de boas-vindas se endereço fornecido
       let emailResult = null
       if (req2.email) {
         try {
-          const base    = new URL(req.url).origin
           const emailRes = await fetch(`${base}/api/send-email?mk=${MASTER_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

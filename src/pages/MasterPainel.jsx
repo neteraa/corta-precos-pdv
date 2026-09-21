@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, TrendingUp, AlertTriangle, CalendarClock, Mail, ClipboardList, CheckCircle2, XCircle, MessageCircle, Phone, MapPin, Bot, Users, Building2, Flame, Send, Loader2, Menu, LogOut } from 'lucide-react'
+import { Plus, RefreshCw, Power, Trash2, LogIn, Copy, Check, Eye, EyeOff, ShieldAlert, Store, Clock, X, Key, Zap, Truck, BarChart2, TrendingUp, AlertTriangle, CalendarClock, Mail, ClipboardList, CheckCircle2, XCircle, MessageCircle, Phone, MapPin, Bot, Users, Building2, Flame, Send, Loader2, Menu, LogOut, Award, Link2, ToggleLeft, ToggleRight, DollarSign } from 'lucide-react'
 import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
 
 /* ─── constants ──────────────────────────────────────────── */
@@ -793,6 +793,13 @@ export default function MasterPainel() {
 
   const [approving,    setApproving]     = useState(null) // id being processed
 
+  // ── Afiliados ──────────────────────────────────────────────
+  const [affiliates,    setAffiliates]   = useState([])
+  const [affLoading,    setAffLoading]   = useState(false)
+  const [affForm,       setAffForm]      = useState({ nome:'', telefone:'', codigo:'', comissaoPct:'20' })
+  const [affAdding,     setAffAdding]    = useState(false)
+  const [affShowForm,   setAffShowForm]  = useState(false)
+
   const load = useCallback(async (key = mk) => {
     if (!key) return
     setLoading(true); setErr(null)
@@ -852,6 +859,62 @@ export default function MasterPainel() {
   }, [queueApi])
 
   useEffect(() => { if (tab === 'prospect' && mk) loadQueue() }, [tab, mk, loadQueue])
+
+  const loadAffiliates = useCallback(async () => {
+    if (!mk) return
+    setAffLoading(true)
+    try {
+      const res = await fetch(`/api/affiliates?mk=${mk}`)
+      const d   = await res.json()
+      if (d.ok) setAffiliates(d.affiliates || [])
+    } finally { setAffLoading(false) }
+  }, [mk])
+
+  useEffect(() => { if (tab === 'afiliados' && mk) loadAffiliates() }, [tab, mk, loadAffiliates])
+
+  const addAffiliate = async () => {
+    if (!affForm.nome.trim() || !affForm.telefone.trim()) return
+    setAffAdding(true)
+    try {
+      const res = await fetch(`/api/affiliates?mk=${mk}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action:      'create',
+          nome:        affForm.nome.trim(),
+          telefone:    affForm.telefone.trim(),
+          codigo:      affForm.codigo.trim() || undefined,
+          comissaoPct: Number(affForm.comissaoPct) / 100,
+        }),
+      })
+      const d = await res.json()
+      if (d.ok) {
+        setAffiliates(prev => [...prev, d.affiliate])
+        setAffForm({ nome:'', telefone:'', codigo:'', comissaoPct:'20' })
+        setAffShowForm(false)
+      } else { alert(d.error || 'Erro ao criar afiliado') }
+    } finally { setAffAdding(false) }
+  }
+
+  const toggleAffiliate = async (id) => {
+    const res = await fetch(`/api/affiliates?mk=${mk}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'toggle', id }),
+    })
+    const d = await res.json()
+    if (d.ok) setAffiliates(prev => prev.map(a => a.id === id ? { ...a, ativo: d.ativo } : a))
+  }
+
+  const deleteAffiliate = async (id, nome) => {
+    if (!confirm(`Excluir afiliado "${nome}"?`)) return
+    const res = await fetch(`/api/affiliates?mk=${mk}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id }),
+    })
+    if ((await res.json()).ok) setAffiliates(prev => prev.filter(a => a.id !== id))
+  }
 
   // Normaliza telefone no frontend (igual ao backend)
   const normalizePhone = useCallback((raw) => {
@@ -1209,6 +1272,7 @@ export default function MasterPainel() {
     { id: 'markets',   label: `Mercados (${markets.length})`,                         icon: Store         },
     { id: 'dist',      label: `Distribuidores (${distributors.length})`,              icon: Truck         },
     { id: 'leads',     label: leads.length > 0 ? `Leads Bot (${leads.length})` : 'Leads Bot', icon: Bot },
+    { id: 'afiliados', label: affiliates.length > 0 ? `Afiliados (${affiliates.length})` : 'Afiliados', icon: Award },
     { id: 'prospect',  label: 'Prospectar 🚀',  icon: Send },
   ]
 
@@ -1470,9 +1534,14 @@ export default function MasterPainel() {
                           }`}>
                             {isPending ? '⏳ Pendente' : isApproved ? '✅ Aprovado' : '❌ Rejeitado'}
                           </span>
-                          {req.tipo && (
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${req.tipo === 'distribuidor' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
-                              {req.tipo === 'distribuidor' ? '🚛 Distribuidora' : '🏪 Mercado'}
+                          {req.niche && (
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full border bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
+                              {req.niche === 'padaria' ? '🥖' : req.niche === 'açougue' ? '🥩' : req.niche === 'restaurante' ? '🍽️' : req.niche === 'distribuidor' ? '🚛' : '🏪'} {req.niche}
+                            </span>
+                          )}
+                          {req.ref && (
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full border bg-yellow-500/10 text-yellow-400 border-yellow-500/20">
+                              🤝 {req.ref}
                             </span>
                           )}
                           <span className="text-gray-500 text-xs">{dt}</span>
@@ -1717,6 +1786,144 @@ export default function MasterPainel() {
           </div>
         )}
       </div>
+
+      {/* ── ABA AFILIADOS ────────────────────────────────────── */}
+      {tab === 'afiliados' && (
+        <div className="space-y-5">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h2 className="text-xl font-black text-white">Vendedores externos</h2>
+              <p className="text-gray-400 text-sm mt-0.5">Cada afiliado tem um link único com o código dele. Comissão paga manualmente.</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={loadAffiliates} className="btn-ghost flex items-center gap-2 text-sm">
+                <RefreshCw className={`w-4 h-4 ${affLoading?'animate-spin':''}`}/> Atualizar
+              </button>
+              <button onClick={() => setAffShowForm(f => !f)} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors">
+                <Plus className="w-4 h-4"/> Novo afiliado
+              </button>
+            </div>
+          </div>
+
+          {/* Formulário novo afiliado */}
+          {affShowForm && (
+            <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 space-y-3">
+              <h3 className="font-bold text-white text-sm">Cadastrar novo vendedor</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-400 font-semibold mb-1 block">Nome *</label>
+                  <input value={affForm.nome} onChange={e => setAffForm(f=>({...f,nome:e.target.value}))}
+                    placeholder="Ex: Pedro Vendas" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"/>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 font-semibold mb-1 block">WhatsApp *</label>
+                  <input value={affForm.telefone} onChange={e => setAffForm(f=>({...f,telefone:e.target.value}))}
+                    placeholder="(15) 99999-0000" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"/>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 font-semibold mb-1 block">Código (opcional)</label>
+                  <input value={affForm.codigo} onChange={e => setAffForm(f=>({...f,codigo:e.target.value.toLowerCase().replace(/[^a-z0-9]/g,'')}))}
+                    placeholder="pedro (gerado auto se vazio)" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono"/>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 font-semibold mb-1 block">Comissão (%)</label>
+                  <input value={affForm.comissaoPct} onChange={e => setAffForm(f=>({...f,comissaoPct:e.target.value}))}
+                    type="number" min="1" max="50" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"/>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={addAffiliate} disabled={affAdding || !affForm.nome.trim() || !affForm.telefone.trim()}
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors">
+                  {affAdding ? <Loader2 className="w-4 h-4 animate-spin"/> : <Plus className="w-4 h-4"/>} Criar afiliado
+                </button>
+                <button onClick={() => setAffShowForm(false)} className="btn-ghost text-sm px-3 py-2">Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {affLoading && <div className="text-center text-gray-400 py-10 text-sm">Carregando...</div>}
+
+          {!affLoading && affiliates.length === 0 && (
+            <div className="text-center py-14 text-gray-500">
+              <Award className="w-10 h-10 mx-auto mb-3 opacity-30"/>
+              <p className="font-bold">Nenhum afiliado cadastrado</p>
+              <p className="text-sm mt-1">Crie um afiliado e ele vai receber um link único para indicar clientes.</p>
+            </div>
+          )}
+
+          {!affLoading && affiliates.length > 0 && (
+            <div className="space-y-3">
+              {affiliates.map(aff => {
+                const totalComissao = (aff.vendas||[]).reduce((s,v) => s+v.comissao,0)
+                const pct           = Math.round((aff.comissaoPct||0.20)*100)
+                const link          = `https://zatendestok.com.br/login?ref=${aff.codigo}`
+                return (
+                  <div key={aff.id} className={`bg-gray-900 border rounded-xl p-4 ${aff.ativo ? 'border-gray-700' : 'border-gray-800 opacity-60'}`}>
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-black text-white">{aff.nome}</span>
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full border bg-indigo-500/10 text-indigo-400 border-indigo-500/20 font-mono">
+                            {aff.codigo}
+                          </span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${aff.ativo ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-gray-700 text-gray-400 border-gray-600'}`}>
+                            {aff.ativo ? '● Ativo' : '○ Inativo'}
+                          </span>
+                          <span className="text-xs text-yellow-400 font-bold">{pct}% comissão</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-gray-400 flex-wrap">
+                          <span>{aff.telefone}</span>
+                          <span className="text-gray-600">·</span>
+                          <span>{aff.vendas?.length||0} conversões</span>
+                          <span className="text-gray-600">·</span>
+                          <span className="text-green-400 font-bold">R${totalComissao.toFixed(2).replace('.',',')}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-xs text-gray-500 font-mono truncate max-w-xs">{link}</span>
+                          <button onClick={() => navigator.clipboard.writeText(link)}
+                            className="text-gray-500 hover:text-white transition-colors flex-shrink-0" title="Copiar link">
+                            <Copy className="w-3.5 h-3.5"/>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button onClick={() => toggleAffiliate(aff.id)} title={aff.ativo ? 'Desativar' : 'Ativar'}
+                          className="p-1.5 hover:text-white text-gray-400 transition-colors">
+                          {aff.ativo ? <ToggleRight className="w-5 h-5 text-green-400"/> : <ToggleLeft className="w-5 h-5"/>}
+                        </button>
+                        <button onClick={() => window.open(`https://wa.me/55${aff.telefone.replace(/\D/g,'')}?text=${encodeURIComponent(`Olá ${aff.nome}! Seu link de afiliado: ${link}`)}`, '_blank')}
+                          className="p-1.5 hover:text-green-400 text-gray-400 transition-colors" title="Enviar link por WA">
+                          <MessageCircle className="w-4 h-4"/>
+                        </button>
+                        <button onClick={() => window.open(`/afiliado?code=${aff.codigo}`, '_blank')}
+                          className="p-1.5 hover:text-indigo-400 text-gray-400 transition-colors" title="Ver painel do afiliado">
+                          <Link2 className="w-4 h-4"/>
+                        </button>
+                        <button onClick={() => deleteAffiliate(aff.id, aff.nome)}
+                          className="p-1.5 hover:text-red-400 text-gray-400 transition-colors">
+                          <Trash2 className="w-4 h-4"/>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Vendas do afiliado */}
+                    {aff.vendas?.length > 0 && (
+                      <div className="mt-3 border-t border-gray-800 pt-3 space-y-1.5">
+                        {aff.vendas.map((v,i) => (
+                          <div key={i} className="flex items-center justify-between text-xs text-gray-400">
+                            <span>{v.mercado} <span className="text-gray-600">· {v.niche} · {v.plano}</span></span>
+                            <span className="text-green-400 font-bold">+R${(v.comissao||0).toFixed(2).replace('.',',')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── ABA PROSPECÇÃO ──────────────────────────────────── */}
       {tab === 'prospect' && (

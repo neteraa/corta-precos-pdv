@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User, MessageCircle, CheckCircle2, ArrowRight, ArrowLeft, Phone, MapPin, ShieldCheck, Zap, Headphones, Bell, BarChart3, Wifi, Store, Truck } from 'lucide-react'
 import { getCredentials, getConfiguredStoreId, saveStoreId } from '../utils/auth.js'
@@ -176,6 +176,7 @@ const NICHE_CFG = [
 /* ── Cadastro multi-step COM seleção de tipo ─────────────── */
 function CadastroFlow() {
   const [niche,  setNiche]  = useState(null)   // null | id de NICHE_CFG
+  const [affRef, setAffRef] = useState('')     // código do afiliado se ?ref=xxx
   const [step,   setStep]   = useState(1)
   const [form,   setForm]   = useState({ nome:'', empresa:'', cidade:'', telefone:'', email:'' })
   const [sent,   setSent]   = useState(false)
@@ -184,6 +185,12 @@ function CadastroFlow() {
 
   const cfg  = NICHE_CFG.find(n => n.id === niche)
   const tipo = cfg?.tipo || 'mercado'
+
+  // Captura ?ref= do afiliado na URL
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get('ref') || ''
+    if (ref) setAffRef(ref.toLowerCase().trim())
+  }, [])
 
   const validate = () => {
     const e = {}
@@ -200,15 +207,21 @@ function CadastroFlow() {
       await fetch('/api/request-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, mercado: form.empresa, tipo, niche }),
+        body: JSON.stringify({ ...form, mercado: form.empresa, tipo, niche, ref: affRef }),
       })
     } catch {}
-    openWpp(`🛒 *Solicitação de cadastro — ZatendeStok*\n\n👤 Nome: *${form.nome}*\n🏪 ${cfg?.nomeLabel||'Negócio'}: *${form.empresa}*\n📍 Cidade: *${form.cidade}*\n📱 WhatsApp: *${form.telefone}*\n🏷 Tipo: *${cfg?.label||'Negócio'}*\n\nQuero começar a usar o ZatendeStok! 🚀`)
+    openWpp(`🛒 *Solicitação de cadastro — ZatendeStok*\n\n👤 Nome: *${form.nome}*\n🏪 ${cfg?.nomeLabel||'Negócio'}: *${form.empresa}*\n📍 Cidade: *${form.cidade}*\n📱 WhatsApp: *${form.telefone}*\n🏷 Tipo: *${cfg?.label||'Negócio'}*${affRef ? `\n🔗 Indicado por: *${affRef}*` : ''}\n\nQuero começar a usar o ZatendeStok! 🚀`)
   }
 
   /* Passo 0 — escolha do tipo */
   if (!niche) return (
     <div style={{ animation:'fadeUp .25s ease' }}>
+      {affRef && (
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:10, marginBottom:16 }}>
+          <span style={{ fontSize:14 }}>🤝</span>
+          <span style={{ fontSize:12, color:B.green, fontWeight:700 }}>Indicado por <strong>{affRef}</strong> — bem-vindo ao ZatendeStok!</span>
+        </div>
+      )}
       <div style={{ marginBottom:22 }}>
         <h1 style={{ fontSize:21, fontWeight:900, color:B.text, marginBottom:4 }}>O que você quer cadastrar?</h1>
         <p style={{ color:B.muted, fontSize:13 }}>Escolha o tipo de negócio para continuar</p>
