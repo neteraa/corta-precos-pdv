@@ -1,139 +1,104 @@
-import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowRight, MessageCircle, ChevronDown, CheckCircle2, AlertTriangle, TrendingUp, ClipboardList, BarChart3, Truck, Smartphone, ShieldCheck } from 'lucide-react'
-import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
+import React, { useEffect, useState, useRef } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import {
+  ArrowRight, MessageCircle, CheckCircle2, TrendingUp, BarChart3,
+  Smartphone, Zap, Users, Star, Package, Receipt, Tag, Clock,
+  BadgePercent, FileText, ChevronRight, Play, DollarSign, Percent,
+  Shield, Award, Repeat, ChevronDown
+} from 'lucide-react'
+import ZatendeStokLogo, { ZSMark } from '../components/ZatendeStokLogo.jsx'
 import { isLoggedIn } from '../utils/auth.js'
 
 const ZAP     = '5515997969303'
 const ZAP_MSG = 'Olá! Quero conhecer o ZatendeStok para meu negócio.'
 const openWpp = (msg) => window.open(`https://wa.me/${ZAP}?text=${encodeURIComponent(msg || ZAP_MSG)}`, '_blank')
 
+/* ─── data ─────────────────────────────────────────────────── */
+const NICHOS = [
+  { slug:'mercado',       emoji:'🏪', label:'Mercado',       color:'#f97316', features:['PDV multi-caixa','Estoque FIFO','Promoção 3x2 auto','Fiado digital'] },
+  { slug:'padaria',       emoji:'🥖', label:'Padaria',       color:'#d97706', features:['5 pães por R$5,90 auto','Venda por peso','Comanda por mesa','Fiado do cliente'] },
+  { slug:'acougue',       emoji:'🥩', label:'Açougue',       color:'#dc2626', features:['Venda por kg balança','Corte especial','Cardápio WhatsApp','Controle de lote'] },
+  { slug:'restaurante',   emoji:'🍽️', label:'Restaurante',   color:'#0891b2', features:['Comanda por mesa','Cardápio QR Code','Delivery integrado','Caixa em tempo real'] },
+  { slug:'lanchonete',    emoji:'🌯', label:'Lanchonete',    color:'#16a34a', features:['Adicionais automáticos','Fila de pedidos live','Combo desconto auto','WhatsApp pedidos'] },
+  { slug:'distribuidora', emoji:'🚚', label:'Distribuidora', color:'#1d4ed8', features:['Venda por caixa/grade','Crédito por cliente','Rota de entrega','Faturamento cliente'] },
+]
+
+const FEATURES = [
+  { Icon: Package,      label:'PDV / Caixa',       desc:'Venda com leitor de câmera, impressora e multi-caixa'       },
+  { Icon: BarChart3,    label:'Estoque FIFO',       desc:'Primeiro a entrar, primeiro a sair — alertas automáticos'   },
+  { Icon: Receipt,      label:'Relatórios',         desc:'Faturamento, ticket médio, produtos campeões em PDF/Excel'  },
+  { Icon: Clock,        label:'Validade',           desc:'Alerta 7/15/30 dias antes do vencimento por WhatsApp'       },
+  { Icon: Users,        label:'Clientes + Fiado',   desc:'Cadastro, histórico, crediário com cobrança automática'     },
+  { Icon: Star,         label:'Fidelidade',         desc:'Pontuação, cashback e resgates automáticos via WhatsApp'    },
+  { Icon: BadgePercent, label:'Promoções',          desc:'Combo, leve X pague Y, desconto progressivo e relâmpago'    },
+  { Icon: MessageCircle,label:'Bot WhatsApp IA',    desc:'Zara — vendedora 24h com memória e fechamento automático'   },
+  { Icon: Tag,          label:'Etiquetas',          desc:'Imprime preço com código de barras em lote, sem driver'     },
+  { Icon: TrendingUp,   label:'Campanhas',          desc:'Disparo em massa no WhatsApp segmentado por histórico'      },
+  { Icon: Smartphone,   label:'100% no celular',    desc:'Sem instalar nada — abre no navegador do seu smartphone'   },
+  { Icon: Zap,          label:'Multi-loja',         desc:'Vários PDVs e filiais numa única conta, dados unificados'   },
+]
+
+const PLANOS = [
+  {
+    name:'Essencial', price:'297', period:'/mês', tag:null,
+    desc:'Pra sair do papel e ter controle de verdade.',
+    items:['1 PDV / caixa','Estoque + FIFO','Validade + alertas','Fiado digital','Relatórios básicos','Suporte WhatsApp'],
+    cta:'Começar agora', color:'#f97316',
+  },
+  {
+    name:'Profissional', price:'497', period:'/mês', tag:'MAIS POPULAR ⭐', highlight:true,
+    desc:'Pra vender mais, fidelizar cliente e não precisar de funcionário extra.',
+    items:['Até 3 PDVs / caixas','Tudo do Essencial','Bot Zara WhatsApp IA','Fidelidade + cashback','Campanhas WhatsApp','Etiquetas em lote','Validade avançada','Suporte prioritário'],
+    cta:'Quero o Profissional', color:'#7c3aed',
+  },
+  {
+    name:'Personalizado', price:'?', period:'', tag:'REDES E ATACADO',
+    desc:'PDVs ilimitados, onboarding dedicado e tudo customizado.',
+    items:['PDVs e filiais ilimitados','Tudo do Profissional','Onboarding + treinamento','SLA e suporte dedicado','Integrações customizadas','Relatório gerencial avançado'],
+    cta:'Falar com consultor', color:'#0891b2',
+  },
+]
+
+const AFIL_STEPS = [
+  { n:'01', color:'#f97316', title:'Cadastra como afiliado',  desc:'Preenche o form em zatendestok.com.br/afiliado — aprovação em até 1 hora.' },
+  { n:'02', color:'#7c3aed', title:'Indica e apresenta demo', desc:'Manda o link /demo para o cliente — ele já vê o sistema funcionando na hora.' },
+  { n:'03', color:'#22c55e', title:'Cliente fecha, você ganha',desc:'Comissão de R$150 (Essencial) ou R$250 (Profissional) cai no seu PIX.' },
+]
+
+const FAQ = [
+  { q:'Precisa instalar alguma coisa?', a:'Não. Abre no navegador do celular ou computador. Zero instalação, zero driver, zero configuração.' },
+  { q:'Funciona offline?', a:'Sim. O PDV funciona sem internet. Quando a conexão volta, sincroniza automaticamente.' },
+  { q:'Posso cancelar quando quiser?', a:'Pode. Não tem contrato, não tem multa. Cancela com um WhatsApp e acabou.' },
+  { q:'Quanto tempo demora pra começar?', a:'Em até 2 horas do cadastro você já tem usuário e senha. Ativação no mesmo dia.' },
+  { q:'O bot WhatsApp funciona com meu número?', a:'Funciona com qualquer número WhatsApp Business. A gente configura tudo na ativação.' },
+]
+
+const TICKER_ITEMS = ['PDV OFFLINE', 'BOT WHATSAPP 24H', 'FIFO AUTOMÁTICO', 'VALIDADE COM ALERTA', 'FIADO DIGITAL', 'FIDELIDADE', 'CAMPANHAS WHATSAPP', 'ETIQUETAS SEM DRIVER', 'MULTI-CAIXA', 'RELATÓRIO PDF', 'ESTOQUE EM TEMPO REAL', 'CANCELA SEM CONTRATO']
+
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800;900&display=swap');
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; }
-  body { font-family: 'Inter', sans-serif; background: #fff; }
-  @keyframes fadeUp  { from{opacity:0;transform:translateY(32px)} to{opacity:1;transform:translateY(0)} }
-  @keyframes pulse   { 0%,100%{opacity:.6} 50%{opacity:1} }
-  @keyframes ticker  { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
-  @keyframes bob     { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(7px)} }
-  @keyframes float   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
-  .fade-in { animation: fadeUp .8s ease both; }
-  .d1 { animation-delay: .1s; }
-  .d2 { animation-delay: .22s; }
-  .d3 { animation-delay: .34s; }
-  .d4 { animation-delay: .46s; }
-  .hover-lift { transition: transform .2s, box-shadow .2s; }
-  .hover-lift:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,.12) !important; }
-  .btn-wpp { transition: all .2s; }
-  .btn-wpp:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(34,197,94,.4) !important; }
-  .btn-outline:hover { background: #0f172a !important; color: #fff !important; }
-  nav a, nav button { text-decoration: none; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+  html { scroll-behavior:smooth; }
+  body { font-family:'Inter',sans-serif; background:#09090b; color:#fff; }
+  @keyframes ticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes pulse2 { 0%,100%{opacity:.5} 50%{opacity:1} }
+  @keyframes bob    { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(7px)} }
+  @keyframes glow   { 0%,100%{box-shadow:0 0 20px rgba(249,115,22,.3)} 50%{box-shadow:0 0 40px rgba(249,115,22,.6)} }
+  .fu{animation:fadeUp .7s ease both}
+  .d1{animation-delay:.08s}.d2{animation-delay:.18s}.d3{animation-delay:.28s}.d4{animation-delay:.38s}.d5{animation-delay:.48s}
+  .ticker-inner{display:flex;width:max-content;animation:ticker 30s linear infinite}
+  .hl{transition:transform .2s,box-shadow .2s,opacity .2s}
+  .hl:hover{transform:translateY(-3px) !important;opacity:.9}
 `
-
-/* ─── DIFERENCIAIS ─── */
-const DIFS = [
-  {
-    icon: AlertTriangle,
-    color: '#f59e0b',
-    bg: '#fffbeb',
-    border: '#fde68a',
-    tag: 'Ruptura zero',
-    title: 'Saiba antes de faltar, não depois.',
-    body: 'O sistema monitora o giro de cada produto e dispara um alerta quando está chegando na hora de repor — com base no seu histórico real de vendas, não em chute. Acaba a falta de arroz na sexta à tarde.',
-  },
-  {
-    icon: ClipboardList,
-    color: '#5462D8',
-    bg: '#eef2ff',
-    border: '#c7d2fe',
-    tag: 'FIFO Automático',
-    title: 'Primeiro que entra, primeiro que sai.',
-    body: 'O ZatendeStok organiza seu estoque no padrão FIFO: os lotes mais antigos aparecem na frente para venda. Menos produto vencendo, menos prejuízo. Funciona para frios, secos, limpeza — qualquer categoria.',
-  },
-  {
-    icon: AlertTriangle,
-    color: '#ef4444',
-    bg: '#fef2f2',
-    border: '#fecaca',
-    tag: 'Controle de validade',
-    title: 'Produto vencendo é dinheiro jogado fora.',
-    body: 'Receba alertas automáticos quando um produto está a 7, 15 ou 30 dias do vencimento. Aja a tempo: promoção, devolução ou retirada. Chega de encontrar caixa de produto vencido no fundo do estoque.',
-  },
-  {
-    icon: Truck,
-    color: '#22c55e',
-    bg: '#f0fdf4',
-    border: '#bbf7d0',
-    tag: 'Pedido automático',
-    title: 'Reposição com um clique, sem ligação.',
-    body: 'Conecte seu mercado ao distribuidor parceiro e faça pedidos diretamente pelo sistema — sem ligar, sem mandar áudio, sem WhatsApp manual. O pedido vai formatado, com quantidade certa e histórico de compras.',
-  },
-  {
-    icon: BarChart3,
-    color: '#8b5cf6',
-    bg: '#f5f3ff',
-    border: '#ddd6fe',
-    tag: 'PDV integrado',
-    title: 'Frente de caixa que atualiza o estoque na hora.',
-    body: 'Cada venda no PDV já abate do estoque em tempo real. Sem lançamento manual, sem conferência de planilha no fim do dia. Você sabe exatamente quanto tem de cada produto agora — não ontem.',
-  },
-  {
-    icon: Smartphone,
-    color: '#0ea5e9',
-    bg: '#f0f9ff',
-    border: '#bae6fd',
-    tag: '100% no celular',
-    title: 'Gerencia o mercado de qualquer lugar.',
-    body: 'Está em casa, no banco ou viajando? Acessa o estoque, aprova pedidos e vê o movimento do caixa direto no celular. Sem instalar app, sem versão diferente — a mesma tela do computador no seu smartphone.',
-  },
-]
-
-/* ─── PERSONAS ─── */
-const PERSONAS = [
-  {
-    emoji: '🏪',
-    tipo: 'Mercado & Mercearia',
-    desc: 'Controle o que entra e sai, evite vencimento, mantenha o estoque sem ruptura e venda pelo WhatsApp sem complicação.',
-    items: ['FIFO por lote e data de validade', 'PDV integrado multi-caixa', 'Pedido automático ao distribuidor', 'Alertas de validade em tempo real'],
-  },
-  {
-    emoji: '🥖',
-    tipo: 'Padaria & Confeitaria',
-    desc: 'Controle insumos, precifique por receita e use o bot pra mandar promoções de pão quentinho direto no WhatsApp dos clientes.',
-    items: ['Controle de insumos por receita', 'Alerta de estoque mínimo de farinha etc.', 'Bot WhatsApp pra promoções diárias', 'PDV rápido no balcão'],
-  },
-  {
-    emoji: '🥩',
-    tipo: 'Açougue & Frigorífico',
-    desc: 'Gerencie cortes, pesos e datas de validade. Nunca mais perde carne por vencimento ou falta de controle por lote.',
-    items: ['Validade por lote e corte', 'PDV por peso integrado', 'Histórico de compras ao fornecedor', 'Relatório de giro por categoria'],
-  },
-  {
-    emoji: '🍽️',
-    tipo: 'Restaurante & Lanchonete',
-    desc: 'Controle o estoque do dia, veja o caixa em tempo real e capture mais clientes com o bot no WhatsApp — tudo conectado.',
-    items: ['Estoque de insumos em tempo real', 'Caixa do dia integrado ao PDV', 'Bot WhatsApp para pedidos e promoções', 'Relatório de venda por período'],
-  },
-  {
-    emoji: '🚚',
-    tipo: 'Distribuidora & Atacado',
-    desc: 'Volume grande exige controle grande. Gerencie múltiplos clientes, emita pedidos e controle validade de todo o estoque.',
-    items: ['Gestão de grandes volumes FIFO', 'Múltiplos clientes e pedidos', 'Alertas de validade em lote', 'Relatórios de giro por categoria'],
-  },
-]
-
-/* ─── COMO FUNCIONA ─── */
-const STEPS = [
-  { n:'01', color:'#5462D8', title:'Solicita o acesso', desc:'Preenche o formulário com o nome do seu negócio. Nossa equipe recebe e configura tudo.' },
-  { n:'02', color:'#22c55e', title:'Recebe as credenciais', desc:'Em até 2 horas você tem usuário e senha. Sem instalação, abre no navegador do celular.' },
-  { n:'03', color:'#f59e0b', title:'Começa a gerenciar', desc:'Cadastra os produtos, conecta o distribuidor e o estoque começa a trabalhar por você.' },
-]
 
 /* ══════════════════════════════════════════════════════════ */
 export default function Landing() {
   const navigate = useNavigate()
-  const [vis, setVis] = useState(false)
+  const [vis, setVis]       = useState(false)
+  const [openFaq, setOpenFaq] = useState(null)
+  const [afil, setAfil]     = useState(4)
+  const comissao             = afil * 200
 
   useEffect(() => {
     if (isLoggedIn()) { navigate('/dashboard', { replace: true }); return }
@@ -142,321 +107,288 @@ export default function Landing() {
   }, [])
 
   return (
-    <div style={{ fontFamily:"'Inter',sans-serif", background:'#fff', color:'#0f172a' }}>
+    <div style={{ fontFamily:"'Inter',sans-serif", background:'#09090b', color:'#fff', overflowX:'hidden' }}>
       <style>{CSS}</style>
 
-      {/* ══ NAV ══════════════════════════════════════════════ */}
-      <nav style={{ position:'sticky', top:0, zIndex:50, background:'rgba(255,255,255,.92)', backdropFilter:'blur(12px)', borderBottom:'1px solid #f1f5f9', padding:'0 32px', height:64, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      {/* ══ NAV ═══════════════════════════════════════════ */}
+      <nav style={{ position:'sticky', top:0, zIndex:50, background:'rgba(9,9,11,0.9)', backdropFilter:'blur(16px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 24px', height:60, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <ZatendeStokLogo variant="wordmark" />
-        <div style={{ display:'flex', gap:10, alignItems:'center' }}>
-          <a href="/guia" style={{ color:'#64748b', fontSize:13, fontWeight:600, padding:'8px 14px', borderRadius:8 }}>Guia</a>
-          <button onClick={() => navigate('/login')} style={{ padding:'9px 20px', borderRadius:9, border:'1px solid #e2e8f0', background:'#fff', color:'#0f172a', fontSize:13, fontWeight:700, cursor:'pointer' }} className="btn-outline">
-            Entrar
-          </button>
-          <button onClick={() => navigate('/login?tab=cadastro')} style={{ padding:'9px 20px', borderRadius:9, border:'none', background:'#5462D8', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:'0 2px 10px rgba(84,98,216,.3)' }}>
-            Quero participar
-          </button>
+        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+          <Link to="/demo"     style={{ color:'rgba(255,255,255,.5)', fontSize:13, fontWeight:600, padding:'7px 12px', borderRadius:8, textDecoration:'none' }}>Demos</Link>
+          <Link to="/afiliado" style={{ color:'rgba(255,255,255,.5)', fontSize:13, fontWeight:600, padding:'7px 12px', borderRadius:8, textDecoration:'none' }}>Afiliados</Link>
+          <button onClick={() => navigate('/login')} style={{ padding:'8px 18px', borderRadius:8, border:'1px solid rgba(255,255,255,.1)', background:'rgba(255,255,255,.04)', color:'rgba(255,255,255,.7)', fontSize:13, fontWeight:700, cursor:'pointer' }}>Entrar</button>
+          <button onClick={() => openWpp()} style={{ padding:'8px 18px', borderRadius:8, border:'none', background:'#f97316', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', boxShadow:'0 2px 12px rgba(249,115,22,.4)' }}>Falar no WhatsApp</button>
         </div>
       </nav>
 
-      {/* ══ HERO ═════════════════════════════════════════════ */}
-      <section style={{ background:'linear-gradient(160deg,#0f172a 0%,#1e1b4b 55%,#1e3a8a 100%)', minHeight:'100dvh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'80px 24px 60px', textAlign:'center', position:'relative', overflow:'hidden' }}>
-        {/* decorative blobs */}
-        <div aria-hidden style={{ position:'absolute', top:'-10%', right:'-5%', width:500, height:500, borderRadius:'50%', background:'rgba(84,98,216,.2)', filter:'blur(80px)', pointerEvents:'none' }} />
-        <div aria-hidden style={{ position:'absolute', bottom:'-5%', left:'-5%', width:400, height:400, borderRadius:'50%', background:'rgba(34,197,94,.12)', filter:'blur(70px)', pointerEvents:'none' }} />
-        <div aria-hidden style={{ position:'absolute', inset:0, backgroundImage:'radial-gradient(circle,rgba(255,255,255,.03) 1px,transparent 1px)', backgroundSize:'32px 32px', pointerEvents:'none' }} />
+      {/* ══ HERO ══════════════════════════════════════════ */}
+      <section style={{ minHeight:'100dvh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'80px 24px 60px', textAlign:'center', position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', top:'15%', left:'50%', transform:'translateX(-50%)', width:700, height:700, borderRadius:'50%', background:'radial-gradient(circle,rgba(249,115,22,.1) 0%,transparent 65%)', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', bottom:'10%', right:'5%', width:400, height:400, borderRadius:'50%', background:'radial-gradient(circle,rgba(124,58,237,.08) 0%,transparent 70%)', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', inset:0, backgroundImage:'radial-gradient(rgba(255,255,255,.025) 1px,transparent 1px)', backgroundSize:'28px 28px', pointerEvents:'none' }} />
 
-        <div style={{ position:'relative', maxWidth:780 }}>
-          {/* badge */}
-          <div className={`fade-in d1 ${vis?'':'opacity-0'}`} style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(84,98,216,.2)', border:'1px solid rgba(84,98,216,.4)', borderRadius:999, padding:'6px 16px', marginBottom:36 }}>
-            <span style={{ width:7, height:7, borderRadius:'50%', background:'#4ade80', display:'inline-block', animation:'pulse 2s ease infinite' }} />
-            <span style={{ color:'rgba(255,255,255,.7)', fontSize:12, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase' }}>Mercados · Padarias · Açougues · Restaurantes · Distribuidoras</span>
+        <div style={{ position:'relative', maxWidth:820 }}>
+          <div className={`fu d1 ${vis?'':'opacity-0'}`} style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(249,115,22,.1)', border:'1px solid rgba(249,115,22,.2)', borderRadius:999, padding:'6px 18px', marginBottom:32 }}>
+            <span style={{ width:6, height:6, borderRadius:'50%', background:'#4ade80', display:'inline-block', animation:'pulse2 2s infinite' }}/>
+            <span style={{ color:'rgba(255,255,255,.55)', fontSize:11, fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase' }}>Sistema completo · sem contrato · ativa hoje</span>
           </div>
 
-          <h1 className={`fade-in d2 ${vis?'':'opacity-0'}`} style={{ fontFamily:"'Anton',sans-serif", fontSize:'clamp(52px,9vw,110px)', lineHeight:.92, letterSpacing:'-.01em', marginBottom:28, color:'#fff' }}>
-            <span style={{ display:'block' }}>GESTÃO QUE</span>
-            <span style={{ display:'block', background:'linear-gradient(135deg,#5462D8,#4ade80)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>SEU NEGÓCIO</span>
-            <span style={{ display:'block', color:'rgba(255,255,255,.9)' }}>PRECISAVA.</span>
+          <h1 className={`fu d2 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(48px,8.5vw,108px)', fontWeight:900, lineHeight:.92, letterSpacing:'-.03em', marginBottom:28 }}>
+            <span style={{ display:'block', color:'#fff' }}>GESTÃO QUE</span>
+            <span style={{ display:'block', background:'linear-gradient(90deg,#f97316,#fbbf24)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>QUALQUER NEGÓCIO</span>
+            <span style={{ display:'block', color:'rgba(255,255,255,.85)' }}>PODE PAGAR.</span>
           </h1>
 
-          <p className={`fade-in d3 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(16px,2vw,19px)', color:'rgba(255,255,255,.6)', lineHeight:1.7, maxWidth:560, margin:'0 auto 40px' }}>
-            Controle de estoque com FIFO, alertas de validade, frente de caixa e bot de vendas no WhatsApp — tudo conectado, tudo no celular. Para qualquer negócio de alimentação.
+          <p className={`fu d3 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(15px,1.8vw,18px)', color:'rgba(255,255,255,.45)', lineHeight:1.8, maxWidth:540, margin:'0 auto 36px' }}>
+            PDV offline + Bot WhatsApp com IA + Estoque FIFO + Fidelidade + Fiado + Campanhas.<br/>
+            Por <strong style={{ color:'#f97316' }}>R$297/mês</strong> — menos de R$10 por dia.
           </p>
 
-          <div className={`fade-in d4 ${vis?'':'opacity-0'}`} style={{ display:'flex', gap:14, justifyContent:'center', flexWrap:'wrap' }}>
-            <button className="btn-wpp" onClick={() => openWpp()}
-              style={{ display:'flex', alignItems:'center', gap:10, padding:'16px 32px', borderRadius:13, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#22c55e,#16a34a)', color:'#fff', fontSize:16, fontWeight:900, boxShadow:'0 4px 24px rgba(34,197,94,.35)' }}>
-              <MessageCircle size={20} /> Quero conhecer o sistema
+          <div className={`fu d4 ${vis?'':'opacity-0'}`} style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap', marginBottom:48 }}>
+            <button onClick={() => openWpp()} style={{ display:'flex', alignItems:'center', gap:10, padding:'15px 30px', borderRadius:12, border:'none', cursor:'pointer', background:'#f97316', color:'#fff', fontSize:16, fontWeight:900, animation:'glow 3s ease infinite' }}>
+              <MessageCircle size={20}/> Quero ver o sistema
             </button>
-            <button onClick={() => navigate('/login')}
-              style={{ display:'flex', alignItems:'center', gap:8, padding:'16px 26px', borderRadius:13, border:'1px solid rgba(255,255,255,.15)', background:'rgba(255,255,255,.06)', color:'rgba(255,255,255,.8)', fontSize:15, fontWeight:700, cursor:'pointer' }}>
-              Já tenho acesso <ArrowRight size={16} />
-            </button>
+            <Link to="/demo" style={{ display:'flex', alignItems:'center', gap:8, padding:'15px 24px', borderRadius:12, border:'1px solid rgba(255,255,255,.12)', background:'rgba(255,255,255,.05)', color:'rgba(255,255,255,.8)', fontSize:15, fontWeight:700, textDecoration:'none' }}>
+              <Play size={16}/> Ver demo ao vivo
+            </Link>
+          </div>
+
+          <div className={`fu d5 ${vis?'':'opacity-0'}`} style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap' }}>
+            {NICHOS.map(n => (
+              <Link key={n.slug} to={`/demo/${n.slug}`} className="hl"
+                style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'7px 14px', borderRadius:999, border:`1px solid ${n.color}30`, background:`${n.color}10`, color:n.color, fontSize:12, fontWeight:700, textDecoration:'none' }}>
+                {n.emoji} {n.label}
+              </Link>
+            ))}
           </div>
         </div>
-
-        {/* scroll hint */}
-        <div style={{ position:'absolute', bottom:28, left:'50%', animation:'bob 2s ease infinite', opacity:.3 }}><ChevronDown size={22} color="#fff" /></div>
+        <div style={{ position:'absolute', bottom:24, left:'50%', animation:'bob 2s ease infinite', opacity:.25 }}><ChevronDown size={20} color="#fff"/></div>
       </section>
 
-      {/* ══ TICKER ═══════════════════════════════════════════ */}
-      <div style={{ background:'#f8fafc', borderTop:'1px solid #e2e8f0', borderBottom:'1px solid #e2e8f0', overflow:'hidden', padding:'14px 0' }}>
-        <div style={{ display:'flex', animation:'ticker 28s linear infinite', whiteSpace:'nowrap', width:'max-content' }}>
-          {[...Array(2)].map((_,i) => (
-            <span key={i} style={{ display:'inline-flex', alignItems:'center' }}>
-              {['Controle FIFO','Alertas de validade','Ruptura zero','Pedido ao distribuidor','PDV integrado','Funciona no celular','Sem instalar app','Suporte pelo WhatsApp','Gestão profissional','Estoque em tempo real','Mercado','Padaria','Açougue','Restaurante','Distribuidora'].map(t => (
-                <span key={t} style={{ display:'inline-flex', alignItems:'center', gap:20, paddingRight:48 }}>
-                  <span style={{ color:'#c7d2fe', fontSize:14 }}>✦</span>
-                  <span style={{ color:'#64748b', fontSize:12, fontWeight:600, letterSpacing:'.08em', textTransform:'uppercase' }}>{t}</span>
-                </span>
-              ))}
+      {/* ══ TICKER ════════════════════════════════════════ */}
+      <div style={{ background:'#f97316', padding:'12px 0', overflow:'hidden' }}>
+        <div className="ticker-inner">
+          {[...TICKER_ITEMS,...TICKER_ITEMS].map((t,i) => (
+            <span key={i} style={{ whiteSpace:'nowrap', padding:'0 24px', fontSize:11.5, fontWeight:900, letterSpacing:'.15em', color:'rgba(255,255,255,.9)', display:'inline-flex', alignItems:'center', gap:10 }}>
+              <span>✦</span> {t}
             </span>
           ))}
         </div>
       </div>
 
-      {/* ══ DIFERENCIAIS ══════════════════════════════════════ */}
-      <section style={{ padding:'100px 24px', maxWidth:1140, margin:'0 auto' }}>
-        <div style={{ textAlign:'center', marginBottom:64 }}>
-          <div style={{ display:'inline-block', background:'#eef2ff', border:'1px solid #c7d2fe', borderRadius:999, padding:'5px 16px', marginBottom:16 }}>
-            <span style={{ color:'#5462D8', fontSize:12, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase' }}>Diferenciais reais</span>
-          </div>
-          <h2 style={{ fontFamily:"'Anton',sans-serif", fontSize:'clamp(36px,5vw,62px)', lineHeight:1, color:'#0f172a', marginBottom:16 }}>
-            TUDO QUE DRENA SEU<br/>RESULTADO — RESOLVIDO.
+      {/* ══ DEMOS POR NICHO ═══════════════════════════════ */}
+      <section style={{ padding:'100px 24px', maxWidth:1100, margin:'0 auto' }}>
+        <div style={{ textAlign:'center', marginBottom:52 }}>
+          <span style={{ display:'inline-block', background:'rgba(249,115,22,.08)', border:'1px solid rgba(249,115,22,.2)', borderRadius:999, padding:'4px 14px', fontSize:11, fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'#f97316', marginBottom:16 }}>DEMOS INTERATIVOS</span>
+          <h2 style={{ fontSize:'clamp(30px,5vw,52px)', fontWeight:900, letterSpacing:'-.03em', lineHeight:1.05, marginBottom:14 }}>
+            Clica e vê como fica<br/><span style={{ color:'#f97316' }}>pro seu negócio.</span>
           </h2>
-          <p style={{ color:'#64748b', fontSize:17, maxWidth:520, margin:'0 auto' }}>
-            Cada funcionalidade foi pensada para o dia a dia de quem trabalha com produto físico, giro rápido e margem apertada.
-          </p>
+          <p style={{ color:'rgba(255,255,255,.35)', fontSize:15, maxWidth:480, margin:'0 auto' }}>PDV funcionando, promoção automática, checkout. Sem login, sem cadastro.</p>
         </div>
-
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))', gap:24 }}>
-          {DIFS.map(({ icon:Icon, color, bg, border, tag, title, body }) => (
-            <div key={tag} className="hover-lift"
-              style={{ background:bg, border:`1px solid ${border}`, borderRadius:20, padding:'32px 28px', boxShadow:'0 2px 12px rgba(0,0,0,.04)' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:18 }}>
-                <div style={{ width:40, height:40, borderRadius:11, background:'rgba(255,255,255,.8)', border:`1px solid ${border}`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                  <Icon size={20} color={color} />
-                </div>
-                <span style={{ fontSize:11, fontWeight:800, color:color, letterSpacing:'.08em', textTransform:'uppercase' }}>{tag}</span>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:16 }}>
+          {NICHOS.map(n => (
+            <Link key={n.slug} to={`/demo/${n.slug}`} className="hl"
+              style={{ display:'block', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:20, padding:24, textDecoration:'none', position:'relative', overflow:'hidden' }}>
+              <div style={{ position:'absolute', top:0, right:0, width:110, height:110, borderRadius:'50%', background:`radial-gradient(circle,${n.color}20,transparent 70%)`, pointerEvents:'none' }}/>
+              <div style={{ fontSize:38, marginBottom:12, lineHeight:1 }}>{n.emoji}</div>
+              <div style={{ fontWeight:900, fontSize:17, color:'#fff', marginBottom:3 }}>{n.label}</div>
+              <div style={{ fontSize:10, fontWeight:700, color:n.color, marginBottom:14, textTransform:'uppercase', letterSpacing:'.08em' }}>DEMO GRATUITO</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:5, marginBottom:16 }}>
+                {n.features.map((f,i) => (
+                  <div key={i} style={{ fontSize:12, color:'rgba(255,255,255,.45)', display:'flex', alignItems:'center', gap:6 }}>
+                    <CheckCircle2 size={11} color={n.color}/> {f}
+                  </div>
+                ))}
               </div>
-              <h3 style={{ fontSize:18, fontWeight:900, color:'#0f172a', marginBottom:10, lineHeight:1.3 }}>{title}</h3>
-              <p style={{ color:'#475569', fontSize:14, lineHeight:1.75 }}>{body}</p>
+              <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:13, fontWeight:700, color:n.color }}>Abrir demo <ArrowRight size={13}/></div>
+              <div style={{ position:'absolute', bottom:0, left:0, right:0, height:2, background:n.color, opacity:.35 }}/>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* ══ FEATURES ══════════════════════════════════════ */}
+      <section style={{ padding:'80px 24px', background:'rgba(255,255,255,0.018)', borderTop:'1px solid rgba(255,255,255,0.05)', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ maxWidth:1100, margin:'0 auto' }}>
+          <div style={{ textAlign:'center', marginBottom:48 }}>
+            <h2 style={{ fontSize:'clamp(26px,4vw,46px)', fontWeight:900, letterSpacing:'-.03em', marginBottom:10 }}>
+              Do R$297 vem <span style={{ color:'#f97316' }}>tudo isso.</span>
+            </h2>
+            <p style={{ color:'rgba(255,255,255,.35)', fontSize:14 }}>12 módulos. Uma mensalidade. Cancela quando quiser.</p>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(230px,1fr))', gap:12 }}>
+            {FEATURES.map(({ Icon, label, desc }) => (
+              <div key={label} style={{ display:'flex', gap:14, padding:'18px 18px', background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:16 }}>
+                <div style={{ width:34, height:34, borderRadius:9, background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.18)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <Icon size={15} color="#f97316"/>
+                </div>
+                <div>
+                  <div style={{ fontWeight:800, fontSize:13, color:'#fff', marginBottom:3 }}>{label}</div>
+                  <div style={{ fontSize:11.5, color:'rgba(255,255,255,.35)', lineHeight:1.5 }}>{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══ PLANOS ════════════════════════════════════════ */}
+      <section style={{ padding:'100px 24px', maxWidth:1000, margin:'0 auto' }}>
+        <div style={{ textAlign:'center', marginBottom:52 }}>
+          <h2 style={{ fontSize:'clamp(28px,4.5vw,50px)', fontWeight:900, letterSpacing:'-.03em', marginBottom:10 }}>
+            Sem enrolação.<br/><span style={{ color:'#f97316' }}>Escolhe e começa hoje.</span>
+          </h2>
+          <p style={{ color:'rgba(255,255,255,.35)', fontSize:15 }}>Sem contrato. Sem taxa de adesão. Sem pegadinha.</p>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:20, alignItems:'start' }}>
+          {PLANOS.map(p => (
+            <div key={p.name} style={{ background:p.highlight ? 'linear-gradient(160deg,rgba(124,58,237,.18),rgba(124,58,237,.04))' : 'rgba(255,255,255,0.03)', border:`1px solid ${p.highlight ? 'rgba(124,58,237,.45)' : 'rgba(255,255,255,.07)'}`, borderRadius:24, padding:'30px 26px', position:'relative', overflow:'hidden' }}>
+              {p.highlight && <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:'linear-gradient(90deg,#7c3aed,#a855f7)' }}/>}
+              {p.tag && <div style={{ display:'inline-block', background:`${p.color}1a`, border:`1px solid ${p.color}40`, borderRadius:999, padding:'3px 10px', fontSize:10, fontWeight:800, letterSpacing:'.08em', color:p.color, marginBottom:14 }}>{p.tag}</div>}
+              <div style={{ fontWeight:900, fontSize:20, color:'#fff', marginBottom:6 }}>{p.name}</div>
+              <div style={{ display:'flex', alignItems:'baseline', gap:4, marginBottom:8 }}>
+                {p.price !== '?' ? <><span style={{ fontSize:12, color:'rgba(255,255,255,.3)', fontWeight:700 }}>R$</span><span style={{ fontSize:46, fontWeight:900, color:'#fff', lineHeight:1 }}>{p.price}</span><span style={{ color:'rgba(255,255,255,.35)', fontSize:13 }}>{p.period}</span></> : <span style={{ fontSize:26, fontWeight:900, color:'#fff' }}>Sob consulta</span>}
+              </div>
+              <div style={{ fontSize:13, color:'rgba(255,255,255,.38)', marginBottom:22, lineHeight:1.55 }}>{p.desc}</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:9, marginBottom:26 }}>
+                {p.items.map(item => (
+                  <div key={item} style={{ display:'flex', gap:9, alignItems:'flex-start', fontSize:13, color:'rgba(255,255,255,.7)' }}>
+                    <CheckCircle2 size={13} color={p.color} style={{ marginTop:1, flexShrink:0 }}/> {item}
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => openWpp(`Olá! Tenho interesse no plano ${p.name} do ZatendeStok.`)}
+                style={{ width:'100%', padding:'13px', borderRadius:12, border:'none', cursor:'pointer', background:p.highlight ? 'linear-gradient(135deg,#7c3aed,#a855f7)' : p.color, color:'#fff', fontSize:14, fontWeight:800, boxShadow:p.highlight ? '0 4px 20px rgba(124,58,237,.35)' : `0 4px 14px ${p.color}40` }}>
+                {p.cta}
+              </button>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ══ FIFO DESTAQUE ════════════════════════════════════ */}
-      <section style={{ background:'linear-gradient(135deg,#1e1b4b,#312e81)', padding:'100px 24px', position:'relative', overflow:'hidden' }}>
-        <div aria-hidden style={{ position:'absolute', top:'-20%', right:'-10%', width:500, height:500, borderRadius:'50%', background:'rgba(74,222,128,.1)', filter:'blur(80px)', pointerEvents:'none' }} />
-        <div style={{ maxWidth:1060, margin:'0 auto', display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))', gap:60, alignItems:'center' }}>
+      {/* ══ AFILIADOS ═════════════════════════════════════ */}
+      <section style={{ padding:'100px 24px', background:'linear-gradient(160deg,rgba(124,58,237,.07),rgba(249,115,22,.04))', borderTop:'1px solid rgba(255,255,255,0.05)', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ maxWidth:1000, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:60, alignItems:'center' }}>
           <div>
-            <div style={{ display:'inline-block', background:'rgba(84,98,216,.3)', border:'1px solid rgba(84,98,216,.5)', borderRadius:999, padding:'5px 16px', marginBottom:20 }}>
-              <span style={{ color:'#a5b4fc', fontSize:12, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase' }}>FIFO Automático</span>
-            </div>
-            <h2 style={{ fontFamily:"'Anton',sans-serif", fontSize:'clamp(36px,5vw,58px)', lineHeight:1, color:'#fff', marginBottom:20 }}>
-              O PRODUTO MAIS<br/>VELHO VENDE<br/>PRIMEIRO.<br/>SEMPRE.
+            <span style={{ display:'inline-block', background:'rgba(124,58,237,.12)', border:'1px solid rgba(124,58,237,.25)', borderRadius:999, padding:'4px 14px', fontSize:11, fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'#a78bfa', marginBottom:20 }}>PROGRAMA DE AFILIADOS</span>
+            <h2 style={{ fontSize:'clamp(28px,4vw,46px)', fontWeight:900, letterSpacing:'-.03em', lineHeight:1.08, marginBottom:18 }}>
+              Venda o ZatendeStok.<br/><span style={{ background:'linear-gradient(90deg,#f97316,#fbbf24)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Fature por fora.</span>
             </h2>
-            <p style={{ color:'rgba(255,255,255,.6)', fontSize:16, lineHeight:1.8, marginBottom:28 }}>
-              FIFO significa <strong style={{ color:'rgba(255,255,255,.9)' }}>First In, First Out</strong> — o padrão ouro para qualquer negócio com produto de validade. Quem chega primeiro, sai primeiro. Menos desperdício, menos vencimento, mais margem.
+            <p style={{ color:'rgba(255,255,255,.45)', fontSize:15, lineHeight:1.8, marginBottom:28 }}>
+              Indica um cliente, ele assina, você ganha.<br/>
+              <strong style={{ color:'#fff' }}>R$150</strong> por Essencial ou <strong style={{ color:'#f97316' }}>R$250</strong> por Profissional.<br/>
+              PIX na hora. Sem limite de indicações.
             </p>
-            <p style={{ color:'rgba(255,255,255,.6)', fontSize:16, lineHeight:1.8 }}>
-              O ZatendeStok registra cada entrada com data de fabricação e vencimento, e <strong style={{ color:'#4ade80' }}>sugere automaticamente qual lote vender primeiro</strong>. Funciona para frios, laticínios, hortifrúti, padaria, bebidas, limpeza — qualquer categoria com validade.
-            </p>
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            {[
-              { n:'01', cor:'#4ade80', titulo:'Entrada registrada', desc:'Produto entra no estoque com lote, quantidade e data de vencimento.' },
-              { n:'02', cor:'#a5b4fc', titulo:'Ordenação automática', desc:'Sistema coloca o lote mais antigo na frente da fila de venda.' },
-              { n:'03', cor:'#fbbf24', titulo:'Alerta de validade', desc:'7 dias antes de vencer: alerta, promoção sugerida ou devolução.' },
-              { n:'04', cor:'#f87171', titulo:'Ruptura evitada', desc:'Quando o lote vai acabar, o pedido ao distribuidor já é preparado.' },
-            ].map(({ n, cor, titulo, desc }) => (
-              <div key={n} style={{ display:'flex', gap:16, padding:'20px', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.08)', borderRadius:16 }}>
-                <div style={{ width:40, height:40, borderRadius:10, background:cor+'20', border:`1px solid ${cor}40`, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                  <span style={{ color:cor, fontWeight:900, fontSize:13, fontFamily:"'Anton',sans-serif" }}>{n}</span>
+            <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:18, padding:'22px 24px', marginBottom:24 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,.4)', marginBottom:12, letterSpacing:'.06em' }}>SIMULADOR DE GANHOS</div>
+              <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:14 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:11, color:'rgba(255,255,255,.35)', marginBottom:6 }}>Vendas por mês: <strong style={{ color:'#fff' }}>{afil}</strong></div>
+                  <input type="range" min={1} max={20} value={afil} onChange={e => setAfil(+e.target.value)} style={{ width:'100%', accentColor:'#f97316', cursor:'pointer' }}/>
                 </div>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.15)', borderRadius:12, padding:'14px 18px' }}>
+                <span style={{ fontSize:13, color:'rgba(255,255,255,.55)', fontWeight:600 }}>Comissão estimada/mês</span>
+                <span style={{ fontSize:26, fontWeight:900, color:'#f97316' }}>R${comissao.toLocaleString('pt-BR')}</span>
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+              <Link to="/afiliado" style={{ display:'flex', alignItems:'center', gap:8, padding:'13px 22px', borderRadius:11, border:'none', cursor:'pointer', background:'#f97316', color:'#fff', fontSize:14, fontWeight:800, textDecoration:'none', boxShadow:'0 4px 18px rgba(249,115,22,.4)' }}>
+                Quero ser afiliado <ArrowRight size={14}/>
+              </Link>
+              <button onClick={() => openWpp('Oi! Quero saber mais sobre o programa de afiliados do ZatendeStok.')} style={{ display:'flex', alignItems:'center', gap:7, padding:'13px 18px', borderRadius:11, border:'1px solid rgba(255,255,255,.1)', background:'rgba(255,255,255,.04)', color:'rgba(255,255,255,.65)', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                <MessageCircle size={14}/> Tirar dúvidas
+              </button>
+            </div>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,.3)', letterSpacing:'.1em', textTransform:'uppercase', marginBottom:4 }}>COMO FUNCIONA</div>
+            {AFIL_STEPS.map(s => (
+              <div key={s.n} style={{ display:'flex', gap:16, padding:'20px 20px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:18 }}>
+                <div style={{ fontWeight:900, fontSize:30, color:s.color, lineHeight:1, flexShrink:0, opacity:.65 }}>{s.n}</div>
                 <div>
-                  <div style={{ color:'#fff', fontWeight:800, fontSize:15, marginBottom:4 }}>{titulo}</div>
-                  <div style={{ color:'rgba(255,255,255,.5)', fontSize:13, lineHeight:1.6 }}>{desc}</div>
+                  <div style={{ fontWeight:800, fontSize:14, color:'#fff', marginBottom:4 }}>{s.title}</div>
+                  <div style={{ fontSize:12.5, color:'rgba(255,255,255,.4)', lineHeight:1.6 }}>{s.desc}</div>
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ══ PARA QUEM É ══════════════════════════════════════ */}
-      <section style={{ padding:'100px 24px', background:'#f8fafc' }}>
-        <div style={{ maxWidth:1060, margin:'0 auto' }}>
-          <div style={{ textAlign:'center', marginBottom:64 }}>
-            <div style={{ display:'inline-block', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:999, padding:'5px 16px', marginBottom:16 }}>
-              <span style={{ color:'#16a34a', fontSize:12, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase' }}>Para quem é</span>
+            <div style={{ display:'flex', gap:14, padding:'16px 20px', background:'rgba(34,197,94,0.07)', border:'1px solid rgba(34,197,94,0.18)', borderRadius:16 }}>
+              <Shield size={20} color="#22c55e" style={{ flexShrink:0, marginTop:2 }}/>
+              <div style={{ fontSize:12.5, color:'rgba(255,255,255,.5)', lineHeight:1.65 }}>
+                <strong style={{ color:'#22c55e' }}>Sem risco.</strong> Você só indica — a gente fecha, cobra, dá suporte e paga sua comissão no PIX.
+              </div>
             </div>
-            <h2 style={{ fontFamily:"'Anton',sans-serif", fontSize:'clamp(36px,5vw,58px)', lineHeight:1, color:'#0f172a', marginBottom:16 }}>
-              SEU TIPO DE<br/>NEGÓCIO ESTÁ AQUI.
-            </h2>
-            <p style={{ color:'#64748b', fontSize:17, maxWidth:480, margin:'0 auto' }}>Desenvolvido para a realidade do comércio brasileiro, do menor ao médio porte.</p>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))', gap:24 }}>
-            {PERSONAS.map(({ emoji, tipo, desc, items }) => (
-              <div key={tipo} className="hover-lift"
-                style={{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:22, padding:'36px 30px', boxShadow:'0 2px 16px rgba(0,0,0,.06)' }}>
-                <div style={{ fontSize:44, marginBottom:18 }}>{emoji}</div>
-                <h3 style={{ fontSize:21, fontWeight:900, color:'#0f172a', marginBottom:12 }}>{tipo}</h3>
-                <p style={{ color:'#64748b', fontSize:14, lineHeight:1.75, marginBottom:22 }}>{desc}</p>
-                <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
-                  {items.map(item => (
-                    <div key={item} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                      <CheckCircle2 size={15} color="#22c55e" style={{ flexShrink:0 }} />
-                      <span style={{ color:'#334155', fontSize:13, fontWeight:600 }}>{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
 
-      {/* ══ COMO FUNCIONA ════════════════════════════════════ */}
-      <section style={{ padding:'100px 24px' }}>
-        <div style={{ maxWidth:860, margin:'0 auto', textAlign:'center' }}>
-          <div style={{ display:'inline-block', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:999, padding:'5px 16px', marginBottom:16 }}>
-            <span style={{ color:'#d97706', fontSize:12, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase' }}>Simples de começar</span>
-          </div>
-          <h2 style={{ fontFamily:"'Anton',sans-serif", fontSize:'clamp(36px,5vw,56px)', lineHeight:1, color:'#0f172a', marginBottom:56 }}>
-            COMEÇA HOJE,<br/>SEM COMPLICAÇÃO.
+      {/* ══ COMO COMEÇA ═══════════════════════════════════ */}
+      <section style={{ padding:'90px 24px', maxWidth:860, margin:'0 auto', textAlign:'center' }}>
+        <h2 style={{ fontSize:'clamp(26px,4vw,44px)', fontWeight:900, letterSpacing:'-.03em', marginBottom:10 }}>
+          Ativa hoje, tá rodando <span style={{ color:'#f97316' }}>em 2 horas.</span>
+        </h2>
+        <p style={{ color:'rgba(255,255,255,.35)', fontSize:15, marginBottom:48 }}>Zero instalação. Zero técnico. Zero dor de cabeça.</p>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
+          {[
+            { n:'01', color:'#f97316', title:'Solicita acesso',    desc:'Preenche o form ou manda WhatsApp — aprovamos em até 2h.' },
+            { n:'02', color:'#a855f7', title:'Recebe as credenciais', desc:'Usuário e senha. Abre no celular, sem instalar nada.' },
+            { n:'03', color:'#22c55e', title:'Começa a vender',    desc:'Cadastra os produtos e o estoque começa a trabalhar por você.' },
+          ].map(s => (
+            <div key={s.n} style={{ padding:'26px 22px', background:'rgba(255,255,255,0.028)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:20 }}>
+              <div style={{ fontSize:40, fontWeight:900, color:s.color, opacity:.5, marginBottom:14, lineHeight:1 }}>{s.n}</div>
+              <div style={{ fontWeight:800, fontSize:15, color:'#fff', marginBottom:7 }}>{s.title}</div>
+              <div style={{ fontSize:13, color:'rgba(255,255,255,.38)', lineHeight:1.6 }}>{s.desc}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ══ FAQ ═══════════════════════════════════════════ */}
+      <section style={{ padding:'72px 24px', maxWidth:680, margin:'0 auto' }}>
+        <h2 style={{ fontSize:34, fontWeight:900, letterSpacing:'-.02em', textAlign:'center', marginBottom:36 }}>
+          Perguntas <span style={{ color:'#f97316' }}>frequentes</span>
+        </h2>
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {FAQ.map((f,i) => (
+            <div key={i} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:14, overflow:'hidden' }}>
+              <button onClick={() => setOpenFaq(openFaq===i ? null : i)}
+                style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'16px 20px', background:'none', border:'none', cursor:'pointer', color:'#fff', fontSize:14, fontWeight:700, textAlign:'left', gap:12 }}>
+                {f.q}
+                <ChevronDown size={15} color="rgba(255,255,255,.4)" style={{ flexShrink:0, transform:openFaq===i?'rotate(180deg)':'none', transition:'transform .2s' }}/>
+              </button>
+              {openFaq===i && <div style={{ padding:'0 20px 16px', fontSize:13.5, color:'rgba(255,255,255,.45)', lineHeight:1.7 }}>{f.a}</div>}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ══ CTA FINAL ═════════════════════════════════════ */}
+      <section style={{ padding:'80px 24px 100px', textAlign:'center' }}>
+        <div style={{ maxWidth:580, margin:'0 auto' }}>
+          <div style={{ display:'flex', justifyContent:'center', marginBottom:22 }}><ZSMark size={54}/></div>
+          <h2 style={{ fontSize:'clamp(26px,4.5vw,46px)', fontWeight:900, letterSpacing:'-.03em', marginBottom:14 }}>
+            Chega de controle no papel.<br/><span style={{ color:'#f97316' }}>Começa hoje.</span>
           </h2>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:32 }}>
-            {STEPS.map(({ n, color, title, desc }, i) => (
-              <div key={n} style={{ position:'relative' }}>
-                {i < STEPS.length-1 && (
-                  <div aria-hidden style={{ display:'none', position:'absolute', top:28, left:'calc(50% + 40px)', right:'calc(-50% + 40px)', height:2, background:'#e2e8f0' }} />
-                )}
-                <div style={{ width:56, height:56, borderRadius:16, background:color+'15', border:`2px solid ${color}`, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px', fontFamily:"'Anton',sans-serif", fontSize:20, color:color }}>{n}</div>
-                <h3 style={{ fontSize:18, fontWeight:800, color:'#0f172a', marginBottom:10 }}>{title}</h3>
-                <p style={{ color:'#64748b', fontSize:14, lineHeight:1.7 }}>{desc}</p>
-              </div>
-            ))}
-          </div>
+          <p style={{ color:'rgba(255,255,255,.38)', fontSize:15, marginBottom:32 }}>A Zara responde em segundos — 24h por dia, 7 dias por semana.</p>
+          <button onClick={() => openWpp()} style={{ display:'inline-flex', alignItems:'center', gap:12, padding:'17px 34px', borderRadius:14, border:'none', cursor:'pointer', background:'#f97316', color:'#fff', fontSize:17, fontWeight:900, animation:'glow 3s ease infinite' }}>
+            <MessageCircle size={22}/> Falar com a Zara no WhatsApp
+          </button>
+          <div style={{ marginTop:14, fontSize:11.5, color:'rgba(255,255,255,.2)' }}>Resposta em menos de 30 segundos · 24 horas por dia</div>
         </div>
       </section>
 
-      {/* ══ PLANOS & PREÇOS ══════════════════════════════════ */}
-      <section style={{ padding:'100px 24px', background:'#f8fafc' }}>
-        <div style={{ maxWidth:1100, margin:'0 auto' }}>
-          <div style={{ textAlign:'center', marginBottom:56 }}>
-            <div style={{ display:'inline-block', background:'#f0fdf4', border:'1px solid #86efac', borderRadius:999, padding:'5px 16px', marginBottom:16 }}>
-              <span style={{ color:'#16a34a', fontSize:12, fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase' }}>Planos simples e transparentes</span>
-            </div>
-            <h2 style={{ fontFamily:"'Anton',sans-serif", fontSize:'clamp(36px,5vw,56px)', lineHeight:1, color:'#0f172a', marginBottom:16 }}>
-              INVISTA EM CONTROLE,<br/>ECONOMIZE EM PREJUÍZO.
-            </h2>
-            <p style={{ color:'#64748b', fontSize:16, maxWidth:500, margin:'0 auto' }}>
-              Sem contrato, sem taxa de instalação. Cancele quando quiser.
-            </p>
-          </div>
-
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(290px,1fr))', gap:24, alignItems:'stretch' }}>
-            {/* ESSENCIAL */}
-            <div style={{ background:'#fff', borderRadius:24, padding:'36px 32px', border:'1px solid #e2e8f0', display:'flex', flexDirection:'column' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#64748b', letterSpacing:'.05em', textTransform:'uppercase', marginBottom:12 }}>Essencial</div>
-              <div style={{ display:'flex', alignItems:'flex-end', gap:4, marginBottom:4 }}>
-                <span style={{ fontSize:13, fontWeight:700, color:'#94a3b8', alignSelf:'flex-start', marginTop:10 }}>R$</span>
-                <span style={{ fontFamily:"'Anton',sans-serif", fontSize:60, lineHeight:1, color:'#0f172a' }}>297</span>
-                <span style={{ fontSize:14, color:'#94a3b8', marginBottom:8 }}>/mês</span>
-              </div>
-              <div style={{ fontSize:11, color:'#22c55e', fontWeight:800, marginBottom:16 }}>menos de R$10 por dia ✅</div>
-              <p style={{ color:'#64748b', fontSize:13, marginBottom:28, lineHeight:1.6 }}>Ideal para quem está saindo do papel e do caderno.</p>
-              <ul style={{ listStyle:'none', padding:0, margin:'0 0 28px', flex:1, display:'flex', flexDirection:'column', gap:10 }}>
-                {['✅ 1 terminal PDV / Caixa','✅ Estoque + controle de validade','✅ Fiado digital','✅ Relatórios de vendas','✅ Impressora térmica','✅ Funciona offline','❌ Bot WhatsApp de atendimento','❌ Programa de fidelidade','❌ Campanhas WhatsApp'].map(f => (
-                  <li key={f} style={{ fontSize:13, color: f.startsWith('❌') ? '#cbd5e1' : '#334155', display:'flex', gap:8 }}>{f}</li>
-                ))}
-              </ul>
-              <button onClick={() => openWpp('Quero o plano Essencial (R$297/mês)')} style={{ padding:'14px', borderRadius:14, border:'2px solid #0f172a', background:'transparent', color:'#0f172a', fontWeight:900, fontSize:15, cursor:'pointer', transition:'all .2s' }}
-                onMouseOver={e=>{ e.currentTarget.style.background='#0f172a'; e.currentTarget.style.color='#fff' }}
-                onMouseOut={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#0f172a' }}>
-                Começar com Essencial
-              </button>
-            </div>
-
-            {/* PROFISSIONAL — destaque */}
-            <div style={{ background:'linear-gradient(160deg,#0f172a,#1e1b4b)', borderRadius:24, padding:'36px 32px', border:'2px solid #6366f1', display:'flex', flexDirection:'column', position:'relative', boxShadow:'0 20px 60px rgba(99,102,241,.25)' }}>
-              <div style={{ position:'absolute', top:-14, left:'50%', transform:'translateX(-50%)', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', color:'#fff', fontSize:11, fontWeight:900, padding:'4px 16px', borderRadius:999, letterSpacing:'.06em', textTransform:'uppercase', whiteSpace:'nowrap' }}>⭐ Mais popular</div>
-              <div style={{ fontSize:13, fontWeight:700, color:'#a5b4fc', letterSpacing:'.05em', textTransform:'uppercase', marginBottom:12 }}>Profissional</div>
-              <div style={{ display:'flex', alignItems:'flex-end', gap:4, marginBottom:4 }}>
-                <span style={{ fontSize:13, fontWeight:700, color:'#818cf8', alignSelf:'flex-start', marginTop:10 }}>R$</span>
-                <span style={{ fontFamily:"'Anton',sans-serif", fontSize:60, lineHeight:1, color:'#fff' }}>497</span>
-                <span style={{ fontSize:14, color:'#818cf8', marginBottom:8 }}>/mês</span>
-              </div>
-              <div style={{ fontSize:11, color:'#86efac', fontWeight:800, marginBottom:16 }}>menos de R$17 por dia — até 3 caixas 🚀</div>
-              <p style={{ color:'#94a3b8', fontSize:13, marginBottom:28, lineHeight:1.6 }}>Para quem quer atender melhor, fidelizar clientes e vender mais pelo WhatsApp.</p>
-              <ul style={{ listStyle:'none', padding:0, margin:'0 0 28px', flex:1, display:'flex', flexDirection:'column', gap:10 }}>
-                {['✅ Até 3 terminais PDV / Caixa','✅ Tudo do plano Essencial','✅ Bot WhatsApp com IA 🤖','✅ Respostas automáticas de promoções','✅ Programa de fidelidade (QR + WhatsApp)','✅ Campanhas de promoção via WhatsApp','✅ Etiquetas de preço automáticas','✅ Multi-caixa em rede'].map(f => (
-                  <li key={f} style={{ fontSize:13, color:'#e2e8f0', display:'flex', gap:8 }}>{f}</li>
-                ))}
-              </ul>
-              <button onClick={() => openWpp('Quero o plano Profissional (R$497/mês)')} style={{ padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', color:'#fff', fontWeight:900, fontSize:15, cursor:'pointer', boxShadow:'0 4px 20px rgba(99,102,241,.4)' }}>
-                Quero o Profissional →
-              </button>
-            </div>
-
-            {/* PERSONALIZADO */}
-            <div style={{ background:'#fff', borderRadius:24, padding:'36px 32px', border:'1px solid #e2e8f0', display:'flex', flexDirection:'column' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#64748b', letterSpacing:'.05em', textTransform:'uppercase', marginBottom:12 }}>Rede / Enterprise</div>
-              <div style={{ display:'flex', alignItems:'flex-end', gap:4, marginBottom:4 }}>
-                <span style={{ fontFamily:"'Anton',sans-serif", fontSize:42, lineHeight:1, color:'#0f172a' }}>Personalizado</span>
-              </div>
-              <div style={{ fontSize:11, color:'#f97316', fontWeight:800, marginBottom:16 }}>cotação sob medida para sua operação 🏆</div>
-              <p style={{ color:'#64748b', fontSize:13, marginBottom:28, lineHeight:1.6 }}>Para redes com múltiplas lojas, mercados grandes e quem quer escalar sem limite.</p>
-              <ul style={{ listStyle:'none', padding:0, margin:'0 0 28px', flex:1, display:'flex', flexDirection:'column', gap:10 }}>
-                {['✅ Terminais PDV ilimitados','✅ Tudo do plano Profissional','✅ Suporte prioritário (resposta em <1h)','✅ Onboarding dedicado com sua equipe','✅ Treinamento presencial ou remoto','✅ Bot WhatsApp com nome e logo do seu negócio','✅ Relatórios avançados e exportação'].map(f => (
-                  <li key={f} style={{ fontSize:13, color:'#334155', display:'flex', gap:8 }}>{f}</li>
-                ))}
-              </ul>
-              <button onClick={() => openWpp('Quero uma cotação para o plano Enterprise')} style={{ padding:'14px', borderRadius:14, border:'2px solid #f97316', background:'transparent', color:'#f97316', fontWeight:900, fontSize:15, cursor:'pointer', transition:'all .2s' }}
-                onMouseOver={e=>{ e.currentTarget.style.background='#f97316'; e.currentTarget.style.color='#fff' }}
-                onMouseOut={e=>{ e.currentTarget.style.background='transparent'; e.currentTarget.style.color='#f97316' }}>
-                Falar sobre cotação →
-              </button>
-            </div>
-          </div>
-
-          <p style={{ textAlign:'center', color:'#94a3b8', fontSize:12, marginTop:32 }}>
-            🔒 Sem contrato de fidelidade · Cancele a qualquer momento · Ativação no mesmo dia · Suporte via WhatsApp
-          </p>
+      {/* ══ FOOTER ════════════════════════════════════════ */}
+      <footer style={{ borderTop:'1px solid rgba(255,255,255,0.06)', padding:'26px 24px', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:14 }}>
+        <ZatendeStokLogo variant="wordmark"/>
+        <div style={{ display:'flex', gap:18, alignItems:'center' }}>
+          <Link to="/demo"     style={{ color:'rgba(255,255,255,.3)', fontSize:12, fontWeight:600, textDecoration:'none' }}>Demos</Link>
+          <Link to="/afiliado" style={{ color:'rgba(255,255,255,.3)', fontSize:12, fontWeight:600, textDecoration:'none' }}>Afiliados</Link>
+          <Link to="/guia"     style={{ color:'rgba(255,255,255,.3)', fontSize:12, fontWeight:600, textDecoration:'none' }}>Guia</Link>
+          <button onClick={() => navigate('/login')} style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,.3)', fontSize:12, fontWeight:600 }}>Entrar</button>
         </div>
-      </section>
-
-      {/* ══ CTA FINAL ════════════════════════════════════════ */}
-      <section style={{ padding:'0 24px 100px' }}>
-        <div style={{ maxWidth:760, margin:'0 auto', background:'linear-gradient(135deg,#0f172a,#1e1b4b)', borderRadius:28, padding:'64px 48px', textAlign:'center', position:'relative', overflow:'hidden' }}>
-          <div aria-hidden style={{ position:'absolute', top:'-30%', left:'50%', transform:'translateX(-50%)', width:400, height:400, borderRadius:'50%', background:'rgba(84,98,216,.2)', filter:'blur(60px)', pointerEvents:'none' }} />
-          <div style={{ position:'relative' }}>
-            <h2 style={{ fontFamily:"'Anton',sans-serif", fontSize:'clamp(40px,7vw,70px)', lineHeight:.95, color:'#fff', marginBottom:20 }}>
-              CHEGA DE<br/>PREJUÍZO COM<br/>ESTOQUE.
-            </h2>
-            <p style={{ color:'rgba(255,255,255,.55)', fontSize:16, lineHeight:1.7, marginBottom:36, maxWidth:440, margin:'0 auto 36px' }}>
-              Fale com a gente e receba acesso ao ZatendeStok em até 2 horas. Sem contrato, sem mensalidade surpresa.
-            </p>
-            <button className="btn-wpp" onClick={() => openWpp()}
-              style={{ display:'inline-flex', alignItems:'center', gap:12, padding:'18px 40px', borderRadius:16, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#22c55e,#16a34a)', color:'#fff', fontSize:18, fontWeight:900, boxShadow:'0 4px 24px rgba(34,197,94,.35)' }}>
-              <MessageCircle size={22} /> Quero começar agora
-            </button>
-            <div style={{ marginTop:20, color:'rgba(255,255,255,.2)', fontSize:12 }}>Sem contrato · Acesso em 2h · Suporte direto</div>
-          </div>
-        </div>
-      </section>
-
-      {/* ══ FOOTER ═══════════════════════════════════════════ */}
-      <footer style={{ borderTop:'1px solid #f1f5f9', padding:'28px 32px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16 }}>
-        <ZatendeStokLogo variant="wordmark" />
-        <div style={{ display:'flex', gap:24, alignItems:'center', flexWrap:'wrap' }}>
-          <a href="/guia" style={{ color:'#94a3b8', fontSize:12, fontWeight:600, textDecoration:'none' }}>Guia</a>
-          <button onClick={() => navigate('/login')} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', fontSize:12, fontWeight:600 }}>Entrar</button>
-          <span style={{ color:'#e2e8f0', fontSize:11 }}>zatendestok.com.br</span>
-        </div>
+        <span style={{ color:'rgba(255,255,255,.18)', fontSize:11 }}>zatendestok.com.br</span>
       </footer>
     </div>
   )
 }
+

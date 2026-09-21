@@ -1,62 +1,80 @@
 /**
  * ZatendeStokLogo — identidade visual ZatendeStok.
- * variant="full"     → logo completa: ícone + wordmark + tagline (login/splash)
- * variant="wordmark" → compacto: ícone pequeno + wordmark (headers/sidebars)
- *
- * Marca: "ZatendeStok" — K em destaque (cor accent + tamanho maior).
+ * variant="mark"     → só o ícone quadrado (favicon, app icon)
+ * variant="full"     → ícone + wordmark + tagline (splash/login)
+ * variant="wordmark" → ícone pequeno + wordmark inline (nav/sidebar)
  */
 
-const C  = '#5462D8'  // azul primário
-const CK = '#22c55e'  // verde accent — K em destaque
-
-/* ── Ícone ───────────────────────────────────────────────── */
-function BasketIcon({ size = 80 }) {
-  const s = size
+/* ── Ícone principal ─────────────────────────────────────── */
+export function ZSMark({ size = 40, rounded = 10 }) {
+  const id = `zs_${size}`
   return (
-    <svg width={s} height={Math.round(s * 1.15)} viewBox="0 0 100 115" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-      <path d="M18,46 C18,22 34,10 50,10 C66,10 82,22 82,46" fill={C} />
-      <rect x="10" y="44" width="80" height="30" fill={C} rx="2" />
-      <polyline points="18,70 34,54 52,64 72,42" stroke={CK} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-      <polygon points="64,36 77,42 70,55" fill={CK} />
-      <line x1="8"  y1="82"  x2="92" y2="82"  stroke={C} strokeWidth="7.5" strokeLinecap="round" />
-      <line x1="15" y1="93"  x2="85" y2="93"  stroke={C} strokeWidth="6.5" strokeLinecap="round" />
-      <line x1="24" y1="103" x2="76" y2="103" stroke={C} strokeWidth="5.5" strokeLinecap="round" />
-      <line x1="33" y1="112" x2="67" y2="112" stroke={C} strokeWidth="4.5" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, borderRadius: rounded }}>
+      <defs>
+        <linearGradient id={`${id}_bg`} x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#0a0a12"/>
+          <stop offset="100%" stopColor="#15102a"/>
+        </linearGradient>
+        <linearGradient id={`${id}_z`} x1="8" y1="10" x2="40" y2="38" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#f97316"/>
+          <stop offset="55%"  stopColor="#fb923c"/>
+          <stop offset="100%" stopColor="#fbbf24"/>
+        </linearGradient>
+        <filter id={`${id}_glow`} x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="2.5" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      {/* background */}
+      <rect width="48" height="48" rx="11" fill={`url(#${id}_bg)`}/>
+      {/* subtle inner border */}
+      <rect x=".5" y=".5" width="47" height="47" rx="10.5" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="1"/>
+      {/* Z bolt shape */}
+      <path
+        filter={`url(#${id}_glow)`}
+        fill={`url(#${id}_z)`}
+        d="M9 11h24l-2.5 4H14L28 28h-5.5L9 14.5V11z M39 34H15l2.5-4H31L17 17h5.5L39 30.5V34z"
+      />
+      {/* connector diagonal accent */}
+      <line x1="14" y1="15" x2="32" y2="29" stroke="rgba(251,191,36,0.25)" strokeWidth="1.5" strokeLinecap="round"/>
     </svg>
   )
 }
 
 /* ── Wordmark text ──────────────────────────────────────── */
-function Word({ size = 52, gap = 0 }) {
+function Word({ size = 18, lightMode = false }) {
+  const base = lightMode ? '#0a0a12' : '#ffffff'
   return (
-    <span style={{ fontWeight: 900, fontSize: size, letterSpacing: '-0.02em', lineHeight: 1, fontFamily: "'Segoe UI Black', 'Arial Black', sans-serif", display: 'inline-flex', alignItems: 'baseline', gap }}>
-      <span style={{ color: C }}>ZatendeSto</span>
-      <span style={{ color: CK, fontSize: size * 1.22, lineHeight: 1, letterSpacing: '-0.01em' }}>k</span>
+    <span style={{ fontWeight: 900, fontSize: size, letterSpacing: '-0.03em', lineHeight: 1, fontFamily: "'Inter','Segoe UI Black','Arial Black',sans-serif", display: 'inline-flex', alignItems: 'baseline' }}>
+      <span style={{ color: base }}>Zatende</span>
+      <span style={{ color: '#f97316' }}>Sto</span>
+      <span style={{ color: '#fbbf24', fontSize: size * 1.12 }}>k</span>
     </span>
   )
 }
 
-export default function ZatendeStokLogo({ variant = 'wordmark', style = {} }) {
+export default function ZatendeStokLogo({ variant = 'wordmark', style = {}, lightMode = false }) {
+  if (variant === 'mark') return <ZSMark size={40} {...(style ? { style } : {})} />
 
-  /* full — stacked so it never overflows narrow containers (login left panel = ~320px) */
   if (variant === 'full') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10, ...style }}>
-        <BasketIcon size={52} />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 12, ...style }}>
+        <ZSMark size={56} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Word size={36} />
-          <span style={{ color: '#7b82c8', fontSize: 11, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
-            Gestão Inteligente de Estoque
+          <Word size={32} lightMode={lightMode} />
+          <span style={{ color: lightMode ? '#6b7280' : 'rgba(255,255,255,0.4)', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+            PDV · BOT WHATSAPP · ESTOQUE
           </span>
         </div>
       </div>
     )
   }
 
+  // wordmark (default)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 7, ...style }}>
-      <BasketIcon size={26} />
-      <Word size={15} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, ...style }}>
+      <ZSMark size={28} rounded={7} />
+      <Word size={15} lightMode={lightMode} />
     </div>
   )
 }
