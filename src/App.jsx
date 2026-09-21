@@ -33,6 +33,7 @@ const PainelTV       = lazy(() => import('./pages/PainelTV.jsx'))
 const VitrinaDigital = lazy(() => import('./pages/VitrinaDigital.jsx'))
 const Guia           = lazy(() => import('./pages/Guia.jsx'))
 const Afiliado       = lazy(() => import('./pages/Afiliado.jsx'))
+const Demo           = lazy(() => import('./pages/Demo.jsx'))
 const MasterPainel   = lazy(() => import('./pages/MasterPainel.jsx'))
 const CaixaLogin     = lazy(() => import('./pages/CaixaLogin.jsx'))
 
@@ -86,6 +87,8 @@ export default function App() {
           <Route path="/loja/:storeSlug" element={<VitrinaDigital />} />
           <Route path="/guia"         element={<Guia />} />
           <Route path="/afiliado"     element={<Afiliado />} />
+          <Route path="/demo"         element={<Demo />} />
+          <Route path="/demo/:niche"  element={<Demo />} />
           <Route path="/painel"       element={<MasterPainel />} />
           <Route path="/caixa"          element={<CaixaLogin />} />
           <Route path="/caixa/:storeId" element={<CaixaLogin />} />
