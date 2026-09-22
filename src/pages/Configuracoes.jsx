@@ -5,6 +5,7 @@ import { parseGdoorCsv } from '../utils/importCsv.js'
 import { usePrinter, getNicheMeta } from '../hooks/usePrinter.js'
 import PixQR from '../components/PixQR.jsx'
 import { getCredentials, saveCredentials, getConfiguredStoreId, saveStoreId, slugify } from '../utils/auth.js'
+import { getMktStoreToken } from '../utils/tenantStorage.js'
 
 /* ── Stable sub-components (MUST be outside the page fn to avoid remount-on-type) ── */
 const Field = ({ label, hint, children }) => (
@@ -683,9 +684,10 @@ export default function Configuracoes() {
     setSettings(s => ({ ...s, ...form }))
     // Persist store name to server so /caixa can show it cross-device
     const storeId = getConfiguredStoreId()
+    const token   = getMktStoreToken()
     fetch('/api/persist', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-zs-token': token },
       body: JSON.stringify({ key: 'cp_store_name', value: form.storeName, storeId }),
     }).catch(() => {})
     setSaved(true)
@@ -1037,9 +1039,10 @@ export default function Configuracoes() {
         {/* Links callout */}
         {(() => {
           const sid      = getConfiguredStoreId()
-          const urlCaixa = `${window.location.origin}/caixa/${sid}`
-          const urlScan  = `${window.location.origin}/scan?storeId=${sid}`
-          const urlEst   = `${window.location.origin}/scan?storeId=${sid}&mode=estoque`
+          const tok      = getMktStoreToken()
+          const urlCaixa = `${window.location.origin}/caixa/${sid}?t=${tok}`
+          const urlScan  = `${window.location.origin}/scan?storeId=${sid}&t=${tok}`
+          const urlEst   = `${window.location.origin}/scan?storeId=${sid}&mode=estoque&t=${tok}`
           const row = (emoji, label, url) => (
             <div key={url} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.07]">
               <span className="text-xl shrink-0">{emoji}</span>

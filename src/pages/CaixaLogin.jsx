@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Loader2, RefreshCw, UserX, Store } from 'lucide-react'
 import { loginAsOperator, getConfiguredStoreId } from '../utils/auth.js'
+import { getMktStoreToken } from '../utils/tenantStorage.js'
 
 const PIN_KEYS = ['1','2','3','4','5','6','7','8','9','⌫','0','✓']
 const COLORS   = ['#f97316','#22c55e','#8b5cf6','#06b6d4','#f59e0b','#ec4899','#10b981','#3b82f6']
@@ -9,9 +10,22 @@ const COLORS   = ['#f97316','#22c55e','#8b5cf6','#06b6d4','#f59e0b','#ec4899','#
 export default function CaixaLogin() {
   const navigate        = useNavigate()
   const { storeId: sid } = useParams()
+  const [searchParams]  = useSearchParams()
   // storeId: from URL param (e.g. /caixa/cortaprecos) → isolates the market
   // fallback: device-configured storeId (for /caixa without param)
   const storeId = sid || getConfiguredStoreId()
+
+  // Patch token from URL (?t=) into session synchronously (before loadOperators runs)
+  // so getMktStoreToken() returns the correct value when the restore call fires.
+  const tok = searchParams.get('t')
+  if (tok) {
+    try {
+      const s = JSON.parse(localStorage.getItem('cp_session') || '{}')
+      if (s.storeToken !== tok) {
+        localStorage.setItem('cp_session', JSON.stringify({ ...s, storeId: storeId, storeToken: tok }))
+      }
+    } catch {}
+  }
 
   const [operators,  setOperators]  = useState([])
   const [storeName,  setStoreName]  = useState('')
@@ -31,7 +45,8 @@ export default function CaixaLogin() {
     const localOps = localRaw ? JSON.parse(localRaw).filter(o => o.active !== false) : []
 
     try {
-      const res  = await fetch(`/api/restore?storeId=${storeId}`)
+      const token = getMktStoreToken()
+      const res  = await fetch(`/api/restore?storeId=${storeId}`, { headers: { 'x-zs-token': token } })
       const json = await res.json()
       if (!json.ok) throw new Error('server error')
 

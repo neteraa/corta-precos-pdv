@@ -36,7 +36,7 @@ import { usePrinter, seedSettingsFromSession, getNicheMeta } from '../hooks/useP
 import { useMarketCheck } from '../hooks/useMarketCheck.js'
 import BlockedScreen from './BlockedScreen.jsx'
 import { logout, getRole, getOperatorName, getTerminalId } from '../utils/auth.js'
-import { getMktStoreId } from '../utils/tenantStorage.js'
+import { getMktStoreId, getMktStoreToken } from '../utils/tenantStorage.js'
 import { useStore } from '../store.jsx'
 
 function SyncBar() {
@@ -270,7 +270,7 @@ export default function Layout() {
               <span className="text-[8px] text-black font-black px-1.5 py-0.5 rounded-full" style={{ background: themeColor }}>ABRIR</span>
             </a>
 
-            <a href={`/scan?storeId=${getMktStoreId()}`} target="_blank" rel="noreferrer"
+            <a href={`/scan?storeId=${getMktStoreId()}&t=${getMktStoreToken()}`} target="_blank" rel="noreferrer"
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all group"
               style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)' }}>
               <Camera className="w-3.5 h-3.5 text-green-500 shrink-0" />

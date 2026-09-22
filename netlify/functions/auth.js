@@ -1,10 +1,17 @@
 import { getStore } from '@netlify/blobs'
-import { createHash } from 'crypto'
+import { createHash, createHmac } from 'crypto'
 
-const APP_SALT = 'zs_2026_corta'
+const APP_SALT       = 'zs_2026_corta'
+const PERSIST_SECRET = process.env.ZS_PERSIST_SECRET || ''  // empty → storeToken null below
 
 function hashPwd(pwd, salt) {
   return createHash('sha256').update(`${APP_SALT}:${salt}:${pwd}`).digest('hex')
+}
+
+/** Returns HMAC token for storeId, or null if secret is not configured. */
+function makeStoreToken(storeId) {
+  if (!PERSIST_SECRET) return null
+  return createHmac('sha256', PERSIST_SECRET).update(storeId).digest('hex').slice(0, 32)
 }
 
 const CORS = {
@@ -43,6 +50,7 @@ export default async (req) => {
       storeName:  market.storeName,
       storePhone: market.storePhone || '',
       niche:      market.niche || 'mercado',
+      storeToken: makeStoreToken(market.storeId),
     }), { headers: CORS })
 
   } catch (err) {

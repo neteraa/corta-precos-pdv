@@ -21,12 +21,16 @@ import { usePrinter } from '../hooks/usePrinter.js'
 // do storeId (ex: cortaprecos_1789770018182 → cortaprecos1789770018182),
 // fazendo o persist salvar no namespace errado e nunca aparecer no sistema.
 ;(() => {
-  const sid = new URLSearchParams(window.location.search).get('storeId')
+  const params = new URLSearchParams(window.location.search)
+  const sid    = params.get('storeId')
+  const tok    = params.get('t')
   if (!sid) return
   try {
     localStorage.setItem('cp_store_id', sid)
     const s = JSON.parse(localStorage.getItem('cp_session') || '{}')
-    localStorage.setItem('cp_session', JSON.stringify({ ...s, storeId: sid }))
+    const patch = { ...s, storeId: sid }
+    if (tok) patch.storeToken = tok  // token from scan URL (&t=HMAC)
+    localStorage.setItem('cp_session', JSON.stringify(patch))
   } catch {}
 })()
 
@@ -287,7 +291,8 @@ export default function ScanMobile() {
       {/* top bar — floats over camera */}
       {(() => {
         const sid = params.get('storeId') || getConfiguredStoreId()
-        const base = `/scan?storeId=${sid}`
+        const tok = params.get('t') || ((() => { try { return JSON.parse(localStorage.getItem('cp_session'))?.storeToken || '' } catch { return '' } })())
+        const base = `/scan?storeId=${sid}&t=${tok}`
         return (
           <div style={S.topbar}>
             <div>

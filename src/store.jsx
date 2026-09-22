@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import PRODUCTS_SEED from './utils/products_seed.json'
 import { getAllPhotos, savePhoto as dbSavePhoto, deletePhoto as dbDeletePhoto } from './utils/photoDb.js'
-import { mktKey, migrateAndGet, getMktStoreId } from './utils/tenantStorage.js'
+import { mktKey, migrateAndGet, getMktStoreId, getMktStoreToken } from './utils/tenantStorage.js'
 import { getOperatorName } from './utils/auth.js'
 
 /* ── formatting helpers ─────────────────────────────────────── */
@@ -128,8 +128,9 @@ function captureSellOut(saleItems, currentProducts) {
     const merged   = [...newEvents, ...existing].slice(0, 300)
     localStorage.setItem(SELLOUT_KEY, JSON.stringify(merged))
 
+    const token = session?.storeToken || ''
     fetch('/api/persist', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-zs-token': token },
       body: JSON.stringify({ key: SELLOUT_KEY, value: JSON.stringify(merged), storeId }),
     }).catch(() => {})
   } catch {}
@@ -206,16 +207,35 @@ export function StoreProvider({ children }) {
     try { localStorage.setItem(mktKey('cp_expiry_days'), String(n)) } catch {}
   }, [])
 
+  // ── Pending-persists counter (per key) ──────────────────────────
+  // Tracks in-flight POSTs so that applyServerData never overwrites
+  // local state while a write is still in transit (Bug-2 fix).
+  // Also keeps the counter > 0 during a single retry on failure (Bug-3 fix).
+  const pendingPersists = React.useRef({})
+
   // ── Persist: namespaced localStorage + storeId-prefixed server key ──
   const persist = useCallback((baseKey, val) => {
-    const str     = JSON.stringify(val)
-    const storeId = getMktStoreId()
+    const str      = JSON.stringify(val)
+    const storeId  = getMktStoreId()
+    const token    = getMktStoreToken()
     try { localStorage.setItem(mktKey(baseKey), str) } catch {}
-    fetch('/api/persist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: baseKey, value: str, storeId }),
-    }).catch(() => {})
+
+    pendingPersists.current[baseKey] = (pendingPersists.current[baseKey] || 0) + 1
+
+    const body = JSON.stringify({ key: baseKey, value: str, storeId })
+    const hdrs = { 'Content-Type': 'application/json', 'x-zs-token': token }
+
+    fetch('/api/persist', { method: 'POST', headers: hdrs, body })
+      .then(r => { if (!r.ok) throw new Error('server') })
+      .catch(() =>
+        // One silent retry after 8 s — keeps pending > 0 during the window
+        new Promise(res => setTimeout(res, 8000))
+          .then(() => fetch('/api/persist', { method: 'POST', headers: hdrs, body }))
+          .catch(() => {})
+      )
+      .finally(() => {
+        pendingPersists.current[baseKey] = Math.max(0, (pendingPersists.current[baseKey] || 1) - 1)
+      })
   }, [])
 
   // ── Last-sync timestamp (shown in UI) ────────────────────────
@@ -226,20 +246,20 @@ export function StoreProvider({ children }) {
   const applyServerData = useCallback((data) => {
     if (!data) return
     const storeId = getMktStoreId()
+    const token   = getMktStoreToken()
     const syncToServer = (key, value) =>
       fetch('/api/persist', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-zs-token': token },
         body: JSON.stringify({ key, value, storeId }),
       }).catch(() => {})
 
     if (data.cp_products) try {
       const parsed = JSON.parse(data.cp_products)
-      // Local vence se tem MAIS produtos — significa que o POST ainda está em
-      // trânsito (o sync de 30s não pode apagar um cadastro/import que acabou
-      // de acontecer e cujo POST ainda não chegou no servidor).
-      // Mesma estratégia já usada para operadores.
+      // Protege sync somente quando há POST real em trânsito (pendingPersists > 0).
+      // Substitui a lógica anterior por contagem que ressuscitava registros excluídos.
       setProducts(prev => {
-        if (prev.length > parsed.length) {
+        if (pendingPersists.current['cp_products'] > 0) {
           syncToServer('cp_products', JSON.stringify(prev))
           return prev
         }
@@ -268,15 +288,15 @@ export function StoreProvider({ children }) {
     if (data.cp_goal)     try { setSalesGoalState(JSON.parse(data.cp_goal));  try { localStorage.setItem(mktKey('cp_goal'),      data.cp_goal)      } catch {} } catch {}
     if (data.cp_operators) try {
       const serverOps = JSON.parse(data.cp_operators)
-      // Local vence se tem mais operadores — previne race condition onde o sync de 30s
-      // sobrescreve operadores recém-adicionados antes do POST ao servidor completar.
+      // Mesma proteção de pendingPersists dos produtos — evita ressurgir
+      // operadores excluídos da mesma forma que a lógica anterior por contagem.
       setOperators(prev => {
-        if (serverOps.length >= prev.length) {
-          try { localStorage.setItem(mktKey('cp_operators'), data.cp_operators) } catch {}
-          return serverOps
+        if (pendingPersists.current['cp_operators'] > 0) {
+          syncToServer('cp_operators', JSON.stringify(prev))
+          return prev
         }
-        syncToServer('cp_operators', JSON.stringify(prev))
-        return prev
+        try { localStorage.setItem(mktKey('cp_operators'), data.cp_operators) } catch {}
+        return serverOps
       })
     } catch {}
     if (data.cp_supplier_offers) try { setSupplierOffers(JSON.parse(data.cp_supplier_offers)); try { localStorage.setItem(mktKey('cp_supplier_offers'), data.cp_supplier_offers); localStorage.setItem('cp_supplier_offers', data.cp_supplier_offers) } catch {} } catch {}
@@ -294,7 +314,8 @@ export function StoreProvider({ children }) {
   const syncNow = useCallback(() => {
     setSyncing(true)
     const storeId = getMktStoreId()
-    fetch(`/api/restore?storeId=${storeId}`)
+    const token   = getMktStoreToken()
+    fetch(`/api/restore?storeId=${storeId}`, { headers: { 'x-zs-token': token } })
       .then(r => r.json())
       .then(({ ok, data }) => { if (ok) applyServerData(data) })
       .catch(() => {})
@@ -347,7 +368,15 @@ export function StoreProvider({ children }) {
       let next = [...prev]
       for (const { product, qty, vencimento, custo } of batch) {
         const idx = next.findIndex(p => p.id === product.id)
-        if (idx < 0) continue
+        if (idx < 0) {
+          // Produto não está no state atual (sync apagou enquanto POST estava em voo).
+          // Insere com o qty como estoque inicial em vez de ignorar silenciosamente.
+          const upd = { ...product, stock: qty, receivedAt: new Date().toISOString() }
+          if (custo)      upd.cost       = parseFloat(custo)
+          if (vencimento) upd.expiryDate = vencimento
+          next = [...next, upd]
+          continue
+        }
         const cur = next[idx]
         const upd = {
           ...cur,
@@ -530,6 +559,7 @@ export function StoreProvider({ children }) {
   // Limpa chaves específicas: local + servidor. Mantém operadores e configurações.
   const clearBusinessData = useCallback(async (keys = ['cp_products','cp_sales','cp_fiado','cp_customers','cp_cash']) => {
     const storeId = getMktStoreId()
+    const token   = getMktStoreToken()
     const MAP = {
       cp_products:  () => { setProducts([]);        },
       cp_sales:     () => { setSales([]);            },
@@ -545,7 +575,7 @@ export function StoreProvider({ children }) {
       try { localStorage.setItem(mktKey(key), '[]') } catch {}
       await fetch('/api/persist', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-zs-token': token },
         body: JSON.stringify({ key, value: JSON.stringify([]), storeId }),
       }).catch(() => {})
     }

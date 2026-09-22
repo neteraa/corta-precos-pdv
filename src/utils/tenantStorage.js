@@ -23,6 +23,12 @@ export function getMktStoreId() {
   catch { return 'default' }
 }
 
+/** HMAC token issued by /api/auth — must be sent as x-zs-token on persist/restore. */
+export function getMktStoreToken() {
+  try { return JSON.parse(localStorage.getItem(MKT_SESSION_KEY))?.storeToken ?? '' }
+  catch { return '' }
+}
+
 function getFornTenantId() {
   try { return JSON.parse(localStorage.getItem(FORN_SESSION_KEY))?.id ?? 'unknown' }
   catch { return 'unknown' }
