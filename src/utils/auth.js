@@ -1,5 +1,3 @@
-const DEFAULT_USER  = 'admin'
-const DEFAULT_PASS  = '1234'
 const CREDS_KEY     = 'cp_creds'
 const SESSION_KEY   = 'cp_session'
 const STORE_ID_KEY  = 'cp_store_id'   // flat — set once per installation
@@ -28,7 +26,6 @@ export function getConfiguredStoreId() {
 export function saveStoreId(id) {
   const safe = slugify(id) || 'default'
   localStorage.setItem(STORE_ID_KEY, safe)
-  // patch current session so everything picks it up immediately
   try {
     const s = JSON.parse(localStorage.getItem(SESSION_KEY)) ?? {}
     localStorage.setItem(SESSION_KEY, JSON.stringify({ ...s, storeId: safe }))
@@ -36,15 +33,23 @@ export function saveStoreId(id) {
   return safe
 }
 
+/**
+ * Local credentials are an explicit development/offline feature only.
+ * There is no built-in production password fallback.
+ */
 export function getCredentials() {
   try {
     const raw = localStorage.getItem(CREDS_KEY)
-    if (raw) return JSON.parse(raw)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed?.username && parsed?.password) return parsed
+    }
   } catch {}
-  return { username: DEFAULT_USER, password: DEFAULT_PASS }
+  return { username: '', password: '' }
 }
 
 export function saveCredentials(username, password) {
+  if (!username || !password) return
   localStorage.setItem(CREDS_KEY, JSON.stringify({ username, password }))
 }
 
