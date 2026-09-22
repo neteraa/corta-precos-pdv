@@ -191,7 +191,7 @@ function DemoHub() {
       </div>
 
       {/* niche grid */}
-      <div className="max-w-5xl mx-auto px-4 pb-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="max-w-5xl mx-auto px-4 pb-16 grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {Object.entries(NICHES).map(([key, n]) => (
           <Link key={key} to={`/demo/${key}`}
             className="group relative overflow-hidden rounded-2xl border transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
@@ -481,20 +481,19 @@ function DemoPDV({ niche }) {
       {/* main area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* topbar */}
-        <header className="flex items-center gap-3 px-4 py-2.5 bg-white border-b border-gray-200 shadow-sm shrink-0">
-          <Link to="/demo" className="p-1.5 rounded-lg hover:bg-gray-100">
+        <header className="flex items-center gap-2 px-3 py-2.5 bg-white border-b border-gray-200 shadow-sm shrink-0 min-w-0">
+          <Link to="/demo" className="p-1.5 rounded-lg hover:bg-gray-100 shrink-0">
             <ArrowLeft className="w-4 h-4 text-gray-500" />
           </Link>
-          <span className="text-base leading-none">{emoji}</span>
-          <span className="font-black text-base tracking-tight" style={{ color }}>{storeName}</span>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="hidden sm:block text-[10px] font-black px-2 py-1 rounded-full border"
+          <span className="text-base leading-none shrink-0">{emoji}</span>
+          <span className="font-black text-sm tracking-tight truncate flex-1 min-w-0" style={{ color }}>{storeName}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="hidden sm:block text-[10px] font-black px-2 py-1 rounded-full border whitespace-nowrap"
               style={{ background:`${color}15`, borderColor:`${color}40`, color }}>
-              DEMO INTERATIVO
+              DEMO
             </span>
-            {/* mobile cart button */}
             <button onClick={() => setCartOpen(o => !o)}
-              className="relative md:hidden p-2 rounded-xl text-white transition-all"
+              className="relative md:hidden p-2 rounded-xl text-white transition-all shrink-0"
               style={{ background:color }}>
               <ShoppingCart className="w-4 h-4" />
               {cartCount > 0 && (
@@ -545,23 +544,23 @@ function DemoPDV({ niche }) {
             </div>
 
             {/* product grid */}
-            <div className="flex-1 overflow-y-auto p-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 content-start">
+            <div className="flex-1 overflow-y-auto p-2 sm:p-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-2.5 content-start">
               {filtered.map(p => {
                 const inCart = cartItem(p.id)
                 return (
                   <div key={p.id}
                     onClick={() => addItem(p)}
-                    className="relative bg-white rounded-2xl p-3 border cursor-pointer select-none transition-all active:scale-95 hover:shadow-md"
+                    className="relative bg-white rounded-xl sm:rounded-2xl p-2 sm:p-3 border cursor-pointer select-none transition-all active:scale-95 hover:shadow-md"
                     style={{ borderColor: inCart ? color : '#e5e7eb' }}>
                     {inCart && (
-                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full text-[10px] font-black text-white flex items-center justify-center"
+                      <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full text-[10px] font-black text-white flex items-center justify-center"
                         style={{ background:color }}>
                         {inCart.qty}
                       </div>
                     )}
-                    <div className="text-3xl mb-1.5 leading-none">{p.emoji}</div>
-                    <div className="font-bold text-gray-800 text-[12px] leading-tight mb-1">{p.name}</div>
-                    <div className="font-black text-base" style={{ color }}>{fmt(p.price)}</div>
+                    <div className="text-2xl sm:text-3xl mb-1 sm:mb-1.5 leading-none">{p.emoji}</div>
+                    <div className="font-bold text-gray-800 text-[11px] sm:text-[12px] leading-tight mb-0.5 sm:mb-1">{p.name}</div>
+                    <div className="font-black text-sm sm:text-base" style={{ color }}>{fmt(p.price)}</div>
                     {p.unit !== 'un' && <div className="text-[10px] text-gray-400">por {p.unit}</div>}
                   </div>
                 )

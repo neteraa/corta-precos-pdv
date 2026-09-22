@@ -79,7 +79,7 @@ const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
   html { scroll-behavior:smooth; }
-  body { font-family:'Inter',sans-serif; background:#09090b; color:#fff; }
+  body { font-family:'Inter',sans-serif; background:#09090b; color:#fff; overflow-x:hidden; }
   @keyframes ticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
   @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
   @keyframes pulse2 { 0%,100%{opacity:.5} 50%{opacity:1} }
@@ -90,6 +90,25 @@ const CSS = `
   .ticker-inner{display:flex;width:max-content;animation:ticker 30s linear infinite}
   .hl{transition:transform .2s,box-shadow .2s,opacity .2s}
   .hl:hover{transform:translateY(-3px) !important;opacity:.9}
+
+  /* ── Responsive layout ─────────────────────────────── */
+  .nav-links   { display:none; }
+  .afil-grid   { display:grid; grid-template-columns:1fr; gap:40px; }
+  .steps-grid  { display:grid; grid-template-columns:1fr; gap:14px; }
+  .hero-cta    { display:flex; flex-direction:column; align-items:stretch; gap:12px; margin-bottom:36px; }
+  .section-pad { padding:64px 20px; }
+  .footer-row  { flex-direction:column; align-items:flex-start; gap:18px; }
+
+  @media(min-width:560px){
+    .hero-cta   { flex-direction:row; align-items:center; justify-content:center; align-items:initial; }
+    .steps-grid { grid-template-columns:repeat(3,1fr); }
+  }
+  @media(min-width:768px){
+    .nav-links  { display:flex; }
+    .afil-grid  { grid-template-columns:1fr 1fr; gap:60px; }
+    .section-pad{ padding:100px 24px; }
+    .footer-row { flex-direction:row; align-items:center; }
+  }
 `
 
 /* ══════════════════════════════════════════════════════════ */
@@ -114,10 +133,14 @@ export default function Landing() {
       <nav style={{ position:'sticky', top:0, zIndex:50, background:'rgba(9,9,11,0.9)', backdropFilter:'blur(16px)', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'0 24px', height:60, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <ZatendeStokLogo variant="wordmark" />
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <Link to="/demo"     style={{ color:'rgba(255,255,255,.5)', fontSize:13, fontWeight:600, padding:'7px 12px', borderRadius:8, textDecoration:'none' }}>Demos</Link>
-          <Link to="/afiliado" style={{ color:'rgba(255,255,255,.5)', fontSize:13, fontWeight:600, padding:'7px 12px', borderRadius:8, textDecoration:'none' }}>Afiliados</Link>
-          <button onClick={() => navigate('/login')} style={{ padding:'8px 18px', borderRadius:8, border:'1px solid rgba(255,255,255,.1)', background:'rgba(255,255,255,.04)', color:'rgba(255,255,255,.7)', fontSize:13, fontWeight:700, cursor:'pointer' }}>Entrar</button>
-          <button onClick={() => openWpp()} style={{ padding:'8px 18px', borderRadius:8, border:'none', background:'#f97316', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', boxShadow:'0 2px 12px rgba(249,115,22,.4)' }}>Falar no WhatsApp</button>
+          <div className="nav-links" style={{ gap:8, alignItems:'center' }}>
+            <Link to="/demo"     style={{ color:'rgba(255,255,255,.5)', fontSize:13, fontWeight:600, padding:'7px 12px', borderRadius:8, textDecoration:'none' }}>Demos</Link>
+            <Link to="/afiliado" style={{ color:'rgba(255,255,255,.5)', fontSize:13, fontWeight:600, padding:'7px 12px', borderRadius:8, textDecoration:'none' }}>Afiliados</Link>
+            <button onClick={() => navigate('/login')} style={{ padding:'8px 18px', borderRadius:8, border:'1px solid rgba(255,255,255,.1)', background:'rgba(255,255,255,.04)', color:'rgba(255,255,255,.7)', fontSize:13, fontWeight:700, cursor:'pointer' }}>Entrar</button>
+          </div>
+          <button onClick={() => openWpp()} style={{ padding:'8px 16px', borderRadius:8, border:'none', background:'#f97316', color:'#fff', fontSize:13, fontWeight:800, cursor:'pointer', boxShadow:'0 2px 12px rgba(249,115,22,.4)', whiteSpace:'nowrap' }}>
+            <span className="nav-links" style={{ gap:0 }}>Falar no </span>WhatsApp
+          </button>
         </div>
       </nav>
 
@@ -144,11 +167,11 @@ export default function Landing() {
             Por <strong style={{ color:'#f97316' }}>R$297/mês</strong> — menos de R$10 por dia.
           </p>
 
-          <div className={`fu d4 ${vis?'':'opacity-0'}`} style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap', marginBottom:48 }}>
-            <button onClick={() => openWpp()} style={{ display:'flex', alignItems:'center', gap:10, padding:'15px 30px', borderRadius:12, border:'none', cursor:'pointer', background:'#f97316', color:'#fff', fontSize:16, fontWeight:900, animation:'glow 3s ease infinite' }}>
+          <div className={`fu d4 hero-cta ${vis?'':'opacity-0'}`}>
+            <button onClick={() => openWpp()} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, padding:'15px 30px', borderRadius:12, border:'none', cursor:'pointer', background:'#f97316', color:'#fff', fontSize:16, fontWeight:900, animation:'glow 3s ease infinite' }}>
               <MessageCircle size={20}/> Quero ver o sistema
             </button>
-            <Link to="/demo" style={{ display:'flex', alignItems:'center', gap:8, padding:'15px 24px', borderRadius:12, border:'1px solid rgba(255,255,255,.12)', background:'rgba(255,255,255,.05)', color:'rgba(255,255,255,.8)', fontSize:15, fontWeight:700, textDecoration:'none' }}>
+            <Link to="/demo" style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'15px 24px', borderRadius:12, border:'1px solid rgba(255,255,255,.12)', background:'rgba(255,255,255,.05)', color:'rgba(255,255,255,.8)', fontSize:15, fontWeight:700, textDecoration:'none' }}>
               <Play size={16}/> Ver demo ao vivo
             </Link>
           </div>
@@ -268,7 +291,7 @@ export default function Landing() {
 
       {/* ══ AFILIADOS ═════════════════════════════════════ */}
       <section style={{ padding:'100px 24px', background:'linear-gradient(160deg,rgba(124,58,237,.07),rgba(249,115,22,.04))', borderTop:'1px solid rgba(255,255,255,0.05)', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
-        <div style={{ maxWidth:1000, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:60, alignItems:'center' }}>
+        <div className="afil-grid" style={{ maxWidth:1000, margin:'0 auto', alignItems:'start' }}>
           <div>
             <span style={{ display:'inline-block', background:'rgba(124,58,237,.12)', border:'1px solid rgba(124,58,237,.25)', borderRadius:999, padding:'4px 14px', fontSize:11, fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'#a78bfa', marginBottom:20 }}>PROGRAMA DE AFILIADOS</span>
             <h2 style={{ fontSize:'clamp(28px,4vw,46px)', fontWeight:900, letterSpacing:'-.03em', lineHeight:1.08, marginBottom:18 }}>
@@ -328,7 +351,7 @@ export default function Landing() {
           Ativa hoje, tá rodando <span style={{ color:'#f97316' }}>em 2 horas.</span>
         </h2>
         <p style={{ color:'rgba(255,255,255,.35)', fontSize:15, marginBottom:48 }}>Zero instalação. Zero técnico. Zero dor de cabeça.</p>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
+        <div className="steps-grid">
           {[
             { n:'01', color:'#f97316', title:'Solicita acesso',    desc:'Preenche o form ou manda WhatsApp — aprovamos em até 2h.' },
             { n:'02', color:'#a855f7', title:'Recebe as credenciais', desc:'Usuário e senha. Abre no celular, sem instalar nada.' },
@@ -378,7 +401,7 @@ export default function Landing() {
       </section>
 
       {/* ══ FOOTER ════════════════════════════════════════ */}
-      <footer style={{ borderTop:'1px solid rgba(255,255,255,0.06)', padding:'26px 24px', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:14 }}>
+      <footer className="footer-row" style={{ borderTop:'1px solid rgba(255,255,255,0.06)', padding:'26px 24px', display:'flex', justifyContent:'space-between' }}>
         <ZatendeStokLogo variant="wordmark"/>
         <div style={{ display:'flex', gap:18, alignItems:'center' }}>
           <Link to="/demo"     style={{ color:'rgba(255,255,255,.3)', fontSize:12, fontWeight:600, textDecoration:'none' }}>Demos</Link>

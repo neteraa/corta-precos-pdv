@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Global mobile safety ── */
+html, body { overflow-x: hidden; max-width: 100vw; }
+
 /* ── Dynamic theme token — updated at runtime by Layout/Terminal ── */
 :root { --zs-theme: #f97316; --zs-theme-dk: #ea580c; }
 

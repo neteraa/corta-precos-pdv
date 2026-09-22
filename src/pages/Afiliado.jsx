@@ -114,6 +114,15 @@ export default function Afiliado() {
     input::placeholder{color:#64748b}
     .slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:linear-gradient(90deg,#22c55e var(--val,50%),#1e2433 var(--val,50%));outline:none;cursor:pointer}
     .slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#22c55e;cursor:pointer;box-shadow:0 0 0 4px rgba(34,197,94,.2)}
+    body{overflow-x:hidden}
+    .af-pillars{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:32px}
+    .af-niches {display:grid;grid-template-columns:1fr;gap:8px}
+    .af-stats  {display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:14px}
+    @media(min-width:420px){
+      .af-pillars{grid-template-columns:repeat(3,1fr)}
+      .af-niches {grid-template-columns:1fr 1fr}
+      .af-stats  {grid-template-columns:1fr 1fr}
+    }
   `
 
   /* ────────────────────────────────────────────── */
@@ -150,7 +159,7 @@ export default function Afiliado() {
               </p>
 
               {/* 3 pilares */}
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:32 }}>
+              <div className="af-pillars">
                 {[
                   { n:'20%', s:'de comissão', d:'recorrente' },
                   { n:'R$89', s:'média/cliente', d:'por mês' },
@@ -267,7 +276,7 @@ export default function Afiliado() {
             {/* quem pode indicar */}
             <div style={{ background:'#111827', border:'1px solid #1f2937', borderRadius:18, padding:'22px 20px', marginBottom:20 }}>
               <p style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,.4)', textTransform:'uppercase', letterSpacing:'.1em', marginBottom:14 }}>Quem você pode indicar</p>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <div className="af-niches">
                 {[['🏪','Mercados'],['🥖','Padarias'],['🥩','Açougues'],['🍽️','Restaurantes'],['🌯','Lanchonetes'],['🚚','Distribuidoras']].map(([e,t]) => (
                   <div key={t} style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 13px', background:'rgba(255,255,255,.03)', border:'1px solid #1f2937', borderRadius:10 }}>
                     <span style={{ fontSize:20 }}>{e}</span>
@@ -293,7 +302,7 @@ export default function Afiliado() {
           <div style={{ animation:'fadeUp .3s ease' }}>
 
             {/* stats */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
+            <div className="af-stats">
               {[
                 { e:'🏆', l:'Conversões', v: String(totalVendas), s:`${totalVendas} cliente${totalVendas!==1?'s':''} ativo${totalVendas!==1?'s':''}` },
                 { e:'💰', l:'Comissão total', v:`R$${totalComissao.toFixed(2).replace('.',',')}`, s:'a receber do Pedro' },
