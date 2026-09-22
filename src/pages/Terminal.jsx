@@ -121,7 +121,13 @@ export default function Terminal() {
 
   const addToCart = useCallback((codeOrProduct) => {
     const p = typeof codeOrProduct === 'string' ? findProduct(codeOrProduct) : codeOrProduct
-    if (!p) { setScanFeed({ msg: `❌ Produto não encontrado`, ok: false }); setTimeout(() => setScanFeed(null), 2000); return }
+    if (!p) {
+      setQuery(''); setResults([])                              // limpa campo — evita concatenação com próximo scan
+      setScanFeed({ msg: `❌ Produto não encontrado`, ok: false })
+      setTimeout(() => setScanFeed(null), 2000)
+      setTimeout(() => inputRef.current?.focus(), 50)           // pronto para o próximo código
+      return
+    }
 
     let promoMsg = null
     setCart(prev => {

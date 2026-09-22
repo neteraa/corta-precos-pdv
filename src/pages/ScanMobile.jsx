@@ -11,15 +11,23 @@ import { ShoppingCart, Package, CheckCircle, Trash2, Check, ChevronDown } from '
 import CameraScanner from '../components/CameraScanner.jsx'
 import { useStore, BRL } from '../store.jsx'
 import { useScanSender } from '../hooks/useScanRelay.js'
-import { saveStoreId, getConfiguredStoreId } from '../utils/auth.js'
+import { getConfiguredStoreId } from '../utils/auth.js'
 import { usePrinter } from '../hooks/usePrinter.js'
 
 // Sync storeId SYNCHRONOUSLY at module load — before the store context
 // initialises. Without this, useStore() opens with storeId='default' because
 // the mobile has no cp_session, and a useEffect fix would be too late.
+// ATENÇÃO: não chamar saveStoreId() aqui — ela aplica slugify() e remove "_"
+// do storeId (ex: cortaprecos_1789770018182 → cortaprecos1789770018182),
+// fazendo o persist salvar no namespace errado e nunca aparecer no sistema.
 ;(() => {
   const sid = new URLSearchParams(window.location.search).get('storeId')
-  if (sid) saveStoreId(sid)
+  if (!sid) return
+  try {
+    localStorage.setItem('cp_store_id', sid)
+    const s = JSON.parse(localStorage.getItem('cp_session') || '{}')
+    localStorage.setItem('cp_session', JSON.stringify({ ...s, storeId: sid }))
+  } catch {}
 })()
 
 /* ── styles (all panels float over the full-screen camera) ── */
