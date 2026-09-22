@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Loader2, CheckCircle2, Link2, ChevronDown, ChevronUp } from 'lucide-react'
 import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
+import ZaraMascot from '../components/ZaraMascot.jsx'
 
 const BASE_URL  = 'https://zatendestok.com.br'
 const ZAP_PEDRO = '5515997969303'
@@ -148,16 +149,22 @@ export default function Afiliado() {
           {!aff && (
             <div style={{ animation:'fadeUp .4s ease' }}>
               {/* badge */}
-              <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'6px 14px', background:'rgba(249,115,22,.1)', border:'1px solid rgba(249,115,22,.28)', borderRadius:999, fontSize:12, fontWeight:700, color:'#fb923c', marginBottom:24 }}>
+              <div style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'6px 14px', background:'rgba(249,115,22,.1)', border:'1px solid rgba(249,115,22,.28)', borderRadius:999, fontSize:12, fontWeight:700, color:'#fb923c', marginBottom:20 }}>
                 <span style={{ width:7,height:7,borderRadius:'50%',background:'#f97316',display:'inline-block',animation:'glow 2s ease infinite' }}/>
                 Programa de afiliados ativo — vagas abertas
               </div>
 
-              <h1 style={{ fontSize:34, fontWeight:900, lineHeight:1.08, marginBottom:16, letterSpacing:'-.025em' }}>
-                Indique.{' '}
-                <span style={{ color:'#f97316', display:'block' }}>Feche. Receba.</span>
-                <span style={{ color:'rgba(255,255,255,.45)', fontSize:21, fontWeight:700, letterSpacing:'-.01em' }}>Todo mês, pra sempre.</span>
-              </h1>
+              {/* headline + mascote lado a lado */}
+              <div style={{ display:'flex', alignItems:'flex-end', gap:0, marginBottom:16 }}>
+                <div style={{ flex:1 }}>
+                  <h1 style={{ fontSize:34, fontWeight:900, lineHeight:1.08, letterSpacing:'-.025em' }}>
+                    Indique.{' '}
+                    <span style={{ color:'#f97316', display:'block' }}>Feche. Receba.</span>
+                    <span style={{ color:'rgba(255,255,255,.45)', fontSize:21, fontWeight:700, letterSpacing:'-.01em' }}>Todo mês, pra sempre.</span>
+                  </h1>
+                </div>
+                <ZaraMascot width={148} style={{ flexShrink:0, marginBottom:-8, marginRight:-12 }}/>
+              </div>
 
               <p style={{ color:'rgba(255,255,255,.5)', fontSize:15, lineHeight:1.7, marginBottom:30 }}>
                 Cada negócio que você indicar gera uma comissão <strong style={{color:'#fb923c'}}>recorrente</strong> pra você.
