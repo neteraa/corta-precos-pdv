@@ -2,13 +2,12 @@ import { getStore } from '@netlify/blobs'
 import { createHash, createHmac } from 'crypto'
 
 const APP_SALT       = 'zs_2026_corta'
-const PERSIST_SECRET = process.env.ZS_PERSIST_SECRET || ''  // empty → storeToken null below
+const PERSIST_SECRET = process.env.ZS_PERSIST_SECRET || ''
 
 function hashPwd(pwd, salt) {
   return createHash('sha256').update(`${APP_SALT}:${salt}:${pwd}`).digest('hex')
 }
 
-/** Returns HMAC token for storeId, or null if secret is not configured. */
 function makeStoreToken(storeId) {
   if (!PERSIST_SECRET) return null
   return createHmac('sha256', PERSIST_SECRET).update(storeId).digest('hex').slice(0, 32)
@@ -31,28 +30,31 @@ export default async (req) => {
     const store = getStore('zs-auth')
     const raw = await store.get('markets')
     const markets = raw ? JSON.parse(raw) : []
-
     const market = markets.find(m => m.username === username.trim().toLowerCase())
 
     if (!market || !market.active)
       return new Response(JSON.stringify({ ok: false, error: 'Usuário ou senha incorretos' }), { status: 401, headers: CORS })
 
+    if (market.expiresAt) {
+      const expiresAt = new Date(market.expiresAt)
+      if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now())
+        return new Response(JSON.stringify({ ok: false, error: 'Acesso expirado' }), { status: 403, headers: CORS })
+    }
+
     if (hashPwd(password, market.salt) !== market.passwordHash)
       return new Response(JSON.stringify({ ok: false, error: 'Usuário ou senha incorretos' }), { status: 401, headers: CORS })
 
-    // Bump lastLogin async — don't await so response is faster
     market.lastLogin = new Date().toISOString()
     store.set('markets', JSON.stringify(markets)).catch(() => {})
 
     return new Response(JSON.stringify({
-      ok:         true,
-      storeId:    market.storeId,
-      storeName:  market.storeName,
+      ok: true,
+      storeId: market.storeId,
+      storeName: market.storeName,
       storePhone: market.storePhone || '',
-      niche:      market.niche || 'mercado',
+      niche: market.niche || 'mercado',
       storeToken: makeStoreToken(market.storeId),
     }), { headers: CORS })
-
   } catch (err) {
     return new Response(JSON.stringify({ ok: false, error: err.message }), { status: 500, headers: CORS })
   }
