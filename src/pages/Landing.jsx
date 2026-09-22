@@ -98,11 +98,13 @@ const CSS = `
   .hero-cta    { display:flex; flex-direction:column; align-items:stretch; gap:12px; margin-bottom:36px; }
   .section-pad { padding:64px 20px; }
   .footer-row  { flex-direction:column; align-items:flex-start; gap:18px; }
-  .feat-list   { display:grid; grid-template-columns:1fr; gap:0; max-width:800px; margin:0 auto; }
-  .hero-inner  { text-align:center; }
-  .hero-label  { justify-content:center; }
-  .hero-pills  { justify-content:center; }
-  .stats-row   { display:flex; flex-wrap:wrap; justify-content:center; gap:32px 48px; }
+  .feat-list      { display:grid; grid-template-columns:1fr; gap:0; max-width:800px; margin:0 auto; }
+  .hero-inner     { text-align:center; flex:1; }
+  .hero-label     { justify-content:center; }
+  .hero-pills     { justify-content:center; }
+  .stats-row      { display:flex; flex-wrap:wrap; justify-content:center; gap:32px 48px; }
+  .hero-layout    { display:flex; flex-direction:column; width:100%; max-width:1100px; gap:48px; }
+  .hero-col-visual{ display:none; }
 
   @media(min-width:560px){
     .hero-cta   { flex-direction:row; align-items:center; justify-content:flex-start; }
@@ -110,9 +112,11 @@ const CSS = `
     .feat-list  { grid-template-columns:1fr 1fr; column-gap:48px; }
   }
   @media(min-width:700px){
-    .hero-inner { text-align:left; }
-    .hero-label { justify-content:flex-start; }
-    .hero-pills { justify-content:flex-start; }
+    .hero-inner     { text-align:left; }
+    .hero-label     { justify-content:flex-start; }
+    .hero-pills     { justify-content:flex-start; }
+    .hero-layout    { flex-direction:row; align-items:center; }
+    .hero-col-visual{ display:flex; flex-direction:column; align-items:center; flex-shrink:0; }
   }
   @media(min-width:768px){
     .nav-links  { display:flex; }
@@ -121,6 +125,57 @@ const CSS = `
     .footer-row { flex-direction:row; align-items:center; }
   }
 `
+
+/* ─── PDV Mockup ──────────────────────────────────────────── */
+const PDVMock = () => (
+  <div style={{ width:196, background:'#0f0f0f', borderRadius:32, border:'5px solid #1c1c1c', boxShadow:'0 40px 80px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.04)', padding:'12px 10px 16px', userSelect:'none' }}>
+    <div style={{ width:48, height:4, borderRadius:2, background:'#2a2a2a', margin:'0 auto 12px' }}/>
+    {/* app bar */}
+    <div style={{ background:'#f97316', borderRadius:10, padding:'8px 10px', marginBottom:10, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+      <div>
+        <div style={{ fontSize:10, fontWeight:900, color:'#fff' }}>🏪 Mercado Teste</div>
+        <div style={{ fontSize:7.5, color:'rgba(255,255,255,.75)', marginTop:1 }}>Caixa 01 · Aberto</div>
+      </div>
+      <div style={{ fontSize:8, background:'rgba(0,0,0,.2)', borderRadius:5, padding:'3px 6px', color:'#fff', fontWeight:700 }}>PDV</div>
+    </div>
+    {/* search bar */}
+    <div style={{ background:'#1a1a1a', borderRadius:7, padding:'6px 8px', marginBottom:8, fontSize:8.5, color:'rgba(255,255,255,.2)', display:'flex', alignItems:'center', gap:5 }}>
+      <span>🔍</span> Buscar produto...
+    </div>
+    {/* items */}
+    {[
+      { n:'Arroz 5kg',   q:'×1', v:'R$28,90' },
+      { n:'Feijão 1kg',  q:'×2', v:'R$9,90'  },
+      { n:'Leite caixa', q:'×3', v:'R$4,50'  },
+      { n:'Óleo 900ml',  q:'×1', v:'R$7,40'  },
+    ].map(i => (
+      <div key={i.n} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 4px', borderBottom:'1px solid rgba(255,255,255,.05)' }}>
+        <div>
+          <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,.82)' }}>{i.n}</div>
+          <div style={{ fontSize:7.5, color:'rgba(255,255,255,.25)' }}>{i.q}</div>
+        </div>
+        <div style={{ fontSize:9.5, fontWeight:800, color:'#f97316' }}>{i.v}</div>
+      </div>
+    ))}
+    {/* total */}
+    <div style={{ margin:'8px 4px 0', paddingTop:8, borderTop:'1px solid rgba(249,115,22,.2)', display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
+      <div>
+        <div style={{ fontSize:7.5, color:'rgba(255,255,255,.28)', fontWeight:700, letterSpacing:'.08em' }}>TOTAL</div>
+        <div style={{ fontSize:22, fontWeight:900, color:'#fff', lineHeight:1.1 }}>R$50,70</div>
+      </div>
+      <div style={{ textAlign:'right' }}>
+        <div style={{ fontSize:7.5, color:'rgba(255,255,255,.28)', fontWeight:600 }}>4 itens</div>
+        <div style={{ fontSize:7.5, color:'rgba(249,115,22,.6)', fontWeight:700, marginTop:1 }}>● OFFLINE OK</div>
+      </div>
+    </div>
+    {/* CTA */}
+    <div style={{ margin:'8px 4px 0', background:'#f97316', borderRadius:8, padding:'10px 0', textAlign:'center', cursor:'pointer' }}>
+      <div style={{ fontSize:9.5, fontWeight:900, color:'#fff', letterSpacing:'.06em' }}>FINALIZAR VENDA</div>
+    </div>
+    {/* home indicator */}
+    <div style={{ width:52, height:3, borderRadius:2, background:'rgba(255,255,255,.15)', margin:'12px auto 0' }}/>
+  </div>
+)
 
 /* ══════════════════════════════════════════════════════════ */
 export default function Landing() {
@@ -156,45 +211,54 @@ export default function Landing() {
       </nav>
 
       {/* ══ HERO ══════════════════════════════════════════ */}
-      <section style={{ minHeight:'100dvh', display:'flex', flexDirection:'column', justifyContent:'center', padding:'80px 24px 60px', position:'relative', overflow:'hidden' }}>
+      <section style={{ minHeight:'100dvh', display:'flex', alignItems:'center', padding:'80px 24px 60px', position:'relative', overflow:'hidden' }}>
 
-        <div className="hero-inner" style={{ position:'relative', maxWidth:860 }}>
-          {/* label editorial */}
-          <div className={`fu d1 hero-label ${vis?'':'opacity-0'}`} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:32 }}>
-            <div style={{ width:28, height:2, background:'#f97316', borderRadius:1, flexShrink:0 }}/>
-            <span style={{ fontSize:11, fontWeight:800, letterSpacing:'.14em', textTransform:'uppercase', color:'rgba(255,255,255,.35)' }}>PDV · Estoque · Bot WhatsApp · Fidelidade</span>
-          </div>
+        <div className="hero-layout">
+          {/* ── coluna texto ── */}
+          <div className="hero-inner">
+            <div className={`fu d1 hero-label ${vis?'':'opacity-0'}`} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:28 }}>
+              <div style={{ width:28, height:2, background:'#f97316', borderRadius:1, flexShrink:0 }}/>
+              <span style={{ fontSize:11, fontWeight:800, letterSpacing:'.14em', textTransform:'uppercase', color:'rgba(255,255,255,.35)' }}>PDV · Estoque · Bot WhatsApp · Fidelidade</span>
+            </div>
 
-          <h1 className={`fu d2 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(52px,9.5vw,112px)', fontWeight:900, lineHeight:.88, letterSpacing:'-.04em', marginBottom:28 }}>
-            <span style={{ display:'block', color:'#fff' }}>Gestão que</span>
-            <span style={{ display:'block', color:'#f97316' }}>qualquer negócio</span>
-            <span style={{ display:'block', color:'rgba(255,255,255,.72)' }}>pode pagar.</span>
-          </h1>
+            <h1 className={`fu d2 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(44px,7.5vw,96px)', fontWeight:900, lineHeight:.9, letterSpacing:'-.04em', marginBottom:24 }}>
+              <span style={{ display:'block', color:'#fff' }}>Gestão que</span>
+              <span style={{ display:'block', color:'#f97316' }}>qualquer negócio</span>
+              <span style={{ display:'block', color:'rgba(255,255,255,.68)' }}>pode pagar.</span>
+            </h1>
 
-          <p className={`fu d3 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(15px,1.8vw,17px)', color:'rgba(255,255,255,.45)', lineHeight:1.75, maxWidth:480, marginBottom:36 }}>
-            Do caixa ao WhatsApp, tudo numa tela — no celular, sem instalar nada.
-            A partir de <strong style={{ color:'#f97316', fontWeight:800 }}>R$297/mês</strong>, sem contrato.
-          </p>
+            <p className={`fu d3 ${vis?'':'opacity-0'}`} style={{ fontSize:16, color:'rgba(255,255,255,.42)', lineHeight:1.7, maxWidth:440, marginBottom:32 }}>
+              Do caixa ao WhatsApp, tudo numa tela —
+              no celular, sem instalar nada.
+              A partir de <strong style={{ color:'#f97316', fontWeight:800 }}>R$297/mês</strong>, sem contrato.
+            </p>
 
-          <div className={`fu d4 hero-cta ${vis?'':'opacity-0'}`}>
-            <button onClick={() => openWpp()} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, padding:'15px 30px', borderRadius:10, border:'none', cursor:'pointer', background:'#f97316', color:'#fff', fontSize:15, fontWeight:900, letterSpacing:'-.01em' }}>
-              <MessageCircle size={18}/> Falar no WhatsApp
-            </button>
-            <Link to="/demo" style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'15px 24px', borderRadius:10, border:'1px solid rgba(255,255,255,.14)', background:'transparent', color:'rgba(255,255,255,.7)', fontSize:15, fontWeight:700, textDecoration:'none' }}>
-              Ver o sistema →
-            </Link>
-          </div>
-
-          <div className={`fu d5 hero-pills ${vis?'':'opacity-0'}`} style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            {NICHOS.map(n => (
-              <Link key={n.slug} to={`/demo/${n.slug}`} className="hl"
-                style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'6px 13px', borderRadius:999, border:`1px solid ${n.color}30`, background:`${n.color}0d`, color:n.color, fontSize:12, fontWeight:700, textDecoration:'none' }}>
-                {n.emoji} {n.label}
+            <div className={`fu d4 hero-cta ${vis?'':'opacity-0'}`}>
+              <button onClick={() => openWpp()} style={{ display:'flex', alignItems:'center', gap:9, padding:'14px 28px', borderRadius:10, border:'none', cursor:'pointer', background:'#f97316', color:'#fff', fontSize:15, fontWeight:900 }}>
+                <MessageCircle size={17}/> Falar no WhatsApp
+              </button>
+              <Link to="/demo" style={{ display:'flex', alignItems:'center', padding:'14px 22px', borderRadius:10, border:'1px solid rgba(255,255,255,.13)', color:'rgba(255,255,255,.65)', fontSize:14, fontWeight:700, textDecoration:'none' }}>
+                Ver o sistema →
               </Link>
-            ))}
+            </div>
+
+            <div className={`fu d5 hero-pills ${vis?'':'opacity-0'}`} style={{ display:'flex', gap:7, flexWrap:'wrap' }}>
+              {NICHOS.map(n => (
+                <Link key={n.slug} to={`/demo/${n.slug}`} className="hl"
+                  style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:999, border:`1px solid ${n.color}28`, background:`${n.color}0c`, color:n.color, fontSize:11.5, fontWeight:700, textDecoration:'none' }}>
+                  {n.emoji} {n.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* ── coluna visual (desktop) ── */}
+          <div className="hero-col-visual">
+            <PDVMock />
           </div>
         </div>
-        <div style={{ position:'absolute', bottom:24, left:'50%', animation:'bob 2s ease infinite', opacity:.2 }}><ChevronDown size={20} color="#fff"/></div>
+
+        <div style={{ position:'absolute', bottom:20, left:'50%', animation:'bob 2s ease infinite', opacity:.18 }}><ChevronDown size={20} color="#fff"/></div>
       </section>
 
       {/* ══ TICKER ════════════════════════════════════════ */}
