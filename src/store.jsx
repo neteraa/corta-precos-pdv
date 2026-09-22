@@ -338,6 +338,31 @@ export function StoreProvider({ children }) {
     setProducts(prev => { const next = prev.filter(x => x.id !== id); persist('cp_products', next); return next })
   }, [persist])
 
+  // Atualiza vários produtos de uma vez num único persist — sem race condition
+  // entre os POSTs. Usa o estoque ATUAL de `prev` (não o valor no momento do scan).
+  // Usado pelo ScanMobile confirmAll para aplicar o lote de entrada de estoque.
+  const bulkUpsertProducts = useCallback((batch) => {
+    // batch: [{ product, qty, vencimento, custo }]
+    setProducts(prev => {
+      let next = [...prev]
+      for (const { product, qty, vencimento, custo } of batch) {
+        const idx = next.findIndex(p => p.id === product.id)
+        if (idx < 0) continue
+        const cur = next[idx]
+        const upd = {
+          ...cur,
+          stock:       (cur.stock || 0) + qty,
+          receivedAt:  new Date().toISOString(),
+        }
+        if (custo)      upd.cost       = parseFloat(custo)
+        if (vencimento) upd.expiryDate = vencimento
+        next = next.map((p, i) => i === idx ? upd : p)
+      }
+      persist('cp_products', next)
+      return next
+    })
+  }, [persist])
+
   const registerSale = useCallback((sale) => {
     const s = { ...sale, id: `s${Date.now()}`, date: sale.date || new Date().toISOString(), operatorName: sale.operatorName || getOperatorName() }
     setSales(prev => { const next = [s, ...prev]; persist('cp_sales', next); return next })
@@ -531,7 +556,7 @@ export function StoreProvider({ children }) {
       products, sales, customers, promos,
       cashMovements, salesGoal, operators,
       photos, saveProductPhoto,
-      upsertProduct, deleteProduct, registerSale, cancelSale,
+      upsertProduct, deleteProduct, bulkUpsertProducts, registerSale, cancelSale,
       upsertCustomer, deleteCustomer, importProducts,
       upsertPromo, deletePromo, assignPromoGroup,
       addFiado, payFiado,

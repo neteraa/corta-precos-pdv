@@ -91,7 +91,7 @@ const S = {
 export default function ScanMobile() {
   const [params]  = useSearchParams()
   const mode      = params.get('mode') || 'pdv'
-  const { products, upsertProduct, syncNow, lastSync } = useStore()
+  const { products, upsertProduct, bulkUpsertProducts, syncNow, lastSync } = useStore()
   const { settings } = usePrinter()
   const storeName = settings.storeName || 'MEU MERCADO'
 
@@ -180,7 +180,7 @@ export default function ScanMobile() {
       cost:     parseFloat(newProdCost)  || 0,
       category: newProdCat.trim() || 'Outros',
       unit:     newProdUnit || 'UN',
-      stock:        parseFloat(newProdQty)          || 0,
+      stock:        0,  // começa em 0 — confirmAll adiciona qty via bulkUpsertProducts (evita dobrar o estoque)
       priceAtacado: parseFloat(newProdPriceAtacado) || 0,
       qtdAtacado:   parseInt(newProdQtdAtacado, 10) || 0,
     }
@@ -233,12 +233,10 @@ export default function ScanMobile() {
 
   /* ── confirm all batch entries ─────────────────────────── */
   const confirmAll = () => {
-    batch.forEach(({ product, qty, vencimento, custo }) => {
-      const updates = { stock: (product.stock || 0) + qty, receivedAt: new Date().toISOString() }
-      if (custo)      updates.cost       = parseFloat(custo)
-      if (vencimento) updates.expiryDate = vencimento   // ← BUG FIX: save to product
-      upsertProduct({ ...product, ...updates })
-    })
+    // Um único setProducts + um único POST — sem race condition entre itens do lote.
+    // bulkUpsertProducts usa o estoque ATUAL do servidor (prev), não o valor
+    // capturado no momento do scan (que pode estar desatualizado).
+    bulkUpsertProducts(batch)
     setDone(true)
     setTimeout(() => { setBatch([]); setDone(false) }, 8000)
   }
