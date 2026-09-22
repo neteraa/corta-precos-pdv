@@ -309,6 +309,7 @@ export default function PDV() {
 
   // Round total up to nearest R$5 for suggested received amount
   const suggestReceived = () => {
+    if (received !== '') return   // não sobrescreve o que o operador já digitou
     const t = Math.max(0, total)
     const rounded = Math.ceil(t / 5) * 5
     setReceived(rounded.toFixed(2))
@@ -890,18 +891,17 @@ export default function PDV() {
           {/* payment */}
           <div className="card p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide">Pagamento</h2>
-              <button
-                onClick={() => { setSplitMode(s => !s); setSplitPays([{ method: 'PIX', amount: '' }]) }}
-                className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg border transition-colors ${
-                  splitMode
-                    ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                    : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
-                }`}
-              >
-                <SplitSquareHorizontal className="w-3.5 h-3.5" />
-                {splitMode ? 'Split ativo' : 'Dividir pagamento'}
-              </button>
+              <h2 className="font-bold text-gray-700 text-sm uppercase tracking-wide">
+                {splitMode ? '💳 + 💵 Pagamento misto' : 'Pagamento'}
+              </h2>
+              {splitMode && (
+                <button
+                  onClick={() => { setSplitMode(false); setSplitPays([{ method: 'PIX', amount: '' }]) }}
+                  className="text-xs font-bold px-2.5 py-1 rounded-lg border bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors"
+                >
+                  ← Voltar
+                </button>
+              )}
             </div>
 
             {/* single payment mode */}
@@ -935,6 +935,66 @@ export default function PDV() {
                     </div>
                   </div>
                 )}
+
+                {/* ── Troco inline — Dinheiro ─────────────────────────── */}
+                {payment === 'Dinheiro' && (
+                  <div className="bg-green-50 border-2 border-green-200 rounded-xl p-3 space-y-2">
+                    <div className="text-xs font-black text-green-700 uppercase tracking-wide">💵 Valor recebido do cliente</div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm pointer-events-none">R$</span>
+                      <input
+                        type="number" min="0" step="0.01"
+                        value={received}
+                        onChange={e => setReceived(e.target.value)}
+                        placeholder="0,00"
+                        className="input pl-9 py-3 text-xl font-black w-full"
+                      />
+                    </div>
+                    {/* sugestões de valor */}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {(() => {
+                        const t = Math.max(0, total)
+                        const base = Math.ceil(t / 5) * 5
+                        return [0, 5, 10, 20, 50, 100].map(extra => {
+                          const val = base + extra
+                          if (val < t - 0.01) return null
+                          return (
+                            <button key={extra}
+                              onClick={() => setReceived(val.toFixed(2))}
+                              className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
+                                Math.abs(receivedVal - val) < 0.01
+                                  ? 'bg-green-200 border-green-500 text-green-800'
+                                  : 'bg-white border-gray-200 text-gray-600 hover:bg-green-50'
+                              }`}
+                            >{BRL.format(val)}</button>
+                          )
+                        })
+                      })()}
+                    </div>
+                    {/* troco / falta ao vivo */}
+                    {received !== '' && (
+                      <div className={`rounded-xl px-4 py-3 flex justify-between items-center ${
+                        trocoValid ? 'bg-green-100 border border-green-300' : 'bg-red-50 border border-red-200'
+                      }`}>
+                        <span className={`font-black text-sm ${trocoValid ? 'text-green-700' : 'text-red-600'}`}>
+                          {trocoValid ? '✅ Troco' : '⚠️ Falta'}
+                        </span>
+                        <span className={`text-3xl font-black ${trocoValid ? 'text-green-700' : 'text-red-500'}`}>
+                          {BRL.format(trocoValid ? troco : Math.max(0, total) - receivedVal)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Pagamento misto ─────────────────────────────────── */}
+                <button
+                  onClick={() => { setSplitMode(true); setSplitPays([{ method: payment === 'Dinheiro' ? 'Dinheiro' : 'PIX', amount: '' }, { method: payment === 'Dinheiro' ? 'PIX' : 'Dinheiro', amount: '' }]); setReceived('') }}
+                  className="w-full py-2.5 flex items-center justify-center gap-2 border-2 border-dashed border-indigo-300 text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50 text-sm font-bold rounded-xl transition-colors"
+                >
+                  <SplitSquareHorizontal className="w-4 h-4" />
+                  💳 + 💵 &nbsp; Pagamento misto (2 formas)
+                </button>
               </div>
             )}
 
@@ -981,15 +1041,14 @@ export default function PDV() {
             )}
           </div>
 
-          {/* ── QUICK PAY — finaliza sem modal ─────────────── */}
-          {cart.length > 0 && !splitMode && (
+          {/* ── QUICK PAY — finaliza sem modal (PIX e Débito) ─── */}
+          {cart.length > 0 && !splitMode && payment !== 'Dinheiro' && payment !== 'Crédito' && (
             <div className="space-y-2">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">⚡ Pagamento rápido</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {[
                   { m: 'PIX',    emoji: '⚡', bg: '#0ea5e91a', border: '#0ea5e9', text: '#38bdf8' },
                   { m: 'Débito', emoji: '💳', bg: '#8b5cf61a', border: '#8b5cf6', text: '#a78bfa' },
-                  { m: 'Dinheiro', emoji: '💵', bg: '#22c55e1a', border: '#22c55e', text: '#4ade80' },
                 ].map(({ m, emoji, bg, border, text }) => (
                   <button key={m}
                     onClick={() => quickPay(m)}
@@ -1004,19 +1063,35 @@ export default function PDV() {
             </div>
           )}
 
-          {/* finalizar — abre modal para mais opções */}
+          {/* finalizar */}
           <button
-            disabled={cart.length === 0 || !splitValid}
-            onClick={() => { suggestReceived(); setShowFinish(true) }}
+            disabled={cart.length === 0 || !splitValid || (showTroco && !trocoValid && received !== '')}
+            onClick={() => {
+              // Dinheiro com troco já calculado inline → finaliza direto
+              if (!splitMode && payment === 'Dinheiro' && trocoValid && received !== '') {
+                finish()
+              } else {
+                suggestReceived()
+                setShowFinish(true)
+              }
+            }}
             className="btn-primary w-full justify-center disabled:opacity-30 disabled:cursor-not-allowed rounded-2xl shadow-lg active:scale-[.98] transition-transform"
             style={{ minHeight: 56, fontSize: cart.length > 0 ? 15 : 18, fontWeight: 900, letterSpacing: '.02em' }}
           >
             <Check className="w-5 h-5" />
-            {splitMode && !splitValid
-              ? `⚠️  Falta ${BRL.format(splitRemain)}`
-              : cart.length === 0
-                ? 'Adicione itens para finalizar'
-                : `Mais opções / Crédito / Split`}
+            {cart.length === 0
+              ? 'Adicione itens para finalizar'
+              : splitMode && !splitValid
+                ? `⚠️ Falta ${BRL.format(splitRemain)}`
+                : splitMode
+                  ? '✓ Confirmar pagamento misto'
+                  : payment === 'Dinheiro' && trocoValid && received !== ''
+                    ? `✅ Confirmar — Troco ${BRL.format(troco)}`
+                    : payment === 'Dinheiro'
+                      ? '💵 Confirmar venda (Dinheiro)'
+                      : payment === 'Crédito'
+                        ? '💳 Confirmar + Parcelamento'
+                        : `✓ Confirmar — ${payment}`}
           </button>
         </div>
       </div>
