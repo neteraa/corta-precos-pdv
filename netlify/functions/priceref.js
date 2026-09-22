@@ -5,6 +5,9 @@
  * Os dados do PDV são tenant-scoped quando storeId é informado.
  */
 import { getStore } from '@netlify/blobs'
+import { createHmac } from 'crypto'
+
+const PERSIST_SECRET = process.env.ZS_PERSIST_SECRET || ''
 
 function normalize(s = '') {
   return s.toLowerCase()
@@ -18,6 +21,10 @@ function score(a, b) {
   const wb = normalize(b).split(' ').filter(Boolean)
   const hits = wa.filter(w => w.length >= 3 && wb.some(x => x.includes(w) || w.includes(x)))
   return hits.length / Math.max(wa.length, 1)
+}
+
+function makeStoreToken(storeId) {
+  return createHmac('sha256', PERSIST_SECRET).update(storeId).digest('hex').slice(0, 32)
 }
 
 async function readJson(store, key) {
@@ -37,18 +44,31 @@ export default async (req) => {
     })
   }
 
+  if (storeId !== 'default') {
+    if (!PERSIST_SECRET) {
+      return new Response(JSON.stringify({ error: 'Serviço indisponível' }), {
+        status: 503, headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    const token = req.headers.get('x-zs-token') || ''
+    if (token !== makeStoreToken(storeId)) {
+      return new Response(JSON.stringify({ error: 'Não autorizado' }), {
+        status: 403, headers: { 'Content-Type': 'application/json' },
+      })
+    }
+  }
+
   try {
     const store = getStore('corta-precos')
     const [estoque, offers, prods] = await Promise.all([
-      readJson(store, 'cp_fornecedor_estoque'),
-      readJson(store, 'cp_supplier_offers'),
+      readJson(store, storeId === 'default' ? 'cp_fornecedor_estoque' : `${storeId}:cp_fornecedor_estoque`),
+      readJson(store, storeId === 'default' ? 'cp_supplier_offers' : `${storeId}:cp_supplier_offers`),
       readJson(store, storeId === 'default' ? 'cp_products' : `${storeId}:cp_products`),
     ])
 
     const offer = offers.find(o =>
       (ean && (o.sku === ean || o.barcode === ean)) || score(o.productName, name) >= 0.4
     ) || null
-
     const stock = estoque.find(e =>
       (ean && (e.sku === ean || e.barcode === ean)) || score(e.productName, name) >= 0.4
     ) || null
@@ -62,8 +82,8 @@ export default async (req) => {
         bestScore = 1
         break
       }
-      const s = score(p.name, lookup)
-      if (s > bestScore) { bestScore = s; bestProd = p }
+      const currentScore = score(p.name, lookup)
+      if (currentScore > bestScore) { bestScore = currentScore; bestProd = p }
     }
     const pdvProd = bestScore >= 0.35 ? bestProd : null
 
