@@ -576,7 +576,8 @@ function MarketBotProfileSection({ storeId }) {
 }
 
 export default function Configuracoes() {
-  const { products, sales, customers, importProducts, operators, upsertOperator, deleteOperator, syncOperators } = useStore()
+  const { products, sales, customers, importProducts, operators, upsertOperator, deleteOperator, syncOperators, clearBusinessData } = useStore()
+  const [clearing, setClearing] = useState(null) // null | 'confirm-products' | 'confirm-all' | 'done'
   const { settings, setSettings } = usePrinter()
   const [form, setForm] = useState(() => ({
     storeName:  settings.storeName  || '',
@@ -1100,6 +1101,75 @@ export default function Configuracoes() {
           Conecte o número de WhatsApp da sua loja. Escaneie o QR Code com o celular do número que vai atender seus clientes.
         </p>
         <WhatsAppBotSection instance={getConfiguredStoreId() || 'zatendestok'} />
+      </Section>
+
+      {/* ── Zona de Risco ─────────────────────────────────────────────── */}
+      <Section icon={Trash2} title="Limpar Base de Dados">
+        <p className="text-xs text-gray-400 mb-4">
+          Remove produtos, vendas, clientes e fiado — tanto deste dispositivo quanto do servidor.
+          Operadores e configurações da loja <strong className="text-gray-300">não</strong> são apagados.
+        </p>
+
+        {clearing === 'done' ? (
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-sm font-semibold">
+            <Check className="w-5 h-5 shrink-0" /> Dados apagados com sucesso — local e servidor.
+          </div>
+        ) : clearing === 'confirm-products' ? (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 space-y-3">
+            <p className="text-sm text-red-300 font-semibold">⚠️ Apagar apenas o catálogo de produtos?</p>
+            <p className="text-xs text-gray-400">Vendas, clientes e fiado continuam. Não tem como desfazer.</p>
+            <div className="flex gap-2">
+              <button onClick={async () => {
+                await clearBusinessData(['cp_products'])
+                setClearing('done')
+                setTimeout(() => setClearing(null), 4000)
+              }} className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700">
+                Confirmar — apagar produtos
+              </button>
+              <button onClick={() => setClearing(null)} className="px-4 py-2 rounded-lg border border-gray-700 text-gray-400 text-sm hover:bg-gray-800">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : clearing === 'confirm-all' ? (
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 space-y-3">
+            <p className="text-sm text-red-300 font-semibold">⚠️ Apagar TODOS os dados do negócio?</p>
+            <p className="text-xs text-gray-400">Produtos, vendas, clientes, fiado e caixa. Não tem como desfazer.</p>
+            <div className="flex gap-2">
+              <button onClick={async () => {
+                await clearBusinessData(['cp_products','cp_sales','cp_customers','cp_fiado','cp_cash','cp_promos'])
+                setClearing('done')
+                setTimeout(() => setClearing(null), 4000)
+              }} className="flex-1 py-2 rounded-lg bg-red-700 text-white text-sm font-bold hover:bg-red-800">
+                Confirmar — apagar tudo
+              </button>
+              <button onClick={() => setClearing(null)} className="px-4 py-2 rounded-lg border border-gray-700 text-gray-400 text-sm hover:bg-gray-800">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <button
+              onClick={() => setClearing('confirm-products')}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 text-sm font-semibold transition-colors text-left">
+              <Trash2 className="w-4 h-4 shrink-0" />
+              <div>
+                <div>Limpar catálogo de produtos</div>
+                <div className="text-xs text-gray-500 font-normal mt-0.5">{products.length} produto{products.length !== 1 ? 's' : ''} cadastrado{products.length !== 1 ? 's' : ''} · vendas e clientes ficam</div>
+              </div>
+            </button>
+            <button
+              onClick={() => setClearing('confirm-all')}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-red-700/40 text-red-500 hover:bg-red-700/10 text-sm font-semibold transition-colors text-left">
+              <Database className="w-4 h-4 shrink-0" />
+              <div>
+                <div>Limpar tudo — produtos, vendas, clientes e fiado</div>
+                <div className="text-xs text-gray-500 font-normal mt-0.5">{sales.length} venda{sales.length !== 1 ? 's' : ''} · {customers.length} cliente{customers.length !== 1 ? 's' : ''} · Operadores e configs ficam</div>
+              </div>
+            </button>
+          </div>
+        )}
       </Section>
 
     </div>

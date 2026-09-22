@@ -256,7 +256,19 @@ export function StoreProvider({ children }) {
     if (data.cp_fiado)    { try { localStorage.setItem(mktKey('cp_fiado'), data.cp_fiado) } catch {} }
     if (data.cp_cash)     try { setCashMovements(JSON.parse(data.cp_cash));   try { localStorage.setItem(mktKey('cp_cash'),      data.cp_cash)      } catch {} } catch {}
     if (data.cp_goal)     try { setSalesGoalState(JSON.parse(data.cp_goal));  try { localStorage.setItem(mktKey('cp_goal'),      data.cp_goal)      } catch {} } catch {}
-    if (data.cp_operators)       try { setOperators(JSON.parse(data.cp_operators));            try { localStorage.setItem(mktKey('cp_operators'),       data.cp_operators)       } catch {} } catch {}
+    if (data.cp_operators) try {
+      const serverOps = JSON.parse(data.cp_operators)
+      // Local vence se tem mais operadores — previne race condition onde o sync de 30s
+      // sobrescreve operadores recém-adicionados antes do POST ao servidor completar.
+      setOperators(prev => {
+        if (serverOps.length >= prev.length) {
+          try { localStorage.setItem(mktKey('cp_operators'), data.cp_operators) } catch {}
+          return serverOps
+        }
+        syncToServer('cp_operators', JSON.stringify(prev))
+        return prev
+      })
+    } catch {}
     if (data.cp_supplier_offers) try { setSupplierOffers(JSON.parse(data.cp_supplier_offers)); try { localStorage.setItem(mktKey('cp_supplier_offers'), data.cp_supplier_offers); localStorage.setItem('cp_supplier_offers', data.cp_supplier_offers) } catch {} } catch {}
 
     // Push local keys not yet on server
@@ -480,6 +492,28 @@ export function StoreProvider({ children }) {
     ;['cp_products','cp_sales','cp_customers','cp_promos'].forEach(k => localStorage.removeItem(mktKey(k)))
   }, [])
 
+  // Limpa chaves específicas: local + servidor. Mantém operadores e configurações.
+  const clearBusinessData = useCallback(async (keys = ['cp_products','cp_sales','cp_fiado','cp_customers','cp_cash']) => {
+    const storeId = getMktStoreId()
+    const MAP = {
+      cp_products:  () => { setProducts([]);        },
+      cp_sales:     () => { setSales([]);            },
+      cp_customers: () => { setCustomers([]);        },
+      cp_promos:    () => { setPromos(SEED_PROMOS);  },
+      cp_fiado:     () => {                          },
+      cp_cash:      () => { setCashMovements([]);    },
+    }
+    for (const key of keys) {
+      MAP[key]?.()
+      localStorage.removeItem(mktKey(key))
+      await fetch('/api/persist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value: JSON.stringify([]), storeId }),
+      }).catch(() => {})
+    }
+  }, [])
+
   return (
     <Ctx.Provider value={{
       products, sales, customers, promos,
@@ -491,7 +525,7 @@ export function StoreProvider({ children }) {
       addFiado, payFiado,
       addCashMovement, setSalesGoal,
       upsertOperator, deleteOperator, syncOperators,
-      resetAll,
+      resetAll, clearBusinessData,
       syncNow, lastSync, syncing,
       expiryAlertDays, setExpiryAlertDays,
       supplierOffers,
