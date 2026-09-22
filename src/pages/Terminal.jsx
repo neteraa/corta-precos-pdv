@@ -122,18 +122,39 @@ export default function Terminal() {
   const addToCart = useCallback((codeOrProduct) => {
     const p = typeof codeOrProduct === 'string' ? findProduct(codeOrProduct) : codeOrProduct
     if (!p) { setScanFeed({ msg: `❌ Produto não encontrado`, ok: false }); setTimeout(() => setScanFeed(null), 2000); return }
+
+    let promoMsg = null
     setCart(prev => {
-      const idx = prev.findIndex(i => i.productId === p.id)
-      if (idx >= 0) {
-        const next = [...prev]; next[idx] = { ...next[idx], qty: next[idx].qty + 1 }; return next
+      const idx  = prev.findIndex(i => i.productId === p.id)
+      const next = idx >= 0
+        ? prev.map((i, j) => j === idx ? { ...i, qty: i.qty + 1 } : i)
+        : [...prev, { productId: p.id, name: p.name, price: p.price, qty: 1 }]
+
+      // Calcula progresso de promo para o grupo deste produto (se houver)
+      if (p.promoGroup) {
+        const rule = promos.find(r => r.active && r.group === p.promoGroup && r.type === 'combo')
+        if (rule) {
+          const totalQty = next
+            .filter(i => products.find(x => x.id === i.productId)?.promoGroup === rule.group)
+            .reduce((s, i) => s + i.qty, 0)
+          const complete = Math.floor(totalQty / rule.qty)
+          if (complete >= 1 && totalQty % rule.qty === 0) {
+            promoMsg = `🏷 PROMO ATIVA! ${rule.name}`
+          } else {
+            const needed = rule.qty - (totalQty % rule.qty)
+            promoMsg = `⚡ ${rule.name} — falta${needed > 1 ? 'm' : ''} ${needed} un.`
+          }
+        }
       }
-      return [...prev, { productId: p.id, name: p.name, price: p.price, qty: 1 }]
+
+      return next
     })
+
     setQuery(''); setResults([])
-    setScanFeed({ msg: `✅ ${p.name}`, ok: true })
-    setTimeout(() => setScanFeed(null), 1800)
+    setScanFeed({ msg: promoMsg ? `✅ ${p.name}  ·  ${promoMsg}` : `✅ ${p.name}`, ok: true, promo: !!promoMsg })
+    setTimeout(() => setScanFeed(null), promoMsg ? 2800 : 1800)
     setTimeout(() => inputRef.current?.focus(), 50)
-  }, [products])
+  }, [products, promos])
 
   const [showHelp, setShowHelp] = useState(false)
 
@@ -144,7 +165,14 @@ export default function Terminal() {
   const [pinError,       setPinError]       = useState(false)
   const [showClose,      setShowClose]      = useState(false) // fechar caixa confirm
 
-  const caixaOps = useMemo(() => operators.filter(o => o.role === 'caixa'), [operators])
+  // Mostra todos os operadores ativos (não só caixa) — gerente/admin tb podem operar o terminal
+  const caixaOps = useMemo(() => operators.filter(o => o.active !== false), [operators])
+
+  // Foca o campo de busca assim que o operador fizer login — sem isso o caixa
+  // precisa clicar no campo toda vez que o lock screen fecha.
+  useEffect(() => {
+    if (activeOperator) setTimeout(() => inputRef.current?.focus(), 120)
+  }, [activeOperator])
 
   const selectOperator = (op) => {
     if (!op.pin) { setActiveOperator(op); setPinTarget(null); setPinInput(''); return }
@@ -380,7 +408,12 @@ export default function Terminal() {
             )}
 
             {scanFeed && (
-              <div style={{ marginTop: 8, padding: '8px 14px', borderRadius: 10, background: scanFeed.ok ? '#052e16' : '#450a0a', color: scanFeed.ok ? '#4ade80' : '#f87171', fontSize: 13, fontWeight: 700 }}>
+              <div style={{
+                marginTop: 8, padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+                background: !scanFeed.ok ? '#450a0a' : scanFeed.promo ? '#431407' : '#052e16',
+                color:      !scanFeed.ok ? '#f87171' : scanFeed.promo ? '#fb923c' : '#4ade80',
+                border: scanFeed.promo ? '1px solid rgba(251,146,60,.3)' : 'none',
+              }}>
                 {scanFeed.msg}
               </div>
             )}
