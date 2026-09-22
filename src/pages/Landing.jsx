@@ -98,10 +98,21 @@ const CSS = `
   .hero-cta    { display:flex; flex-direction:column; align-items:stretch; gap:12px; margin-bottom:36px; }
   .section-pad { padding:64px 20px; }
   .footer-row  { flex-direction:column; align-items:flex-start; gap:18px; }
+  .feat-list   { display:grid; grid-template-columns:1fr; gap:0; max-width:800px; margin:0 auto; }
+  .hero-inner  { text-align:center; }
+  .hero-label  { justify-content:center; }
+  .hero-pills  { justify-content:center; }
+  .stats-row   { display:flex; flex-wrap:wrap; justify-content:center; gap:32px 48px; }
 
   @media(min-width:560px){
-    .hero-cta   { flex-direction:row; align-items:center; justify-content:center; align-items:initial; }
+    .hero-cta   { flex-direction:row; align-items:center; justify-content:flex-start; }
     .steps-grid { grid-template-columns:repeat(3,1fr); }
+    .feat-list  { grid-template-columns:1fr 1fr; column-gap:48px; }
+  }
+  @media(min-width:700px){
+    .hero-inner { text-align:left; }
+    .hero-label { justify-content:flex-start; }
+    .hero-pills { justify-content:flex-start; }
   }
   @media(min-width:768px){
     .nav-links  { display:flex; }
@@ -145,14 +156,13 @@ export default function Landing() {
       </nav>
 
       {/* ══ HERO ══════════════════════════════════════════ */}
-      <section style={{ minHeight:'100dvh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'80px 24px 60px', textAlign:'center', position:'relative', overflow:'hidden' }}>
+      <section style={{ minHeight:'100dvh', display:'flex', flexDirection:'column', justifyContent:'center', padding:'80px 24px 60px', position:'relative', overflow:'hidden' }}>
 
-        <div style={{ position:'relative', maxWidth:860 }}>
+        <div className="hero-inner" style={{ position:'relative', maxWidth:860 }}>
           {/* label editorial */}
-          <div className={`fu d1 ${vis?'':'opacity-0'}`} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:32 }}>
-            <div style={{ width:28, height:2, background:'#f97316', borderRadius:1 }}/>
+          <div className={`fu d1 hero-label ${vis?'':'opacity-0'}`} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:32 }}>
+            <div style={{ width:28, height:2, background:'#f97316', borderRadius:1, flexShrink:0 }}/>
             <span style={{ fontSize:11, fontWeight:800, letterSpacing:'.14em', textTransform:'uppercase', color:'rgba(255,255,255,.35)' }}>PDV · Estoque · Bot WhatsApp · Fidelidade</span>
-            <div style={{ width:28, height:2, background:'#f97316', borderRadius:1 }}/>
           </div>
 
           <h1 className={`fu d2 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(52px,9.5vw,112px)', fontWeight:900, lineHeight:.88, letterSpacing:'-.04em', marginBottom:28 }}>
@@ -161,30 +171,30 @@ export default function Landing() {
             <span style={{ display:'block', color:'rgba(255,255,255,.72)' }}>pode pagar.</span>
           </h1>
 
-          <p className={`fu d3 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(15px,1.8vw,18px)', color:'rgba(255,255,255,.45)', lineHeight:1.8, maxWidth:540, margin:'0 auto 36px' }}>
-            PDV offline + Bot WhatsApp com IA + Estoque FIFO + Fidelidade + Fiado + Campanhas.<br/>
-            Por <strong style={{ color:'#f97316' }}>R$297/mês</strong> — menos de R$10 por dia.
+          <p className={`fu d3 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(15px,1.8vw,17px)', color:'rgba(255,255,255,.45)', lineHeight:1.75, maxWidth:480, marginBottom:36 }}>
+            Do caixa ao WhatsApp, tudo numa tela — no celular, sem instalar nada.
+            A partir de <strong style={{ color:'#f97316', fontWeight:800 }}>R$297/mês</strong>, sem contrato.
           </p>
 
           <div className={`fu d4 hero-cta ${vis?'':'opacity-0'}`}>
-            <button onClick={() => openWpp()} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, padding:'15px 30px', borderRadius:12, border:'none', cursor:'pointer', background:'#f97316', color:'#fff', fontSize:16, fontWeight:900, animation:'glow 3s ease infinite' }}>
-              <MessageCircle size={20}/> Quero ver o sistema
+            <button onClick={() => openWpp()} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, padding:'15px 30px', borderRadius:10, border:'none', cursor:'pointer', background:'#f97316', color:'#fff', fontSize:15, fontWeight:900, letterSpacing:'-.01em' }}>
+              <MessageCircle size={18}/> Falar no WhatsApp
             </button>
-            <Link to="/demo" style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'15px 24px', borderRadius:12, border:'1px solid rgba(255,255,255,.12)', background:'rgba(255,255,255,.05)', color:'rgba(255,255,255,.8)', fontSize:15, fontWeight:700, textDecoration:'none' }}>
-              <Play size={16}/> Ver demo ao vivo
+            <Link to="/demo" style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'15px 24px', borderRadius:10, border:'1px solid rgba(255,255,255,.14)', background:'transparent', color:'rgba(255,255,255,.7)', fontSize:15, fontWeight:700, textDecoration:'none' }}>
+              Ver o sistema →
             </Link>
           </div>
 
-          <div className={`fu d5 ${vis?'':'opacity-0'}`} style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap' }}>
+          <div className={`fu d5 hero-pills ${vis?'':'opacity-0'}`} style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {NICHOS.map(n => (
               <Link key={n.slug} to={`/demo/${n.slug}`} className="hl"
-                style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'7px 14px', borderRadius:999, border:`1px solid ${n.color}30`, background:`${n.color}10`, color:n.color, fontSize:12, fontWeight:700, textDecoration:'none' }}>
+                style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'6px 13px', borderRadius:999, border:`1px solid ${n.color}30`, background:`${n.color}0d`, color:n.color, fontSize:12, fontWeight:700, textDecoration:'none' }}>
                 {n.emoji} {n.label}
               </Link>
             ))}
           </div>
         </div>
-        <div style={{ position:'absolute', bottom:24, left:'50%', animation:'bob 2s ease infinite', opacity:.25 }}><ChevronDown size={20} color="#fff"/></div>
+        <div style={{ position:'absolute', bottom:24, left:'50%', animation:'bob 2s ease infinite', opacity:.2 }}><ChevronDown size={20} color="#fff"/></div>
       </section>
 
       {/* ══ TICKER ════════════════════════════════════════ */}
@@ -197,6 +207,23 @@ export default function Landing() {
           ))}
         </div>
       </div>
+
+      {/* ══ NÚMEROS ═══════════════════════════════════════ */}
+      <section style={{ padding:'52px 24px', borderBottom:'1px solid rgba(255,255,255,.06)' }}>
+        <div className="stats-row" style={{ maxWidth:900, margin:'0 auto' }}>
+          {[
+            { n:'6',      l:'segmentos atendidos'     },
+            { n:'12',     l:'módulos integrados'      },
+            { n:'R$297',  l:'por mês, sem contrato'   },
+            { n:'2h',     l:'pra ativar e começar'    },
+          ].map(s => (
+            <div key={s.l} style={{ textAlign:'center' }}>
+              <div style={{ fontSize:38, fontWeight:900, color:'#f97316', lineHeight:1, letterSpacing:'-.03em' }}>{s.n}</div>
+              <div style={{ fontSize:12, color:'rgba(255,255,255,.38)', marginTop:5, fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em' }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* ══ DEMOS POR NICHO ═══════════════════════════════ */}
       <section style={{ padding:'100px 24px', maxWidth:1100, margin:'0 auto' }}>
@@ -246,15 +273,15 @@ export default function Landing() {
             </h2>
             <p style={{ color:'rgba(255,255,255,.35)', fontSize:14 }}>12 módulos. Uma mensalidade. Cancela quando quiser.</p>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(230px,1fr))', gap:12 }}>
-            {FEATURES.map(({ Icon, label, desc }) => (
-              <div key={label} style={{ display:'flex', gap:14, padding:'18px 18px', background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:16 }}>
-                <div style={{ width:34, height:34, borderRadius:9, background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.18)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                  <Icon size={15} color="#f97316"/>
+          <div className="feat-list">
+            {FEATURES.map(({ label, desc }) => (
+              <div key={label} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'14px 0', borderBottom:'1px solid rgba(255,255,255,.05)' }}>
+                <div style={{ width:20, height:20, borderRadius:5, background:'rgba(249,115,22,.1)', border:'1px solid rgba(249,115,22,.22)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>
+                  <svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="#f97316" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </div>
                 <div>
-                  <div style={{ fontWeight:800, fontSize:13, color:'#fff', marginBottom:3 }}>{label}</div>
-                  <div style={{ fontSize:11.5, color:'rgba(255,255,255,.35)', lineHeight:1.5 }}>{desc}</div>
+                  <div style={{ fontWeight:800, fontSize:14, color:'rgba(255,255,255,.85)', lineHeight:1.3 }}>{label}</div>
+                  <div style={{ fontSize:12, color:'rgba(255,255,255,.3)', marginTop:2, lineHeight:1.5 }}>{desc}</div>
                 </div>
               </div>
             ))}
