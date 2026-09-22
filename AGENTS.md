@@ -1,4 +1,4 @@
-# ZatendeStok — AGENTS.md (v10.0 — 2026-09-22)
+# ZatendeStok — AGENTS.md (v11.0 — 2026-09-22)
 
 ## Projeto
 
@@ -106,7 +106,7 @@ Proteções:
 
 mkt_1789747558270       — Nete Ta Mercado (mercado)
 mkt_1789762223411       — ZatendeStok Admin (mercado)
-cortaprecos_1789770018182 — Corta preços (mercado)
+cortaprecos_1789770018182 — Corta preços (mercado) — 2797 produtos
 padariateste_1790000668712 — Padaria Teste (padaria)
 
 ---
@@ -167,14 +167,76 @@ padariateste_1790000668712 — Padaria Teste (padaria)
 
 ---
 
+## Bugs corrigidos (v11.0 — críticos do primeiro cliente)
+
+**Ver CHANGELOG.md para histórico completo detalhado.**
+
+| Bug | Arquivo | Commit |
+|---|---|---|
+| storeId sem `_` → produto celular não aparecia no terminal | auth.js, ScanMobile.jsx | cc133ce, 4c89d90 |
+| Estoque dobrado ao cadastrar produto novo pelo celular | ScanMobile.jsx | 43aaef3 |
+| Race condition no lote de entrada (N POSTs simultâneos) | store.jsx, ScanMobile.jsx | 43aaef3 |
+| Sync de 30s apagava produtos recém-importados | store.jsx | 5a09a32 |
+| Scanner concatenava códigos após produto não encontrado | Terminal.jsx | 4c89d90 |
+| Terminal retornava produto errado ao escanear mesmo item | Terminal.jsx | 3e1a018 |
+| IDs duplicados em cadastros rápidos (sem sufixo random) | store.jsx | 5a09a32 |
+| Flash de SEED_PRODUCTS após limpar base de dados | store.jsx | 5a09a32 |
+| Operadores não apareciam no lock screen do terminal | Terminal.jsx | e871104 |
+| Sem foco automático após login de operador | Terminal.jsx | e871104 |
+| Race condition sobrescrevia operadores adicionados | store.jsx | b49fd83 |
+
+---
+
+## Regras de conflito de sync (store.jsx)
+
+```
+applyServerData():
+  Produtos   → local vence se prev.length > parsed.length (POST em trânsito)
+  Operadores → local vence se prev.length > serverOps.length (mesmo padrão)
+  Vendas     → servidor sempre vence
+  Clientes   → servidor sempre vence
+  Promos     → servidor sempre vence
+```
+
+---
+
+## Fluxo mobile→desktop correto (validado)
+
+```
+storeId correto = 'cortaprecos_1789770018182'  (com _ preservado pelo slugify)
+
+getConfiguredStoreId() → prefere cp_session.storeId (tem o valor original com _)
+                      → fallback cp_store_id (pode estar sem _ em instalações antigas)
+
+URL enviada ao celular:  /scan?storeId=cortaprecos_1789770018182&mode=estoque
+Celular salva em:        cortaprecos_1789770018182:cp_products  ✅
+PC lê de:               cortaprecos_1789770018182:cp_products  ✅
+```
+
+ScanMobile não chama mais `saveStoreId()` (ver comentário no topo do arquivo).  
+IIFE inicial define `cp_store_id` e `cp_session.storeId` diretamente sem slugify.
+
+---
+
+## Estado dos dados Corta Preços (22/09/2026)
+
+- **2797 produtos** no namespace `cortaprecos_1789770018182:cp_products`
+- 1 produto migrado de namespace errado nesta sessão: DODON FRUTAS VERMELHAS 140G
+
+---
+
 ## Commits recentes
 
+cc133ce — fix: storeId com underscore — causa raiz produto não aparecer no terminal
+43aaef3 — fix: ScanMobile — estoque dobrado + race condition no lote de entrada
+5a09a32 — fix: 3 buracos de segurança no fluxo de persistência de produtos
+3e1a018 — fix: terminal — scanner retornava produto errado ao escanear mesmo item
+4c89d90 — fix: 2 bugs críticos do primeiro cliente
+e871104 — fix: terminal — 3 bugs do caixa
+b49fd83 — fix: race condition operadores + botão Limpar Base de Dados
+65fcb95 — chore: AGENTS.md v10.0
 f85238a — fix: landing Bricolage + hero sem vazio + phone float + scroll reveal
 e4bb785 — feat: hero 2 colunas + PDVMock animado no desktop
-014dba2 — fix: landing checklist features + stats bar + copy humano
-1877a10 — fix: fallback OpenAI quota (credit_balance_exhausted)
-acede4f — fix: responsividade mobile Landing + Demo + Afiliado
-7ee7f84 — feat: logo nova + landing redesign + Zara atualizada
 
 ---
 
