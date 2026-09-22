@@ -378,8 +378,12 @@ export default function Terminal() {
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   onKeyDown={e => {
-                    if (e.key === 'Enter' && results.length > 0) addToCart(results[0])
-                    else if (e.key === 'Enter' && query.trim()) addToCart(query.trim())
+                    if (e.key !== 'Enter') return
+                    // Mesma prioridade do PDV admin: código exato primeiro, texto como fallback
+                    const exact = findProduct(query.trim())
+                    if (exact)              addToCart(exact)
+                    else if (results.length > 0) addToCart(results[0])
+                    else if (query.trim())  addToCart(query.trim())
                   }}
                   placeholder="Código de barras ou nome do produto  (F2)"
                   style={{ width: '100%', background: bg3, border: `1px solid ${brd}`, borderRadius: 10, padding: '12px 12px 12px 42px', color: txt, fontSize: 15, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
