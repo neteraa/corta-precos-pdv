@@ -76,20 +76,30 @@ const FAQ = [
 const TICKER_ITEMS = ['PDV OFFLINE', 'BOT WHATSAPP 24H', 'FIFO AUTOMÁTICO', 'VALIDADE COM ALERTA', 'FIADO DIGITAL', 'FIDELIDADE', 'CAMPANHAS WHATSAPP', 'ETIQUETAS SEM DRIVER', 'MULTI-CAIXA', 'RELATÓRIO PDF', 'ESTOQUE EM TEMPO REAL', 'CANCELA SEM CONTRATO']
 
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400;12..96,75..100,700;12..96,75..100,800&family=Inter:wght@400;500;600;700;800;900&display=swap');
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
   html { scroll-behavior:smooth; }
   body { font-family:'Inter',sans-serif; background:#09090b; color:#fff; overflow-x:hidden; }
-  @keyframes ticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
-  @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
-  @keyframes pulse2 { 0%,100%{opacity:.5} 50%{opacity:1} }
-  @keyframes bob    { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(7px)} }
-  @keyframes glow   { 0%,100%{box-shadow:0 0 20px rgba(249,115,22,.3)} 50%{box-shadow:0 0 40px rgba(249,115,22,.6)} }
-  .fu{animation:fadeUp .7s ease both}
-  .d1{animation-delay:.08s}.d2{animation-delay:.18s}.d3{animation-delay:.28s}.d4{animation-delay:.38s}.d5{animation-delay:.48s}
-  .ticker-inner{display:flex;width:max-content;animation:ticker 30s linear infinite}
-  .hl{transition:transform .2s,box-shadow .2s,opacity .2s}
-  .hl:hover{transform:translateY(-3px) !important;opacity:.9}
+
+  @keyframes ticker   { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+  @keyframes fadeUp   { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes pulse2   { 0%,100%{opacity:.5} 50%{opacity:1} }
+  @keyframes bobArrow { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(6px)} }
+  @keyframes phoneFloat { 0%,100%{transform:translateY(0) rotate(2deg)} 50%{transform:translateY(-14px) rotate(2deg)} }
+  @keyframes revealUp { from{opacity:0;transform:translateY(36px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes countIn  { from{opacity:0;transform:scale(.7)} to{opacity:1;transform:scale(1)} }
+  @keyframes borderPulse { 0%,100%{border-color:rgba(249,115,22,.15)} 50%{border-color:rgba(249,115,22,.4)} }
+
+  .fu{animation:fadeUp .65s cubic-bezier(.16,1,.3,1) both}
+  .d1{animation-delay:.06s}.d2{animation-delay:.14s}.d3{animation-delay:.24s}.d4{animation-delay:.34s}.d5{animation-delay:.44s}
+  .ticker-inner{display:flex;width:max-content;animation:ticker 28s linear infinite}
+  .hl{transition:transform .2s,opacity .2s}
+  .hl:hover{transform:translateY(-3px) !important;opacity:.88}
+
+  .rv { opacity:0; transform:translateY(32px); transition:opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1); }
+  .rv.in { opacity:1; transform:translateY(0); }
+  .rv-d1{ transition-delay:.08s }.rv-d2{ transition-delay:.18s }.rv-d3{ transition-delay:.28s }
+  .rv-d4{ transition-delay:.38s }.rv-d5{ transition-delay:.48s }.rv-d6{ transition-delay:.58s }
 
   /* ── Responsive layout ─────────────────────────────── */
   .nav-links   { display:none; }
@@ -128,7 +138,7 @@ const CSS = `
 
 /* ─── PDV Mockup ──────────────────────────────────────────── */
 const PDVMock = () => (
-  <div style={{ width:196, background:'#0f0f0f', borderRadius:32, border:'5px solid #1c1c1c', boxShadow:'0 40px 80px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.04)', padding:'12px 10px 16px', userSelect:'none' }}>
+  <div style={{ width:234, background:'#0f0f0f', borderRadius:36, border:'5px solid #1c1c1c', boxShadow:'0 40px 80px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.04)', padding:'14px 12px 18px', userSelect:'none' }}>
     <div style={{ width:48, height:4, borderRadius:2, background:'#2a2a2a', margin:'0 auto 12px' }}/>
     {/* app bar */}
     <div style={{ background:'#f97316', borderRadius:10, padding:'8px 10px', marginBottom:10, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -191,6 +201,15 @@ export default function Landing() {
     return () => clearTimeout(t)
   }, [])
 
+  useEffect(() => {
+    const io = new IntersectionObserver(
+      entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in') }),
+      { threshold: 0.12 }
+    )
+    document.querySelectorAll('.rv').forEach(el => io.observe(el))
+    return () => io.disconnect()
+  }, [])
+
   return (
     <div style={{ fontFamily:"'Inter',sans-serif", background:'#09090b', color:'#fff', overflowX:'hidden' }}>
       <style>{CSS}</style>
@@ -211,41 +230,40 @@ export default function Landing() {
       </nav>
 
       {/* ══ HERO ══════════════════════════════════════════ */}
-      <section style={{ minHeight:'100dvh', display:'flex', alignItems:'center', padding:'80px 24px 60px', position:'relative', overflow:'hidden' }}>
+      <section style={{ minHeight:'100dvh', display:'flex', alignItems:'flex-start', padding:'max(110px,14vh) 24px 80px', position:'relative', overflow:'hidden' }}>
 
         <div className="hero-layout">
           {/* ── coluna texto ── */}
           <div className="hero-inner">
-            <div className={`fu d1 hero-label ${vis?'':'opacity-0'}`} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:28 }}>
+            <div className={`fu d1 hero-label ${vis?'':'opacity-0'}`} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:24 }}>
               <div style={{ width:28, height:2, background:'#f97316', borderRadius:1, flexShrink:0 }}/>
-              <span style={{ fontSize:11, fontWeight:800, letterSpacing:'.14em', textTransform:'uppercase', color:'rgba(255,255,255,.35)' }}>PDV · Estoque · Bot WhatsApp · Fidelidade</span>
+              <span style={{ fontSize:11, fontWeight:700, letterSpacing:'.13em', textTransform:'uppercase', color:'rgba(255,255,255,.32)' }}>PDV · Estoque · Bot WhatsApp · Fidelidade</span>
             </div>
 
-            <h1 className={`fu d2 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(44px,7.5vw,96px)', fontWeight:900, lineHeight:.9, letterSpacing:'-.04em', marginBottom:24 }}>
+            <h1 className={`fu d2 ${vis?'':'opacity-0'}`} style={{ fontFamily:"'Bricolage Grotesque',sans-serif", fontSize:'clamp(46px,7vw,88px)', fontWeight:800, lineHeight:.92, letterSpacing:'-.02em', marginBottom:24 }}>
               <span style={{ display:'block', color:'#fff' }}>Gestão que</span>
               <span style={{ display:'block', color:'#f97316' }}>qualquer negócio</span>
-              <span style={{ display:'block', color:'rgba(255,255,255,.68)' }}>pode pagar.</span>
+              <span style={{ display:'block', color:'rgba(255,255,255,.6)' }}>pode pagar.</span>
             </h1>
 
-            <p className={`fu d3 ${vis?'':'opacity-0'}`} style={{ fontSize:16, color:'rgba(255,255,255,.42)', lineHeight:1.7, maxWidth:440, marginBottom:32 }}>
-              Do caixa ao WhatsApp, tudo numa tela —
-              no celular, sem instalar nada.
+            <p className={`fu d3 ${vis?'':'opacity-0'}`} style={{ fontSize:15.5, color:'rgba(255,255,255,.4)', lineHeight:1.75, maxWidth:420, marginBottom:32 }}>
+              Do caixa ao WhatsApp, tudo numa tela — no celular, sem instalar nada.
               A partir de <strong style={{ color:'#f97316', fontWeight:800 }}>R$297/mês</strong>, sem contrato.
             </p>
 
             <div className={`fu d4 hero-cta ${vis?'':'opacity-0'}`}>
-              <button onClick={() => openWpp()} style={{ display:'flex', alignItems:'center', gap:9, padding:'14px 28px', borderRadius:10, border:'none', cursor:'pointer', background:'#f97316', color:'#fff', fontSize:15, fontWeight:900 }}>
-                <MessageCircle size={17}/> Falar no WhatsApp
+              <button onClick={() => openWpp()} style={{ display:'flex', alignItems:'center', gap:9, padding:'13px 26px', borderRadius:9, border:'none', cursor:'pointer', background:'#f97316', color:'#fff', fontSize:14.5, fontWeight:800, letterSpacing:'-.01em' }}>
+                <MessageCircle size={16}/> Falar no WhatsApp
               </button>
-              <Link to="/demo" style={{ display:'flex', alignItems:'center', padding:'14px 22px', borderRadius:10, border:'1px solid rgba(255,255,255,.13)', color:'rgba(255,255,255,.65)', fontSize:14, fontWeight:700, textDecoration:'none' }}>
+              <Link to="/demo" style={{ display:'flex', alignItems:'center', padding:'13px 20px', borderRadius:9, border:'1px solid rgba(255,255,255,.12)', color:'rgba(255,255,255,.6)', fontSize:14, fontWeight:700, textDecoration:'none', transition:'border-color .2s,color .2s' }}>
                 Ver o sistema →
               </Link>
             </div>
 
-            <div className={`fu d5 hero-pills ${vis?'':'opacity-0'}`} style={{ display:'flex', gap:7, flexWrap:'wrap' }}>
+            <div className={`fu d5 hero-pills ${vis?'':'opacity-0'}`} style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
               {NICHOS.map(n => (
                 <Link key={n.slug} to={`/demo/${n.slug}`} className="hl"
-                  style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:999, border:`1px solid ${n.color}28`, background:`${n.color}0c`, color:n.color, fontSize:11.5, fontWeight:700, textDecoration:'none' }}>
+                  style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'5px 11px', borderRadius:999, border:`1px solid ${n.color}25`, background:`${n.color}0b`, color:n.color, fontSize:11.5, fontWeight:700, textDecoration:'none' }}>
                   {n.emoji} {n.label}
                 </Link>
               ))}
@@ -254,11 +272,13 @@ export default function Landing() {
 
           {/* ── coluna visual (desktop) ── */}
           <div className="hero-col-visual">
-            <PDVMock />
+            <div style={{ animation:'phoneFloat 4.5s ease-in-out infinite', filter:'drop-shadow(0 32px 48px rgba(249,115,22,.18))' }}>
+              <PDVMock />
+            </div>
           </div>
         </div>
 
-        <div style={{ position:'absolute', bottom:20, left:'50%', animation:'bob 2s ease infinite', opacity:.18 }}><ChevronDown size={20} color="#fff"/></div>
+        <div style={{ position:'absolute', bottom:20, left:'50%', animation:'bobArrow 2.2s ease infinite', opacity:.18 }}><ChevronDown size={20} color="#fff"/></div>
       </section>
 
       {/* ══ TICKER ════════════════════════════════════════ */}
@@ -276,14 +296,14 @@ export default function Landing() {
       <section style={{ padding:'52px 24px', borderBottom:'1px solid rgba(255,255,255,.06)' }}>
         <div className="stats-row" style={{ maxWidth:900, margin:'0 auto' }}>
           {[
-            { n:'6',      l:'segmentos atendidos'     },
-            { n:'12',     l:'módulos integrados'      },
-            { n:'R$297',  l:'por mês, sem contrato'   },
-            { n:'2h',     l:'pra ativar e começar'    },
+            { n:'6',      l:'segmentos atendidos', d:'rv rv-d1' },
+            { n:'12',     l:'módulos integrados',  d:'rv rv-d2' },
+            { n:'R$297',  l:'por mês, sem contrato', d:'rv rv-d3' },
+            { n:'2h',     l:'pra ativar e começar',  d:'rv rv-d4' },
           ].map(s => (
-            <div key={s.l} style={{ textAlign:'center' }}>
-              <div style={{ fontSize:38, fontWeight:900, color:'#f97316', lineHeight:1, letterSpacing:'-.03em' }}>{s.n}</div>
-              <div style={{ fontSize:12, color:'rgba(255,255,255,.38)', marginTop:5, fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em' }}>{s.l}</div>
+            <div key={s.l} className={s.d} style={{ textAlign:'center' }}>
+              <div style={{ fontFamily:"'Bricolage Grotesque',sans-serif", fontSize:40, fontWeight:800, color:'#f97316', lineHeight:1, letterSpacing:'-.02em' }}>{s.n}</div>
+              <div style={{ fontSize:11.5, color:'rgba(255,255,255,.35)', marginTop:6, fontWeight:600, textTransform:'uppercase', letterSpacing:'.07em' }}>{s.l}</div>
             </div>
           ))}
         </div>
@@ -291,20 +311,20 @@ export default function Landing() {
 
       {/* ══ DEMOS POR NICHO ═══════════════════════════════ */}
       <section style={{ padding:'100px 24px', maxWidth:1100, margin:'0 auto' }}>
-        <div style={{ textAlign:'center', marginBottom:52 }}>
+        <div className="rv" style={{ textAlign:'center', marginBottom:52 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:18 }}>
             <div style={{ width:24, height:2, background:'#f97316', borderRadius:1 }}/>
-            <span style={{ fontSize:11, fontWeight:800, letterSpacing:'.14em', textTransform:'uppercase', color:'rgba(255,255,255,.35)' }}>Demos ao vivo</span>
+            <span style={{ fontSize:11, fontWeight:700, letterSpacing:'.14em', textTransform:'uppercase', color:'rgba(255,255,255,.3)' }}>Demos ao vivo</span>
             <div style={{ width:24, height:2, background:'#f97316', borderRadius:1 }}/>
           </div>
-          <h2 style={{ fontSize:'clamp(30px,5vw,52px)', fontWeight:900, letterSpacing:'-.03em', lineHeight:1.05, marginBottom:14 }}>
+          <h2 style={{ fontFamily:"'Bricolage Grotesque',sans-serif", fontSize:'clamp(30px,5vw,50px)', fontWeight:800, letterSpacing:'-.02em', lineHeight:1.05, marginBottom:14 }}>
             Clica e vê como fica<br/><span style={{ color:'#f97316' }}>pro seu negócio.</span>
           </h2>
-          <p style={{ color:'rgba(255,255,255,.35)', fontSize:15, maxWidth:480, margin:'0 auto' }}>PDV funcionando, promoção automática, checkout. Sem login, sem cadastro.</p>
+          <p style={{ color:'rgba(255,255,255,.32)', fontSize:15, maxWidth:480, margin:'0 auto' }}>PDV funcionando, promoção automática, checkout. Sem login, sem cadastro.</p>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:16 }}>
-          {NICHOS.map(n => (
-            <Link key={n.slug} to={`/demo/${n.slug}`} className="hl"
+          {NICHOS.map((n, i) => (
+            <Link key={n.slug} to={`/demo/${n.slug}`} className={`hl rv rv-d${Math.min(i+1,6)}`}
               style={{ display:'block', background:'rgba(255,255,255,0.03)', border:`1px solid ${n.color}22`, borderRadius:20, padding:24, textDecoration:'none', position:'relative', overflow:'hidden' }}>
               <div style={{ fontSize:38, marginBottom:12, lineHeight:1 }}>{n.emoji}</div>
               <div style={{ fontWeight:900, fontSize:17, color:'#fff', marginBottom:3 }}>{n.label}</div>
@@ -332,7 +352,7 @@ export default function Landing() {
               <span style={{ fontSize:11, fontWeight:800, letterSpacing:'.14em', textTransform:'uppercase', color:'rgba(255,255,255,.35)' }}>O que vem incluso</span>
               <div style={{ width:24, height:2, background:'#f97316', borderRadius:1 }}/>
             </div>
-            <h2 style={{ fontSize:'clamp(26px,4vw,46px)', fontWeight:900, letterSpacing:'-.03em', marginBottom:10 }}>
+            <h2 style={{ fontFamily:"'Bricolage Grotesque',sans-serif", fontSize:'clamp(26px,4vw,46px)', fontWeight:800, letterSpacing:'-.02em', marginBottom:10 }}>
               Do R$297 vem <span style={{ color:'#f97316' }}>tudo isso.</span>
             </h2>
             <p style={{ color:'rgba(255,255,255,.35)', fontSize:14 }}>12 módulos. Uma mensalidade. Cancela quando quiser.</p>
@@ -361,7 +381,7 @@ export default function Landing() {
             <span style={{ fontSize:11, fontWeight:800, letterSpacing:'.14em', textTransform:'uppercase', color:'rgba(255,255,255,.35)' }}>Planos e preços</span>
             <div style={{ width:24, height:2, background:'#f97316', borderRadius:1 }}/>
           </div>
-          <h2 style={{ fontSize:'clamp(28px,4.5vw,50px)', fontWeight:900, letterSpacing:'-.03em', marginBottom:10 }}>
+                      <h2 style={{ fontFamily:"'Bricolage Grotesque',sans-serif", fontSize:'clamp(28px,4.5vw,50px)', fontWeight:800, letterSpacing:'-.02em', marginBottom:10 }}>
             Sem enrolação.<br/><span style={{ color:'#f97316' }}>Escolhe e começa hoje.</span>
           </h2>
           <p style={{ color:'rgba(255,255,255,.35)', fontSize:15 }}>Sem contrato. Sem taxa de adesão. Sem pegadinha.</p>
