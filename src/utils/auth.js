@@ -8,12 +8,19 @@ const STORE_ID_KEY  = 'cp_store_id'   // flat — set once per installation
 export function slugify(name = '') {
   return name.toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // strip accents
-    .replace(/[^a-z0-9]+/g, '')                         // keep alphanumeric only
+    .replace(/[^a-z0-9_]+/g, '')                        // keep alphanumeric + underscore
     .slice(0, 32) || 'default'
 }
 
-/** Returns the storeId configured for THIS browser installation. */
+/** Returns the storeId configured for THIS browser installation.
+ *  Prefere cp_session.storeId (set pelo login, preserva underscores)
+ *  para evitar que o cp_store_id legado (gerado com slugify antigo,
+ *  sem underscore) gere URLs de celular com namespace errado. */
 export function getConfiguredStoreId() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY))
+    if (s?.storeId && s.storeId !== 'default') return s.storeId
+  } catch {}
   return localStorage.getItem(STORE_ID_KEY) || 'default'
 }
 
