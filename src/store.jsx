@@ -226,7 +226,15 @@ export function StoreProvider({ children }) {
     const hdrs = { 'Content-Type': 'application/json', 'x-zs-token': token }
 
     fetch('/api/persist', { method: 'POST', headers: hdrs, body })
-      .then(r => { if (!r.ok) throw new Error('server') })
+      .then(r => {
+        if (r.status === 401 || r.status === 403) {
+          // Token inválido — não tenta retry; avisa o usuário para refazer login
+          try { localStorage.setItem('zs_session_expired', '1') } catch {}
+          window.dispatchEvent(new CustomEvent('zs:auth-error'))
+          return
+        }
+        if (!r.ok) throw new Error('server')
+      })
       .catch(() =>
         // One silent retry after 8 s — keeps pending > 0 during the window
         new Promise(res => setTimeout(res, 8000))
@@ -288,24 +296,29 @@ export function StoreProvider({ children }) {
     if (data.cp_goal)     try { setSalesGoalState(JSON.parse(data.cp_goal));  try { localStorage.setItem(mktKey('cp_goal'),      data.cp_goal)      } catch {} } catch {}
     if (data.cp_operators) try {
       const serverOps = JSON.parse(data.cp_operators)
-      // Mesma proteção de pendingPersists dos produtos — evita ressurgir
-      // operadores excluídos da mesma forma que a lógica anterior por contagem.
       setOperators(prev => {
         if (pendingPersists.current['cp_operators'] > 0) {
           syncToServer('cp_operators', JSON.stringify(prev))
           return prev
         }
-        try { localStorage.setItem(mktKey('cp_operators'), data.cp_operators) } catch {}
-        return serverOps
+        // Operadores que existem só no local (persist falhou antes) são preservados
+        // e enviados ao servidor para não se perderem no próximo sync.
+        const serverIds = new Set(serverOps.map(o => o.id))
+        const localOnly = prev.filter(o => !serverIds.has(o.id))
+        const merged = localOnly.length > 0 ? [...serverOps, ...localOnly] : serverOps
+        if (localOnly.length > 0) syncToServer('cp_operators', JSON.stringify(merged))
+        try { localStorage.setItem(mktKey('cp_operators'), JSON.stringify(merged)) } catch {}
+        return merged
       })
     } catch {}
     if (data.cp_supplier_offers) try { setSupplierOffers(JSON.parse(data.cp_supplier_offers)); try { localStorage.setItem(mktKey('cp_supplier_offers'), data.cp_supplier_offers); localStorage.setItem('cp_supplier_offers', data.cp_supplier_offers) } catch {} } catch {}
 
     // Push local keys not yet on server
-    if (!data.cp_customers) setCustomers(c  => { syncToServer('cp_customers', JSON.stringify(c));  return c })
-    if (!data.cp_promos)    setPromos(pr    => { syncToServer('cp_promos',    JSON.stringify(pr)); return pr })
-    if (!data.cp_products)  setProducts(p   => { syncToServer('cp_products',  JSON.stringify(p));  return p })
-    if (!data.cp_sales)     setSales(s      => { syncToServer('cp_sales',     JSON.stringify(s));  return s })
+    if (!data.cp_customers)  setCustomers(c  => { syncToServer('cp_customers',  JSON.stringify(c));  return c })
+    if (!data.cp_promos)     setPromos(pr    => { syncToServer('cp_promos',     JSON.stringify(pr)); return pr })
+    if (!data.cp_products)   setProducts(p   => { syncToServer('cp_products',   JSON.stringify(p));  return p })
+    if (!data.cp_sales)      setSales(s      => { syncToServer('cp_sales',      JSON.stringify(s));  return s })
+    if (!data.cp_operators)  setOperators(o  => { syncToServer('cp_operators',  JSON.stringify(o));  return o })
 
     setLastSync(new Date())
   }, []) // eslint-disable-line

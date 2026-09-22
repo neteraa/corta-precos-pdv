@@ -389,6 +389,7 @@ export default function Login() {
       if (data.ok) {
         saveStoreId(data.storeId)
         localStorage.setItem('cp_session', JSON.stringify({ loggedIn:true, user:u, storeId:data.storeId, storeName:data.storeName, storePhone:data.storePhone, niche:data.niche||'mercado', role:'admin', storeToken:data.storeToken||'' }))
+        try { localStorage.removeItem('zs_session_expired') } catch {}
         wipeLegacyFlatKeys()
         registerStoreId(data.storeId)
         seedSettingsFromSession()          // pre-populate storeName + themeColor

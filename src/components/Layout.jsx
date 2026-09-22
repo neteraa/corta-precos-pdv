@@ -198,6 +198,15 @@ export default function Layout() {
   const themeColor   = storeSettings.themeColor || '#f97316'
   const nicheMeta    = getNicheMeta(_session.niche || 'mercado')
 
+  const [sessionExpired, setSessionExpired] = useState(() => {
+    try { return localStorage.getItem('zs_session_expired') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    const handler = () => setSessionExpired(true)
+    window.addEventListener('zs:auth-error', handler)
+    return () => window.removeEventListener('zs:auth-error', handler)
+  }, [])
+
   // Keep CSS variable in sync so ALL --zs-theme consumers (btn-primary, inputs, etc.) update instantly
   useEffect(() => {
     document.documentElement.style.setProperty('--zs-theme', themeColor)
@@ -329,6 +338,16 @@ export default function Layout() {
           <div className="flex items-center gap-2 px-4 py-2 bg-amber-400 text-amber-950 text-sm font-bold shrink-0">
             <span>⚡</span>
             <span>Sem internet — operando offline. Vendas salvas localmente e sincronizadas quando voltar.</span>
+          </div>
+        )}
+
+        {/* session expired banner — token inválido, dados não estão salvando no servidor */}
+        {sessionExpired && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-bold shrink-0">
+            <span>🔒</span>
+            <span className="flex-1">Sessão expirada — os dados não estão sendo salvos. Faça login novamente.</span>
+            <button onClick={() => { navigate('/login') }} className="underline whitespace-nowrap">Entrar →</button>
+            <button onClick={() => { try { localStorage.removeItem('zs_session_expired') } catch {} setSessionExpired(false) }} className="ml-3 opacity-80 hover:opacity-100 text-base leading-none">✕</button>
           </div>
         )}
 
