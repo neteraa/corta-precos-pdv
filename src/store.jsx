@@ -234,8 +234,18 @@ export function StoreProvider({ children }) {
 
     if (data.cp_products) try {
       const parsed = JSON.parse(data.cp_products)
-      setProducts(mergeWithSeed(parsed))
-      try { localStorage.setItem(mktKey('cp_products'), data.cp_products) } catch {}
+      // Local vence se tem MAIS produtos — significa que o POST ainda está em
+      // trânsito (o sync de 30s não pode apagar um cadastro/import que acabou
+      // de acontecer e cujo POST ainda não chegou no servidor).
+      // Mesma estratégia já usada para operadores.
+      setProducts(prev => {
+        if (prev.length > parsed.length) {
+          syncToServer('cp_products', JSON.stringify(prev))
+          return prev
+        }
+        try { localStorage.setItem(mktKey('cp_products'), data.cp_products) } catch {}
+        return mergeWithSeed(parsed)
+      })
     } catch {}
     if (data.cp_sales) try {
       setSales(JSON.parse(data.cp_sales))
@@ -319,7 +329,7 @@ export function StoreProvider({ children }) {
       const exists = p.id && prev.some(x => x.id === p.id)
       const next = exists
         ? prev.map(x => x.id === p.id ? { ...x, ...p } : x)
-        : [...prev, { ...p, id: p.id ?? `p${Date.now()}` }]
+        : [...prev, { ...p, id: p.id ?? `p${Date.now()}_${Math.random().toString(36).slice(2)}` }]
       persist('cp_products', next); return next
     })
   }, [persist])
@@ -505,7 +515,9 @@ export function StoreProvider({ children }) {
     }
     for (const key of keys) {
       MAP[key]?.()
-      localStorage.removeItem(mktKey(key))
+      // Setar '[]' em vez de removeItem — evita que na próxima carga de página
+      // o useState leia null e inicie com SEED_PRODUCTS (flash de produtos falsos)
+      try { localStorage.setItem(mktKey(key), '[]') } catch {}
       await fetch('/api/persist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
