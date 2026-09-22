@@ -1,4 +1,4 @@
-# ZatendeStok — AGENTS.md (v11.0 — 2026-09-22)
+# ZatendeStok — AGENTS.md (v12.0 — 2026-09-22)
 
 ## Projeto
 
@@ -22,17 +22,29 @@
 | Instância WA | zatendeapi · open · +55 15 9979-6930 · nome: "zatende" |
 | Webhook WA | https://zatendestok.com.br/wa-bot · MESSAGES_UPSERT · enabled: true |
 | OpenAI | gpt-4o-mini · max_tokens: 350 · temp: 0.75 · timeout: 12s |
+| WS Relay | Railway — wss://ws-relay-production-42a7.up.railway.app/ws/scan |
+|         | Projeto: charming-dedication · Serviço: ws-relay (69a44033) |
+|         | rootDirectory=relay · startCommand=node ws-relay.js |
+|         | Autenticação: HMAC-SHA256 com ZS_PERSIST_SECRET |
 | Railway latência | ~3.5s cold start |
 
 ---
 
 ## Env Vars (Netlify — nunca committar)
 
-- EVOLUTION_API_URL  ✅
-- EVOLUTION_API_KEY  ✅
-- EVOLUTION_INSTANCE ✅
-- OPENAI_API_KEY     ✅ (sk-proj-4FVEl...)
-- WA_BOT_SECRET      ❌ ausente (não crítico)
+- EVOLUTION_API_URL     ✅
+- EVOLUTION_API_KEY     ✅
+- EVOLUTION_INSTANCE    ✅
+- OPENAI_API_KEY        ✅ (sk-proj-4FVEl...)
+- WA_BOT_SECRET         ❌ ausente (não crítico)
+- ZS_PERSIST_SECRET     ✅ (64 chars hex — production; também no Railway ws-relay)
+- VITE_WS_RELAY_URL     ✅ wss://ws-relay-production-42a7.up.railway.app (todos os contextos)
+
+**CRITICAL:** VITE_ vars precisam de `export VITE_XXX=val && npm run build` — variáveis inline no mesmo
+comando (`VITE_XXX=val npm run build`) NÃO são injetadas pelo shell do CI da Netlify. Sempre usar `export`.
+
+**NOTA domínio Railway:** O domínio real é `ws-relay-production-42a7.up.railway.app` (com sufixo -42a7),
+NÃO `ws-relay-production.up.railway.app`. Confundir os dois quebra o relay silenciosamente.
 
 ---
 
@@ -227,16 +239,13 @@ IIFE inicial define `cp_store_id` e `cp_session.storeId` diretamente sem slugify
 
 ## Commits recentes
 
-cc133ce — fix: storeId com underscore — causa raiz produto não aparecer no terminal
-43aaef3 — fix: ScanMobile — estoque dobrado + race condition no lote de entrada
-5a09a32 — fix: 3 buracos de segurança no fluxo de persistência de produtos
-3e1a018 — fix: terminal — scanner retornava produto errado ao escanear mesmo item
-4c89d90 — fix: 2 bugs críticos do primeiro cliente
-e871104 — fix: terminal — 3 bugs do caixa
-b49fd83 — fix: race condition operadores + botão Limpar Base de Dados
-65fcb95 — chore: AGENTS.md v10.0
-f85238a — fix: landing Bricolage + hero sem vazio + phone float + scroll reveal
-e4bb785 — feat: hero 2 colunas + PDVMock animado no desktop
+(próximo)    — chore: AGENTS.md v12.0 + relay E2E verificado
+c1201179    — feat: WebSocket relay for cross-device scanner → PDV
+af8696cd    — fix: secure tenant persistence and sync
+9b10d8d9    — chore: AGENTS.md v11.0 + CHANGELOG.md completo
+cc133ce     — fix: storeId com underscore — causa raiz produto não aparecer no terminal
+43aaef3     — fix: ScanMobile — estoque dobrado + race condition no lote de entrada
+5a09a32     — fix: 3 buracos de segurança no fluxo de persistência de produtos
 
 ---
 
@@ -245,7 +254,8 @@ e4bb785 — feat: hero 2 colunas + PDVMock animado no desktop
 - Inline styles → componentes dark (Landing, Afiliado, Demo hub)
 - Tailwind classes → sistema autenticado (Layout, PDV, Dashboard)
 - CSS const com @media → responsividade Landing (560px/768px), Afiliado (420px)
-- Build: npm run build → dist/ sempre limpo antes de deploy
+- Build: `export VITE_WS_RELAY_URL=wss://ws-relay-production-42a7.up.railway.app && npm run build`
+  → dist/ sempre limpo antes de deploy; `export` obrigatório para VITE_ vars
 - Git: branch master, Co-authored-by: openhands <openhands@all-hands.dev>
 - Push: git remote set-url com token → push → resetar remote sem token
 
@@ -265,3 +275,17 @@ curl -X POST https://zatendestok.com.br/wa-bot -H "Content-Type: application/jso
 
 # Setar env var
 npx netlify-cli env:set NOME_VAR valor --auth=$NETLIFY_AUTH_TOKEN
+
+# Build + deploy correto (export obrigatório para VITE_ vars)
+export VITE_WS_RELAY_URL=wss://ws-relay-production-42a7.up.railway.app && npm run build
+npx netlify-cli deploy --prod --dir=dist --auth=$NETLIFY_AUTH_TOKEN
+
+# Relay health (domínio correto com -42a7)
+curl https://ws-relay-production-42a7.up.railway.app/health
+# Expected: {"ok":true,"rooms":<N>,"secret":true}
+
+# Railway redeploy via API
+/tmp/node_modules/.bin/railway api 'mutation { serviceInstanceRedeploy(serviceId: "69a44033-d4aa-45de-b738-eef350413f6c", environmentId: "061cb025-41f8-4eaf-bb06-ebceca4ac87c") }'
+
+# Railway vars (ws-relay)
+/tmp/node_modules/.bin/railway variables set --project df6bcfe6 --service ws-relay --environment production KEY=VALUE
