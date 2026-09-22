@@ -223,20 +223,21 @@ function sendReply(number, text, instance) {
 
   if (!url || !key || !inst) {
     console.error('wa-bot: Evolution API not configured')
-    return
+    return Promise.resolve()
   }
 
   const ac = new AbortController()
-  setTimeout(() => ac.abort(), 8000) // desiste em 8s
+  const timer = setTimeout(() => ac.abort(), 8000) // desiste em 8s
 
-  fetch(`${url}/message/sendText/${inst}`, {
+  return fetch(`${url}/message/sendText/${inst}`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', 'apikey': key },
     body:    JSON.stringify({ number, text }),
     signal:  ac.signal,
   }).then(r => {
-    if (!r.ok) r.text().then(b => console.error(`wa-bot: sendText ${r.status} — ${b.slice(0,200)}`))
-    else console.log(`wa-bot: sendText OK → ${number}`)
+    clearTimeout(timer)
+    if (!r.ok) return r.text().then(b => console.error(`wa-bot: sendText ${r.status} — ${b.slice(0,200)}`))
+    console.log(`wa-bot: sendText OK → ${number}`)
   }).catch(e => console.error('wa-bot: sendReply error:', e.message))
 }
 
@@ -372,7 +373,7 @@ function pushHistory(senderNum, role, content) {
 // Track recently processed message IDs to avoid duplicate responses
 const recentIds = new Set()
 
-export default async (req) => {
+export default async (req, context) => {
   if (req.method === 'GET') {
     // Webhook verification (some Evolution versions send GET)
     return new Response(JSON.stringify({ status: 'wa-bot online' }), {
@@ -488,7 +489,7 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
         await saveLead(senderNum, { waName: senderName, stage: leadProfile.stage || 'novo' })
       }
 
-      sendReply(senderNum, reply, instanceName)
+      context.waitUntil(sendReply(senderNum, reply, instanceName))
       console.log(`wa-bot [Zara]: respondeu ${senderNum}: ${reply.slice(0, 80)}`)
 
     } else {
@@ -507,7 +508,7 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
 
       // Bot do mercado não usa <zs_lead> — resposta direta
       pushHistory(senderNum, 'assistant', rawReply)
-      sendReply(senderNum, rawReply, instanceName)
+      context.waitUntil(sendReply(senderNum, rawReply, instanceName))
       console.log(`wa-bot [${instanceName}]: respondeu ${senderNum}: ${rawReply.slice(0, 80)}`)
     }
 
@@ -518,7 +519,7 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
       const fallback = isZara
         ? `Oi${senderName ? ', ' + senderName : ''}! 👋 Tô aqui sim — só tive um probleminha técnico agora.\nVou chamar o Pedro pra te atender direitinho. Já te retorno! 😊`
         : `Oi! Estamos com uma instabilidade agora, mas já resolvemos em breve. Obrigado pela paciência! 😊`
-      sendReply(senderNum, fallback, instanceName)
+      context.waitUntil(sendReply(senderNum, fallback, instanceName))
     } else {
       console.error('wa-bot error:', err.message)
     }
