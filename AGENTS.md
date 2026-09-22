@@ -1,4 +1,4 @@
-# ZatendeStok — AGENTS.md (v9.0 — 2026-09)
+# ZatendeStok — AGENTS.md (v10.0 — 2026-09-22)
 
 ## Projeto
 
@@ -122,14 +122,59 @@ padariateste_1790000668712 — Padaria Teste (padaria)
 
 ---
 
+## Design System — Landing (v10.0)
+
+**Fonte:** Bricolage Grotesque (800w) para h1/h2/stats — Google Fonts variável
+**Corpo:** Inter (400/700/800/900) — sistema autenticado usa Tailwind defaults
+
+**Hero:**
+- Layout: 2 colunas flex-row no desktop (≥700px), flex-column no mobile
+- `alignItems:'flex-start'` + `paddingTop:'max(110px,14vh)'` — sem vazio no topo
+- `minHeight:'100dvh'` mantido para scroll indicator funcionar
+- Coluna visual: PDVMock (234px) com `animation:phoneFloat 4.5s ease-in-out infinite`
+- `filter: drop-shadow(0 32px 48px rgba(249,115,22,.18))` no phone
+
+**Animações CSS:**
+- `phoneFloat`: levita 14px + rotate(2deg) infinito
+- `.rv` / `.rv.in`: scroll reveal via IntersectionObserver (threshold 0.12)
+- `.rv-d1..d6`: stagger delays 0.08s → 0.58s
+- `bobArrow`: seta no bottom do hero
+
+**Aplicado em:**
+- Stats números: rv-d1..d4 com Bricolage 40px/800
+- Demo cards: rv rv-d1..d6 (staggered por índice)
+- Demo section header: rv
+
+**Paleta:** `#f97316` (laranja) / `#fbbf24` (âmbar) — ZERO roxo/verde AI
+**Seções dark:** inline styles (não Tailwind) — Landing.jsx, Afiliado.jsx, Demo hub
+
+---
+
+## QA produção (22/09/2026)
+
+| Check | Status |
+|---|---|
+| Landing / | ✅ 200 |
+| /demo | ✅ 200 |
+| /demo/mercado..distribuidora | ✅ 200 (todos 6) |
+| /login | ✅ 200, rejeita credencial inválida |
+| /afiliado | ✅ 200, slider funcionando |
+| /painel | ✅ login com 198556@@Pedro, 4 mercados visíveis |
+| /api/wa-status | ✅ status:open, phone:5515997969303 |
+| /wa-bot | ✅ HTTP 200, captura lead (testado) |
+| PDV demo interativo | ✅ carrinho, total, pagamentos |
+| Leads Bot | ✅ 13 leads capturados pela Zara |
+
+---
+
 ## Commits recentes
 
+f85238a — fix: landing Bricolage + hero sem vazio + phone float + scroll reveal
+e4bb785 — feat: hero 2 colunas + PDVMock animado no desktop
+014dba2 — fix: landing checklist features + stats bar + copy humano
 1877a10 — fix: fallback OpenAI quota (credit_balance_exhausted)
 acede4f — fix: responsividade mobile Landing + Demo + Afiliado
 7ee7f84 — feat: logo nova + landing redesign + Zara atualizada
-43d638a — fix: wa-bot timeout 26s + fire-and-forget
-c63c6d9 — feat: demo nav modal features
-f9d026a — feat: demos interativos por nicho
 
 ---
 
