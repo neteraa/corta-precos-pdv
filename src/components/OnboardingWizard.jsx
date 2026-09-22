@@ -72,7 +72,7 @@ function useOnboardingData() {
   useEffect(() => {
     const storeId = getConfiguredStoreId()
     const sn = localStorage.getItem(`mkt:${storeId}:cp_store_name`) || localStorage.getItem('cp_store_name') || ''
-    const raw = localStorage.getItem(`mkt:${storeId}:cp_operators`) || localStorage.getItem('cp_operators') || '[]'
+    const raw = localStorage.getItem(`mkt:${storeId}:cp_operators`) || '[]'
     setStoreName(sn)
     try { setOperators(JSON.parse(raw)) } catch { setOperators([]) }
   }, [])

@@ -41,7 +41,6 @@ export default function CaixaLogin() {
 
     // Local cache (works when same device as admin)
     const localRaw = localStorage.getItem(`mkt:${storeId}:cp_operators`)
-                  ?? localStorage.getItem('cp_operators')
     const localOps = localRaw ? JSON.parse(localRaw).filter(o => o.active !== false) : []
 
     try {
