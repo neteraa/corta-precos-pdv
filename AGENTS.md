@@ -42,7 +42,9 @@ src/pages/Landing.jsx         — landing dark completa (hero, demos, planos, af
 src/pages/Demo.jsx            — /demo hub + /demo/:niche PDV interativo sem auth
 src/pages/Afiliado.jsx        — landing afiliados com simulador de ganhos
 src/pages/Login.jsx           — login, salva niche na session
-src/components/ZatendeStokLogo.jsx — ZSMark SVG + wordmark laranja/âmbar
+src/components/ZatendeStokLogo.jsx — ZSMark SVG + wordmark laranja/âmbar (fundo warm-dark #0d0b07→#1a1307)
+src/components/ZaraMascot.jsx — mascote Zara, flat SVG 280×390px, animações: float/blink/wave/pulse
+                                  props: width, className, style · usado no hero de /afiliado
 src/components/Layout.jsx     — sidebar niche-aware tema dinâmico
 src/hooks/usePrinter.js       — NICHE_META, getNicheMeta()
 src/index.css                 — html,body overflow-x:hidden global
