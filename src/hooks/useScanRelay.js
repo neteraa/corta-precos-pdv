@@ -1,49 +1,61 @@
 /**
  * useScanRelay — cross-device barcode relay via WebSocket.
  *
- * Sender  (phone /scan page):   useScanRelay.send(code)
- * Receiver (PDV / Terminal):    useScanRelay.useReceive(callback)
+ * Sender  (phone /scan page):   useScanSender()
+ * Receiver (PDV / Terminal):    useScanReceiver(callback)
  *
  * Transport priority:
- *   1. WebSocket  /ws/scan  → works cross-device (phone → PC)
+ *   1. WebSocket → VITE_WS_RELAY_URL (Railway relay) — works cross-device
  *   2. localStorage storage event → fallback for same-browser multi-tab
+ *
+ * Auth: storeId + storeToken passed as query params on connect.
+ *       Relay verifies HMAC before admitting the connection.
+ *       Loja A never receives events from Loja B.
  */
 import { useEffect, useRef } from 'react'
+import { getMktStoreId, getMktStoreToken } from '../utils/tenantStorage.js'
 
 const LS_KEY = 'cp_mobile_scan'
 
-// Derive WebSocket URL from current page location.
-// Works with Cloudflare tunnel (wss://) and local dev (ws://)
-function wsUrl() {
+// Build the WebSocket URL.
+// Production: VITE_WS_RELAY_URL points to the Railway relay service.
+// Local dev:  falls back to same-host /ws/scan (server.js relay).
+function wsUrl(type = 'terminal') {
+  const storeId = getMktStoreId()
+  const token   = getMktStoreToken()
+  const params  = `storeId=${encodeURIComponent(storeId)}&t=${encodeURIComponent(token)}&type=${type}`
+
+  const relay = import.meta.env.VITE_WS_RELAY_URL
+  if (relay) return `${relay}/ws/scan?${params}`
+
+  // Local dev fallback (same host — server.js must be running)
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  return `${proto}://${window.location.host}/ws/scan`
+  return `${proto}://${window.location.host}/ws/scan?${params}`
 }
 
-// Exponential backoff: 3s → 6s → 12s → 30s → stops after 5 failures.
-// On Netlify there is no /ws/scan endpoint; localStorage is the live fallback.
-function makeReconnector(factory, maxAttempts = 5) {
+// Reconnects indefinitely while the page is open.
+// Backoff: 2s → 4s → 8s → 16s → 30s (capped) — resets on successful open.
+function makeReconnector(factory) {
   let attempts = 0
-  let dead = false
-  let ws = null
-  let timer = null
+  let stopped  = false
+  let timer    = null
 
   function connect() {
-    if (dead) return
+    if (stopped) return
     try {
-      ws = factory(
-        () => { attempts = 0 },                                       // onopen — reset counter
-        () => {                                                        // onclose
-          if (dead) return
+      factory(
+        () => { attempts = 0 },                                        // onopen — reset counter
+        () => {                                                         // onclose
+          if (stopped) return
           attempts++
-          if (attempts >= maxAttempts) { dead = true; return }        // give up silently
-          const delay = Math.min(3000 * 2 ** (attempts - 1), 30_000) // 3s 6s 12s 24s 30s
+          const delay = Math.min(2000 * 2 ** Math.min(attempts - 1, 4), 30_000) // cap 30s
           timer = setTimeout(connect, delay)
         }
       )
     } catch {}
   }
   connect()
-  return { get ws() { return ws }, stop() { dead = true; clearTimeout(timer); ws?.close() } }
+  return { stop() { stopped = true; clearTimeout(timer) } }
 }
 
 /* ── SENDER (used in ScanMobile) ──────────────────────────── */
@@ -52,18 +64,17 @@ export function useScanSender() {
 
   useEffect(() => {
     const r = makeReconnector((onopen, onclose) => {
-      const ws = new WebSocket(wsUrl())
+      const ws = new WebSocket(wsUrl('scanner'))
       ws.onopen  = () => { wsRef.current = ws; onopen() }
       ws.onclose = () => { wsRef.current = null; onclose() }
       ws.onerror = () => ws.close()
-      return ws
     })
     return () => r.stop()
   }, [])
 
   return (code) => {
-    const payload = JSON.stringify({ code, ts: Date.now() })
-    // 1. WebSocket (cross-device — only when server supports /ws/scan)
+    const payload = JSON.stringify({ type: 'scan', code, ts: Date.now() })
+    // 1. WebSocket relay (cross-device)
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(payload)
     }
@@ -89,12 +100,11 @@ export function useScanReceiver(onCode) {
     }
 
     const r = makeReconnector((onopen, onclose) => {
-      const ws = new WebSocket(wsUrl())
+      const ws = new WebSocket(wsUrl('terminal'))
       ws.onopen    = onopen
       ws.onmessage = (e) => handle(e.data)
       ws.onclose   = onclose
       ws.onerror   = () => ws.close()
-      return ws
     })
 
     // localStorage fallback (same-browser multi-tab — always active)

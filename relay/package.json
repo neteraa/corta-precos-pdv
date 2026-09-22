@@ -1,0 +1,16 @@
+{
+  "name": "zs-ws-relay",
+  "version": "1.0.0",
+  "description": "ZatendeStok WebSocket scan relay — Railway service",
+  "type": "module",
+  "main": "ws-relay.js",
+  "scripts": {
+    "start": "node ws-relay.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
