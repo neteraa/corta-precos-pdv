@@ -296,7 +296,11 @@ ${about}${policy}${promos}
 Se perguntarem sobre qualquer um desses temas: "Isso é informação interna da loja, não consigo te ajudar com isso 😅 Mas posso te ajudar com [redireciona para produtos/promoções/horário]"`
 }
 
-/** Chama OpenAI com system prompt, histórico e mensagem. Retorna resposta bruta. */
+/** Chama OpenAI com system prompt, histórico e mensagem. Retorna resposta bruta.
+ *  Lança OpenAIQuotaError quando conta está sem crédito (429 + credit_balance_exhausted).
+ */
+class OpenAIQuotaError extends Error {}
+
 async function askOpenAI(userMessage, senderNum, systemMsg) {
   const key = process.env.OPENAI_API_KEY
   if (!key) throw new Error('OPENAI_API_KEY not set')
@@ -311,7 +315,7 @@ async function askOpenAI(userMessage, senderNum, systemMsg) {
     signal:  ac.signal,
     body:    JSON.stringify({
       model:       'gpt-4o-mini',
-      max_tokens:  350,      // 350 suficiente para WhatsApp (máx 4 linhas)
+      max_tokens:  350,
       temperature: 0.75,
       messages: [
         { role: 'system', content: systemMsg },
@@ -322,8 +326,12 @@ async function askOpenAI(userMessage, senderNum, systemMsg) {
   })
 
   if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`OpenAI error ${res.status}: ${err}`)
+    const body = await res.text()
+    // 429 com crédito esgotado — sinaliza para o handler usar fallback
+    if (res.status === 429 && body.includes('credit_balance_exhausted')) {
+      throw new OpenAIQuotaError('sem_credito')
+    }
+    throw new Error(`OpenAI error ${res.status}: ${body}`)
   }
 
   const data = await res.json()
@@ -504,7 +512,16 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
     }
 
   } catch (err) {
-    console.error('wa-bot error:', err.message)
+    // Crédito OpenAI esgotado → resposta de fallback humanizada
+    if (err instanceof OpenAIQuotaError) {
+      console.error('wa-bot: OpenAI sem crédito — enviando fallback')
+      const fallback = isZara
+        ? `Oi${senderName ? ', ' + senderName : ''}! 👋 Tô aqui sim — só tive um probleminha técnico agora.\nVou chamar o Pedro pra te atender direitinho. Já te retorno! 😊`
+        : `Oi! Estamos com uma instabilidade agora, mas já resolvemos em breve. Obrigado pela paciência! 😊`
+      sendReply(senderNum, fallback, instanceName)
+    } else {
+      console.error('wa-bot error:', err.message)
+    }
   }
 
   return new Response('OK', { status: 200 })
