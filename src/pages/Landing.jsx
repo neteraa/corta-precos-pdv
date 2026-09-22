@@ -49,7 +49,7 @@ const PLANOS = [
     name:'Profissional', price:'497', period:'/mês', tag:'MAIS POPULAR ⭐', highlight:true,
     desc:'Pra vender mais, fidelizar cliente e não precisar de funcionário extra.',
     items:['Até 3 PDVs / caixas','Tudo do Essencial','Bot Zara WhatsApp IA','Fidelidade + cashback','Campanhas WhatsApp','Etiquetas em lote','Validade avançada','Suporte prioritário'],
-    cta:'Quero o Profissional', color:'#7c3aed',
+    cta:'Quero o Profissional', color:'#f97316',
   },
   {
     name:'Personalizado', price:'?', period:'', tag:'REDES E ATACADO',
@@ -61,7 +61,7 @@ const PLANOS = [
 
 const AFIL_STEPS = [
   { n:'01', color:'#f97316', title:'Cadastra como afiliado',  desc:'Preenche o form em zatendestok.com.br/afiliado — aprovação em até 1 hora.' },
-  { n:'02', color:'#7c3aed', title:'Indica e apresenta demo', desc:'Manda o link /demo para o cliente — ele já vê o sistema funcionando na hora.' },
+  { n:'02', color:'#fbbf24', title:'Indica e apresenta demo', desc:'Manda o link /demo para o cliente — ele já vê o sistema funcionando na hora.' },
   { n:'03', color:'#22c55e', title:'Cliente fecha, você ganha',desc:'Comissão de R$150 (Essencial) ou R$250 (Profissional) cai no seu PIX.' },
 ]
 
@@ -146,20 +146,19 @@ export default function Landing() {
 
       {/* ══ HERO ══════════════════════════════════════════ */}
       <section style={{ minHeight:'100dvh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'80px 24px 60px', textAlign:'center', position:'relative', overflow:'hidden' }}>
-        <div style={{ position:'absolute', top:'15%', left:'50%', transform:'translateX(-50%)', width:700, height:700, borderRadius:'50%', background:'radial-gradient(circle,rgba(249,115,22,.1) 0%,transparent 65%)', pointerEvents:'none' }} />
-        <div style={{ position:'absolute', bottom:'10%', right:'5%', width:400, height:400, borderRadius:'50%', background:'radial-gradient(circle,rgba(124,58,237,.08) 0%,transparent 70%)', pointerEvents:'none' }} />
-        <div style={{ position:'absolute', inset:0, backgroundImage:'radial-gradient(rgba(255,255,255,.025) 1px,transparent 1px)', backgroundSize:'28px 28px', pointerEvents:'none' }} />
 
-        <div style={{ position:'relative', maxWidth:820 }}>
-          <div className={`fu d1 ${vis?'':'opacity-0'}`} style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(249,115,22,.1)', border:'1px solid rgba(249,115,22,.2)', borderRadius:999, padding:'6px 18px', marginBottom:32 }}>
-            <span style={{ width:6, height:6, borderRadius:'50%', background:'#4ade80', display:'inline-block', animation:'pulse2 2s infinite' }}/>
-            <span style={{ color:'rgba(255,255,255,.55)', fontSize:11, fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase' }}>Sistema completo · sem contrato · ativa hoje</span>
+        <div style={{ position:'relative', maxWidth:860 }}>
+          {/* label editorial */}
+          <div className={`fu d1 ${vis?'':'opacity-0'}`} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:32 }}>
+            <div style={{ width:28, height:2, background:'#f97316', borderRadius:1 }}/>
+            <span style={{ fontSize:11, fontWeight:800, letterSpacing:'.14em', textTransform:'uppercase', color:'rgba(255,255,255,.35)' }}>PDV · Estoque · Bot WhatsApp · Fidelidade</span>
+            <div style={{ width:28, height:2, background:'#f97316', borderRadius:1 }}/>
           </div>
 
-          <h1 className={`fu d2 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(48px,8.5vw,108px)', fontWeight:900, lineHeight:.92, letterSpacing:'-.03em', marginBottom:28 }}>
-            <span style={{ display:'block', color:'#fff' }}>GESTÃO QUE</span>
-            <span style={{ display:'block', background:'linear-gradient(90deg,#f97316,#fbbf24)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>QUALQUER NEGÓCIO</span>
-            <span style={{ display:'block', color:'rgba(255,255,255,.85)' }}>PODE PAGAR.</span>
+          <h1 className={`fu d2 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(52px,9.5vw,112px)', fontWeight:900, lineHeight:.88, letterSpacing:'-.04em', marginBottom:28 }}>
+            <span style={{ display:'block', color:'#fff' }}>Gestão que</span>
+            <span style={{ display:'block', color:'#f97316' }}>qualquer negócio</span>
+            <span style={{ display:'block', color:'rgba(255,255,255,.72)' }}>pode pagar.</span>
           </h1>
 
           <p className={`fu d3 ${vis?'':'opacity-0'}`} style={{ fontSize:'clamp(15px,1.8vw,18px)', color:'rgba(255,255,255,.45)', lineHeight:1.8, maxWidth:540, margin:'0 auto 36px' }}>
@@ -202,7 +201,11 @@ export default function Landing() {
       {/* ══ DEMOS POR NICHO ═══════════════════════════════ */}
       <section style={{ padding:'100px 24px', maxWidth:1100, margin:'0 auto' }}>
         <div style={{ textAlign:'center', marginBottom:52 }}>
-          <span style={{ display:'inline-block', background:'rgba(249,115,22,.08)', border:'1px solid rgba(249,115,22,.2)', borderRadius:999, padding:'4px 14px', fontSize:11, fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'#f97316', marginBottom:16 }}>DEMOS INTERATIVOS</span>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:18 }}>
+            <div style={{ width:24, height:2, background:'#f97316', borderRadius:1 }}/>
+            <span style={{ fontSize:11, fontWeight:800, letterSpacing:'.14em', textTransform:'uppercase', color:'rgba(255,255,255,.35)' }}>Demos ao vivo</span>
+            <div style={{ width:24, height:2, background:'#f97316', borderRadius:1 }}/>
+          </div>
           <h2 style={{ fontSize:'clamp(30px,5vw,52px)', fontWeight:900, letterSpacing:'-.03em', lineHeight:1.05, marginBottom:14 }}>
             Clica e vê como fica<br/><span style={{ color:'#f97316' }}>pro seu negócio.</span>
           </h2>
@@ -211,8 +214,7 @@ export default function Landing() {
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:16 }}>
           {NICHOS.map(n => (
             <Link key={n.slug} to={`/demo/${n.slug}`} className="hl"
-              style={{ display:'block', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:20, padding:24, textDecoration:'none', position:'relative', overflow:'hidden' }}>
-              <div style={{ position:'absolute', top:0, right:0, width:110, height:110, borderRadius:'50%', background:`radial-gradient(circle,${n.color}20,transparent 70%)`, pointerEvents:'none' }}/>
+              style={{ display:'block', background:'rgba(255,255,255,0.03)', border:`1px solid ${n.color}22`, borderRadius:20, padding:24, textDecoration:'none', position:'relative', overflow:'hidden' }}>
               <div style={{ fontSize:38, marginBottom:12, lineHeight:1 }}>{n.emoji}</div>
               <div style={{ fontWeight:900, fontSize:17, color:'#fff', marginBottom:3 }}>{n.label}</div>
               <div style={{ fontSize:10, fontWeight:700, color:n.color, marginBottom:14, textTransform:'uppercase', letterSpacing:'.08em' }}>DEMO GRATUITO</div>
@@ -234,6 +236,11 @@ export default function Landing() {
       <section style={{ padding:'80px 24px', background:'rgba(255,255,255,0.018)', borderTop:'1px solid rgba(255,255,255,0.05)', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
         <div style={{ maxWidth:1100, margin:'0 auto' }}>
           <div style={{ textAlign:'center', marginBottom:48 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:18 }}>
+              <div style={{ width:24, height:2, background:'#f97316', borderRadius:1 }}/>
+              <span style={{ fontSize:11, fontWeight:800, letterSpacing:'.14em', textTransform:'uppercase', color:'rgba(255,255,255,.35)' }}>O que vem incluso</span>
+              <div style={{ width:24, height:2, background:'#f97316', borderRadius:1 }}/>
+            </div>
             <h2 style={{ fontSize:'clamp(26px,4vw,46px)', fontWeight:900, letterSpacing:'-.03em', marginBottom:10 }}>
               Do R$297 vem <span style={{ color:'#f97316' }}>tudo isso.</span>
             </h2>
@@ -258,6 +265,11 @@ export default function Landing() {
       {/* ══ PLANOS ════════════════════════════════════════ */}
       <section style={{ padding:'100px 24px', maxWidth:1000, margin:'0 auto' }}>
         <div style={{ textAlign:'center', marginBottom:52 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:18 }}>
+            <div style={{ width:24, height:2, background:'#f97316', borderRadius:1 }}/>
+            <span style={{ fontSize:11, fontWeight:800, letterSpacing:'.14em', textTransform:'uppercase', color:'rgba(255,255,255,.35)' }}>Planos e preços</span>
+            <div style={{ width:24, height:2, background:'#f97316', borderRadius:1 }}/>
+          </div>
           <h2 style={{ fontSize:'clamp(28px,4.5vw,50px)', fontWeight:900, letterSpacing:'-.03em', marginBottom:10 }}>
             Sem enrolação.<br/><span style={{ color:'#f97316' }}>Escolhe e começa hoje.</span>
           </h2>
@@ -265,8 +277,8 @@ export default function Landing() {
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:20, alignItems:'start' }}>
           {PLANOS.map(p => (
-            <div key={p.name} style={{ background:p.highlight ? 'linear-gradient(160deg,rgba(124,58,237,.18),rgba(124,58,237,.04))' : 'rgba(255,255,255,0.03)', border:`1px solid ${p.highlight ? 'rgba(124,58,237,.45)' : 'rgba(255,255,255,.07)'}`, borderRadius:24, padding:'30px 26px', position:'relative', overflow:'hidden' }}>
-              {p.highlight && <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:'linear-gradient(90deg,#7c3aed,#a855f7)' }}/>}
+            <div key={p.name} style={{ background:p.highlight ? 'linear-gradient(160deg,rgba(249,115,22,.12),rgba(249,115,22,.03))' : 'rgba(255,255,255,0.03)', border:`1px solid ${p.highlight ? 'rgba(249,115,22,.4)' : 'rgba(255,255,255,.07)'}`, borderRadius:24, padding:'30px 26px', position:'relative', overflow:'hidden' }}>
+              {p.highlight && <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:'linear-gradient(90deg,#f97316,#fbbf24)' }}/>}
               {p.tag && <div style={{ display:'inline-block', background:`${p.color}1a`, border:`1px solid ${p.color}40`, borderRadius:999, padding:'3px 10px', fontSize:10, fontWeight:800, letterSpacing:'.08em', color:p.color, marginBottom:14 }}>{p.tag}</div>}
               <div style={{ fontWeight:900, fontSize:20, color:'#fff', marginBottom:6 }}>{p.name}</div>
               <div style={{ display:'flex', alignItems:'baseline', gap:4, marginBottom:8 }}>
@@ -281,7 +293,7 @@ export default function Landing() {
                 ))}
               </div>
               <button onClick={() => openWpp(`Olá! Tenho interesse no plano ${p.name} do ZatendeStok.`)}
-                style={{ width:'100%', padding:'13px', borderRadius:12, border:'none', cursor:'pointer', background:p.highlight ? 'linear-gradient(135deg,#7c3aed,#a855f7)' : p.color, color:'#fff', fontSize:14, fontWeight:800, boxShadow:p.highlight ? '0 4px 20px rgba(124,58,237,.35)' : `0 4px 14px ${p.color}40` }}>
+                style={{ width:'100%', padding:'13px', borderRadius:12, border:'none', cursor:'pointer', background:p.color, color:'#fff', fontSize:14, fontWeight:800, boxShadow:`0 4px 14px ${p.color}40` }}>
                 {p.cta}
               </button>
             </div>
@@ -347,6 +359,11 @@ export default function Landing() {
 
       {/* ══ COMO COMEÇA ═══════════════════════════════════ */}
       <section style={{ padding:'90px 24px', maxWidth:860, margin:'0 auto', textAlign:'center' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:18 }}>
+          <div style={{ width:24, height:2, background:'#f97316', borderRadius:1 }}/>
+          <span style={{ fontSize:11, fontWeight:800, letterSpacing:'.14em', textTransform:'uppercase', color:'rgba(255,255,255,.35)' }}>Como começa</span>
+          <div style={{ width:24, height:2, background:'#f97316', borderRadius:1 }}/>
+        </div>
         <h2 style={{ fontSize:'clamp(26px,4vw,44px)', fontWeight:900, letterSpacing:'-.03em', marginBottom:10 }}>
           Ativa hoje, tá rodando <span style={{ color:'#f97316' }}>em 2 horas.</span>
         </h2>
@@ -354,7 +371,7 @@ export default function Landing() {
         <div className="steps-grid">
           {[
             { n:'01', color:'#f97316', title:'Solicita acesso',    desc:'Preenche o form ou manda WhatsApp — aprovamos em até 2h.' },
-            { n:'02', color:'#a855f7', title:'Recebe as credenciais', desc:'Usuário e senha. Abre no celular, sem instalar nada.' },
+            { n:'02', color:'#fbbf24', title:'Recebe as credenciais', desc:'Usuário e senha. Abre no celular, sem instalar nada.' },
             { n:'03', color:'#22c55e', title:'Começa a vender',    desc:'Cadastra os produtos e o estoque começa a trabalhar por você.' },
           ].map(s => (
             <div key={s.n} style={{ padding:'26px 22px', background:'rgba(255,255,255,0.028)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:20 }}>

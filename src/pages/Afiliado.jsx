@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Loader2, CheckCircle2, Link2, ChevronDown, ChevronUp } from 'lucide-react'
 import ZatendeStokLogo from '../components/ZatendeStokLogo.jsx'
-import ZaraMascot from '../components/ZaraMascot.jsx'
 
 const BASE_URL  = 'https://zatendestok.com.br'
 const ZAP_PEDRO = '5515997969303'
@@ -154,17 +153,11 @@ export default function Afiliado() {
                 Programa de afiliados ativo — vagas abertas
               </div>
 
-              {/* headline + mascote lado a lado */}
-              <div style={{ display:'flex', alignItems:'flex-end', gap:0, marginBottom:16 }}>
-                <div style={{ flex:1 }}>
-                  <h1 style={{ fontSize:34, fontWeight:900, lineHeight:1.08, letterSpacing:'-.025em' }}>
-                    Indique.{' '}
-                    <span style={{ color:'#f97316', display:'block' }}>Feche. Receba.</span>
-                    <span style={{ color:'rgba(255,255,255,.45)', fontSize:21, fontWeight:700, letterSpacing:'-.01em' }}>Todo mês, pra sempre.</span>
-                  </h1>
-                </div>
-                <ZaraMascot width={148} style={{ flexShrink:0, marginBottom:-8, marginRight:-12 }}/>
-              </div>
+              <h1 style={{ fontSize:36, fontWeight:900, lineHeight:1.06, letterSpacing:'-.03em', marginBottom:16 }}>
+                Indique.{' '}
+                <span style={{ color:'#f97316', display:'block' }}>Feche. Receba.</span>
+                <span style={{ color:'rgba(255,255,255,.42)', fontSize:22, fontWeight:700, letterSpacing:'-.01em' }}>Todo mês, pra sempre.</span>
+              </h1>
 
               <p style={{ color:'rgba(255,255,255,.5)', fontSize:15, lineHeight:1.7, marginBottom:30 }}>
                 Cada negócio que você indicar gera uma comissão <strong style={{color:'#fb923c'}}>recorrente</strong> pra você.
