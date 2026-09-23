@@ -75,9 +75,8 @@ export default function CaixaLogin() {
     if (operators.length === 1 && !selected) {
       const op = operators[0]
       if (!op.pin) {
-        // No PIN configured — go straight to PDV
         loginAsOperator(op)
-        navigate(op.role === 'caixa' ? '/pdv' : '/dashboard', { replace: true })
+        navigate(op.role === 'caixa' ? '/terminal' : '/dashboard', { replace: true })
       } else {
         setSelected(op)
       }
@@ -95,7 +94,7 @@ export default function CaixaLogin() {
     if (!selected) return
     if (!selected.pin || pin === selected.pin) {
       loginAsOperator(selected)
-      navigate(selected.role === 'caixa' ? '/pdv' : '/dashboard', { replace: true })
+      navigate(selected.role === 'caixa' ? '/terminal' : '/dashboard', { replace: true })
     } else {
       setPinErr(true)
       setTimeout(() => { setPinErr(false); setPin('') }, 600)

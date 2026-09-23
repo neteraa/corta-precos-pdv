@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { StoreProvider } from './store.jsx'
 import Layout from './components/Layout.jsx'
 import UpdateBanner from './components/UpdateBanner.jsx'
-import { isLoggedIn, getRole } from './utils/auth.js'
+import { isLoggedIn, getRole, hasConfiguredStore } from './utils/auth.js'
 
 /* ── Lazy page chunks — each page loads only when first visited ── */
 const Landing        = lazy(() => import('./pages/Landing.jsx'))
@@ -54,6 +54,22 @@ function RequireAuth({ children }) {
   return children
 }
 
+/**
+ * Guarda o Terminal atrás de auth, mas:
+ * - Se o dispositivo tem storeId configurado → redireciona para /caixa (PIN de operador)
+ * - Se não tem storeId → redireciona para /login (primeiro acesso, admin configura)
+ * O caixeiro NUNCA precisa digitar username/senha de admin.
+ */
+function RequireCaixaAuth({ children }) {
+  const location = useLocation()
+  if (!isLoggedIn()) {
+    return hasConfiguredStore()
+      ? <Navigate to="/caixa" state={{ from: location }} replace />
+      : <Navigate to="/login" state={{ from: location }} replace />
+  }
+  return children
+}
+
 /* Routes only admin/gerente can access — caixa goes to /pdv */
 const ADMIN_ONLY = new Set(['/dashboard','/produtos','/vendas','/estoque','/clientes','/relatorio','/etiquetas','/validade','/campanhas','/fidelidade','/flyer','/configuracoes','/promocoes','/ofertas'])
 
@@ -83,7 +99,7 @@ export default function App() {
           {/* Full-screen pages — no sidebar */}
           <Route path="/display" element={<CustomerDisplay />} />
           <Route path="/flyer"   element={<RequireAuth><Flyer /></RequireAuth>} />
-          <Route path="/terminal" element={<RequireAuth><Terminal /></RequireAuth>} />
+          <Route path="/terminal" element={<RequireCaixaAuth><Terminal /></RequireCaixaAuth>} />
           <Route path="/scan"         element={<RequireAuth><ScanMobile /></RequireAuth>} />
           <Route path="/fornecedor"   element={<Fornecedor />} />
           <Route path="/tv"           element={<PainelTV />} />

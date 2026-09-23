@@ -70,11 +70,29 @@ export function getTerminalId() {
   return getSession()?.terminalId ?? 1
 }
 
-/** Login as a named operator (cashier/manager) while keeping storeId from the base session. */
+/** Returns true when a storeId (different from 'default') is configured on this device. */
+export function hasConfiguredStore() {
+  return getConfiguredStoreId() !== 'default'
+}
+
+/** Login as a named operator.
+ *  Works even without a prior admin session — uses the device's configured
+ *  storeId/storeToken so a cashier-only device never needs admin credentials. */
 export function loginAsOperator(op) {
   const base = getSession()
+  // Recover storeId: session → flat key → 'default'
+  const storeId = base?.storeId || getConfiguredStoreId()
+  // Recover storeToken from the market-namespaced session if available
+  let storeToken = base?.storeToken
+  if (!storeToken) {
+    try {
+      const mkt = JSON.parse(localStorage.getItem(`mkt:${storeId}:cp_session`) || '{}')
+      storeToken = mkt?.storeToken || ''
+    } catch {}
+  }
   localStorage.setItem(SESSION_KEY, JSON.stringify({
-    ...base,
+    storeId,
+    storeToken,
     loggedIn:     true,
     operatorId:   op.id,
     operatorName: op.name,

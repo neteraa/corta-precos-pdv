@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { Component } from 'react'
+import IconTour, { shouldShowTour } from './IconTour.jsx'
 
 class PageErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
@@ -254,6 +255,9 @@ export default function Layout() {
   const [sessionExpired, setSessionExpired] = useState(() => {
     try { return localStorage.getItem('zs_session_expired') === '1' } catch { return false }
   })
+  const [showTour, setShowTour] = useState(() => shouldShowTour())
+  const openTour  = useCallback(() => setShowTour(true),  [])
+  const closeTour = useCallback(() => setShowTour(false), [])
   useEffect(() => {
     const handler = () => setSessionExpired(true)
     window.addEventListener('zs:auth-error', handler)
@@ -347,8 +351,24 @@ export default function Layout() {
           )}
         </nav>
 
-        {/* ── Bottom strip: sync + logout ── */}
+        {/* ── Bottom strip: tour ? + sync + logout ── */}
         <div className="pb-3 pt-1 flex flex-col items-center gap-0.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          {/* Guia / tour */}
+          <button
+            onClick={openTour}
+            className="group relative flex items-center justify-center w-full py-0.5"
+            title="Guia do sistema">
+            <span className="flex items-center justify-center w-10 h-10 rounded-2xl hover:bg-white/5 transition-all">
+              <span className="text-zinc-600 group-hover:text-zinc-300 transition-colors font-black text-[15px] leading-none select-none">?</span>
+            </span>
+            <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2
+              px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap
+              opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100
+              transition-all duration-150 z-[999]"
+              style={{ background: '#18181b', color: '#f4f4f5', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 8px 28px rgba(0,0,0,0.55)' }}>
+              Guia do sistema
+            </span>
+          </button>
           <SyncDot />
           <button
             onClick={handleLogout}
@@ -499,6 +519,9 @@ export default function Layout() {
           <PageErrorBoundary><Outlet /></PageErrorBoundary>
         </main>
       </div>
+
+      {/* Icon tour overlay */}
+      {showTour && <IconTour onClose={closeTour} />}
     </div>
   )
 }
