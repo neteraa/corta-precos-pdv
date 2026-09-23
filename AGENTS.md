@@ -118,11 +118,22 @@ ZARA_INSTANCES = ['zatendestok']
   - Ignora: fromMe, grupos, áudio, sticker, reaction
 
 ### Fluxo de entrega (Corta Preços)
+  - PIX CNPJ: 60.662.362/0001-70 — chave hardcoded no prompt do bot
   - Bot gera tag `<zs_delivery>{phone,name,address,items,total,deliveryFee:7}</zs_delivery>`
   - saveDeliveryOrder() escreve direto no blob corta-precos:cortaprecos_1789770018182:cp_deliveries
   - delivery.js GET /api/delivery sem auth (storeId escopa dados)
   - delivery.js POST /api/delivery aceita pedido direto (bot ou frontend)
   - Entrega.jsx auto-refresh 15s + visibilitychange
+  - extractText: imageMessage sem caption → "[comprovante enviado]" (bot responde ao comprovante)
+  - Fluxo: coleta endereço → lista produtos+preços → calcula total+R$7 → envia PIX CNPJ → pede comprovante → confirma pedido → emite tag delivery
+
+### Sync Configurações Cross-Device
+  - cp_settings no blob: {storeName, phone, pixKey, pixCity, themeColor} (sem logoImage)
+  - persist.js e restore.js: cp_settings adicionado aos KEYS
+  - saveSettings em Configuracoes.jsx persiste tudo ao blob
+  - store.jsx applyServerData: cp_settings → localStorage (só campos vazios)
+  - Configuracoes.jsx: useEffect preenche form quando settings sync chega
+  - Blob pré-populado: pixKey=60662362000170, phone=(15)9979-6930, pixCity=BOITUVA
 
 ---
 
