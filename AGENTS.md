@@ -117,6 +117,13 @@ ZARA_INSTANCES = ['zatendestok']
   - OpenAIQuotaError → fallback humanizado com keywords (nunca fica mudo)
   - Ignora: fromMe, grupos, áudio, sticker, reaction
 
+### Fluxo de entrega (Corta Preços)
+  - Bot gera tag `<zs_delivery>{phone,name,address,items,total,deliveryFee:7}</zs_delivery>`
+  - saveDeliveryOrder() escreve direto no blob corta-precos:cortaprecos_1789770018182:cp_deliveries
+  - delivery.js GET /api/delivery sem auth (storeId escopa dados)
+  - delivery.js POST /api/delivery aceita pedido direto (bot ou frontend)
+  - Entrega.jsx auto-refresh 15s + visibilitychange
+
 ---
 
 ## Markets em produção (blob zs-auth)
@@ -251,6 +258,38 @@ af8696cd    — fix: secure tenant persistence and sync
 cc133ce     — fix: storeId com underscore — causa raiz produto não aparecer no terminal
 43aaef3     — fix: ScanMobile — estoque dobrado + race condition no lote de entrada
 5a09a32     — fix: 3 buracos de segurança no fluxo de persistência de produtos
+
+---
+
+## Controle de Lotes (Multi-lot / FIFO)
+
+Produtos podem ter múltiplos lotes com datas de vencimento diferentes.
+
+**Estrutura:**
+```js
+product.lots = [
+  { id: 'lot_xxx', qty: 20, expiryDate: '2024-01-10', receivedAt: '...' },
+  { id: 'lot_yyy', qty: 30, expiryDate: '2024-01-30', receivedAt: '...' },
+]
+// product.stock = soma dos lotes (mantido em sync)
+// product.expiryDate = data do lote mais próximo ao vencimento
+```
+
+**Invariantes:**
+- Produtos sem lotes (`lots` vazio/undefined): comportamento idêntico ao anterior
+- Produtos com lotes: `stock = lots.reduce((s,l)=>s+l.qty,0)`
+- FIFO automático na venda (registerSale em store.jsx)
+
+**Fluxo de entrada (Estoque.jsx):**
+1. Escanear produto → linha na lista com qty e data de vencimento
+2. Botão `[L+]` para adicionar novo lote do mesmo produto (data diferente)
+3. Badge "Lote 1", "Lote 2" identifica múltiplos lotes na lista
+4. Confirmar → cada linha chama addLot(productId, {qty, expiryDate})
+
+**Validade.jsx:**
+- Produtos com lotes são expandidos em linhas separadas por lote
+- Badge "Lote 1/2", "Lote 2/2" — editável individualmente
+- "Gerar Promoção" usa qty do lote específico
 
 ---
 
