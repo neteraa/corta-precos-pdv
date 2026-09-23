@@ -229,6 +229,7 @@ export default function PDV() {
   const [lastSale, setLastSale]     = useState(null)
   const [scanFeedback,   setScanFeedback]   = useState(null)
   const [pendingScanCode, setPendingScanCode] = useState(null)   // retry after sync
+  const [qtyMult, setQtyMult]           = useState(1)    // ex: "7*" antes do scan
 
   // ── Split payment ──────────────────────────────────────────
   const [splitMode, setSplitMode]   = useState(false)
@@ -337,6 +338,10 @@ export default function PDV() {
     setQuery('')
   }, [])
 
+  // Ref para que addToCart sempre leia o qtyMult atual sem precisar de dep
+  const qtyMultRef = useRef(1)
+  useEffect(() => { qtyMultRef.current = qtyMult }, [qtyMult])
+
   const addToCart = useCallback((p) => {
     const unit = (p.unit || '').toUpperCase()
     if (unit === 'KG' || unit === 'G') {
@@ -344,7 +349,9 @@ export default function PDV() {
       setWeightModal(p)
       return
     }
-    addToCartRaw(p, 1)
+    const qty = qtyMultRef.current > 1 ? qtyMultRef.current : 1
+    addToCartRaw(p, qty)
+    if (qty > 1) setQtyMult(1)    // reset multiplicador após uso
   }, [addToCartRaw])
 
   // HID scanner callback — matches SKU or barcode, with normalization
@@ -413,7 +420,7 @@ export default function PDV() {
       return
     }
     if (e.key === 'Escape') {
-      setQuery(''); setSelIdx(-1); return
+      setQuery(''); setSelIdx(-1); setQtyMult(1); return
     }
     if (e.key === 'Enter') {
       const val = query.trim()
@@ -655,14 +662,33 @@ export default function PDV() {
         <div className="lg:col-span-3 space-y-3">
           {/* search */}
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            {qtyMult > 1
+              ? <button
+                  onClick={() => setQtyMult(1)}
+                  title="Cancelar multiplicador (Esc)"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 flex items-center gap-1 bg-orange-500 text-white text-xs font-black px-2 py-1 rounded-lg hover:bg-orange-600 transition-colors"
+                  style={{ height: 32 }}
+                >
+                  ×{qtyMult} <X className="w-3 h-3" />
+                </button>
+              : <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            }
             <input
               ref={searchRef}
               value={query}
-              onChange={e => setQuery(e.target.value)}
+              onChange={e => {
+                const v = e.target.value
+                // Detecta padrão "7*" ou "7×" — seta multiplicador e limpa campo
+                const m = v.match(/^(\d{1,3})[*×](.*)$/)
+                if (m) {
+                  const n = Math.min(parseInt(m[1], 10), 999)
+                  if (n > 1) { setQtyMult(n); setQuery(m[2]); return }
+                }
+                setQuery(v)
+              }}
               onKeyDown={handleSearchKey}
-              placeholder="🔍  Digite o produto ou bata o código de barras…"
-              className="input pl-11 pr-11 text-base font-medium"
+              placeholder={qtyMult > 1 ? `×${qtyMult} — escaneie o produto…` : '🔍  Digite o produto ou bata o código de barras…'}
+              className={`input pr-11 text-base font-medium ${qtyMult > 1 ? 'pl-16 border-orange-400 ring-1 ring-orange-300' : 'pl-11'}`}
               style={{ height: 52 }}
               autoFocus
             />

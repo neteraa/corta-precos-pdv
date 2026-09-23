@@ -117,7 +117,7 @@ const S = {
 export default function ScanMobile() {
   const [params]  = useSearchParams()
   const mode      = params.get('mode') || 'pdv'
-  const { products, upsertProduct, bulkUpsertProducts, syncNow, lastSync } = useStore()
+  const { products, promos, upsertProduct, bulkUpsertProducts, syncNow, lastSync } = useStore()
   const { settings } = usePrinter()
   const storeName = settings.storeName || 'MEU MERCADO'
 
@@ -161,6 +161,8 @@ export default function ScanMobile() {
   const [newProdQty,          setNewProdQty]          = useState('')
   const [newProdPriceAtacado, setNewProdPriceAtacado] = useState('')
   const [newProdQtdAtacado,   setNewProdQtdAtacado]   = useState('')
+  const [newProdPromoGroup,   setNewProdPromoGroup]   = useState(null)   // promoGroup do novo produto
+  const [sheetPromoGroup,     setSheetPromoGroup]     = useState(null)   // promo p/ produto já existente
   const [lookingUp,    setLookingUp]    = useState(false)
   const [lookupFound,  setLookupFound]  = useState(false)
   const nameRef = useRef(null)
@@ -194,7 +196,7 @@ export default function ScanMobile() {
     setNewProdName(''); setNewProdPrice(''); setNewProdCost('')
     setNewProdCat(''); setNewProdUnit('UN'); setNewProdQty('')
     setNewProdPriceAtacado(''); setNewProdQtdAtacado('')
-    setLookupFound(false)
+    setNewProdPromoGroup(null); setLookupFound(false)
 
     // Busca nome/marca na base Open Food Facts (sem bloquear a UI)
     const cleanCode = String(code || '').replace(/\D/g, '')
@@ -224,11 +226,12 @@ export default function ScanMobile() {
       name:     newProdName.trim().toUpperCase(),
       price:    parseFloat(newProdPrice) || 0,
       cost:     parseFloat(newProdCost)  || 0,
-      category: newProdCat.trim() || 'Outros',
-      unit:     newProdUnit || 'UN',
-      stock:        0,  // começa em 0 — confirmAll adiciona qty via bulkUpsertProducts (evita dobrar o estoque)
+      category:   newProdCat.trim() || 'Outros',
+      unit:       newProdUnit || 'UN',
+      stock:        0,
       priceAtacado: parseFloat(newProdPriceAtacado) || 0,
       qtdAtacado:   parseInt(newProdQtdAtacado, 10) || 0,
+      promoGroup:   newProdPromoGroup || null,
     }
     upsertProduct(p)
     setNewProdCode(null)
@@ -240,7 +243,7 @@ export default function ScanMobile() {
       setQty(newProdQty || '1'); setVencimento(''); setLote(''); setCusto('')
       setSheet(p)
     }
-  }, [newProdCode, newProdName, newProdPrice, newProdCost, newProdCat, newProdUnit, newProdQty, newProdPriceAtacado, newProdQtdAtacado, mode, upsertProduct, sendScan])
+  }, [newProdCode, newProdName, newProdPrice, newProdCost, newProdCat, newProdUnit, newProdQty, newProdPriceAtacado, newProdQtdAtacado, newProdPromoGroup, mode, upsertProduct, sendScan])
 
   /* ── scan handler ──────────────────────────────────────── */
   const handleScan = useCallback((code) => {
@@ -257,6 +260,7 @@ export default function ScanMobile() {
     const p = findProduct(code)
     if (!p) { openNewProd(code); return }   // ← open registration instead of error
     setQty('1'); setVencimento(''); setLote(''); setCusto(p.cost > 0 ? String(p.cost) : '')
+    setSheetPromoGroup(p.promoGroup || null)
     setSheet(p)
   }, [mode, findProduct, openNewProd])
 
@@ -264,9 +268,13 @@ export default function ScanMobile() {
   const addToBatch = () => {
     const n = parseInt(qty, 10)
     if (!n || n <= 0) return
+    // Se promoGroup mudou, atualiza o produto imediatamente (separado do lote)
+    if (sheetPromoGroup !== (sheet.promoGroup || null)) {
+      upsertProduct({ ...sheet, promoGroup: sheetPromoGroup })
+    }
     setBatch(prev => [
       {
-        product: sheet,
+        product: { ...sheet, promoGroup: sheetPromoGroup },
         qty: n,
         vencimento: vencimento || null,
         lote: lote || null,
@@ -520,6 +528,32 @@ export default function ScanMobile() {
                 style={S.input} placeholder="Ex: Mercearia, Bebidas, Carnes…" />
             </div>
 
+            {/* Promoção */}
+            <div style={{ padding: '0 20px 16px' }}>
+              <label style={S.label}>🏷 Promoção</label>
+              {promos.filter(r => r.active).length === 0
+                ? <div style={{ marginTop: 6, fontSize: 12, color: '#71717a', fontStyle: 'italic' }}>
+                    Nenhuma promoção cadastrada — crie em Promoções no painel.
+                  </div>
+                : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                    <button type="button" onClick={() => setNewProdPromoGroup(null)}
+                      style={{ padding: '7px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 800,
+                        background: !newProdPromoGroup ? '#ea580c' : '#3f3f46',
+                        color:      !newProdPromoGroup ? '#000'    : '#a1a1aa' }}>
+                      Sem promoção
+                    </button>
+                    {promos.filter(r => r.active).map(r => (
+                      <button key={r.id} type="button" onClick={() => setNewProdPromoGroup(r.group)}
+                        style={{ padding: '7px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 800,
+                          background: newProdPromoGroup === r.group ? '#16a34a' : '#3f3f46',
+                          color:      newProdPromoGroup === r.group ? '#fff'    : '#a1a1aa' }}>
+                        🏷 {r.name}
+                      </button>
+                    ))}
+                  </div>
+              }
+            </div>
+
             <div style={S.row}>
               <button style={S.btnCancel} onClick={() => setNewProdCode(null)}>Cancelar</button>
               <button
@@ -571,6 +605,32 @@ export default function ScanMobile() {
               <input type="number" inputMode="decimal" step="0.01" min="0"
                 value={custo} onChange={e => setCusto(e.target.value)}
                 style={S.input} placeholder={`Atual: ${BRL.format(sheet.cost || 0)}`} />
+            </div>
+
+            {/* Promoção — atribuir ou trocar */}
+            <div style={{ padding: '0 20px 16px' }}>
+              <label style={S.label}>🏷 Promoção</label>
+              {promos.filter(r => r.active).length === 0
+                ? <div style={{ marginTop: 6, fontSize: 12, color: '#71717a', fontStyle: 'italic' }}>
+                    Nenhuma promoção cadastrada — crie em Promoções no painel.
+                  </div>
+                : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                    <button type="button" onClick={() => setSheetPromoGroup(null)}
+                      style={{ padding: '7px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 800,
+                        background: !sheetPromoGroup ? '#ea580c' : '#3f3f46',
+                        color:      !sheetPromoGroup ? '#000'    : '#a1a1aa' }}>
+                      Sem promoção
+                    </button>
+                    {promos.filter(r => r.active).map(r => (
+                      <button key={r.id} type="button" onClick={() => setSheetPromoGroup(r.group)}
+                        style={{ padding: '7px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 800,
+                          background: sheetPromoGroup === r.group ? '#16a34a' : '#3f3f46',
+                          color:      sheetPromoGroup === r.group ? '#fff'    : '#a1a1aa' }}>
+                        🏷 {r.name}
+                      </button>
+                    ))}
+                  </div>
+              }
             </div>
 
             <div style={S.row}>

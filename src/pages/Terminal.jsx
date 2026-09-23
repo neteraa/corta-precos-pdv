@@ -78,6 +78,9 @@ export default function Terminal() {
   const [results,    setResults]    = useState([])
   const [scanFeed,      setScanFeed]      = useState(null)
   const [pendingScanCode, setPendingScanCode] = useState(null)   // retry after sync
+  const [qtyMult,       setQtyMult]       = useState(1)   // ex: "7*" antes do scan
+  const qtyMultRef = useRef(1)
+  useEffect(() => { qtyMultRef.current = qtyMult }, [qtyMult])
   const [showPay,    setShowPay]    = useState(false)
   const [lastSale,   setLastSale]   = useState(null)
   const [received,   setReceived]   = useState('')
@@ -138,12 +141,15 @@ export default function Terminal() {
       return
     }
 
+    const mult = qtyMultRef.current > 1 ? qtyMultRef.current : 1
+    if (mult > 1) setQtyMult(1)   // reset após uso
+
     let promoMsg = null
     setCart(prev => {
       const idx  = prev.findIndex(i => i.productId === p.id)
       const next = idx >= 0
-        ? prev.map((i, j) => j === idx ? { ...i, qty: i.qty + 1 } : i)
-        : [...prev, { productId: p.id, name: p.name, price: p.price, qty: 1 }]
+        ? prev.map((i, j) => j === idx ? { ...i, qty: i.qty + mult } : i)
+        : [...prev, { productId: p.id, name: p.name, price: p.price, qty: mult }]
 
       // Calcula progresso de promo para o grupo deste produto (se houver)
       if (p.promoGroup) {
@@ -393,13 +399,27 @@ export default function Terminal() {
           <div style={{ flexShrink: 0, padding: '16px 20px', borderBottom: `1px solid ${brd}`, background: bg2 }}>
             <div style={{ display: 'flex', gap: 8 }}>
               <div style={{ flex: 1, position: 'relative' }}>
-                <Barcode style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 18, height: 18, color: txt2 }} />
+                {qtyMult > 1
+                  ? <button onClick={() => setQtyMult(1)} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', zIndex: 2, display: 'flex', alignItems: 'center', gap: 4, background: '#ea580c', color: '#fff', border: 'none', borderRadius: 8, padding: '4px 9px', fontSize: 12, fontWeight: 900, cursor: 'pointer' }}>
+                      ×{qtyMult} <X style={{ width: 12, height: 12 }} />
+                    </button>
+                  : <Barcode style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 18, height: 18, color: txt2 }} />
+                }
                 <input
                   ref={inputRef}
                   autoFocus
                   value={query}
-                  onChange={e => setQuery(e.target.value)}
+                  onChange={e => {
+                    const v = e.target.value
+                    const m = v.match(/^(\d{1,3})[*×](.*)$/)
+                    if (m) {
+                      const n = Math.min(parseInt(m[1], 10), 999)
+                      if (n > 1) { setQtyMult(n); setQuery(m[2]); return }
+                    }
+                    setQuery(v)
+                  }}
                   onKeyDown={e => {
+                    if (e.key === 'Escape') { setQuery(''); setQtyMult(1); return }
                     if (e.key !== 'Enter') return
                     // Mesma prioridade do PDV admin: código exato primeiro, texto como fallback
                     const exact = findProduct(query.trim())
@@ -407,8 +427,8 @@ export default function Terminal() {
                     else if (results.length > 0) addToCart(results[0])
                     else if (query.trim())  addToCart(query.trim())
                   }}
-                  placeholder="Código de barras ou nome do produto  (F2)"
-                  style={{ width: '100%', background: bg3, border: `1px solid ${brd}`, borderRadius: 10, padding: '12px 12px 12px 42px', color: txt, fontSize: 15, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
+                  placeholder={qtyMult > 1 ? `×${qtyMult} — escaneie o produto…` : 'Código de barras ou nome do produto  (F2)'}
+                  style={{ width: '100%', background: bg3, border: `1px solid ${qtyMult > 1 ? '#ea580c' : brd}`, borderRadius: 10, padding: `12px 12px 12px ${qtyMult > 1 ? '68px' : '42px'}`, color: txt, fontSize: 15, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
                 />
               </div>
               <button
