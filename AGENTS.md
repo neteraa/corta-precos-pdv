@@ -1,4 +1,4 @@
-# ZatendeStok — AGENTS.md (v12.0 — 2026-09-22)
+# ZatendeStok — AGENTS.md (v13.0 — 2026-09-23)
 
 ## Projeto
 
@@ -185,7 +185,7 @@ padariateste_1790000668712 — Padaria Teste (padaria)
 
 ---
 
-## QA produção (22/09/2026)
+## QA produção (23/09/2026)
 
 | Check | Status |
 |---|---|
@@ -197,8 +197,18 @@ padariateste_1790000668712 — Padaria Teste (padaria)
 | /painel | ✅ login com 198556@@Pedro, 4 mercados visíveis |
 | /api/wa-status | ✅ status:open, phone:5515997969303 |
 | /wa-bot | ✅ HTTP 200, captura lead (testado) |
+| /wa-bot PIX CNPJ | ✅ bot responde com CNPJ 60.662.362/0001-70 |
+| /wa-bot comprovante | ✅ imageMessage → "[comprovante enviado]" → bot confirma pedido |
+| /entrega | ✅ página carrega, 1 pedido salvo (Maria Silva) |
+| /api/delivery GET | ✅ retorna pedidos por storeId |
+| /api/delivery PATCH | ✅ atualiza status do pedido |
+| /api/restore cp_settings | ✅ HMAC auth funciona (403 para token inválido) |
+| cp_settings blob | ✅ pixKey + phone + pixCity pré-populados |
+| Multi-lote FIFO | ✅ addLot() + registerSale() deduz lote mais próximo ao vencimento |
+| Estoque entrada | ✅ rowId por lote, botão [L+] novo lote, confirmEntrada → addLot |
+| Validade lotes | ✅ flatMap em linhas separadas, badge Lote N/M |
 | PDV demo interativo | ✅ carrinho, total, pagamentos |
-| Leads Bot | ✅ 13 leads capturados pela Zara |
+| Leads Bot | ✅ 13+ leads capturados pela Zara |
 
 ---
 
@@ -262,13 +272,14 @@ IIFE inicial define `cp_store_id` e `cp_session.storeId` diretamente sem slugify
 
 ## Commits recentes
 
-(próximo)    — chore: AGENTS.md v12.0 + relay E2E verificado
-c1201179    — feat: WebSocket relay for cross-device scanner → PDV
-af8696cd    — fix: secure tenant persistence and sync
-9b10d8d9    — chore: AGENTS.md v11.0 + CHANGELOG.md completo
-cc133ce     — fix: storeId com underscore — causa raiz produto não aparecer no terminal
-43aaef3     — fix: ScanMobile — estoque dobrado + race condition no lote de entrada
-5a09a32     — fix: 3 buracos de segurança no fluxo de persistência de produtos
+3cfc42e    — fix: Entrega crash — remove dangling 'token' from useCallback deps
+d36076f    — chore: AGENTS.md — PIX CNPJ, comprovante, sync settings cross-device
+1d94d48    — feat: PIX CNPJ delivery + sync settings cross-device + comprovante ZAP
+a527d0c    — chore: AGENTS.md — lotes FIFO + fluxo entrega bot
+9ac0e01    — feat: controle multi-lote FIFO + delivery bot integrado no painel
+c1201179   — feat: WebSocket relay for cross-device scanner → PDV
+af8696cd   — fix: secure tenant persistence and sync
+cc133ce    — fix: storeId com underscore — causa raiz produto não aparecer no terminal
 
 ---
 
