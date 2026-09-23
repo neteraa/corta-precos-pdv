@@ -187,7 +187,7 @@ export default function Entrega() {
       if (json.ok) { setOrders(json.orders || []); setLastFetch(new Date()) }
     } catch (e) { console.error('Entrega fetch:', e.message) }
     setLoading(false)
-  }, [storeId, token])
+  }, [storeId])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 
