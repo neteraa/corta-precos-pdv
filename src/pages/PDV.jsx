@@ -216,7 +216,7 @@ function useVoice(onResult) {
 }
 
 export default function PDV() {
-  const { products, promos, registerSale, photos } = useStore()
+  const { products, promos, registerSale, photos, syncNow } = useStore()
   const printer   = usePrinter()
   const broadcast = useBroadcastSend()
 
@@ -227,7 +227,8 @@ export default function PDV() {
   const [installments, setInstallments] = useState(1)
   const [showFinish, setShowFinish] = useState(false)
   const [lastSale, setLastSale]     = useState(null)
-  const [scanFeedback, setScanFeedback] = useState(null)
+  const [scanFeedback,   setScanFeedback]   = useState(null)
+  const [pendingScanCode, setPendingScanCode] = useState(null)   // retry after sync
 
   // ── Split payment ──────────────────────────────────────────
   const [splitMode, setSplitMode]   = useState(false)
@@ -365,12 +366,33 @@ export default function PDV() {
     const p = findProduct(code)
     if (p) {
       addToCart(p)
+      setPendingScanCode(null)
       setScanFeedback({ ok: true, msg: `✅ ${p.name}` })
+      setTimeout(() => setScanFeedback(null), 2500)
     } else {
-      setScanFeedback({ ok: false, msg: `❌ Código não encontrado: ${code}` })
+      // Produto não encontrado → sincroniza com servidor imediatamente
+      // O useEffect abaixo re-tenta quando products atualizar
+      setPendingScanCode(code)
+      setScanFeedback({ ok: false, msg: `🔄 Sincronizando — aguarde...` })
+      syncNow()
     }
-    setTimeout(() => setScanFeedback(null), 2500)
-  }, [findProduct, addToCart])
+  }, [findProduct, addToCart, syncNow])
+
+  // Retry automático: se havia um código pendente e produtos mudaram, tenta de novo
+  useEffect(() => {
+    if (!pendingScanCode) return
+    const p = findProduct(pendingScanCode)
+    if (p) {
+      addToCart(p)
+      setPendingScanCode(null)
+      setScanFeedback({ ok: true, msg: `✅ ${p.name} (sincronizado)` })
+      setTimeout(() => setScanFeedback(null), 2500)
+    } else {
+      // Se já está sincronizado e ainda não achou, mostra erro
+      setScanFeedback({ ok: false, msg: `❌ Código não encontrado: ${pendingScanCode}` })
+      setTimeout(() => { setScanFeedback(null); setPendingScanCode(null) }, 3500)
+    }
+  }, [products]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useHIDScanner(handleScan)
   useScanReceiver(handleScan)

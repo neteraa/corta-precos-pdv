@@ -13,6 +13,7 @@ import { useStore, BRL } from '../store.jsx'
 import { useScanSender } from '../hooks/useScanRelay.js'
 import { getConfiguredStoreId } from '../utils/auth.js'
 import { usePrinter } from '../hooks/usePrinter.js'
+import { fetchProductInfo } from '../utils/openFoodFacts.js'
 
 // Sync storeId SYNCHRONOUSLY at module load — before the store context
 // initialises. Without this, useStore() opens with storeId='default' because
@@ -139,6 +140,8 @@ export default function ScanMobile() {
   const [newProdQty,          setNewProdQty]          = useState('')
   const [newProdPriceAtacado, setNewProdPriceAtacado] = useState('')
   const [newProdQtdAtacado,   setNewProdQtdAtacado]   = useState('')
+  const [lookingUp,    setLookingUp]    = useState(false)
+  const [lookupFound,  setLookupFound]  = useState(false)
   const nameRef = useRef(null)
   const UNITS_QUICK = ['UN', 'KG', 'LT', 'CX', 'PC', 'DZ']
 
@@ -164,12 +167,30 @@ export default function ScanMobile() {
     if (sheet) setTimeout(() => qtyRef.current?.focus(), 300)
   }, [sheet])
 
-  /* ── open new-product form ──────────────────────────────── */
+  /* ── open new-product form + busca automática no OFF ──────── */
   const openNewProd = useCallback((code) => {
     setNewProdCode(code)
     setNewProdName(''); setNewProdPrice(''); setNewProdCost('')
     setNewProdCat(''); setNewProdUnit('UN'); setNewProdQty('')
     setNewProdPriceAtacado(''); setNewProdQtdAtacado('')
+    setLookupFound(false)
+
+    // Busca nome/marca na base Open Food Facts (sem bloquear a UI)
+    const cleanCode = String(code || '').replace(/\D/g, '')
+    if (cleanCode.length >= 8) {
+      setLookingUp(true)
+      fetchProductInfo(cleanCode).then(info => {
+        setLookingUp(false)
+        if (!info) return
+        // Monta nome completo: NOME — MARCA
+        const fullName = info.brand
+          ? `${info.name.toUpperCase()} ${info.brand.toUpperCase()}`
+          : info.name.toUpperCase()
+        setNewProdName(prev => prev || fullName)          // não sobrescreve se já digitou
+        if (info.category) setNewProdCat(prev => prev || info.category)
+        setLookupFound(true)
+      }).catch(() => setLookingUp(false))
+    }
   }, [])
 
   /* ── save new product ───────────────────────────────────── */
@@ -377,11 +398,26 @@ export default function ScanMobile() {
               <div style={{ width: 36, height: 36, borderRadius: 10, background: '#431407', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Package style={{ width: 18, height: 18, color: '#ea580c' }} />
               </div>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#71717a', letterSpacing: 1, textTransform: 'uppercase' }}>Código não encontrado — cadastrar</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#71717a', letterSpacing: 1, textTransform: 'uppercase' }}>
+                  {lookingUp ? '🔍 Buscando na base mundial...' : lookupFound ? '✅ Produto encontrado — confirme os dados' : 'Código não encontrado — cadastrar'}
+                </div>
                 <div style={{ fontSize: 13, fontWeight: 800, color: '#a1a1aa', fontFamily: 'monospace', marginTop: 2 }}>{newProdCode}</div>
               </div>
             </div>
+
+            {/* badge lookup */}
+            {lookingUp && (
+              <div style={{ margin: '0 20px 10px', padding: '8px 12px', background: '#1c1917', borderRadius: 10, border: '1px solid #3f3f46', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16, animation: 'spin 1s linear infinite', display: 'inline-block' }}>🔄</span>
+                <span style={{ fontSize: 12, color: '#a1a1aa', fontWeight: 600 }}>Consultando Open Food Facts (base mundial de produtos)...</span>
+              </div>
+            )}
+            {lookupFound && !lookingUp && (
+              <div style={{ margin: '0 20px 10px', padding: '8px 12px', background: '#052e16', borderRadius: 10, border: '1px solid #16a34a55' }}>
+                <span style={{ fontSize: 12, color: '#4ade80', fontWeight: 700 }}>✅ Nome preenchido automaticamente — verifique e ajuste se necessário</span>
+              </div>
+            )}
 
             {/* Nome */}
             <div style={S.field}>
@@ -389,7 +425,8 @@ export default function ScanMobile() {
               <input
                 ref={nameRef}
                 type="text" value={newProdName} onChange={e => setNewProdName(e.target.value)}
-                style={S.input} placeholder="Ex: ARROZ TIÃO 5KG"
+                style={{ ...S.input, border: lookupFound && newProdName ? '2px solid #16a34a' : S.input.border }}
+                placeholder={lookingUp ? 'Buscando...' : 'Ex: ARROZ TIÃO 5KG'}
                 onKeyDown={e => e.key === 'Enter' && document.getElementById('scanNewPrice')?.focus()}
               />
             </div>

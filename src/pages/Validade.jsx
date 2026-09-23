@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react'
 import { AlertTriangle, CheckCircle, Clock, Search, Calendar, QrCode, Tag, Settings, Zap } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
+import { getMktStoreId, getMktStoreToken } from '../utils/tenantStorage.js'
 
 function daysUntil(dateStr) {
   if (!dateStr) return null
@@ -106,7 +107,7 @@ export default function Validade() {
             className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-50 font-bold text-sm transition-colors">
             <Settings className="w-4 h-4" /> Configurar alerta
           </button>
-          <a href="/scan?mode=estoque" target="_blank" rel="noreferrer"
+          <a href={`/scan?mode=estoque&storeId=${getMktStoreId()}&t=${getMktStoreToken()}`} target="_blank" rel="noreferrer"
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-black font-black text-sm transition-colors">
             <QrCode className="w-4 h-4" /> Escanear no celular
           </a>

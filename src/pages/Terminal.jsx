@@ -58,7 +58,7 @@ const PAYMENTS = ['PIX', 'Débito', 'Crédito', 'Dinheiro']
 const PAY_ICON = { PIX: Smartphone, Débito: CreditCard, Crédito: CreditCard, Dinheiro: Banknote }
 
 export default function Terminal() {
-  const { products, registerSale, promos, sales, customers, addFiado, operators } = useStore()
+  const { products, registerSale, promos, sales, customers, addFiado, operators, syncNow } = useStore()
   const todaySales = useMemo(() => {
     const today = new Date().toDateString()
     return sales.filter(s => new Date(s.date).toDateString() === today).length
@@ -76,7 +76,8 @@ export default function Terminal() {
   // ── UI state ────────────────────────────────────────────────
   const [query,      setQuery]      = useState('')
   const [results,    setResults]    = useState([])
-  const [scanFeed,   setScanFeed]   = useState(null)
+  const [scanFeed,      setScanFeed]      = useState(null)
+  const [pendingScanCode, setPendingScanCode] = useState(null)   // retry after sync
   const [showPay,    setShowPay]    = useState(false)
   const [lastSale,   setLastSale]   = useState(null)
   const [received,   setReceived]   = useState('')
@@ -122,10 +123,18 @@ export default function Terminal() {
   const addToCart = useCallback((codeOrProduct) => {
     const p = typeof codeOrProduct === 'string' ? findProduct(codeOrProduct) : codeOrProduct
     if (!p) {
-      setQuery(''); setResults([])                              // limpa campo — evita concatenação com próximo scan
-      setScanFeed({ msg: `❌ Produto não encontrado`, ok: false })
-      setTimeout(() => setScanFeed(null), 2000)
-      setTimeout(() => inputRef.current?.focus(), 50)           // pronto para o próximo código
+      const code = typeof codeOrProduct === 'string' ? codeOrProduct.trim() : null
+      setQuery(''); setResults([])
+      if (code) {
+        // Sincroniza com servidor — produto pode ter sido cadastrado em outro device
+        setPendingScanCode(code)
+        setScanFeed({ msg: `🔄 Sincronizando — aguarde...`, ok: false })
+        syncNow()
+      } else {
+        setScanFeed({ msg: `❌ Produto não encontrado`, ok: false })
+        setTimeout(() => setScanFeed(null), 2000)
+      }
+      setTimeout(() => inputRef.current?.focus(), 50)
       return
     }
 
@@ -157,10 +166,23 @@ export default function Terminal() {
     })
 
     setQuery(''); setResults([])
+    setPendingScanCode(null)
     setScanFeed({ msg: promoMsg ? `✅ ${p.name}  ·  ${promoMsg}` : `✅ ${p.name}`, ok: true, promo: !!promoMsg })
     setTimeout(() => setScanFeed(null), promoMsg ? 2800 : 1800)
     setTimeout(() => inputRef.current?.focus(), 50)
   }, [products, promos])
+
+  // Retry automático: produto sincronizado → tenta adicionar ao carrinho
+  useEffect(() => {
+    if (!pendingScanCode) return
+    const p = findProduct(pendingScanCode)
+    if (p) {
+      addToCart(p)   // já limpa pendingScanCode internamente via setPendingScanCode(null)
+    } else {
+      setScanFeed({ msg: `❌ Código não encontrado: ${pendingScanCode}`, ok: false })
+      setTimeout(() => { setScanFeed(null); setPendingScanCode(null) }, 3500)
+    }
+  }, [products]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [showHelp, setShowHelp] = useState(false)
 

@@ -11,24 +11,44 @@ const CONCURRENCY = 4     // requests paralelos simultâneos
 const SIZE_PX     = 280   // tamanho máximo do lado maior após compressão
 const QUALITY     = 0.80  // JPEG quality
 
-/* ── busca a URL da foto frontal de um produto pelo EAN ──── */
-async function fetchImageUrl(barcode) {
+/* ── busca informações completas de um produto pelo EAN ──── */
+export async function fetchProductInfo(barcode) {
   const clean = String(barcode || '').replace(/\D/g, '')
   if (clean.length < 8) return null
 
   try {
-    const res = await fetch(`${OFF_API}/${clean}.json`, { signal: AbortSignal.timeout(8000) })
+    const res = await fetch(
+      `${OFF_API}/${clean}.json?fields=product_name,product_name_pt,product_name_en,brands,categories_tags,image_front_small_url,image_small_url,image_front_url,image_url`,
+      { signal: AbortSignal.timeout(8000) }
+    )
     if (!res.ok) return null
     const data = await res.json()
     if (data.status !== 1 || !data.product) return null
 
     const p = data.product
-    // Prefer small (200px) → less download, still good quality after recompress
-    return p.image_front_small_url || p.image_small_url ||
-           p.image_front_url       || p.image_url       || null
+
+    // Nome: preferir português, senão genérico, senão em inglês
+    const name = (p.product_name_pt || p.product_name || p.product_name_en || '').trim()
+    if (!name) return null   // sem nome = não usável
+
+    const brand    = (p.brands || '').split(',')[0].trim()
+    const imageUrl = p.image_front_small_url || p.image_small_url || p.image_front_url || p.image_url || null
+
+    // Mapear categoria OFF → categoria do sistema
+    const catTag   = (p.categories_tags || []).find(t => t.startsWith('pt:') || t.startsWith('en:')) || ''
+    const catRaw   = catTag.replace(/^(pt:|en:)/, '').replace(/-/g, ' ')
+    const category = catRaw ? (catRaw.charAt(0).toUpperCase() + catRaw.slice(1)) : ''
+
+    return { name, brand, category, imageUrl }
   } catch {
     return null
   }
+}
+
+/* ── busca a URL da foto frontal de um produto pelo EAN ──── */
+async function fetchImageUrl(barcode) {
+  const info = await fetchProductInfo(barcode)
+  return info?.imageUrl || null
 }
 
 /* ── baixa URL → canvas → data URL comprimido ─────────────── */
