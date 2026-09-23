@@ -47,18 +47,20 @@ async function loadStoreCatalog() {
 }
 
 function buildCatalogText(products, promos) {
-  // Somente produtos com preço, máximo 100 itens para não explodir o contexto
-  const active = products.filter(p => p.price > 0 && p.active !== false).slice(0, 100)
+  // Máx 60 produtos para economizar tokens — priorizamos os com estoque > 0
+  const active = products
+    .filter(p => p.price > 0 && p.active !== false)
+    .sort((a, b) => (b.stock || 0) - (a.stock || 0))
+    .slice(0, 60)
   const byCategory = {}
   for (const p of active) {
     const cat = p.category || 'Outros'
     if (!byCategory[cat]) byCategory[cat] = []
-    byCategory[cat].push(`• ${p.name} — R$${p.price.toFixed(2).replace('.', ',')}`)
+    byCategory[cat].push(`• ${p.name} R$${p.price.toFixed(2).replace('.', ',')}`)
   }
   const lines = []
   for (const [cat, items] of Object.entries(byCategory)) {
-    lines.push(`\n${cat.toUpperCase()}:`)
-    lines.push(...items.slice(0, 20))
+    lines.push(`${cat}: ${items.slice(0, 10).join(' | ')}`)   // 1 linha por categoria
   }
 
   const promoLines = promos
@@ -487,7 +489,26 @@ function parseLeadTag(rawReply) {
 // Memória de conversa por contato — mantém contexto entre mensagens
 // (dura enquanto a instância da função estiver quente — ~minutos/horas)
 const conversations = new Map()   // senderNum → [{role, content}, ...]
-const MAX_HISTORY   = 12          // últimas 12 trocas (6 pares user/assistant)
+const MAX_HISTORY   = 8           // últimas 8 trocas (4 pares) — reduzido para economizar tokens
+
+// ─── Rate limiting por número ─────────────────────────────────────────────────
+// Evita dreno de crédito por spam ou loops involuntários
+const rateMap = new Map()   // senderNum → { count, windowStart }
+const RATE_WINDOW_MS  = 60 * 60 * 1000  // janela de 1 hora
+const RATE_MAX_PER_HR = 20              // máx 20 mensagens por número por hora
+
+function checkRateLimit(senderNum) {
+  const now  = Date.now()
+  const prev = rateMap.get(senderNum) || { count: 0, windowStart: now }
+  if (now - prev.windowStart > RATE_WINDOW_MS) {
+    // nova janela
+    rateMap.set(senderNum, { count: 1, windowStart: now })
+    return true
+  }
+  if (prev.count >= RATE_MAX_PER_HR) return false   // bloqueado
+  rateMap.set(senderNum, { count: prev.count + 1, windowStart: prev.windowStart })
+  return true
+}
 
 function getHistory(senderNum) {
   if (!conversations.has(senderNum)) conversations.set(senderNum, [])
@@ -557,6 +578,12 @@ export default async (req, context) => {
   const senderName = data?.pushName || ''
 
   if (!text || !senderNum) return new Response('OK', { status: 200 })
+
+  // ── Rate limit — bloqueia spam antes de gastar tokens ────────────────────
+  if (!checkRateLimit(senderNum)) {
+    console.warn(`wa-bot: rate limit atingido para ${senderNum} — ignorando`)
+    return new Response('OK', { status: 200 })
+  }
 
   console.log(`wa-bot [${instanceName}]: msg de ${senderNum} (${senderName}): ${text.slice(0, 80)}`)
 
