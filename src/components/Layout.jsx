@@ -23,12 +23,12 @@ class PageErrorBoundary extends Component {
     return this.props.children
   }
 }
-import ZatendeStokLogo from './ZatendeStokLogo.jsx'
+import { ZSMark } from './ZatendeStokLogo.jsx'
 import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
   Warehouse, Users, Settings, Menu,
-  QrCode, Tag, Star, Download, Monitor, Camera, Store, HandCoins, LogOut,
-  BarChart2, Printer, CalendarClock, Megaphone, RefreshCw, Truck
+  QrCode, Tag, Star, Download, Monitor, Camera, HandCoins, LogOut,
+  BarChart2, Printer, CalendarClock, Megaphone, RefreshCw, Truck, X
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import { useOnlineStatus } from '../hooks/useOnlineStatus.js'
@@ -39,44 +39,10 @@ import { logout, getRole, getOperatorName, getTerminalId } from '../utils/auth.j
 import { getMktStoreId, getMktStoreToken } from '../utils/tenantStorage.js'
 import { useStore } from '../store.jsx'
 
-function SyncBar() {
-  const { syncNow, lastSync, syncing } = useStore()
-  const online = useOnlineStatus()
-  const [ago, setAgo] = useState('')
-
-  useEffect(() => {
-    const update = () => {
-      if (!lastSync) { setAgo(''); return }
-      const s = Math.floor((Date.now() - lastSync) / 1000)
-      if (s < 5)  setAgo('agora mesmo')
-      else if (s < 60)  setAgo(`há ${s}s`)
-      else setAgo(`há ${Math.floor(s / 60)}min`)
-    }
-    update()
-    const t = setInterval(update, 5000)
-    return () => clearInterval(t)
-  }, [lastSync])
-
-  return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${!online ? 'bg-amber-400' : syncing ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'}`} />
-      <span className="text-[10px] flex-1 truncate" style={{ color: !online ? '#fbbf24' : '#6b7280' }}>
-        {!online ? 'Offline — local' : syncing ? 'Sincronizando...' : ago ? `Sync ${ago}` : 'Conectando...'}
-      </span>
-      <button onClick={syncNow} disabled={syncing}
-        className="text-gray-600 hover:text-green-400 transition-colors disabled:opacity-30">
-        <RefreshCw className={`w-3 h-3 ${syncing ? 'animate-spin' : ''}`} />
-      </button>
-    </div>
-  )
-}
-
 /* ── nav sections ─────────────────────────────────────────── */
-// roles: which roles can see this item. Omit = everyone sees it.
 const CAIXA = [
-  { to: '/pdv',       icon: ShoppingCart, label: 'PDV / Caixa',   hot: true },
-  { to: '/promocoes', icon: Tag,          label: 'Promoções',     roles: ['admin','gerente'] },
+  { to: '/pdv',       icon: ShoppingCart, label: 'PDV / Caixa',    hot: true },
+  { to: '/promocoes', icon: Tag,          label: 'Promoções',      roles: ['admin','gerente'] },
 ]
 const GESTAO = [
   { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',  roles: ['admin','gerente'] },
@@ -88,85 +54,172 @@ const GESTAO = [
   { to: '/relatorio',  icon: BarChart2,       label: 'Relatório',  roles: ['admin','gerente'] },
 ]
 const EXTRAS = [
-  { to: '/etiquetas',     icon: Printer,      label: 'Etiquetas',       roles: ['admin','gerente'] },
-  { to: '/validade',      icon: CalendarClock,label: 'Validade',        roles: ['admin','gerente'] },
-  { to: '/campanhas',     icon: Megaphone,    label: 'Campanhas / ZAP', badge: 'NOVO', roles: ['admin','gerente'] },
-  { to: '/fidelidade',    icon: QrCode,       label: 'Fidelidade / ZAP',roles: ['admin','gerente'] },
-  { to: '/flyer',         icon: Star,         label: 'Flyer Sorteio',   roles: ['admin','gerente'] },
-  { to: '/configuracoes', icon: Settings,     label: 'Configurações',   roles: ['admin'] },
+  { to: '/etiquetas',     icon: Printer,       label: 'Etiquetas',        roles: ['admin','gerente'] },
+  { to: '/validade',      icon: CalendarClock, label: 'Validade',         roles: ['admin','gerente'] },
+  { to: '/campanhas',     icon: Megaphone,     label: 'Campanhas / ZAP',  badge: 'NOVO', roles: ['admin','gerente'] },
+  { to: '/fidelidade',    icon: QrCode,        label: 'Fidelidade / ZAP', roles: ['admin','gerente'] },
+  { to: '/flyer',         icon: Star,          label: 'Flyer Sorteio',    roles: ['admin','gerente'] },
+  { to: '/configuracoes', icon: Settings,      label: 'Configurações',    roles: ['admin'] },
 ]
 
 function filterByRole(items, role) {
   return items.filter(item => !item.roles || item.roles.includes(role))
 }
 
-/* ── logo ─────────────────────────────────────────────────── */
-function SidebarLogo() {
-  const { settings } = usePrinter()
-  const session    = (() => { try { return JSON.parse(localStorage.getItem('cp_session') || '{}') } catch { return {} } })()
-  const name       = session.storeName || settings.storeName || 'MEU MERCADO'
-  const logoImg    = settings.logoImage
-  const nicheMeta  = getNicheMeta(session.niche || 'mercado')
+/* ─────────────────────────────────────────────────────────────
+   RAIL ICON ITEM (desktop only — com tooltip)
+───────────────────────────────────────────────────────────── */
+function RailItem({ to, icon: Icon, label, badge, hot, onClick }) {
+  const inner = (isActive) => (
+    <>
+      {/* left active accent */}
+      {isActive && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-8 rounded-r-full"
+          style={{ background: 'var(--zs-theme)', boxShadow: '0 0 8px var(--zs-theme)' }} />
+      )}
+      {/* icon wrapper */}
+      <span className="relative flex items-center justify-center w-10 h-10 rounded-2xl transition-all duration-150"
+        style={isActive
+          ? { background: 'color-mix(in srgb, var(--zs-theme) 18%, transparent)', boxShadow: '0 0 0 1px color-mix(in srgb, var(--zs-theme) 30%, transparent)' }
+          : {}}>
+        <Icon className="w-[18px] h-[18px] transition-transform duration-150 group-hover:scale-110"
+          style={{ color: isActive ? 'var(--zs-theme)' : '#52525b' }} />
+        {/* badge dot */}
+        {(badge || hot) && (
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border-[1.5px] border-gray-950"
+            style={{ background: badge ? '#22c55e' : 'var(--zs-theme)', animation: hot ? 'pulse 2s infinite' : 'none' }} />
+        )}
+      </span>
+      {/* tooltip */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2
+          flex items-center gap-2
+          px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap
+          opacity-0 group-hover:opacity-100
+          scale-95 group-hover:scale-100
+          transition-all duration-150 z-[999]"
+        style={{ background: '#18181b', color: '#f4f4f5', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 8px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.5)' }}>
+        {label}
+        {badge && <span className="text-[9px] font-black bg-green-500/20 text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded-full">{badge}</span>}
+      </span>
+    </>
+  )
+
+  if (onClick) return (
+    <button onClick={onClick}
+      className="group relative flex items-center justify-center w-full py-0.5 cursor-pointer">
+      {inner(false)}
+    </button>
+  )
 
   return (
-    <div className="px-3 pt-3 pb-2 shrink-0">
-      {/* brand wordmark or custom logo */}
-      <div className="mb-2 flex items-center justify-center py-1.5 px-3 rounded-xl bg-gray-900/60 border border-gray-800">
-        {logoImg
-          ? <img src={logoImg} alt="logo" style={{ height: 28, maxWidth: 148, objectFit: 'contain' }} />
-          : <ZatendeStokLogo variant="wordmark" />
-        }
-      </div>
-      {/* store badge — niche emoji + name + segment label */}
-      <div className="relative overflow-hidden rounded-xl px-3 py-2.5 shadow-lg"
-        style={{ background: 'linear-gradient(135deg, var(--zs-theme), color-mix(in srgb, var(--zs-theme) 70%, black))', boxShadow: '0 8px 24px color-mix(in srgb, var(--zs-theme) 35%, transparent)' }}>
-        <div className="relative flex items-center gap-2">
-          <span className="text-base leading-none shrink-0" aria-hidden="true">{nicheMeta.emoji}</span>
-          <div className="flex-1 min-w-0">
-            <span className="text-white font-black text-sm tracking-tight leading-none truncate block">{name}</span>
-            <span className="text-white/50 font-semibold text-[9px] tracking-widest uppercase leading-none block mt-0.5">{nicheMeta.label}</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <NavLink to={to}
+      className="group relative flex items-center justify-center w-full py-0.5">
+      {({ isActive }) => inner(isActive)}
+    </NavLink>
   )
 }
 
-/* ── nav section ──────────────────────────────────────────── */
-// Uses var(--zs-theme) so active states update instantly when theme changes (no save needed).
-function NavSection({ title, items, onClose }) {
+/* ─────────────────────────────────────────────────────────────
+   DRAWER NAV ITEM (mobile only — ícone + label)
+───────────────────────────────────────────────────────────── */
+function DrawerItem({ to, icon: Icon, label, badge, hot, onClose }) {
   return (
-    <div className="mb-1">
-      <div className="px-4 mb-1 text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: '#6b7280' }}>
-        {title}
-      </div>
-      {items.map(({ to, icon: Icon, label, badge, hot }) => (
-        <NavLink key={to} to={to} onClick={onClose}
-          className="group relative flex items-center gap-3 mx-2 px-3 py-2 rounded-xl text-[13px] font-semibold transition-colors duration-150"
-        >
-          {({ isActive }) => (
-            <>
-              <span className="absolute inset-0 rounded-xl pointer-events-none"
-                style={isActive ? { background: 'color-mix(in srgb, var(--zs-theme) 16%, transparent)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--zs-theme) 35%, transparent)' } : {}} />
-              {isActive && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full" style={{ background: 'var(--zs-theme)' }} />
-              )}
-              <Icon className="w-4 h-4 flex-shrink-0"
-                style={{ color: isActive ? 'var(--zs-theme)' : '#9ca3af' }}
-              />
-              <span className="flex-1" style={{ color: isActive ? 'var(--zs-theme)' : '#d1d5db' }}>{label}</span>
-              {hot && !badge && (
-                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--zs-theme)' }} />
-              )}
-              {badge && (
-                <span className="text-[9px] font-black bg-green-500/20 text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded-full leading-none">
-                  {badge}
-                </span>
-              )}
-            </>
+    <NavLink to={to} onClick={onClose}
+      className="group relative flex items-center gap-3 mx-2 px-3 py-2.5 rounded-xl transition-colors duration-150">
+      {({ isActive }) => (
+        <>
+          <span className="absolute inset-0 rounded-xl pointer-events-none transition-all"
+            style={isActive ? { background: 'color-mix(in srgb, var(--zs-theme) 15%, transparent)', boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--zs-theme) 30%, transparent)' } : {}} />
+          {isActive && (
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-7 rounded-r-full"
+              style={{ background: 'var(--zs-theme)' }} />
           )}
-        </NavLink>
-      ))}
+          <Icon className="w-4 h-4 flex-shrink-0" style={{ color: isActive ? 'var(--zs-theme)' : '#71717a' }} />
+          <span className="flex-1 text-[13px] font-semibold" style={{ color: isActive ? 'var(--zs-theme)' : '#d4d4d8' }}>{label}</span>
+          {hot && !badge && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--zs-theme)' }} />}
+          {badge && <span className="text-[9px] font-black bg-green-500/20 text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded-full">{badge}</span>}
+        </>
+      )}
+    </NavLink>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RAIL DIVIDER
+───────────────────────────────────────────────────────────── */
+const RailDivider = () => (
+  <div className="mx-auto w-5 h-px my-1" style={{ background: 'rgba(255,255,255,0.06)' }} />
+)
+
+/* ─────────────────────────────────────────────────────────────
+   SYNC / ONLINE INDICATOR — compact for rail
+───────────────────────────────────────────────────────────── */
+function SyncDot() {
+  const { syncNow, lastSync, syncing } = useStore()
+  const online = useOnlineStatus()
+  const [ago, setAgo]       = useState('')
+
+  useEffect(() => {
+    const update = () => {
+      if (!lastSync) { setAgo(''); return }
+      const s = Math.floor((Date.now() - lastSync) / 1000)
+      if (s < 5)        setAgo('agora mesmo')
+      else if (s < 60)  setAgo(`há ${s}s`)
+      else              setAgo(`há ${Math.floor(s / 60)}min`)
+    }
+    update()
+    const t = setInterval(update, 5000)
+    return () => clearInterval(t)
+  }, [lastSync])
+
+  const color = !online ? '#f59e0b' : syncing ? '#facc15' : '#22c55e'
+  const tip   = !online ? 'Offline — local' : syncing ? 'Sincronizando...' : `Sincronizado ${ago}`
+
+  return (
+    <button onClick={syncNow} disabled={syncing}
+      className="group relative flex items-center justify-center w-full py-0.5"
+      title={tip}>
+      <span className="relative flex items-center justify-center w-10 h-10 rounded-2xl hover:bg-white/5 transition-all">
+        <RefreshCw className="w-[17px] h-[17px] transition-transform" style={{ color, animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
+        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border-[1.5px] border-gray-950"
+          style={{ background: color, boxShadow: syncing ? 'none' : `0 0 6px ${color}` }} />
+      </span>
+      {/* tooltip */}
+      <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2
+        px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap
+        opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100
+        transition-all duration-150 z-[999]"
+        style={{ background: '#18181b', color: '#f4f4f5', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 8px 28px rgba(0,0,0,0.55)' }}>
+        {tip}
+      </span>
+    </button>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   STORE AVATAR — topo do rail
+───────────────────────────────────────────────────────────── */
+function StoreAvatar({ name, emoji, themeColor, logoImg }) {
+  const initial = (name || '?')[0].toUpperCase()
+  return (
+    <div className="group relative flex items-center justify-center w-full py-2">
+      <div className="relative w-10 h-10 rounded-2xl flex items-center justify-center font-black text-base overflow-hidden"
+        style={{ background: `linear-gradient(135deg, ${themeColor}, color-mix(in srgb, ${themeColor} 60%, #000))`, boxShadow: `0 4px 14px color-mix(in srgb, ${themeColor} 40%, transparent)` }}>
+        {logoImg
+          ? <img src={logoImg} alt="logo" className="w-full h-full object-cover" />
+          : <span className="text-white text-sm leading-none select-none">{emoji}</span>
+        }
+      </div>
+      {/* tooltip com nome da loja */}
+      <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2
+        px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap
+        opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100
+        transition-all duration-150 z-[999]"
+        style={{ background: '#18181b', color: '#f4f4f5', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 8px 28px rgba(0,0,0,0.55)' }}>
+        {name}
+      </span>
     </div>
   )
 }
@@ -233,103 +286,174 @@ export default function Layout() {
   if (marketCheck.blocked)
     return <BlockedScreen reason={marketCheck.reason} daysLeft={marketCheck.daysLeft} />
 
+  const caixaItems   = filterByRole(CAIXA,  role)
+  const gestaoItems  = filterByRole(GESTAO, role)
+  const extrasItems  = dynamicExtras
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
 
-      {/* ── Sidebar ───────────────────────────────────────── */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-40 w-[228px] shrink-0 flex flex-col transition-transform duration-200
-        md:static md:translate-x-0
-        ${open ? 'translate-x-0' : '-translate-x-full'}
-      `} style={{ background: '#09090b', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+      {/* ══════════════════════════════════════════════════
+          DESKTOP: Icon Rail (56px, always visible, md+)
+          Completely separate from the mobile drawer so
+          there's no conflict between the two layouts.
+      ══════════════════════════════════════════════════ */}
+      <aside
+        className="hidden md:flex flex-col shrink-0 z-40 overflow-visible"
+        style={{ width: 56, background: '#09090b', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
 
-        <SidebarLogo />
-
-        {/* ── Operator badge ── */}
-        <div className="mx-3 mb-2 px-3 py-1.5 rounded-xl flex items-center gap-2 shrink-0" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          <div style={{ width: 28, height: 28, borderRadius: '50%', background: (ROLE_COLOR[role] ?? '#9ca3af') + '22', border: `1.5px solid ${ROLE_COLOR[role] ?? '#9ca3af'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, color: ROLE_COLOR[role] ?? '#9ca3af', flexShrink: 0 }}>
-            {operatorName[0]?.toUpperCase() ?? '?'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[12px] font-bold text-gray-200 truncate">{operatorName}</div>
-            <div className="text-[10px] font-semibold" style={{ color: ROLE_COLOR[role] ?? '#9ca3af' }}>
-              {ROLE_LABEL[role] ?? role}{role === 'caixa' ? ` · Terminal ${terminalId}` : ''}
-            </div>
-          </div>
+        {/* ── Store avatar (top) ── */}
+        <div className="pt-3 pb-1">
+          <StoreAvatar
+            name={storeName}
+            emoji={nicheMeta.emoji}
+            themeColor={themeColor}
+            logoImg={storeSettings.logoImage}
+          />
         </div>
 
-        {/* divider */}
-        <div className="mx-4 mb-3 h-px bg-white/5" />
+        <div className="mx-auto w-5 h-px" style={{ background: 'rgba(255,255,255,0.07)' }} />
 
-        {/* nav — min-h-0 is required so flex-1 can actually shrink and overflow-y-auto activates */}
-        <nav className="flex-1 min-h-0 overflow-y-auto pb-3 space-y-2">
-          <NavSection title="Caixa"   items={filterByRole(CAIXA, role)}   onClose={() => setOpen(false)} />
-          <NavSection title="Gestão"  items={filterByRole(GESTAO, role)}  onClose={() => setOpen(false)} />
-          {dynamicExtras.length > 0 && <NavSection title="Extras" items={dynamicExtras} onClose={() => setOpen(false)} />}
+        {/* ── Nav icons (scrollable) ── */}
+        <nav className="flex-1 flex flex-col items-center min-h-0 overflow-y-auto overflow-x-visible py-1 gap-0.5 no-scrollbar">
 
-          {/* ── inline shortcuts — inside scroll so nada fica cortado ── */}
-          <div className="px-2 pt-1 space-y-1">
-            <div className="px-2 mb-1 text-[9px] font-black text-gray-600 tracking-[0.15em] uppercase">Ferramentas</div>
+          {/* CAIXA group */}
+          {caixaItems.map(item => (
+            <RailItem key={item.to} {...item} />
+          ))}
 
-            {/* Terminal 1 */}
-            <a href="/terminal" target="_blank" rel="noreferrer"
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all group"
-              style={{ background: `${themeColor}18`, border: `1px solid ${themeColor}33` }}>
-              <Monitor className="w-3.5 h-3.5 shrink-0" style={{ color: themeColor }} />
-              <span className="text-[11px] font-black flex-1" style={{ color: themeColor + 'cc' }}>Terminal · PDV 1</span>
-              <span className="text-[8px] text-black font-black px-1.5 py-0.5 rounded-full" style={{ background: themeColor }}>ABRIR</span>
-            </a>
+          {gestaoItems.length > 0 && <RailDivider />}
 
-            {/* Terminal 2 — abre nova janela do app (funciona no PWA Windows) */}
-            <button
-              onClick={() => window.open('/terminal', '_blank', 'noopener,noreferrer')}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
-              style={{ background: `${themeColor}10`, border: `1px solid ${themeColor}22` }}
-              title="Abre um segundo caixa em nova janela — funciona no app instalado">
-              <Monitor className="w-3.5 h-3.5 shrink-0" style={{ color: themeColor + '99' }} />
-              <span className="text-[11px] font-semibold flex-1" style={{ color: themeColor + '99' }}>＋ Abrir 2° Terminal</span>
-              <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full border" style={{ color: themeColor + '99', borderColor: themeColor + '44' }}>NOVA JANELA</span>
-            </button>
+          {/* GESTÃO group */}
+          {gestaoItems.map(item => (
+            <RailItem key={item.to} {...item} />
+          ))}
 
-            <a href={`/scan?storeId=${getMktStoreId()}&t=${getMktStoreToken()}`} target="_blank" rel="noreferrer"
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all group"
-              style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)' }}>
-              <Camera className="w-3.5 h-3.5 text-green-500 shrink-0" />
-              <span className="text-green-400 text-[11px] font-black flex-1 group-hover:text-green-300">Scanner Celular</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            </a>
+          {extrasItems.length > 0 && <RailDivider />}
 
-            {canInstall && (
-              <button onClick={install}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors"
-                style={{ background: themeColor }}>
-                <Download className="w-3.5 h-3.5 text-black shrink-0" />
-                <span className="text-black text-[11px] font-black">Instalar App (PWA)</span>
-              </button>
-            )}
+          {/* EXTRAS group */}
+          {extrasItems.map(item => (
+            <RailItem key={item.to} {...item} />
+          ))}
 
-            <a href="/guia"
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-500 transition-all"
-              style={{ textDecoration: 'none' }}>
-              <span className="text-[13px]">📖</span>
-              <span className="text-[11px] font-semibold">Guia do sistema</span>
-            </a>
-          </div>
+          <RailDivider />
+
+          {/* Tools */}
+          <RailItem icon={Monitor} label="Terminal PDV 1" onClick={() => window.open('/terminal', '_blank', 'noopener,noreferrer')} />
+          <RailItem icon={Monitor} label="＋ 2° Terminal"   onClick={() => window.open('/terminal', '_blank', 'noopener,noreferrer')} />
+          <RailItem icon={Camera}  label="Scanner Celular" onClick={() => window.open(`/scan?storeId=${getMktStoreId()}&t=${getMktStoreToken()}`, '_blank', 'noopener,noreferrer')} />
+          {canInstall && (
+            <RailItem icon={Download} label="Instalar App (PWA)" onClick={install} />
+          )}
         </nav>
 
-        {/* ── bottom strip — só Sync + Sair, tudo mais está no scroll ── */}
-        <div className="px-3 py-2 space-y-1 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <SyncBar />
-          <button onClick={handleLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all group">
-            <LogOut className="w-3.5 h-3.5 shrink-0" />
-            <span className="text-[11px] font-semibold">Sair do sistema</span>
+        {/* ── Bottom strip: sync + logout ── */}
+        <div className="pb-3 pt-1 flex flex-col items-center gap-0.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <SyncDot />
+          <button
+            onClick={handleLogout}
+            className="group relative flex items-center justify-center w-full py-0.5"
+            title="Sair do sistema">
+            <span className="flex items-center justify-center w-10 h-10 rounded-2xl hover:bg-red-500/10 transition-all">
+              <LogOut className="w-[17px] h-[17px] text-zinc-600 group-hover:text-red-400 transition-colors" />
+            </span>
+            <span className="pointer-events-none absolute left-[calc(100%+10px)] top-1/2 -translate-y-1/2
+              px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap
+              opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100
+              transition-all duration-150 z-[999]"
+              style={{ background: '#18181b', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)', boxShadow: '0 8px 28px rgba(0,0,0,0.55)' }}>
+              Sair do sistema
+            </span>
           </button>
         </div>
       </aside>
 
-      {/* overlay mobile */}
-      {open && <div className="fixed inset-0 z-30 bg-black/70 md:hidden" onClick={() => setOpen(false)} />}
+      {/* ══════════════════════════════════════════════════
+          MOBILE: Slide-in Drawer (full width, icon + label)
+      ══════════════════════════════════════════════════ */}
+      <aside className={`
+        md:hidden fixed inset-y-0 left-0 z-40 w-60 flex flex-col
+        transition-transform duration-200
+        ${open ? 'translate-x-0' : '-translate-x-full'}
+      `} style={{ background: '#09090b', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+
+        {/* drawer header */}
+        <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm"
+              style={{ background: `linear-gradient(135deg, ${themeColor}, color-mix(in srgb, ${themeColor} 60%, #000))` }}>
+              {nicheMeta.emoji}
+            </div>
+            <span className="text-[13px] font-black text-white truncate max-w-[130px]">{storeName}</span>
+          </div>
+          <button onClick={() => setOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors">
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        {/* operator badge */}
+        <div className="mx-3 mt-2 mb-1 px-3 py-1.5 rounded-xl flex items-center gap-2 shrink-0" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ width: 26, height: 26, borderRadius: '50%', background: (ROLE_COLOR[role] ?? '#9ca3af') + '22', border: `1.5px solid ${ROLE_COLOR[role] ?? '#9ca3af'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, color: ROLE_COLOR[role] ?? '#9ca3af', flexShrink: 0 }}>
+            {operatorName[0]?.toUpperCase() ?? '?'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-bold text-gray-200 truncate">{operatorName}</div>
+            <div className="text-[9px] font-semibold" style={{ color: ROLE_COLOR[role] ?? '#9ca3af' }}>
+              {ROLE_LABEL[role] ?? role}{role === 'caixa' ? ` · PDV ${terminalId}` : ''}
+            </div>
+          </div>
+        </div>
+
+        <nav className="flex-1 min-h-0 overflow-y-auto pb-3 pt-1">
+          {/* CAIXA */}
+          <p className="px-5 pt-2 pb-1 text-[9px] font-black tracking-widest uppercase" style={{ color: '#3f3f46' }}>Caixa</p>
+          {caixaItems.map(item => <DrawerItem key={item.to} {...item} onClose={() => setOpen(false)} />)}
+
+          {/* GESTÃO */}
+          {gestaoItems.length > 0 && <>
+            <p className="px-5 pt-3 pb-1 text-[9px] font-black tracking-widest uppercase" style={{ color: '#3f3f46' }}>Gestão</p>
+            {gestaoItems.map(item => <DrawerItem key={item.to} {...item} onClose={() => setOpen(false)} />)}
+          </>}
+
+          {/* EXTRAS */}
+          {extrasItems.length > 0 && <>
+            <p className="px-5 pt-3 pb-1 text-[9px] font-black tracking-widest uppercase" style={{ color: '#3f3f46' }}>Extras</p>
+            {extrasItems.map(item => <DrawerItem key={item.to} {...item} onClose={() => setOpen(false)} />)}
+          </>}
+
+          {/* Ferramentas */}
+          <p className="px-5 pt-3 pb-1 text-[9px] font-black tracking-widest uppercase" style={{ color: '#3f3f46' }}>Ferramentas</p>
+          <a href="/terminal" target="_blank" rel="noreferrer"
+            className="flex items-center gap-3 mx-2 px-3 py-2.5 rounded-xl text-[13px] font-semibold text-zinc-400 hover:bg-white/5 transition-colors">
+            <Monitor className="w-4 h-4 shrink-0 text-zinc-600" />Terminal PDV 1
+          </a>
+          <button onClick={() => window.open('/terminal','_blank','noopener,noreferrer')}
+            className="w-full flex items-center gap-3 mx-0 px-5 py-2.5 text-[13px] font-semibold text-zinc-400 hover:bg-white/5 transition-colors">
+            <Monitor className="w-4 h-4 shrink-0 text-zinc-600" />＋ 2° Terminal
+          </button>
+          <a href={`/scan?storeId=${getMktStoreId()}&t=${getMktStoreToken()}`} target="_blank" rel="noreferrer"
+            className="flex items-center gap-3 mx-2 px-3 py-2.5 rounded-xl text-[13px] font-semibold text-green-500 hover:bg-white/5 transition-colors">
+            <Camera className="w-4 h-4 shrink-0" />Scanner Celular
+          </a>
+          {canInstall && (
+            <button onClick={install}
+              className="mx-2 mt-1 w-[calc(100%-16px)] flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-black text-black"
+              style={{ background: themeColor }}>
+              <Download className="w-4 h-4 shrink-0" />Instalar App (PWA)
+            </button>
+          )}
+        </nav>
+
+        <div className="px-3 py-2 shrink-0 space-y-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <button onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all">
+            <LogOut className="w-4 h-4 shrink-0" />Sair do sistema
+          </button>
+        </div>
+      </aside>
+
+      {/* mobile overlay */}
+      {open && <div className="md:hidden fixed inset-0 z-30 bg-black/70" onClick={() => setOpen(false)} />}
 
       {/* ── Main area ──────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
