@@ -19,39 +19,7 @@ const SEED_CUSTOMERS = [
 ]
 
 // All promotion rules auto-generated from Gdoor CSV + manual
-const SEED_PROMOS = [
-  { id: 'pr1',             name: '4 Bono / Negresco 90g por R$10,99', group: 'BONO_NEGRESCO_4x999', qty: 4, totalPrice: 10.99, active: true, createdAt: '2025-01-01' },
-  { id: 'pr2',             name: '7 DonDon Garrafinha 140g por R$10,01', group: 'DONDON_7x999',      qty: 7, totalPrice: 10.01, active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_2x1099',   name: '2 unidades por R$10,99',           group: 'MIX_2x1099',          qty: 2,  totalPrice: 10.99, active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_2x699',    name: '2 unidades por R$6,99',            group: 'MIX_2x699',           qty: 2,  totalPrice: 6.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_2x999',    name: '2 unidades por R$9,99',            group: 'MIX_2x999',           qty: 2,  totalPrice: 9.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_3x999',    name: '3 unidades por R$9,99',            group: 'MIX_3x999',           qty: 3,  totalPrice: 9.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_8x999',    name: '8 unidades por R$9,99',            group: 'MIX_8x999',           qty: 8,  totalPrice: 9.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_2x799',    name: '2 unidades por R$7,99',            group: 'MIX_2x799',           qty: 2,  totalPrice: 7.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_4x999',    name: '4 unidades por R$9,99',            group: 'MIX_4x999',           qty: 4,  totalPrice: 9.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_7x999',    name: '7 unidades por R$9,99',            group: 'MIX_7x999',           qty: 7,  totalPrice: 9.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_3x899',    name: '3 unidades por R$8,99',            group: 'MIX_3x899',           qty: 3,  totalPrice: 8.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_4x899',    name: '4 unidades por R$8,99',            group: 'MIX_4x899',           qty: 4,  totalPrice: 8.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_6x1099',   name: '6 unidades por R$10,99',           group: 'MIX_6x1099',          qty: 6,  totalPrice: 10.99, active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_4x1099',   name: '4 unidades por R$10,99',           group: 'MIX_4x1099',          qty: 4,  totalPrice: 10.99, active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_5x799',    name: '5 unidades por R$7,99',            group: 'MIX_5x799',           qty: 5,  totalPrice: 7.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_3x1199',   name: '3 unidades por R$11,99',           group: 'MIX_3x1199',          qty: 3,  totalPrice: 11.99, active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_5x999',    name: '5 unidades por R$9,99',            group: 'MIX_5x999',           qty: 5,  totalPrice: 9.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_2x899',    name: '2 unidades por R$8,99',            group: 'MIX_2x899',           qty: 2,  totalPrice: 8.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_2x1199',   name: '2 unidades por R$11,99',           group: 'MIX_2x1199',          qty: 2,  totalPrice: 11.99, active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_3x1200',   name: '3 unidades por R$12,00',           group: 'MIX_3x1200',          qty: 3,  totalPrice: 12.00, active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_10x999',   name: '10 unidades por R$9,99',           group: 'MIX_10x999',          qty: 10, totalPrice: 9.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_2x1500',   name: '2 unidades por R$15,00',           group: 'MIX_2x1500',          qty: 2,  totalPrice: 15.00, active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_3x499',    name: '3 unidades por R$4,99',            group: 'MIX_3x499',           qty: 3,  totalPrice: 4.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_2x1399',   name: '2 unidades por R$13,99',           group: 'MIX_2x1399',          qty: 2,  totalPrice: 13.99, active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_3x599',    name: '3 unidades por R$5,99',            group: 'MIX_3x599',           qty: 3,  totalPrice: 5.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_4x699',    name: '4 unidades por R$6,99',            group: 'MIX_4x699',           qty: 4,  totalPrice: 6.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_2x1499',   name: '2 unidades por R$14,99',           group: 'MIX_2x1499',          qty: 2,  totalPrice: 14.99, active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_2x1899',   name: '2 unidades por R$18,99',           group: 'MIX_2x1899',          qty: 2,  totalPrice: 18.99, active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_4x1199',   name: '4 unidades por R$11,99',           group: 'MIX_4x1199',          qty: 4,  totalPrice: 11.99, active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_5x899',    name: '5 unidades por R$8,99',            group: 'MIX_5x899',           qty: 5,  totalPrice: 8.99,  active: true, createdAt: '2025-01-01' },
-  { id: 'pr_mix_4x1200',   name: '4 unidades por R$12,00',           group: 'MIX_4x1200',          qty: 4,  totalPrice: 12.00, active: true, createdAt: '2025-01-01' },
-]
+const SEED_PROMOS = []
 
 // Build seed sales from real products in the database
 const _seedProds = PRODUCTS_SEED.filter(p => p.price > 0 && p.stock > 0).slice(0, 50)
