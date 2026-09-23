@@ -561,9 +561,11 @@ export default async (req, context) => {
   console.log(`wa-bot [${instanceName}]: msg de ${senderNum} (${senderName}): ${text.slice(0, 80)}`)
 
   // ── Instâncias: Corta Preços store bot vs Zara sales bot ─────────────────
-  const CORTA_PRECOS_INSTANCES = ['zatendeapi']
+  // instanceName pode vir como 'zatendeapi' OU como o storeId 'cortaprecos_*'
+  const CORTA_PRECOS_INSTANCES = ['zatendeapi', 'cortaprecos_1789770018182']
   const ZARA_INSTANCES         = ['zatendestok']
   const isCortaPrecos = CORTA_PRECOS_INSTANCES.includes(instanceName?.toLowerCase())
+                     || String(instanceName || '').toLowerCase().startsWith('cortaprecos_')
   const isZara        = ZARA_INSTANCES.includes(instanceName?.toLowerCase())
 
   try {
@@ -671,11 +673,26 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
     // Crédito OpenAI esgotado → resposta de fallback humanizada
     if (err instanceof OpenAIQuotaError) {
       console.error('wa-bot: OpenAI sem crédito — enviando fallback')
-      const fallback = isCortaPrecos
-        ? `Oi${senderName ? ', ' + senderName : ''}! 👋 Tive um probleminha técnico agora, mas já já resolvo.\nEntra em contato diretamente pelo (15) 9979-6930 ou liga pra nós! 😊`
-        : isZara
-          ? `Oi${senderName ? ', ' + senderName : ''}! 👋 Tô aqui sim — só tive um probleminha técnico agora.\nVou chamar o Pedro pra te atender direitinho. Já te retorno! 😊`
-          : `Oi! Estamos com uma instabilidade agora, mas já resolvemos em breve. Obrigado pela paciência! 😊`
+      let fallback
+      if (isCortaPrecos) {
+        // Fallback inteligente por palavras-chave quando OpenAI está sem crédito
+        const t = text.toLowerCase()
+        if (/promo|desconto|oferta|promoção/.test(t)) {
+          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 🔥 Passando pelas promoções agora temos os combos especiais!\nLiga pra gente no (15) 9979-6930 e a gente te conta tudo 😊`
+        } else if (/entrega|delivery|manda|mandar|entreg/.test(t)) {
+          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 🛵 Fazemos entrega sim! Taxa fixa R$7,00 e pagamento por PIX.\nManda o endereço completo + o que você quer pedir no (15) 9979-6930 📱`
+        } else if (/preço|valor|quanto|custa|custo|price/.test(t)) {
+          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 😊 Para consultar preços liga no (15) 9979-6930 ou passa aqui na loja — Corta Preços, Boituva-SP!`
+        } else if (/hora|horário|abre|fecha|funcionamento/.test(t)) {
+          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! ⏰ Para confirmar nosso horário de funcionamento, liga no (15) 9979-6930. A gente te atende! 😊`
+        } else {
+          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 👋 Tô com uma instabilidade técnica agora, mas já resolvo.\nPode ligar direto: (15) 9979-6930 📱 Estamos aqui!`
+        }
+      } else if (isZara) {
+        fallback = `Oi${senderName ? ', ' + senderName : ''}! 👋 Tô aqui sim — só tive um probleminha técnico agora.\nVou chamar o Pedro pra te atender direitinho. Já te retorno! 😊`
+      } else {
+        fallback = `Oi! Estamos com uma instabilidade agora, mas já resolvemos em breve. Obrigado pela paciência! 😊`
+      }
       context.waitUntil(sendReply(senderNum, fallback, instanceName))
     } else {
       console.error('wa-bot error:', err.message)
