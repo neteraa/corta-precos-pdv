@@ -94,23 +94,28 @@ Cadastro: /afiliado (landing dark com simulador de ganhos via slider)
 
 ---
 
-## Zara (wa-bot.js)
+## wa-bot.js — Multi-modo
 
-ZARA_INSTANCES = ['zatendeapi', 'zatendestok']
-System Prompt: ~6900 chars com:
-  - 14 módulos listados
-  - Links /demo/:niche por segmento
-  - Afiliados R$150/R$250, link /afiliado
-  - Objeções: tá caro / já tenho sistema / vou pensar / não sei tecnologia / não conheço vocês
-  - Lead tag: <zs_lead>{"name","market","city","niche","stage"}</zs_lead>
-  - Stages: novo|curioso|interessado|demo|afiliado|fechado
+### Corta Preços bot (atendente da loja)
+CORTA_PRECOS_INSTANCES = ['zatendeapi', 'cortaprecos_1789770018182']
+  - instanceName vem como 'cortaprecos_1789770018182' do webhook Evolution API
+  - Carrega catálogo (produtos + promos) do Netlify Blob com cache 20min
+  - buildCatalogText: máx 60 produtos (ordenados por estoque), 1 linha por categoria
+  - buildCortaPrecosPrompt: atendente do Corta Preços, faz delivery R$7 PIX
+  - Fallback sem OpenAI: keywords → resposta contextual + telefone (15) 9979-6930
+  - Delivery: bot anota endereço, confirma por PIX, painel em /entrega
 
-Proteções:
-  - sendReply fire-and-forget (sem await) → retorna ~1.5s
-  - AbortController 8s na Evolution API
-  - OpenAIQuotaError → fallback humanizado (nunca fica mudo)
+### Zara (vendas ZatendeStok)
+ZARA_INSTANCES = ['zatendestok']
+  - System prompt ~6900 chars, 14 módulos, leads, afiliados
+
+### Proteções anti-dreno
+  - Rate limit: 20 msgs/hora por número (descarta silenciosamente)
+  - MAX_HISTORY: 8 trocas (era 12)
+  - Catálogo: 60 produtos em formato compacto (era 100, verbose)
+  - sendReply fire-and-forget, AbortController 8s
+  - OpenAIQuotaError → fallback humanizado com keywords (nunca fica mudo)
   - Ignora: fromMe, grupos, áudio, sticker, reaction
-  - Histórico: Map em memória, últimas 10 msgs por número
 
 ---
 
