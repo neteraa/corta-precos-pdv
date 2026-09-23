@@ -22,10 +22,10 @@
     }
   ],
   "shortcuts": [
-    { "name": "Caixa (PDV)",         "url": "/pdv",        "description": "Abrir PDV principal" },
-    { "name": "Terminal (Scanner)",   "url": "/caixa",      "description": "Terminal com leitor de código" },
-    { "name": "Portal Distribuidor", "url": "/fornecedor", "description": "Portal do Distribuidor" },
-    { "name": "Ver Ofertas",         "url": "/ofertas",    "description": "Portal de Ofertas" }
+    { "name": "PDV Admin",           "url": "/pdv",        "description": "PDV principal com admin" },
+    { "name": "Terminal PDV 1",      "url": "/terminal",   "description": "Caixa modo terminal — PDV 1" },
+    { "name": "Terminal PDV 2",      "url": "/terminal",   "description": "Caixa modo terminal — PDV 2 (nova janela)" },
+    { "name": "Portal Distribuidor", "url": "/fornecedor", "description": "Portal do Distribuidor" }
   ],
   "categories": ["business", "productivity"]
 }

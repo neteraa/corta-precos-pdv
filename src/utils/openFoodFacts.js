@@ -20,18 +20,44 @@ export async function fetchProductInfo(barcode) {
   const clean = String(barcode || '').replace(/\D/g, '')
   if (clean.length < 8) return null
 
-  // ── 1. Proxy Netlify (Cosmos + OFF + cache) ───────────────
+  // ── 1. Base legada Corta Preços (produto idêntico com preço real) ────
+  try {
+    const res = await fetch(`/api/legacy-lookup?code=${clean}`, {
+      signal: AbortSignal.timeout(5000),
+    })
+    if (res.ok) {
+      const d = await res.json()
+      if (d?.ok && d.products?.length > 0) {
+        const p = d.products[0]
+        if (p.name) {
+          return {
+            name:      p.name,
+            brand:     '',
+            quantity:  '',
+            category:  p.category || '',
+            imageUrl:  null,
+            price:     p.price   || 0,   // preço real da base legada
+            cost:      p.cost    || 0,
+            unit:      p.unit    || 'UN',
+            fromLegacy: true,
+          }
+        }
+      }
+    }
+  } catch { /* base legada indisponível */ }
+
+  // ── 2. Proxy Netlify (Cosmos + OFF + cache) ───────────────
   try {
     const res = await fetch(`/api/barcode-lookup?ean=${clean}`, {
       signal: AbortSignal.timeout(9000),
     })
     if (res.ok) {
       const d = await res.json()
-      if (d?.name) return { name: d.name, brand: d.brand || '', quantity: d.quantity || '', category: d.category || '', imageUrl: d.imageUrl || null }
+      if (d?.name) return { name: d.name, brand: d.brand || '', quantity: d.quantity || '', category: d.category || '', imageUrl: d.imageUrl || null, price: 0, cost: 0, unit: 'UN' }
     }
   } catch { /* proxy indisponível em dev local — usa OFF direto */ }
 
-  // ── 2. Fallback: Open Food Facts direto (sem proxy) ───────
+  // ── 3. Fallback: Open Food Facts direto (sem proxy) ───────
   return fetchProductInfoDirect(clean)
 }
 

@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, Search, ToggleLeft, ToggleRight, Tag, X, ChevronDown, ChevronUp } from 'lucide-react'
+import React, { useState, useMemo, useCallback } from 'react'
+import { Plus, Pencil, Trash2, Search, ToggleLeft, ToggleRight, Tag, X, ChevronDown, ChevronUp, Check } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
 
 const EMPTY_RULE = { name: '', group: '', type: 'combo', qty: 4, totalPrice: 0, discountPct: 0, discountAmt: 0, active: true }
@@ -18,6 +18,8 @@ export default function Promocoes() {
   const { products, promos, upsertPromo, deletePromo, assignPromoGroup } = useStore()
 
   const [editing, setEditing]         = useState(null)        // promo rule being created/edited
+  const [editingProdSearch, setEditingProdSearch] = useState('') // busca de produtos no form
+  const [editingSelected, setEditingSelected] = useState(new Set()) // ids selecionados no form
   const [expanded, setExpanded]       = useState(null)        // promo id showing product list
   const [productSearch, setProductSearch] = useState('')      // search inside assign panel
   const [confirmDel, setConfirmDel]   = useState(null)        // id to confirm delete
@@ -50,9 +52,27 @@ export default function Promocoes() {
 
   const activeRule = promos.find(r => r.id === expanded)
 
-  /* ── save rule ──────────────────────────────────────────── */
+  /* ── open modal — pré-seleciona produtos já no grupo ────── */
+  const openEditing = useCallback((rule) => {
+    setEditing(rule)
+    setEditingProdSearch('')
+    // Pré-seleciona todos os produtos que já pertencem ao grupo
+    const pre = new Set(products.filter(p => rule.group && p.promoGroup === rule.group).map(p => p.id))
+    setEditingSelected(pre)
+  }, [products])
+
+  /* ── toggle produto na seleção do form ──────────────────── */
+  const toggleProd = useCallback((id) => {
+    setEditingSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }, [])
+
+  /* ── salva regra + atribuições de produto ────────────────── */
   const isValid = () => {
-    if (!editing.name.trim() || !editing.group.trim() || editing.qty < 1) return false
+    if (!editing || !editing.name.trim() || !editing.group.trim() || editing.qty < 1) return false
     if (editing.type === 'combo')   return editing.totalPrice > 0 && editing.qty >= 2
     if (editing.type === 'percent') return editing.discountPct > 0 && editing.discountPct <= 100
     if (editing.type === 'fixed')   return editing.discountAmt > 0
@@ -61,8 +81,32 @@ export default function Promocoes() {
   const save = () => {
     if (!isValid()) return
     upsertPromo(editing)
+    // Aplica mudanças de promoGroup nos produtos
+    products.forEach(p => {
+      const wasIn  = editing.id && p.promoGroup === editing.group  // estava no grupo
+      const isNow  = editingSelected.has(p.id)
+      const wasInOld = p.promoGroup === editing.group  // sempre checar o grupo atual
+
+      if (isNow && !wasInOld)  assignPromoGroup(p.id, editing.group)  // adicionar
+      if (!isNow && wasInOld)  assignPromoGroup(p.id, null)            // remover
+    })
     setEditing(null)
   }
+
+  /* ── candidatos de produto para o campo de busca do form ── */
+  const formCandidates = useMemo(() => {
+    if (!editing) return []
+    const q = editingProdSearch.trim().toLowerCase()
+    return products
+      .filter(p => !q || p.name?.toLowerCase().includes(q) || (p.sku || '').includes(q) || (p.barcode || '').includes(q))
+      .sort((a, b) => {
+        const aIn = editingSelected.has(a.id)
+        const bIn = editingSelected.has(b.id)
+        if (aIn !== bIn) return aIn ? -1 : 1
+        return (a.name || '').localeCompare(b.name || '')
+      })
+      .slice(0, 60)
+  }, [editing, editingProdSearch, editingSelected, products])
 
   /* ── auto-fill group from name ──────────────────────────── */
   const handleNameChange = (name) => {
@@ -84,7 +128,7 @@ export default function Promocoes() {
             Crie regras como "4 Danones quaisquer por R$10" — o sistema desconta e controla o estoque por variante.
           </p>
         </div>
-        <button onClick={() => setEditing({ ...EMPTY_RULE })} className="btn-primary gap-2">
+        <button onClick={() => openEditing({ ...EMPTY_RULE })} className="btn-primary gap-2">
           <Plus className="w-4 h-4" /> Nova Promoção
         </button>
       </div>
@@ -166,7 +210,7 @@ export default function Promocoes() {
                     {expanded === rule.id ? 'Fechar' : 'Ver produtos'}
                     {expanded === rule.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                   </button>
-                  <button onClick={() => setEditing({ ...rule })} className="btn-ghost text-xs gap-1">
+                  <button onClick={() => openEditing({ ...rule })} className="btn-ghost text-xs gap-1">
                     <Pencil className="w-3.5 h-3.5" /> Editar
                   </button>
                   <button onClick={() => setConfirmDel(rule.id)} className="btn-ghost text-xs gap-1 !text-red-500 hover:!bg-red-50 hover:!border-red-300">
@@ -239,7 +283,7 @@ export default function Promocoes() {
       {/* create / edit modal */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="card p-6 w-full max-w-md animate-pop space-y-4">
+          <div className="card p-6 w-full max-w-2xl animate-pop space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h2 className="font-black text-gray-900 text-lg">
                 {editing.id ? 'Editar Promoção' : 'Nova Promoção'}
@@ -367,6 +411,78 @@ export default function Promocoes() {
                   )}
                 </div>
               )}
+
+              {/* ── Produtos da promoção — busca inline ──────── */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between bg-gray-50 px-3 py-2 border-b border-gray-200">
+                  <span className="text-xs font-black text-gray-700">
+                    🏷 Produtos da promoção
+                    {editingSelected.size > 0 && (
+                      <span className="ml-2 bg-green-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                        {editingSelected.size}
+                      </span>
+                    )}
+                  </span>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+                    <input
+                      value={editingProdSearch}
+                      onChange={e => setEditingProdSearch(e.target.value)}
+                      placeholder="Buscar por nome ou código…"
+                      className="input pl-6 py-1 text-xs w-48"
+                    />
+                  </div>
+                </div>
+
+                {/* chips dos selecionados */}
+                {editingSelected.size > 0 && (
+                  <div className="flex flex-wrap gap-1 px-3 py-2 bg-green-50 border-b border-green-100">
+                    {products.filter(p => editingSelected.has(p.id)).map(p => (
+                      <span key={p.id} className="flex items-center gap-1 bg-green-100 text-green-800 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                        {p.name.length > 22 ? p.name.slice(0, 22) + '…' : p.name}
+                        <button type="button" onClick={() => toggleProd(p.id)} className="hover:text-red-600 ml-0.5">
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* lista de candidatos */}
+                <div className="max-h-52 overflow-y-auto divide-y divide-gray-50">
+                  {products.length === 0 && (
+                    <div className="py-6 text-center text-gray-400 text-xs">
+                      Nenhum produto cadastrado ainda.
+                    </div>
+                  )}
+                  {products.length > 0 && formCandidates.length === 0 && (
+                    <div className="py-6 text-center text-gray-400 text-xs">
+                      Nenhum produto encontrado com "{editingProdSearch}"
+                    </div>
+                  )}
+                  {formCandidates.map(p => {
+                    const sel = editingSelected.has(p.id)
+                    return (
+                      <label key={p.id} className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${sel ? 'bg-green-50' : 'hover:bg-gray-50'}`}>
+                        <div className={`w-4 h-4 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors ${sel ? 'border-green-500 bg-green-500' : 'border-gray-300'}`}>
+                          {sel && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                        </div>
+                        <input type="checkbox" checked={sel} onChange={() => toggleProd(p.id)} className="sr-only" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold text-gray-800 truncate">{p.name}</div>
+                          <div className="text-[10px] text-gray-400 font-mono">{p.sku || p.barcode} · {BRL.format(p.price)}</div>
+                        </div>
+                        {sel && <span className="text-[10px] font-black text-green-700 flex-shrink-0">✓</span>}
+                      </label>
+                    )
+                  })}
+                  {formCandidates.length > 0 && (
+                    <div className="px-3 py-1.5 bg-gray-50 text-[10px] text-gray-400">
+                      Mostrando {formCandidates.length} de {products.length} produtos
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <label className="flex items-center gap-3 cursor-pointer">
                 <div

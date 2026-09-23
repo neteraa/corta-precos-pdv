@@ -165,6 +165,7 @@ export default function ScanMobile() {
   const [sheetPromoGroup,     setSheetPromoGroup]     = useState(null)   // promo p/ produto já existente
   const [lookingUp,    setLookingUp]    = useState(false)
   const [lookupFound,  setLookupFound]  = useState(false)
+  const [lookupSource, setLookupSource] = useState('')   // 'legacy' | 'cosmos' | 'off'
   const nameRef = useRef(null)
   const UNITS_QUICK = ['UN', 'KG', 'LT', 'CX', 'PC', 'DZ']
 
@@ -196,7 +197,7 @@ export default function ScanMobile() {
     setNewProdName(''); setNewProdPrice(''); setNewProdCost('')
     setNewProdCat(''); setNewProdUnit('UN'); setNewProdQty('')
     setNewProdPriceAtacado(''); setNewProdQtdAtacado('')
-    setNewProdPromoGroup(null); setLookupFound(false)
+    setNewProdPromoGroup(null); setLookupFound(false); setLookupSource('')
 
     // Busca nome/marca na base Open Food Facts (sem bloquear a UI)
     const cleanCode = String(code || '').replace(/\D/g, '')
@@ -206,12 +207,16 @@ export default function ScanMobile() {
         setLookingUp(false)
         if (!info) return
         // Monta nome completo: NOME — MARCA
-        const fullName = info.brand
+        const fullName = (info.brand && !info.fromLegacy)
           ? `${info.name.toUpperCase()} ${info.brand.toUpperCase()}`
           : info.name.toUpperCase()
-        setNewProdName(prev => prev || fullName)          // não sobrescreve se já digitou
-        if (info.category) setNewProdCat(prev => prev || info.category)
+        setNewProdName(prev => prev || fullName)
+        if (info.category)   setNewProdCat(prev   => prev || info.category)
+        if (info.unit && info.unit !== 'UN') setNewProdUnit(info.unit)
+        if (info.price > 0)  setNewProdPrice(prev  => prev || String(info.price.toFixed(2)))
+        if (info.cost  > 0)  setNewProdCost(prev   => prev || String(info.cost.toFixed(2)))
         setLookupFound(true)
+        setLookupSource(info.fromLegacy ? 'legacy' : 'cosmos')
       }).catch(() => setLookingUp(false))
     }
   }, [])
@@ -433,7 +438,13 @@ export default function ScanMobile() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#71717a', letterSpacing: 1, textTransform: 'uppercase' }}>
-                  {lookingUp ? '🔍 Buscando na base mundial...' : lookupFound ? '✅ Produto encontrado — confirme os dados' : 'Código não encontrado — cadastrar'}
+                  {lookingUp
+                    ? '🔍 Buscando nas bases de dados...'
+                    : lookupFound
+                      ? lookupSource === 'legacy'
+                        ? '🏪 Encontrado na base Corta Preços — confirme o preço'
+                        : '🌐 Encontrado na base mundial — confirme os dados'
+                      : 'Código não encontrado — cadastrar'}
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 800, color: '#a1a1aa', fontFamily: 'monospace', marginTop: 2 }}>{newProdCode}</div>
               </div>

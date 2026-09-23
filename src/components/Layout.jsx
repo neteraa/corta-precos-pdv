@@ -271,13 +271,25 @@ export default function Layout() {
           <div className="px-2 pt-1 space-y-1">
             <div className="px-2 mb-1 text-[9px] font-black text-gray-600 tracking-[0.15em] uppercase">Ferramentas</div>
 
+            {/* Terminal 1 */}
             <a href="/terminal" target="_blank" rel="noreferrer"
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all group"
               style={{ background: `${themeColor}18`, border: `1px solid ${themeColor}33` }}>
               <Monitor className="w-3.5 h-3.5 shrink-0" style={{ color: themeColor }} />
-              <span className="text-[11px] font-black flex-1" style={{ color: themeColor + 'cc' }}>Terminal do Caixa</span>
+              <span className="text-[11px] font-black flex-1" style={{ color: themeColor + 'cc' }}>Terminal · PDV 1</span>
               <span className="text-[8px] text-black font-black px-1.5 py-0.5 rounded-full" style={{ background: themeColor }}>ABRIR</span>
             </a>
+
+            {/* Terminal 2 — abre nova janela do app (funciona no PWA Windows) */}
+            <button
+              onClick={() => window.open('/terminal', '_blank', 'noopener,noreferrer')}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
+              style={{ background: `${themeColor}10`, border: `1px solid ${themeColor}22` }}
+              title="Abre um segundo caixa em nova janela — funciona no app instalado">
+              <Monitor className="w-3.5 h-3.5 shrink-0" style={{ color: themeColor + '99' }} />
+              <span className="text-[11px] font-semibold flex-1" style={{ color: themeColor + '99' }}>＋ Abrir 2° Terminal</span>
+              <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full border" style={{ color: themeColor + '99', borderColor: themeColor + '44' }}>NOVA JANELA</span>
+            </button>
 
             <a href={`/scan?storeId=${getMktStoreId()}&t=${getMktStoreToken()}`} target="_blank" rel="noreferrer"
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all group"
