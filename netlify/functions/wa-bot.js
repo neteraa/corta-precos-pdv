@@ -15,11 +15,142 @@
  *   messages.upsert
  */
 
-// ─── Netlify Blobs: armazenamento persistente de leads ───────────────────────
+// ─── Netlify Blobs ────────────────────────────────────────────────────────────
 import { getStore } from '@netlify/blobs'
 
 function leadsStore() {
   return getStore({ name: 'wa-leads', consistency: 'strong' })
+}
+
+// ─── Corta Preços: catálogo de produtos e promos (cache 20 min) ───────────────
+const CORTA_PRECOS_STORE_ID = 'cortaprecos_1789770018182'
+const catalogCache = { data: null, ts: 0 }
+
+async function loadStoreCatalog() {
+  const TTL = 20 * 60 * 1000
+  if (catalogCache.data && (Date.now() - catalogCache.ts) < TTL) return catalogCache.data
+  try {
+    const store = getStore({ name: 'corta-precos', consistency: 'eventual' })
+    const [prodRaw, promoRaw] = await Promise.all([
+      store.get(`${CORTA_PRECOS_STORE_ID}:cp_products`, { type: 'text' }).catch(() => null),
+      store.get(`${CORTA_PRECOS_STORE_ID}:cp_promos`,   { type: 'text' }).catch(() => null),
+    ])
+    const products = prodRaw  ? JSON.parse(prodRaw)  : []
+    const promos   = promoRaw ? JSON.parse(promoRaw) : []
+    catalogCache.data = { products, promos }
+    catalogCache.ts   = Date.now()
+    return catalogCache.data
+  } catch (e) {
+    console.error('loadStoreCatalog:', e.message)
+    return { products: [], promos: [] }
+  }
+}
+
+function buildCatalogText(products, promos) {
+  // Somente produtos com preço, máximo 100 itens para não explodir o contexto
+  const active = products.filter(p => p.price > 0 && p.active !== false).slice(0, 100)
+  const byCategory = {}
+  for (const p of active) {
+    const cat = p.category || 'Outros'
+    if (!byCategory[cat]) byCategory[cat] = []
+    byCategory[cat].push(`• ${p.name} — R$${p.price.toFixed(2).replace('.', ',')}`)
+  }
+  const lines = []
+  for (const [cat, items] of Object.entries(byCategory)) {
+    lines.push(`\n${cat.toUpperCase()}:`)
+    lines.push(...items.slice(0, 20))
+  }
+
+  const promoLines = promos
+    .filter(pr => pr.active)
+    .map(pr => `• ${pr.name}`)
+
+  return {
+    catalogText: lines.join('\n') || 'Catálogo sendo atualizado.',
+    promoText:   promoLines.join('\n') || 'Nenhuma promoção ativa no momento.',
+  }
+}
+
+async function saveDeliveryOrder(order) {
+  try {
+    const store = getStore({ name: 'corta-precos', consistency: 'strong' })
+    const key   = `${CORTA_PRECOS_STORE_ID}:cp_deliveries`
+    const raw   = await store.get(key, { type: 'text' }).catch(() => null)
+    const orders = raw ? JSON.parse(raw) : []
+    orders.unshift({
+      ...order,
+      id:        `del_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      status:    'pending',
+    })
+    await store.set(key, JSON.stringify(orders.slice(0, 300)))
+  } catch (e) { console.error('saveDeliveryOrder:', e.message) }
+}
+
+function buildCortaPrecosPrompt(catalogText, promoText) {
+  return `Você é a Zara, atendente virtual do CORTA PREÇOS. Responde pelo WhatsApp de forma simpática, rápida e informal — como uma atendente boa de mercadinho.
+
+━━━━━━━━━━━━━━━━━━━━━━
+🏪 NOSSA LOJA
+━━━━━━━━━━━━━━━━━━━━━━
+• Mercado CORTA PREÇOS — Boituva-SP
+• WhatsApp: (15) 9979-6930
+• Pagamento: PIX, Dinheiro, Débito, Crédito
+• Delivery: taxa fixa R$7,00 — pagamento SOMENTE por PIX
+
+━━━━━━━━━━━━━━━━━━━━━━
+🛒 PRODUTOS E PREÇOS
+━━━━━━━━━━━━━━━━━━━━━━
+${catalogText}
+
+━━━━━━━━━━━━━━━━━━━━━━
+🔥 PROMOÇÕES DE HOJE
+━━━━━━━━━━━━━━━━━━━━━━
+${promoText}
+
+━━━━━━━━━━━━━━━━━━━━━━
+🛵 ENTREGA EM CASA
+━━━━━━━━━━━━━━━━━━━━━━
+Taxa fixa: R$7,00 · Pagamento: SOMENTE PIX
+
+FLUXO DE ENTREGA (siga sempre nessa ordem):
+1. Cliente quer entrega → pergunta o endereço completo (rua, número, bairro)
+2. Confirma os produtos que ele quer e lista com preços
+3. Calcula: total dos produtos + R$7 entrega = TOTAL FINAL
+4. Pede PIX no número (15) 9979-6930 e diz para avisar quando pagar
+5. Quando tiver todos os dados, registra o pedido assim (interno, não exibe ao cliente):
+   <zs_delivery>{"phone":"NUMERO_CLIENTE","name":"NOME","address":"ENDEREÇO","items":"LISTA DE ITENS","total":TOTAL_FLOAT,"deliveryFee":7}</zs_delivery>
+
+━━━━━━━━━━━━━━━━━━━━━━
+🧠 COMO SE COMPORTAR
+━━━━━━━━━━━━━━━━━━━━━━
+• Linguagem natural e informal — "oi!", "claro!", "perfeito!", "pode deixar!"
+• Respostas CURTAS — WhatsApp não é e-mail. Máximo 3-4 linhas
+• Emojis naturais (1-2 por mensagem)
+• Quando perguntar preço: responde direto com o valor
+• Quando perguntar promoção: informa com entusiasmo!
+• Se produto não existir no catálogo: "Esse não temos, mas temos [sugestão]"
+• Para entrega: segue o fluxo acima sem pular etapas
+
+━━━━━━━━━━━━━━━━━━━━━━
+🚫 NUNCA DIZER
+━━━━━━━━━━━━━━━━━━━━━━
+• Custo, margem, fornecedores
+• Dados financeiros internos ou de gestão
+• Que você é uma IA ou robô — você é a Zara, atendente da loja`
+}
+
+/** Extrai <zs_delivery>{...}</zs_delivery> da resposta */
+function parseDeliveryTag(rawReply) {
+  const match = rawReply?.match(/<zs_delivery>([\s\S]*?)<\/zs_delivery>/i)
+  if (!match) return { clean: rawReply, delivery: null }
+  try {
+    const delivery = JSON.parse(match[1].trim())
+    const clean    = rawReply.replace(/<zs_delivery>[\s\S]*?<\/zs_delivery>/gi, '').trim()
+    return { clean, delivery }
+  } catch {
+    return { clean: rawReply.replace(/<zs_delivery>[\s\S]*?<\/zs_delivery>/gi, '').trim(), delivery: null }
+  }
 }
 
 async function loadLead(phone) {
@@ -429,15 +560,42 @@ export default async (req, context) => {
 
   console.log(`wa-bot [${instanceName}]: msg de ${senderNum} (${senderName}): ${text.slice(0, 80)}`)
 
-  // ── Instância ZatendeStok → Zara (bot de vendas/prospecção) ──────────────
-  const ZARA_INSTANCES = ['zatendeapi', 'zatendestok']
-  const isZara = ZARA_INSTANCES.includes(instanceName?.toLowerCase())
+  // ── Instâncias: Corta Preços store bot vs Zara sales bot ─────────────────
+  const CORTA_PRECOS_INSTANCES = ['zatendeapi']
+  const ZARA_INSTANCES         = ['zatendestok']
+  const isCortaPrecos = CORTA_PRECOS_INSTANCES.includes(instanceName?.toLowerCase())
+  const isZara        = ZARA_INSTANCES.includes(instanceName?.toLowerCase())
 
   try {
     let systemMsg
     let rawReply
 
-    if (isZara) {
+    if (isCortaPrecos) {
+      // ── MODO CORTA PREÇOS: bot de atendimento + delivery + produtos ───────
+      const { products, promos } = await loadStoreCatalog()
+      const { catalogText, promoText } = buildCatalogText(products, promos)
+      systemMsg = buildCortaPrecosPrompt(catalogText, promoText)
+
+      if (senderName) {
+        systemMsg += `\n\n📌 Cliente: ${senderName}. Use o nome naturalmente.`
+      }
+
+      pushHistory(senderNum, 'user', text)
+      rawReply = await askOpenAI(text, senderNum, systemMsg)
+      if (!rawReply) return new Response('OK', { status: 200 })
+
+      // Extrai e salva pedido de entrega se houver
+      const { clean: cpReply, delivery } = parseDeliveryTag(rawReply)
+      if (delivery && delivery.address) {
+        context.waitUntil(saveDeliveryOrder({ ...delivery, waName: senderName || delivery.name || senderNum }))
+        console.log(`wa-bot [CortaPrecos]: delivery registrado para ${senderNum}:`, JSON.stringify(delivery))
+      }
+
+      pushHistory(senderNum, 'assistant', cpReply)
+      context.waitUntil(sendReply(senderNum, cpReply, instanceName))
+      console.log(`wa-bot [CortaPrecos]: respondeu ${senderNum}: ${cpReply.slice(0, 80)}`)
+
+    } else if (isZara) {
       // ── MODO ZARA: bot de vendas do ZatendeStok ──────────────────────────
       const [leadProfile, existingMarket] = await Promise.all([
         loadLead(senderNum),
@@ -447,7 +605,6 @@ export default async (req, context) => {
       let profileCtx
 
       if (existingMarket) {
-        // ── Cliente já cadastrado → contexto de renovação ─────────────────
         const planLabel = PLAN_LABEL[existingMarket.plan] || existingMarket.plan || 'plano ativo'
         profileCtx = `
 
@@ -460,7 +617,6 @@ export default async (req, context) => {
 Se falar em RENOVAR: confirme o plano atual (${planLabel}), informe o valor e pergunte se quer manter ou mudar de plano. Não peça informações que você já tem. Seja direto e amigável — ele já é nosso cliente!
 Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga que o Pedro vai entrar em contato.`
       } else {
-        // ── Lead novo ou prospect ─────────────────────────────────────────
         const knownParts = []
         if (leadProfile.name)   knownParts.push(`Nome: ${leadProfile.name}`)
         if (leadProfile.market) knownParts.push(`Mercado: ${leadProfile.market}`)
@@ -481,7 +637,6 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
       const { clean: reply, lead: extracted } = parseLeadTag(rawReply)
       pushHistory(senderNum, 'assistant', reply)
 
-      // Persiste lead
       if (extracted && Object.keys(extracted).length) {
         await saveLead(senderNum, { ...leadProfile, ...extracted, waName: leadProfile.waName || senderName || null })
         console.log(`wa-bot: lead atualizado ${senderNum}:`, JSON.stringify(extracted))
@@ -516,9 +671,11 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
     // Crédito OpenAI esgotado → resposta de fallback humanizada
     if (err instanceof OpenAIQuotaError) {
       console.error('wa-bot: OpenAI sem crédito — enviando fallback')
-      const fallback = isZara
-        ? `Oi${senderName ? ', ' + senderName : ''}! 👋 Tô aqui sim — só tive um probleminha técnico agora.\nVou chamar o Pedro pra te atender direitinho. Já te retorno! 😊`
-        : `Oi! Estamos com uma instabilidade agora, mas já resolvemos em breve. Obrigado pela paciência! 😊`
+      const fallback = isCortaPrecos
+        ? `Oi${senderName ? ', ' + senderName : ''}! 👋 Tive um probleminha técnico agora, mas já já resolvo.\nEntra em contato diretamente pelo (15) 9979-6930 ou liga pra nós! 😊`
+        : isZara
+          ? `Oi${senderName ? ', ' + senderName : ''}! 👋 Tô aqui sim — só tive um probleminha técnico agora.\nVou chamar o Pedro pra te atender direitinho. Já te retorno! 😊`
+          : `Oi! Estamos com uma instabilidade agora, mas já resolvemos em breve. Obrigado pela paciência! 😊`
       context.waitUntil(sendReply(senderNum, fallback, instanceName))
     } else {
       console.error('wa-bot error:', err.message)

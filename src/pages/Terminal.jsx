@@ -635,6 +635,23 @@ export default function Terminal() {
                   borderRadius: 2,
                   animation: 'scanPulse 1.8s ease-in-out infinite',
                 }} />
+
+                {/* ── WhatsApp QR code ── */}
+                <div style={{ marginTop: 28, textAlign: 'center', animation: 'idleTextIn .5s ease-out 1.5s both' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: txt2, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>
+                    📱 Peça sua entrega pelo WhatsApp
+                  </div>
+                  <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 12, borderRadius: 16, background: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+                    <img
+                      src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&format=png&data=https%3A%2F%2Fwa.me%2F5515997969303%3Ftext%3DOl%C3%A1%2C+quero+fazer+um+pedido!"
+                      alt="QR WhatsApp"
+                      style={{ width: 120, height: 120, borderRadius: 8, display: 'block' }}
+                    />
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#25d366', letterSpacing: 0.5 }}>
+                      WhatsApp (15) 9979-6930
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

@@ -29,7 +29,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
   Warehouse, Users, Settings, Menu,
   QrCode, Tag, Star, Download, Monitor, Camera, HandCoins, LogOut,
-  BarChart2, Printer, CalendarClock, Megaphone, RefreshCw, Truck, X
+  BarChart2, Printer, CalendarClock, Megaphone, RefreshCw, Truck, X, Bike,
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import { useOnlineStatus } from '../hooks/useOnlineStatus.js'
@@ -43,6 +43,7 @@ import { useStore } from '../store.jsx'
 /* ── nav sections ─────────────────────────────────────────── */
 const CAIXA = [
   { to: '/pdv',       icon: ShoppingCart, label: 'PDV / Caixa',    hot: true },
+  { to: '/entrega',   icon: Bike,         label: 'Entregas 🛵',    roles: ['admin','gerente'] },
   { to: '/promocoes', icon: Tag,          label: 'Promoções',      roles: ['admin','gerente'] },
 ]
 const GESTAO = [
