@@ -303,6 +303,19 @@ export default function Terminal() {
     printer.printReceipt(sale)
   }
 
+  // ── Número deste terminal (único por aba/janela via sessionStorage) ──
+  const terminalNum = useMemo(() => {
+    const key = 'zs_terminal_num'
+    const existing = sessionStorage.getItem(key)
+    if (existing) return parseInt(existing, 10)
+    // Conta terminais abertos consultando localStorage (incrementa globalmente)
+    const counterKey = 'zs_terminal_counter'
+    const next = (parseInt(localStorage.getItem(counterKey) || '0', 10) + 1)
+    localStorage.setItem(counterKey, String(next))
+    sessionStorage.setItem(key, String(next))
+    return next
+  }, [])
+
   // ── Styles (dark terminal palette) ─────────────────────────
   const _storeName = printer.settings?.storeName  || 'MEU MERCADO'
   const logoImage  = printer.settings?.logoImage  || null
@@ -329,6 +342,9 @@ export default function Terminal() {
           {logoImage && <img src={logoImage} alt="logo" style={{ height: 28, maxWidth: 80, objectFit: 'contain', borderRadius: 6 }} />}
           <div style={{ fontFamily: "'Courier New', monospace", fontWeight: 900, fontSize: 20, color: acc, letterSpacing: '-0.5px' }}>
             {!logoImage && '✕ '}{_storeName}
+          </div>
+          <div style={{ padding: '3px 10px', borderRadius: 12, background: '#1a0f00', border: `1px solid ${acc}44`, color: acc, fontSize: 11, fontWeight: 900, letterSpacing: 1 }}>
+            PDV {terminalNum}
           </div>
           {activeOperator && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: '#1e1b4b', border: '1px solid #4338ca55', color: '#a5b4fc', fontSize: 12, fontWeight: 700 }}>
@@ -383,6 +399,12 @@ export default function Terminal() {
               </button>
             </>
           )}
+          <button
+            onClick={() => window.open('/terminal', '_blank', 'noopener')}
+            title="Abrir um segundo terminal de caixa em nova janela"
+            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 12px', borderRadius: 20, background: '#0c1a0c', border: '1px solid #16a34a44', color: '#4ade80', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+            ＋ 2° Terminal
+          </button>
           <a href="/pdv" style={{ padding: '4px 12px', borderRadius: 20, background: bg3, border: `1px solid ${brd}`, color: txt2, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
             ← Admin
           </a>

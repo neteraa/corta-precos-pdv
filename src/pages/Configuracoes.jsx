@@ -634,10 +634,11 @@ export default function Configuracoes() {
   // ── Auth / credentials ────────────────────────────────────
   const [authForm, setAuthForm] = useState(() => {
     const { username } = getCredentials()
-    return { username, newPass: '', confirmPass: '' }
+    return { username, currentPass: '', newPass: '', confirmPass: '' }
   })
   const [showPass, setShowPass]   = useState(false)
   const [authMsg,  setAuthMsg]    = useState(null) // {type:'ok'|'err', text}
+  const [authSaving, setAuthSaving] = useState(false)
 
   // ── Store ID (installation identity) ─────────────────────
   const [storeIdInput, setStoreIdInput] = useState(getConfiguredStoreId)
@@ -659,25 +660,50 @@ export default function Configuracoes() {
     setTimeout(() => setCopied(false), 1500)
   }
 
-  const saveAuth = () => {
+  const saveAuth = async () => {
     setAuthMsg(null)
-    if (!authForm.username.trim()) return setAuthMsg({ type: 'err', text: 'Usuário não pode ser vazio.' })
+    if (!authForm.username.trim())
+      return setAuthMsg({ type: 'err', text: 'Usuário não pode ser vazio.' })
+    if (!authForm.currentPass)
+      return setAuthMsg({ type: 'err', text: 'Informe a senha atual para confirmar.' })
     if (authForm.newPass && authForm.newPass.length < 4)
-      return setAuthMsg({ type: 'err', text: 'Senha precisa de pelo menos 4 caracteres.' })
+      return setAuthMsg({ type: 'err', text: 'Nova senha precisa de pelo menos 4 caracteres.' })
     if (authForm.newPass !== authForm.confirmPass)
       return setAuthMsg({ type: 'err', text: 'As senhas não coincidem.' })
-    const { password: currentPass } = getCredentials()
-    const finalPass = authForm.newPass || currentPass
-    saveCredentials(authForm.username.trim(), finalPass)
-    setAuthForm(f => ({ ...f, newPass: '', confirmPass: '' }))
-    setAuthMsg({ type: 'ok', text: '✅ Credenciais atualizadas!' })
-    setTimeout(() => setAuthMsg(null), 3000)
-    // Keep local server _auth.json in sync (silent fail on Netlify / offline)
-    fetch('/api/update-auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: authForm.username.trim(), password: finalPass }),
-    }).catch(() => {})
+
+    setAuthSaving(true)
+    try {
+      const storeId = getConfiguredStoreId()
+      const token   = getMktStoreToken()
+      const body    = {
+        storeId,
+        currentPassword: authForm.currentPass,
+        newPassword:     authForm.newPass    || undefined,
+        newUsername:     authForm.username.trim() !== getCredentials().username
+                           ? authForm.username.trim()
+                           : undefined,
+      }
+      const res  = await fetch('/api/update-auth', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'x-zs-token': token },
+        body:    JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!data.ok) {
+        setAuthMsg({ type: 'err', text: `❌ ${data.error}` })
+        return
+      }
+      // Sucesso — atualiza o localStorage também para manter local em sincronia
+      const { password: currentPass } = getCredentials()
+      saveCredentials(authForm.username.trim(), authForm.newPass || currentPass)
+      setAuthForm(f => ({ ...f, currentPass: '', newPass: '', confirmPass: '' }))
+      setAuthMsg({ type: 'ok', text: '✅ Credenciais atualizadas com sucesso!' })
+      setTimeout(() => setAuthMsg(null), 4000)
+    } catch {
+      setAuthMsg({ type: 'err', text: '❌ Erro de conexão — tente novamente.' })
+    } finally {
+      setAuthSaving(false)
+    }
   }
 
   const saveSettings = () => {
@@ -979,7 +1005,7 @@ export default function Configuracoes() {
       {/* ── Acesso / Login ─────────────────────────────────────── */}
       <Section icon={KeyRound} title="Acesso ao Sistema">
         <p className="text-sm text-gray-500 mb-4">
-          Altere o usuário e/ou senha de login. Deixe a senha em branco para manter a atual.
+          Altere o usuário e/ou senha de login. A senha atual é obrigatória para confirmar a alteração.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Usuário">
@@ -991,14 +1017,14 @@ export default function Configuracoes() {
             />
           </Field>
           <div /> {/* spacer */}
-          <Field label="Nova senha" hint="Mínimo 6 caracteres · deixe em branco para manter a atual">
+          <Field label="Senha atual *" hint="Obrigatório para salvar qualquer alteração">
             <div className="relative">
               <input
                 type={showPass ? 'text' : 'password'}
                 className="input pr-10"
-                value={authForm.newPass}
-                onChange={e => setAuthForm(f => ({ ...f, newPass: e.target.value }))}
-                placeholder="mínimo 6 caracteres"
+                value={authForm.currentPass}
+                onChange={e => setAuthForm(f => ({ ...f, currentPass: e.target.value }))}
+                placeholder="senha que você usa para entrar"
               />
               <button type="button" onClick={() => setShowPass(v => !v)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -1006,13 +1032,23 @@ export default function Configuracoes() {
               </button>
             </div>
           </Field>
+          <div /> {/* spacer */}
+          <Field label="Nova senha" hint="Mínimo 4 caracteres · deixe em branco para manter a atual">
+            <input
+              type={showPass ? 'text' : 'password'}
+              className="input"
+              value={authForm.newPass}
+              onChange={e => setAuthForm(f => ({ ...f, newPass: e.target.value }))}
+              placeholder="deixe em branco para manter"
+            />
+          </Field>
           <Field label="Confirmar nova senha">
             <input
               type={showPass ? 'text' : 'password'}
               className="input"
               value={authForm.confirmPass}
               onChange={e => setAuthForm(f => ({ ...f, confirmPass: e.target.value }))}
-              placeholder="repita a senha"
+              placeholder="repita a nova senha"
             />
           </Field>
         </div>
@@ -1025,8 +1061,8 @@ export default function Configuracoes() {
             {authMsg.text}
           </div>
         )}
-        <button onClick={saveAuth} className="btn-primary mt-4">
-          <Save className="w-4 h-4" /> Salvar acesso
+        <button onClick={saveAuth} disabled={authSaving || !authForm.currentPass} className="btn-primary mt-4 disabled:opacity-50">
+          <Save className="w-4 h-4" /> {authSaving ? 'Salvando…' : 'Salvar acesso'}
         </button>
       </Section>
 

@@ -1,19 +1,27 @@
-// Corta Preços PDV — service worker v5
+// Corta Preços PDV — service worker
+// CACHE_VERSION é injetado pelo Vite no build (único por deploy)
 // Strategy:
 //  • Install: pre-cache the app shell (index.html)
 //  • Static assets (/assets/*): cache-first (hashed names never change)
 //  • Navigation (HTML document): network-first → cache → shell fallback
 //  • API / Netlify functions: network-only (fail silently; app uses localStorage)
 
-const CACHE   = 'corta-precos-v5'
+const CACHE   = '__CACHE_VERSION__'
 const SHELL   = '/'
 const SKIP_RE = /\/(\.netlify|api)\//  // never cache API calls
+
+// Permite que a página dispare skipWaiting manualmente (UpdateBanner)
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
+})
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
       .then(c => c.addAll([SHELL]))   // pre-cache the SPA shell
-      .then(() => self.skipWaiting())
+    // NÃO chama skipWaiting aqui — o UpdateBanner controla o momento do reload
   )
 })
 
