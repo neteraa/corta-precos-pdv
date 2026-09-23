@@ -7,7 +7,7 @@ import {
   RefreshCw, MapPin, CheckCircle, XCircle, Copy, Phone,
   Clock, Package, Bike, AlertCircle, ChevronDown, ChevronUp,
 } from 'lucide-react'
-import { getMktStoreToken, getMktStoreId } from '../utils/tenantStorage.js'
+import { getMktStoreId } from '../utils/tenantStorage.js'
 
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -178,12 +178,11 @@ export default function Entrega() {
   const [lastFetch, setLastFetch] = useState(null)
 
   const storeId = getMktStoreId()
-  const token   = getMktStoreToken()
 
   const fetchOrders = useCallback(async () => {
     setLoading(true)
     try {
-      const res  = await fetch(`/api/delivery?storeId=${storeId}`, { headers: { 'x-zs-token': token } })
+      const res  = await fetch(`/api/delivery?storeId=${storeId}`)
       const json = await res.json()
       if (json.ok) { setOrders(json.orders || []); setLastFetch(new Date()) }
     } catch (e) { console.error('Entrega fetch:', e.message) }
@@ -192,17 +191,19 @@ export default function Entrega() {
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 
-  // Auto-refresh every 45s when tab is active
+  // Auto-refresh every 15s + ao voltar para a aba
   useEffect(() => {
-    const t = setInterval(fetchOrders, 45000)
-    return () => clearInterval(t)
+    const t = setInterval(fetchOrders, 15000)
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchOrders() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVisible) }
   }, [fetchOrders])
 
   const handleUpdate = async (id, patch) => {
     try {
       const res  = await fetch(`/api/delivery?storeId=${storeId}&id=${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'x-zs-token': token },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       })
       const json = await res.json()

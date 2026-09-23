@@ -38,21 +38,52 @@ export default function Validade() {
 
   const cfgMap = useMemo(() => STATUS_CFG(warnDays), [warnDays])
 
-  const allWithExpiry = useMemo(() =>
-    products
-      .map(p => { const d = daysUntil(p.expiryDate); return { ...p, days: d, status: statusOf(d, warnDays) } })
-      .filter(p => p.expiryDate)
-      .sort((a, b) => (a.days ?? 99999) - (b.days ?? 99999))
-  , [products, warnDays])
+  const allWithExpiry = useMemo(() => {
+    const rows = []
+    products.forEach(p => {
+      if (p.lots?.length) {
+        // Expande cada lote em uma linha separada
+        p.lots.forEach((lot, i) => {
+          if (!lot.expiryDate) return
+          const d = daysUntil(lot.expiryDate)
+          rows.push({
+            ...p,
+            _lotId:    lot.id,
+            _lotIdx:   i,
+            _lotCount: p.lots.length,
+            _lotQty:   lot.qty,
+            expiryDate: lot.expiryDate,
+            days:   d,
+            status: statusOf(d, warnDays),
+          })
+        })
+      } else {
+        if (!p.expiryDate) return
+        const d = daysUntil(p.expiryDate)
+        rows.push({ ...p, days: d, status: statusOf(d, warnDays) })
+      }
+    })
+    return rows.sort((a, b) => (a.days ?? 99999) - (b.days ?? 99999))
+  }, [products, warnDays])
 
   const counts = useMemo(() => {
     const c = { expired: 0, critical: 0, warning: 0, ok: 0, none: 0, alert: 0 }
     products.forEach(p => {
-      const d = daysUntil(p.expiryDate)
-      const s = statusOf(d, warnDays)
-      if (s === 'none') { c.none++; return }
-      c[s]++
-      if (s === 'expired' || s === 'critical' || s === 'warning') c.alert++
+      if (p.lots?.length) {
+        p.lots.forEach(lot => {
+          const d = daysUntil(lot.expiryDate || p.expiryDate)
+          const s = statusOf(d, warnDays)
+          if (s === 'none') { c.none++; return }
+          c[s]++
+          if (s !== 'ok') c.alert++
+        })
+      } else {
+        const d = daysUntil(p.expiryDate)
+        const s = statusOf(d, warnDays)
+        if (s === 'none') { c.none++; return }
+        c[s]++
+        if (s !== 'ok') c.alert++
+      }
     })
     return c
   }, [products, warnDays])
@@ -71,6 +102,16 @@ export default function Validade() {
   }, [allWithExpiry, products, filter, query])
 
   const updateExpiry = useCallback((id, date) => upsertProduct({ id, expiryDate: date || null }), [upsertProduct])
+
+  // Atualiza data de vencimento de um lote específico
+  const updateLotExpiry = useCallback((productId, lotId, newDate) => {
+    const p = products.find(x => x.id === productId)
+    if (!p) return
+    const newLots = (p.lots || [])
+      .map(l => l.id === lotId ? { ...l, expiryDate: newDate || '' } : l)
+      .sort((a, b) => (a.expiryDate || '9999').localeCompare(b.expiryDate || '9999'))
+    upsertProduct({ ...p, lots: newLots, expiryDate: newLots[0]?.expiryDate || newDate || '' })
+  }, [products, upsertProduct])
 
   const gerarPromocao = useCallback(() => {
     if (!promoModal) return
@@ -221,17 +262,26 @@ export default function Validade() {
           </div>
         )}
         {visible.map(p => {
-          const cfg  = cfgMap[p.status] || cfgMap.ok
-          const Icon = cfg.icon
+          const rowKey  = p._lotId ? `${p.id}_${p._lotId}` : p.id
+          const cfg     = cfgMap[p.status] || cfgMap.ok
+          const Icon    = cfg.icon
           const showPromoBtn = p.status === 'expired' || p.status === 'critical' || p.status === 'warning'
+          const dispQty = p._lotId ? (p._lotQty ?? 0) : (p.stock ?? 0)
           return (
-            <div key={p.id} className={`${cfg.bg} ${cfg.border} border rounded-xl p-3 space-y-2`}>
+            <div key={rowKey} className={`${cfg.bg} ${cfg.border} border rounded-xl p-3 space-y-2`}>
               {/* top row */}
               <div className="flex items-center gap-2">
                 <Icon className={`w-5 h-5 flex-shrink-0 ${cfg.iconColor}`} />
                 <div className="flex-1 min-w-0">
-                  <div className="font-bold text-gray-800 text-sm leading-tight truncate">{p.name}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">{p.category} · <strong>{BRL.format(p.price||0)}</strong> · {p.stock??0} un.</div>
+                  <div className="font-bold text-gray-800 text-sm leading-tight truncate flex items-center gap-1.5">
+                    {p.name}
+                    {p._lotCount > 1 && (
+                      <span className="text-[10px] font-black bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                        Lote {p._lotIdx + 1}/{p._lotCount}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">{p.category} · <strong>{BRL.format(p.price||0)}</strong> · {dispQty} un.</div>
                 </div>
                 {p.days !== null && (
                   <div className="flex-shrink-0 text-right">
@@ -244,11 +294,11 @@ export default function Validade() {
               </div>
               {/* date input */}
               <input type="date" value={p.expiryDate||''}
-                onChange={e => updateExpiry(p.id, e.target.value)}
+                onChange={e => p._lotId ? updateLotExpiry(p.id, p._lotId, e.target.value) : updateExpiry(p.id, e.target.value)}
                 className="input w-full py-2 text-sm" />
               {/* gerar promoção */}
               {showPromoBtn && (
-                <button onClick={() => { setPromoModal({ product: p }); setPromoDisc('20'); setPromoQty('1') }}
+                <button onClick={() => { setPromoModal({ product: { ...p, stock: dispQty } }); setPromoDisc('20'); setPromoQty('1') }}
                   className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-black font-black text-xs transition-colors">
                   <Tag className="w-3.5 h-3.5" />
                   Gerar Promoção — Não perca este produto!

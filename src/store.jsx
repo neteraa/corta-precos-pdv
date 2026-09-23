@@ -373,13 +373,61 @@ export function StoreProvider({ children }) {
     })
   }, [persist])
 
+  /** Adiciona/atualiza um lote específico de um produto (FIFO-aware). */
+  const addLot = useCallback((productId, { qty, expiryDate, cost }) => {
+    setProducts(prev => {
+      const next = prev.map(p => {
+        if (p.id !== productId) return p
+        const lots = [...(p.lots || [])]
+        const idx  = lots.findIndex(l => l.expiryDate === (expiryDate || ''))
+        if (idx >= 0) {
+          lots[idx] = { ...lots[idx], qty: lots[idx].qty + qty }
+        } else {
+          lots.push({
+            id:         `lot_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+            qty,
+            expiryDate: expiryDate || '',
+            receivedAt: new Date().toISOString(),
+            ...(cost != null ? { cost } : {}),
+          })
+        }
+        const sorted   = [...lots].sort((a, b) => (a.expiryDate || '9999').localeCompare(b.expiryDate || '9999'))
+        const newStock = sorted.reduce((s, l) => s + l.qty, 0)
+        return {
+          ...p,
+          lots:        sorted,
+          stock:       newStock,
+          expiryDate:  sorted[0]?.expiryDate || p.expiryDate,
+          receivedAt:  new Date().toISOString(),
+        }
+      })
+      persist('cp_products', next)
+      return next
+    })
+  }, [persist])
+
   const registerSale = useCallback((sale) => {
     const s = { ...sale, id: `s${Date.now()}`, date: sale.date || new Date().toISOString(), operatorName: sale.operatorName || getOperatorName() }
     setSales(prev => { const next = [s, ...prev]; persist('cp_sales', next); return next })
     setProducts(prev => {
       const next = prev.map(p => {
         const item = sale.items.find(i => i.productId === p.id)
-        return item ? { ...p, stock: Math.max(0, p.stock - item.qty) } : p
+        if (!item) return p
+        // FIFO: deduct from earliest-expiry lot first
+        if (p.lots?.length) {
+          const sorted    = [...p.lots].sort((a, b) => (a.expiryDate || '9999').localeCompare(b.expiryDate || '9999'))
+          let   remaining = item.qty
+          const newLots   = []
+          for (const lot of sorted) {
+            if (remaining <= 0) { newLots.push(lot); continue }
+            const take = Math.min(lot.qty, remaining)
+            remaining -= take
+            if (lot.qty - take > 0) newLots.push({ ...lot, qty: lot.qty - take })
+          }
+          const newStock = newLots.reduce((s, l) => s + l.qty, 0)
+          return { ...p, lots: newLots, stock: Math.max(0, newStock), expiryDate: newLots[0]?.expiryDate || '' }
+        }
+        return { ...p, stock: Math.max(0, p.stock - item.qty) }
       })
       persist('cp_products', next); return next
     })
@@ -567,7 +615,7 @@ export function StoreProvider({ children }) {
       products, sales, customers, promos,
       cashMovements, salesGoal, operators,
       photos, saveProductPhoto,
-      upsertProduct, deleteProduct, bulkUpsertProducts, registerSale, cancelSale,
+      upsertProduct, deleteProduct, bulkUpsertProducts, addLot, registerSale, cancelSale,
       upsertCustomer, deleteCustomer, importProducts,
       upsertPromo, deletePromo, assignPromoGroup,
       addFiado, payFiado,
