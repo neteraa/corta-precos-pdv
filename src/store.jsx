@@ -306,7 +306,7 @@ export function StoreProvider({ children }) {
   // ── Boot + auto-poll every 30 s ──────────────────────────────
   useEffect(() => {
     syncNow()
-    const id = setInterval(syncNow, 30_000)
+    const id = setInterval(syncNow, 8_000)  // 8s — produtos do celular aparecem rápido
     return () => clearInterval(id)
   }, [syncNow])
 

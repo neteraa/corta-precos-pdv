@@ -98,7 +98,7 @@ function ModuleCard({ icon: Icon, label, badge, themeColor, onClick }) {
 export default function Home() {
   const navigate     = useNavigate()
   const { settings } = usePrinter()
-  const { supplierOffers } = useStore()
+  const { supplierOffers, products, expiryAlertDays } = useStore()
   const role         = getRole()
   const session      = (() => { try { return JSON.parse(localStorage.getItem('cp_session') || '{}') } catch { return {} } })()
   const storeName    = session.storeName || settings.storeName || 'MEU MERCADO'
@@ -108,14 +108,24 @@ export default function Home() {
 
   const pendingOffers = (supplierOffers || []).filter(o => o.status === 'pending').length
 
+  const expiringCount = useMemo(() => {
+    const warn   = expiryAlertDays || 30
+    const cutoff = Date.now() + warn * 86400000
+    return (products || []).filter(p => {
+      if (!p.expiryDate) return false
+      return new Date(p.expiryDate + 'T00:00').getTime() <= cutoff
+    }).length
+  }, [products, expiryAlertDays])
+
   const modules = useMemo(() => {
     return ALL_MODULES
       .filter(m => !m.roles || m.roles.includes(role))
       .map(m => {
-        if (m.to === '/ofertas' && pendingOffers > 0) return { ...m, badge: String(pendingOffers) }
+        if (m.to === '/ofertas'  && pendingOffers  > 0) return { ...m, badge: String(pendingOffers) }
+        if (m.to === '/validade' && expiringCount  > 0) return { ...m, badge: String(expiringCount) }
         return m
       })
-  }, [role, pendingOffers])
+  }, [role, pendingOffers, expiringCount])
 
   const handleClick = (m) => {
     if (m.scanUrl) {

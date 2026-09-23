@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { Component } from 'react'
 import IconTour, { shouldShowTour } from './IconTour.jsx'
@@ -232,7 +232,7 @@ const ROLE_COLOR = { admin: '#f97316', gerente: '#818cf8', caixa: '#22c55e' }
 export default function Layout() {
   const [open, setOpen]   = useState(false)
   const { canInstall, install } = useInstallPWA()
-  const { supplierOffers } = useStore()
+  const { supplierOffers, products, expiryAlertDays } = useStore()
   const online            = useOnlineStatus()
   const navigate          = useNavigate()
 
@@ -272,8 +272,22 @@ export default function Layout() {
 
   const pendingOffersCount = (supplierOffers || []).filter(o => o.status === 'pending').length
 
+  const expiringCount = useMemo(() => {
+    const warn = expiryAlertDays || 30
+    const cutoff = Date.now() + warn * 86400000
+    return (products || []).filter(p => {
+      if (!p.expiryDate) return false
+      const exp = new Date(p.expiryDate + 'T00:00').getTime()
+      return exp <= cutoff
+    }).length
+  }, [products, expiryAlertDays])
+
   const dynamicExtras = filterByRole([
-    ...EXTRAS,
+    ...EXTRAS.map(item =>
+      item.to === '/validade' && expiringCount > 0
+        ? { ...item, badge: String(expiringCount), hot: true }
+        : item
+    ),
     {
       to: '/ofertas',
       icon: Truck,

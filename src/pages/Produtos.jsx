@@ -553,8 +553,11 @@ export default function Produtos() {
                       <div className="grid grid-cols-4 gap-1 p-2 max-h-48 overflow-y-auto">
                         {pickerResults.map((item, i) => (
                           <button key={i} type="button" onClick={() => pickPhoto(item)}
-                            className="aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-400 transition-all relative group">
-                            <img src={item.url} alt={item.name} className="w-full h-full object-cover bg-gray-100" />
+                            className="aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-400 transition-all relative group bg-gray-100">
+                            <img src={item.url} alt={item.name}
+                              className="w-full h-full object-cover"
+                              onError={e => { e.currentTarget.style.display='none'; e.currentTarget.nextSibling.style.display='flex' }} />
+                            <div style={{display:'none'}} className="w-full h-full items-center justify-center text-gray-400 text-[10px]">sem foto</div>
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end">
                               <p className="text-white text-[8px] font-bold p-1 leading-tight opacity-0 group-hover:opacity-100 truncate w-full">{item.name}</p>
                             </div>
@@ -562,9 +565,11 @@ export default function Produtos() {
                         ))}
                       </div>
                     ) : pickerError ? (
-                      <div className="p-4 text-center space-y-1">
-                        <p className="text-xs font-bold text-amber-600">⚠ Serviço temporariamente indisponível</p>
-                        <p className="text-[10px] text-gray-400">Open Food Facts está fora do ar. Tente em alguns minutos ou use câmera/arquivo.</p>
+                      <div className="p-4 text-center space-y-2">
+                        <p className="text-xs font-bold text-amber-600">⚠ Imagem não encontrada agora</p>
+                        <button type="button" onClick={() => runPickerSearch(pickerQuery)}
+                          className="text-[11px] font-bold text-blue-600 underline">🔄 Tentar novamente</button>
+                        <p className="text-[10px] text-gray-400">Ou use câmera/arquivo abaixo</p>
                       </div>
                     ) : pickerQuery.length >= 3 && !pickerLoading ? (
                       <div className="p-4 text-center space-y-1">
