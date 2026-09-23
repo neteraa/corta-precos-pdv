@@ -280,6 +280,21 @@ export function StoreProvider({ children }) {
       })
     } catch {}
     if (data.cp_supplier_offers) try { setSupplierOffers(JSON.parse(data.cp_supplier_offers)); try { localStorage.setItem(mktKey('cp_supplier_offers'), data.cp_supplier_offers); localStorage.setItem('cp_supplier_offers', data.cp_supplier_offers) } catch {} } catch {}
+    // Sync configurações (phone, address, instagram, pixKey, pixCity, themeColor) cross-device
+    if (data.cp_settings) try {
+      const serverCfg = JSON.parse(data.cp_settings)
+      const lsKey     = mktKey('cp_printer_settings')
+      const localCfg  = JSON.parse(localStorage.getItem(lsKey) || '{}')
+      // Só aplica campos do servidor que estão vazios localmente (preserva edições locais)
+      let changed = false
+      for (const [k, v] of Object.entries(serverCfg)) {
+        if (v && !localCfg[k]) { localCfg[k] = v; changed = true }
+      }
+      if (changed) {
+        localStorage.setItem(lsKey, JSON.stringify(localCfg))
+        window.dispatchEvent(new CustomEvent('cp-settings-saved', { detail: { sourceId: 'sync' } }))
+      }
+    } catch {}
 
     // Push local keys not yet on server
     if (!data.cp_customers)  setCustomers(c  => { syncToServer('cp_customers',  JSON.stringify(c));  return c })

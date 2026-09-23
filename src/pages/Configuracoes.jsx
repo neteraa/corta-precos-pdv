@@ -591,6 +591,21 @@ export default function Configuracoes() {
   }))
   const [saved, setSaved] = useState(false)
 
+  // Quando o sync traz cp_settings do servidor (cross-device), preenche campos vazios
+  useEffect(() => {
+    setForm(f => {
+      const update = {}
+      if (!f.storeName && settings.storeName)  update.storeName  = settings.storeName
+      if (!f.phone     && settings.phone)      update.phone      = settings.phone
+      if (!f.address   && settings.address)    update.address    = settings.address
+      if (!f.instagram && settings.instagram)  update.instagram  = settings.instagram
+      if (!f.pixKey    && settings.pixKey)     update.pixKey     = settings.pixKey
+      if (!f.pixCity   && settings.pixCity)    update.pixCity    = settings.pixCity
+      if (!f.themeColor && settings.themeColor) update.themeColor = settings.themeColor
+      return Object.keys(update).length ? { ...f, ...update } : f
+    })
+  }, [settings])
+
   // ── Logo upload ──────────────────────────────────────────
   const logoFileRef = useRef(null)
   const [logoState, setLogoState] = useState(null) // null | 'loading' | 'ok' | 'err string'
@@ -707,15 +722,18 @@ export default function Configuracoes() {
   }
 
   const saveSettings = () => {
-    setSettings(s => ({ ...s, ...form }))
-    // Persist store name to server so /caixa can show it cross-device
+    const merged = { ...settings, ...form }
+    setSettings(() => merged)
     const storeId = getConfiguredStoreId()
     const token   = getMktStoreToken()
-    fetch('/api/persist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-zs-token': token },
-      body: JSON.stringify({ key: 'cp_store_name', value: form.storeName, storeId }),
-    }).catch(() => {})
+    const hdr     = { 'Content-Type': 'application/json', 'x-zs-token': token }
+    // Persiste storeName legado (cross-device /caixa)
+    fetch('/api/persist', { method: 'POST', headers: hdr,
+      body: JSON.stringify({ key: 'cp_store_name', value: form.storeName, storeId }) }).catch(() => {})
+    // Persiste configurações completas (phone, address, instagram, pixKey, pixCity, themeColor)
+    const { logoImage, ...settingsToSync } = merged  // exclui imagem grande do blob
+    fetch('/api/persist', { method: 'POST', headers: hdr,
+      body: JSON.stringify({ key: 'cp_settings', value: JSON.stringify(settingsToSync), storeId }) }).catch(() => {})
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }

@@ -99,6 +99,7 @@ function buildCortaPrecosPrompt(catalogText, promoText) {
 • WhatsApp: (15) 9979-6930
 • Pagamento: PIX, Dinheiro, Débito, Crédito
 • Delivery: taxa fixa R$7,00 — pagamento SOMENTE por PIX
+• Chave PIX do delivery: CNPJ 60.662.362/0001-70 (Corta Preços)
 
 ━━━━━━━━━━━━━━━━━━━━━━
 🛒 PRODUTOS E PREÇOS
@@ -115,13 +116,23 @@ ${promoText}
 ━━━━━━━━━━━━━━━━━━━━━━
 Taxa fixa: R$7,00 · Pagamento: SOMENTE PIX
 
-FLUXO DE ENTREGA (siga sempre nessa ordem):
+CHAVE PIX DELIVERY: CNPJ 60.662.362/0001-70 — Corta Preços
+
+FLUXO DE ENTREGA (siga SEMPRE nessa ordem exata):
 1. Cliente quer entrega → pergunta o endereço completo (rua, número, bairro)
 2. Confirma os produtos que ele quer e lista com preços
 3. Calcula: total dos produtos + R$7 entrega = TOTAL FINAL
-4. Pede PIX no número (15) 9979-6930 e diz para avisar quando pagar
-5. Quando tiver todos os dados, registra o pedido assim (interno, não exibe ao cliente):
+4. Manda exatamente esta mensagem de pagamento (substitua os valores):
+   "✅ Pedido confirmado! Total: R$XX,XX (produtos + R$7 entrega)\n💳 Pague via PIX:\nCNPJ: 60.662.362/0001-70\nFavorecido: Corta Preços\nApós pagar, me manda o comprovante aqui 📸"
+5. Quando cliente confirmar pagamento OU mandar comprovante, responde:
+   "Perfeito! 🎉 Seu pedido está sendo preparado. Entregamos em até [30-60min]. Qualquer dúvida é só chamar! 🛵"
+6. Registra o pedido (tag interna, nunca mostre ao cliente):
    <zs_delivery>{"phone":"NUMERO_CLIENTE","name":"NOME","address":"ENDEREÇO","items":"LISTA DE ITENS","total":TOTAL_FLOAT,"deliveryFee":7}</zs_delivery>
+
+REGRAS DO COMPROVANTE:
+- Se a mensagem for "[comprovante enviado]" → o cliente mandou foto do comprovante. Responda: "Comprovante recebido! ✅ Seu pedido está sendo preparado e chega em breve. Obrigado! 🛵"
+- Se cliente apenas disser "paguei" sem comprovante → responda "Ótimo! Consegue mandar o comprovante pra gente confirmar? 📸"
+- NUNCA cancele pedido por falta de comprovante — apenas incentive o envio
 
 ━━━━━━━━━━━━━━━━━━━━━━
 🧠 COMO SE COMPORTAR
@@ -332,7 +343,9 @@ Sempre que souber ou atualizar dados, inclua ao FINAL da resposta (cliente não 
 - niche: "mercado" | "padaria" | "acougue" | "restaurante" | "lanchonete" | "distribuidora"
 - Inclua só os campos que souber`
 
-/** Extrai o texto de qualquer tipo de mensagem do Evolution API */
+/** Extrai o texto de qualquer tipo de mensagem do Evolution API.
+ *  Imagens sem legenda → "[comprovante enviado]" para que o bot responda ao pagamento.
+ */
 function extractText(data) {
   const msg = data?.message
   if (!msg) return null
@@ -341,6 +354,7 @@ function extractText(data) {
     msg.extendedTextMessage?.text ||
     msg.imageMessage?.caption ||
     msg.videoMessage?.caption ||
+    (msg.imageMessage   ? '[comprovante enviado]' : null) ||
     null
   )
 }
@@ -707,7 +721,7 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
         if (/promo|desconto|oferta|promoção/.test(t)) {
           fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 🔥 Passando pelas promoções agora temos os combos especiais!\nLiga pra gente no (15) 9979-6930 e a gente te conta tudo 😊`
         } else if (/entrega|delivery|manda|mandar|entreg/.test(t)) {
-          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 🛵 Fazemos entrega sim! Taxa fixa R$7,00 e pagamento por PIX.\nManda o endereço completo + o que você quer pedir no (15) 9979-6930 📱`
+          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 🛵 Fazemos entrega sim! Taxa fixa R$7,00, pagamento por PIX (CNPJ: 60.662.362/0001-70).\nMe manda o seu endereço + o que você quer pedir! 📦`
         } else if (/preço|valor|quanto|custa|custo|price/.test(t)) {
           fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 😊 Para consultar preços liga no (15) 9979-6930 ou passa aqui na loja — Corta Preços, Boituva-SP!`
         } else if (/hora|horário|abre|fecha|funcionamento/.test(t)) {

@@ -2,7 +2,7 @@ import { getStore }   from '@netlify/blobs'
 import { createHmac } from 'crypto'
 
 const PERSIST_SECRET = process.env.ZS_PERSIST_SECRET || ''  // empty → fail closed below
-const KEYS = ['cp_products', 'cp_sales', 'cp_customers', 'cp_promos', 'cp_fiado', 'cp_cash', 'cp_goal', 'cp_operators', 'cp_store_name', 'cp_supplier_offers', 'cp_fornecedor_estoque', 'cp_supplier_orders', 'cp_distribuidor_markets', 'cp_forn_profile_v1', 'cp_sellout_events']
+const KEYS = ['cp_products', 'cp_sales', 'cp_customers', 'cp_promos', 'cp_fiado', 'cp_cash', 'cp_goal', 'cp_operators', 'cp_store_name', 'cp_supplier_offers', 'cp_fornecedor_estoque', 'cp_supplier_orders', 'cp_distribuidor_markets', 'cp_forn_profile_v1', 'cp_sellout_events', 'cp_settings']
 
 function makeStoreToken(storeId) {
   return createHmac('sha256', PERSIST_SECRET).update(storeId).digest('hex').slice(0, 32)
