@@ -11,26 +11,47 @@ import { ShoppingCart, Package, CheckCircle, Trash2, Check, ChevronDown } from '
 import CameraScanner from '../components/CameraScanner.jsx'
 import { useStore, BRL } from '../store.jsx'
 import { useScanSender } from '../hooks/useScanRelay.js'
-import { getConfiguredStoreId } from '../utils/auth.js'
+import { getConfiguredStoreId, getRole } from '../utils/auth.js'
 import { usePrinter } from '../hooks/usePrinter.js'
 import { fetchProductInfo } from '../utils/openFoodFacts.js'
 
-// Sync storeId SYNCHRONOUSLY at module load — before the store context
-// initialises. Without this, useStore() opens with storeId='default' because
-// the mobile has no cp_session, and a useEffect fix would be too late.
-// ATENÇÃO: não chamar saveStoreId() aqui — ela aplica slugify() e remove "_"
-// do storeId (ex: cortaprecos_1789770018182 → cortaprecos1789770018182),
-// fazendo o persist salvar no namespace errado e nunca aparecer no sistema.
+/**
+ * IIFE síncrono — executa antes do React montar qualquer componente.
+ *
+ * Quando a URL contém ?storeId=X&t=TOKEN:
+ *   - Atualiza o namespace do mercado (storeId + storeToken)
+ *   - Se o dispositivo NÃO tem sessão ativa → faz auto-login como 'scanner'
+ *     (acesso restrito a /scan — sem senha master necessária)
+ *   - Se já tem sessão de admin/gerente → preserva a role mais alta
+ *
+ * SEGURANÇA MULTI-TENANT:
+ *   - O token 't' é HMAC(secret, storeId) gerado no servidor
+ *   - Sem token válido, o persist falhará com 403 no servidor
+ *   - A role 'scanner' só tem acesso às rotas /scan e /pdv
+ *   - Dados são sempre isolados por storeId no localStorage
+ */
 ;(() => {
   const params = new URLSearchParams(window.location.search)
   const sid    = params.get('storeId')
   const tok    = params.get('t')
-  if (!sid) return
+  if (!sid || !tok) return          // sem storeId+token → nada a fazer
+
   try {
     localStorage.setItem('cp_store_id', sid)
     const s = JSON.parse(localStorage.getItem('cp_session') || '{}')
-    const patch = { ...s, storeId: sid }
-    if (tok) patch.storeToken = tok  // token from scan URL (&t=HMAC)
+
+    // Hierarquia de roles: admin > gerente > caixa > scanner
+    const ROLE_RANK = { admin: 4, gerente: 3, caixa: 2, scanner: 1 }
+    const existingRank = ROLE_RANK[s.role] || 0
+    const grantedRole  = existingRank >= 2 ? s.role : 'scanner'   // preserva caixa+ existente
+
+    const patch = {
+      ...s,
+      storeId:    sid,
+      storeToken: tok,
+      loggedIn:   true,            // token no URL = prova de identidade do lojista
+      role:       grantedRole,     // scanner ou role existente mais alta
+    }
     localStorage.setItem('cp_session', JSON.stringify(patch))
   } catch {}
 })()
@@ -318,7 +339,11 @@ export default function ScanMobile() {
           <div style={S.topbar}>
             <div>
               <div style={S.brand}>{storeName}</div>
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontFamily: 'monospace', marginTop: 1 }}>{sid}</div>
+              {getRole() === 'scanner' && (
+                <div style={{ marginTop: 3, display: 'inline-block', background: '#431407', border: '1px solid #ea580c66', borderRadius: 6, padding: '1px 7px', fontSize: 10, fontWeight: 800, color: '#fb923c', letterSpacing: 0.3 }}>
+                  📦 Modo Estoquista
+                </div>
+              )}
             </div>
             <div style={S.tabs}>
               <button style={S.tab(mode === 'pdv')} onClick={() => { window.location.href = base }}>

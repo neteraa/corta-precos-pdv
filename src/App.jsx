@@ -60,6 +60,9 @@ const ADMIN_ONLY = new Set(['/dashboard','/produtos','/vendas','/estoque','/clie
 function RequireRole({ children }) {
   const location = useLocation()
   const role = getRole()
+  // scanner: acesso apenas ao /scan — redireciona tudo para lá
+  if (role === 'scanner') return <Navigate to="/scan" replace />
+  // caixa: não pode acessar páginas de admin
   if (role === 'caixa' && ADMIN_ONLY.has(location.pathname)) {
     return <Navigate to="/pdv" replace />
   }

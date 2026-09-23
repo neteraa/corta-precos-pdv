@@ -11,35 +11,73 @@ const CONCURRENCY = 4     // requests paralelos simultâneos
 const SIZE_PX     = 280   // tamanho máximo do lado maior após compressão
 const QUALITY     = 0.80  // JPEG quality
 
-/* ── busca informações completas de um produto pelo EAN ──── */
+/* ── busca informações completas de um produto pelo EAN ──────
+   Tenta o proxy server-side (/api/barcode-lookup) que agrega
+   Cosmos Bluesoft + Open Food Facts com cache em Blobs.
+   Fallback direto ao OFF se o proxy falhar (dev local sem netlify dev).
+───────────────────────────────────────────────────────────── */
 export async function fetchProductInfo(barcode) {
   const clean = String(barcode || '').replace(/\D/g, '')
   if (clean.length < 8) return null
 
+  // ── 1. Proxy Netlify (Cosmos + OFF + cache) ───────────────
   try {
-    const res = await fetch(
-      `${OFF_API}/${clean}.json?fields=product_name,product_name_pt,product_name_en,brands,categories_tags,image_front_small_url,image_small_url,image_front_url,image_url`,
-      { signal: AbortSignal.timeout(8000) }
-    )
+    const res = await fetch(`/api/barcode-lookup?ean=${clean}`, {
+      signal: AbortSignal.timeout(9000),
+    })
+    if (res.ok) {
+      const d = await res.json()
+      if (d?.name) return { name: d.name, brand: d.brand || '', quantity: d.quantity || '', category: d.category || '', imageUrl: d.imageUrl || null }
+    }
+  } catch { /* proxy indisponível em dev local — usa OFF direto */ }
+
+  // ── 2. Fallback: Open Food Facts direto (sem proxy) ───────
+  return fetchProductInfoDirect(clean)
+}
+
+/* ── acesso direto ao OFF (dev local / fallback) ─────────── */
+async function fetchProductInfoDirect(clean) {
+  const fields = [
+    'product_name','product_name_pt','product_name_pt_BR',
+    'generic_name','generic_name_pt',
+    'brands','quantity',
+    'categories_tags',
+    'image_front_small_url','image_small_url','image_front_url','image_url',
+  ].join(',')
+
+  try {
+    const res = await fetch(`${OFF_API}/${clean}.json?fields=${fields}`, {
+      signal: AbortSignal.timeout(8000),
+    })
     if (!res.ok) return null
     const data = await res.json()
     if (data.status !== 1 || !data.product) return null
 
     const p = data.product
 
-    // Nome: preferir português, senão genérico, senão em inglês
-    const name = (p.product_name_pt || p.product_name || p.product_name_en || '').trim()
-    if (!name) return null   // sem nome = não usável
+    const rawName = (
+      p.product_name_pt_BR || p.product_name_pt ||
+      p.generic_name_pt    || p.product_name    ||
+      p.generic_name       || ''
+    ).trim()
+    if (!rawName) return null
 
     const brand    = (p.brands || '').split(',')[0].trim()
+    const quantity = (p.quantity || '').trim()
+
+    // Monta nome completo com marca e tamanho
+    let name = rawName
+    if (brand && !name.toLowerCase().includes(brand.toLowerCase())) name = `${name} ${brand}`
+    if (quantity && !name.toLowerCase().replace(/\s/g, '').includes(quantity.toLowerCase().replace(/\s/g, ''))) name = `${name} ${quantity}`
+    name = name.toUpperCase().trim()
+
+    const catTags  = p.categories_tags || []
+    const catTag   = catTags.find(t => t.startsWith('pt:')) || catTags.find(t => t.startsWith('en:')) || ''
+    const category = catTag.replace(/^(pt:|en:)/, '').replace(/-/g, ' ')
+
     const imageUrl = p.image_front_small_url || p.image_small_url || p.image_front_url || p.image_url || null
 
-    // Mapear categoria OFF → categoria do sistema
-    const catTag   = (p.categories_tags || []).find(t => t.startsWith('pt:') || t.startsWith('en:')) || ''
-    const catRaw   = catTag.replace(/^(pt:|en:)/, '').replace(/-/g, ' ')
-    const category = catRaw ? (catRaw.charAt(0).toUpperCase() + catRaw.slice(1)) : ''
-
-    return { name, brand, category, imageUrl }
+    return { name, brand, quantity, category, imageUrl }
   } catch {
     return null
   }
