@@ -94,7 +94,7 @@ export default function CaixaLogin() {
     if (!selected) return
     if (!selected.pin || pin === selected.pin) {
       loginAsOperator(selected)
-      navigate(selected.role === 'caixa' ? '/terminal' : '/dashboard', { replace: true })
+      navigate(selected.role === 'caixa' ? '/terminal' : '/home', { replace: true })
     } else {
       setPinErr(true)
       setTimeout(() => { setPinErr(false); setPin('') }, 600)

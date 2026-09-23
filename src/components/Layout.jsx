@@ -306,14 +306,16 @@ export default function Layout() {
         className="hidden md:flex flex-col shrink-0 z-40 overflow-visible"
         style={{ width: 56, background: '#09090b', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
 
-        {/* ── Store avatar (top) ── */}
+        {/* ── Store avatar (top) — clica = vai pra /home ── */}
         <div className="pt-3 pb-1">
-          <StoreAvatar
-            name={storeName}
-            emoji={nicheMeta.emoji}
-            themeColor={themeColor}
-            logoImg={storeSettings.logoImage}
-          />
+          <NavLink to="/home" className="block">
+            <StoreAvatar
+              name={storeName + ' · Início'}
+              emoji={nicheMeta.emoji}
+              themeColor={themeColor}
+              logoImg={storeSettings.logoImage}
+            />
+          </NavLink>
         </div>
 
         <div className="mx-auto w-5 h-px" style={{ background: 'rgba(255,255,255,0.07)' }} />
