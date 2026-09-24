@@ -28,6 +28,7 @@ const Etiquetas      = lazy(() => import('./pages/Etiquetas.jsx'))
 const Validade       = lazy(() => import('./pages/Validade.jsx'))
 const Campanhas      = lazy(() => import('./pages/Campanhas.jsx'))
 const Fornecedor     = lazy(() => import('./pages/Fornecedor.jsx'))
+const Fornecedores   = lazy(() => import('./pages/Fornecedores.jsx'))
 const Ofertas        = lazy(() => import('./pages/Ofertas.jsx'))
 const PainelTV       = lazy(() => import('./pages/PainelTV.jsx'))
 const VitrinaDigital = lazy(() => import('./pages/VitrinaDigital.jsx'))
@@ -133,6 +134,7 @@ export default function App() {
             <Route path="/etiquetas"    element={<Etiquetas />} />
             <Route path="/validade"     element={<Validade />} />
             <Route path="/campanhas"    element={<Campanhas />} />
+            <Route path="/fornecedores" element={<Fornecedores />} />
           </Route>
         </Routes>
       </Suspense>

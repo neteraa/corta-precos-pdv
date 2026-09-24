@@ -51,8 +51,9 @@ const GESTAO = [
   { to: '/produtos',   icon: Package,         label: 'Produtos',   roles: ['admin'] },
   { to: '/vendas',     icon: Receipt,         label: 'Vendas',     roles: ['admin','gerente'] },
   { to: '/estoque',    icon: Warehouse,       label: 'Estoque',    roles: ['admin','gerente'] },
-  { to: '/clientes',   icon: Users,           label: 'Clientes',   roles: ['admin','gerente'] },
-  { to: '/fiado',      icon: HandCoins,       label: 'Fiado' },
+  { to: '/clientes',     icon: Users,    label: 'Clientes',     roles: ['admin','gerente'] },
+  { to: '/fornecedores', icon: Truck,    label: 'Fornecedores', roles: ['admin','gerente'] },
+  { to: '/fiado',        icon: HandCoins,label: 'Fiado' },
   { to: '/relatorio',  icon: BarChart2,       label: 'Relatório',  roles: ['admin','gerente'] },
 ]
 const EXTRAS = [
