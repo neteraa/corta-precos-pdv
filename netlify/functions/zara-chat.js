@@ -78,53 +78,74 @@ Configurações (/configuracoes):
 - Se não souber, diga "Não tenho essa informação — entre em contato pelo WhatsApp de suporte"
 - Para suporte técnico urgente: (15) 9979-6930`
 
+const CT = { 'Content-Type': 'application/json' }
+const jr  = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: CT })
+
 export default async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type' } })
-  }
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
 
+  // 1 — parse body
+  let messages
   try {
-    const { messages = [] } = await req.json()
-    if (!Array.isArray(messages) || messages.length === 0)
-      return new Response(JSON.stringify({ reply: 'Olá! Como posso ajudar?' }), { headers: { 'Content-Type': 'application/json' } })
+    const body = await req.json()
+    messages = body.messages || []
+  } catch (e) {
+    return jr({ reply: '⚠️ Requisição inválida.' }, 400)
+  }
 
-    const GROQ_KEY   = process.env.GROQ_API_KEY
-    const OPENAI_KEY = process.env.OPENAI_API_KEY
+  if (!Array.isArray(messages) || messages.length === 0)
+    return jr({ reply: 'Olá! Como posso ajudar?' })
 
-    const payload = {
-      model:       'llama-3.1-8b-instant',
-      messages:    [{ role: 'system', content: SYSTEM }, ...messages.slice(-8)],
-      max_tokens:  320,
-      temperature: 0.55,
-    }
+  // 2 — pick LLM
+  const GROQ_KEY   = (process.env.GROQ_API_KEY   || '').trim()
+  const OPENAI_KEY = (process.env.OPENAI_API_KEY  || '').trim()
 
-    let res
-    if (GROQ_KEY) {
-      res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
-        body:    JSON.stringify(payload),
-      })
-    } else if (OPENAI_KEY) {
-      res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_KEY}` },
-        body:    JSON.stringify({ ...payload, model: 'gpt-4o-mini' }),
-      })
-    } else {
-      return new Response(JSON.stringify({ reply: 'Serviço temporariamente indisponível. Tente novamente em instantes.' }), { status: 503, headers: { 'Content-Type': 'application/json' } })
-    }
+  let endpoint, model, apiKey
+  if (GROQ_KEY) {
+    endpoint = 'https://api.groq.com/openai/v1/chat/completions'
+    model    = 'llama-3.1-8b-instant'
+    apiKey   = GROQ_KEY
+  } else if (OPENAI_KEY) {
+    endpoint = 'https://api.openai.com/v1/chat/completions'
+    model    = 'gpt-4o-mini'
+    apiKey   = OPENAI_KEY
+  } else {
+    return jr({ reply: 'Serviço temporariamente indisponível.' }, 503)
+  }
 
-    if (!res.ok) throw new Error(`LLM ${res.status}`)
-    const data  = await res.json()
-    const reply = data.choices?.[0]?.message?.content?.trim() || 'Não consegui processar. Tente novamente.'
-
-    return new Response(JSON.stringify({ reply }), { headers: { 'Content-Type': 'application/json' } })
-  } catch (err) {
-    console.error('[zara-chat]', err.message)
-    return new Response(JSON.stringify({ reply: 'Ops, erro de conexão. Tente novamente em instantes.' }), {
-      status: 500, headers: { 'Content-Type': 'application/json' },
+  // 3 — call LLM
+  let llmRes
+  try {
+    const ac = new AbortController()
+    setTimeout(() => ac.abort(), 12000)
+    llmRes = await fetch(endpoint, {
+      method:  'POST',
+      signal:  ac.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model, max_tokens: 320, temperature: 0.55,
+        messages: [{ role: 'system', content: SYSTEM }, ...messages.slice(-8)],
+      }),
     })
+  } catch (e) {
+    console.error('[zara-chat] fetch error:', e.message)
+    return jr({ reply: 'Não consegui conectar à IA. Tente novamente.' }, 502)
+  }
+
+  // 4 — handle LLM error
+  if (!llmRes.ok) {
+    const errBody = await llmRes.text().catch(() => '')
+    console.error('[zara-chat] LLM error', llmRes.status, errBody.slice(0, 200))
+    return jr({ reply: `IA indisponível (${llmRes.status}). Tente em instantes.` }, 502)
+  }
+
+  // 5 — parse and return
+  try {
+    const data  = await llmRes.json()
+    const reply = data.choices?.[0]?.message?.content?.trim() || 'Não consegui processar. Tente novamente.'
+    return jr({ reply })
+  } catch (e) {
+    console.error('[zara-chat] parse error:', e.message)
+    return jr({ reply: 'Erro ao processar resposta da IA.' }, 500)
   }
 }
