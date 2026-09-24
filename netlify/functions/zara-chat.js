@@ -102,11 +102,11 @@ export default async (req) => {
   if (!GROQ_KEY && !OPENAI_KEY)
     return jr({ reply: 'Serviço temporariamente indisponível.' }, 503)
 
-  // Candidatos: Groq (grátis) primeiro, OpenAI fallback
+  // Candidatos em ordem de preferência (mais barato primeiro)
   const CANDIDATES = [
-    GROQ_KEY   && { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama3-8b-8192',  key: GROQ_KEY },
-    GROQ_KEY   && { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'mixtral-8x7b-32768', key: GROQ_KEY },
-    OPENAI_KEY && { url: 'https://api.openai.com/v1/chat/completions',      model: 'gpt-4o-mini',     key: OPENAI_KEY },
+    GROQ_KEY   && { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama3-8b-8192',       key: GROQ_KEY,   timeout: 8000 },
+    GROQ_KEY   && { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile', key: GROQ_KEY, timeout: 8000 },
+    OPENAI_KEY && { url: 'https://api.openai.com/v1/chat/completions',      model: 'gpt-4o-mini',          key: OPENAI_KEY, timeout: 9000 },
   ].filter(Boolean)
 
   const llmPayload = (model) => JSON.stringify({
@@ -114,25 +114,30 @@ export default async (req) => {
     messages: [{ role: 'system', content: SYSTEM }, ...messages.slice(-8)],
   })
 
+  const errors = []
   for (const cand of CANDIDATES) {
     let res
     try {
       const ac = new AbortController()
-      setTimeout(() => ac.abort(), 11000)
+      setTimeout(() => ac.abort(), cand.timeout || 9000)
       res = await fetch(cand.url, {
         method: 'POST', signal: ac.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cand.key}` },
         body: llmPayload(cand.model),
       })
     } catch (e) {
-      console.warn(`[zara-chat] ${cand.model} fetch failed:`, e.message)
-      continue // try next candidate
+      const msg = `${cand.model}: fetch_error ${e.message}`
+      console.warn('[zara-chat]', msg)
+      errors.push(msg)
+      continue
     }
 
     if (!res.ok) {
-      const err = await res.text().catch(() => '')
-      console.warn(`[zara-chat] ${cand.model} error ${res.status}:`, err.slice(0, 200))
-      continue // try next candidate
+      const errTxt = await res.text().catch(() => '')
+      const msg = `${cand.model}: HTTP_${res.status} ${errTxt.slice(0, 120)}`
+      console.warn('[zara-chat]', msg)
+      errors.push(msg)
+      continue
     }
 
     try {
@@ -141,10 +146,11 @@ export default async (req) => {
       console.log(`[zara-chat] OK via ${cand.model}`)
       return jr({ reply })
     } catch (e) {
-      console.warn(`[zara-chat] ${cand.model} parse error:`, e.message)
+      errors.push(`${cand.model}: parse_error ${e.message}`)
       continue
     }
   }
 
-  return jr({ reply: 'Serviço de IA temporariamente indisponível. Tente em alguns instantes.' }, 503)
+  console.error('[zara-chat] all candidates failed:', errors)
+  return jr({ reply: 'Serviço de IA temporariamente indisponível. Tente em alguns instantes.', _errors: errors }, 503)
 }

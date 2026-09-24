@@ -10,6 +10,10 @@
 [functions."wa-bot"]
   timeout = 26
 
+# zara-chat: tenta Groq + fallback OpenAI — precisa de até 20s em cold start
+[functions."zara-chat"]
+  timeout = 20
+
 # /instalar-caixa → página de instalação do PWA Terminal de Caixa
 [[redirects]]
   from   = "/instalar-caixa"
