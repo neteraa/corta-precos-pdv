@@ -49,6 +49,19 @@ Bot WhatsApp:
 - Catálogo de produtos, preços, entrega com endereço
 - Pedidos chegam na aba Entregas (/entrega) em tempo real
 
+Campanhas WhatsApp (/campanhas):
+- Disparo de mensagens em massa para clientes via bot conectado
+- 3 modalidades: Contatos individuais, Grupo do Zap, Lista de Transmissão
+- Filtros de destinatários: com WhatsApp cadastrado, com fiado em aberto + WhatsApp, todos os clientes
+- Importar contatos externos por arquivo CSV ou TXT
+- Template de mensagem com variáveis: {{nome}}, {{loja}}, {{saldo}}, {{data}}
+- Adicionar produtos e preços diretamente na mensagem
+- Prévia do WhatsApp ao vivo enquanto edita
+- Regras anti-ban integradas: delay aleatório 1,5–4s, pausa a cada 30 msgs, máx. 80–100/dia
+- Botão "Disparar via Bot" (automático) ou "Enviar um a um" (manual)
+- Promoções prontas da aba Validade aparecem como sugestão de campanha
+- Link de tráfego pago: wa.me/[número] para usar em anúncios
+
 PWA / App instalável:
 - Instalar o Terminal de Caixa como app: zatendestok.com.br/instalar-caixa
 - Abre direto na tela de operador (PIN) sem precisar do navegador
@@ -65,9 +78,15 @@ Configurações (/configuracoes):
 /pdv → PDV Admin
 /terminal → Terminal de Caixa (tela cheia)
 /estoque → Gestão de estoque e lotes
+/validade → Controle de validade por lote
 /clientes → Clientes e fiado
+/campanhas → Campanhas WhatsApp (disparos em massa)
 /dashboard → Relatórios e metas
+/relatorio → Relatório detalhado de vendas
 /entrega → Pedidos de entrega (bot WA)
+/promocoes → Promoções automáticas
+/fornecedores → Cadastro de fornecedores
+/etiquetas → Impressão de etiquetas de preço
 /configuracoes → Configurações gerais
 
 === RESPOSTAS ===
