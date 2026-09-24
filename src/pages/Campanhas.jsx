@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Copy, Check, Search, MessageCircle, Phone, Plus, Flame, ExternalLink, Wifi, WifiOff, Bot, Users, List, RefreshCw, AlertTriangle, Send } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
-import { getConfiguredStoreId, getSession } from '../utils/auth.js'
+import { getConfiguredStoreId } from '../utils/auth.js'
+import { usePrinter } from '../hooks/usePrinter.js'
 
 /* ── helpers ─────────────────────────────────────────────── */
 const cleanPhone = p =>
@@ -85,8 +86,9 @@ function ProductRow({ p, onAdd }) {
 ══════════════════════════════════════════════════════════ */
 export default function Campanhas() {
   const { products, customers, sales, promos } = useStore()
+  const { settings } = usePrinter()
   const instance   = getConfiguredStoreId() || 'zatendestok'
-  const lojaNome   = getSession()?.storeName || instance
+  const lojaNome   = settings?.storeName || instance
 
   // bot connection status
   const [botStatus, setBotStatus] = useState(null) // null | 'open' | 'connecting'
@@ -129,6 +131,12 @@ export default function Campanhas() {
   const [useImported, setUseImported]           = useState(false)
   const [importError, setImportError]           = useState(null)
   const fileRef = useRef(null)
+
+  // envio para número manual
+  const [manualPhone, setManualPhone] = useState('')
+  const [manualName,  setManualName]  = useState('')
+  const [manualSending, setManualSending] = useState(false)
+  const [manualResult,  setManualResult]  = useState(null) // {ok,msg}
 
   const parseContactFile = useCallback((file) => {
     if (!file) return
@@ -384,6 +392,29 @@ export default function Campanhas() {
     window.open(`https://wa.me/${cleanPhone(c.phone)}?text=${encodeURIComponent(renderMsg(template, c, lojaNome))}`, '_blank')
     setLocalIdx(idx + 1)
   }, [audienceList, template, lojaNome])
+
+  /* ── enviar para número digitado manualmente ─────────────── */
+  const sendManual = useCallback(async () => {
+    const digits = manualPhone.replace(/\D/g, '').replace(/^0/, '')
+    if (digits.length < 8) { setManualResult({ ok: false, msg: 'Número inválido' }); return }
+    const number = '55' + digits.slice(-11)
+    const customer = { name: manualName.trim() || 'Cliente', saldo: 0 }
+    const text = renderMsg(template, customer, lojaNome)
+    setManualSending(true)
+    setManualResult(null)
+    try {
+      if (botConnected) {
+        await sendViaBot(instance, number, text)
+        setManualResult({ ok: true, msg: `✅ Enviado via bot para ${number}` })
+      } else {
+        window.open(`https://wa.me/${number}?text=${encodeURIComponent(text)}`, '_blank')
+        setManualResult({ ok: true, msg: '✅ WhatsApp aberto — confirme o envio no celular' })
+      }
+    } catch (e) {
+      setManualResult({ ok: false, msg: `❌ ${e.message}` })
+    }
+    setManualSending(false)
+  }, [manualPhone, manualName, template, lojaNome, botConnected, instance])
 
   /* ── ImportBlock — reutilizável nos 3 tabs ───────────────── */
   const ImportBlock = (
@@ -890,6 +921,57 @@ export default function Campanhas() {
           </div>
 
           {ImportBlock}
+
+          {/* ── Enviar para número manual ── */}
+          <div className="card p-4 space-y-3">
+            <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide">📲 Enviar para número específico</h2>
+            <p className="text-xs text-gray-500">Digite um número avulso para enviar a mensagem atual direto, sem precisar cadastrar no sistema.</p>
+            <div className="flex gap-2">
+              <input
+                value={manualName}
+                onChange={e => { setManualName(e.target.value); setManualResult(null) }}
+                placeholder="Nome (opcional)"
+                className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+              <input
+                value={manualPhone}
+                onChange={e => { setManualPhone(e.target.value); setManualResult(null) }}
+                placeholder="(15) 99999-0000"
+                type="tel"
+                className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => {
+                  const digits = manualPhone.replace(/\D/g,'').replace(/^0/,'')
+                  if (digits.length < 8) return
+                  const number = '55' + digits.slice(-11)
+                  const customer = { name: manualName.trim() || 'Cliente', saldo: 0 }
+                  window.open(`https://wa.me/${number}?text=${encodeURIComponent(renderMsg(template, customer, lojaNome))}`, '_blank')
+                }}
+                disabled={manualPhone.replace(/\D/g,'').length < 8}
+                className="flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors">
+                <MessageCircle className="w-4 h-4 text-green-600" /> Abrir WhatsApp
+              </button>
+              <button
+                onClick={sendManual}
+                disabled={manualPhone.replace(/\D/g,'').length < 8 || manualSending || !botConnected}
+                title={!botConnected ? 'Bot não conectado' : ''}
+                className={`flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-colors disabled:opacity-40
+                  ${botConnected ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+                {manualSending
+                  ? <span className="w-4 h-4 border-2 border-orange-300 border-t-white rounded-full animate-spin" />
+                  : <Bot className="w-4 h-4" />}
+                {manualSending ? 'Enviando...' : 'Disparar via Bot'}
+              </button>
+            </div>
+            {manualResult && (
+              <p className={`text-xs font-bold rounded-xl px-3 py-2 ${manualResult.ok ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                {manualResult.msg}
+              </p>
+            )}
+          </div>
 
           {/* Contador diário anti-ban */}
           <div className={`rounded-xl px-4 py-2.5 flex items-center justify-between text-xs border ${
