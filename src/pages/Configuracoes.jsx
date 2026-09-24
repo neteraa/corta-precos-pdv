@@ -5,7 +5,7 @@ import { parseGdoorCsv } from '../utils/importCsv.js'
 import { usePrinter, getNicheMeta } from '../hooks/usePrinter.js'
 import PixQR from '../components/PixQR.jsx'
 import { getCredentials, saveCredentials, getConfiguredStoreId, saveStoreId, slugify } from '../utils/auth.js'
-import { getMktStoreToken } from '../utils/tenantStorage.js'
+import { getMktStoreToken, mktKey } from '../utils/tenantStorage.js'
 
 /* ── Stable sub-components (MUST be outside the page fn to avoid remount-on-type) ── */
 const Field = ({ label, hint, children }) => (
@@ -311,6 +311,20 @@ function WhatsAppBotSection({ instance }) {
       const r = await fetch(`/api/wa-status?instance=${instance}`)
       const d = await r.json()
       setWa(d)
+      if (d.status === 'open' && d.phone) {
+        try {
+          const lsKey = mktKey('cp_printer_settings')
+          const cfg = JSON.parse(localStorage.getItem(lsKey) || '{}')
+          if (!cfg.phone) {
+            const digits = d.phone.replace(/\D/g, '').replace(/^55/, '')
+            cfg.phone = digits.length === 11
+              ? `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+              : `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+            localStorage.setItem(lsKey, JSON.stringify(cfg))
+            window.dispatchEvent(new CustomEvent('cp-settings-saved', { detail: { sourceId: 'wa-auto' } }))
+          }
+        } catch {}
+      }
     } catch { /* offline */ } finally { setLoading(false) }
   }, [instance])
 

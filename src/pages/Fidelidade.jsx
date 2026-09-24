@@ -1,8 +1,9 @@
-import React, { useState, useRef, useMemo } from 'react'
+import React, { useState, useRef, useMemo, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Printer, Copy, Check, MessageCircle, Users, Phone, ExternalLink, QrCode, Gift, Megaphone, MapPin, Clock } from 'lucide-react'
 import { usePrinter } from '../hooks/usePrinter.js'
 import { useStore } from '../store.jsx'
+import { getMktStoreId, mktKey } from '../utils/tenantStorage.js'
 
 /* ── Ícone WA ───────────────────────────────────────────── */
 const WaIcon = ({ className = 'w-4 h-4' }) => (
@@ -69,6 +70,29 @@ export default function Fidelidade() {
   const phone         = settings.phone || ''
   const waPhone       = phone.replace(/\D/g, '').replace(/^0+/, '')
   const campaigns     = useMemo(() => CAMPAIGNS(storeName), [storeName])
+
+  // Se o telefone não estiver configurado, tenta detectar automaticamente do WhatsApp conectado
+  const storeId = getMktStoreId()
+  useEffect(() => {
+    if (phone) return
+    fetch(`/api/wa-status?instance=${storeId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.status !== 'open' || !d.phone) return
+        const digits = d.phone.replace(/\D/g, '').replace(/^55/, '')
+        const formatted = digits.length === 11
+          ? `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+          : `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
+        const lsKey = mktKey('cp_printer_settings')
+        const cfg = JSON.parse(localStorage.getItem(lsKey) || '{}')
+        if (!cfg.phone) {
+          cfg.phone = formatted
+          localStorage.setItem(lsKey, JSON.stringify(cfg))
+          window.dispatchEvent(new CustomEvent('cp-settings-saved', { detail: { sourceId: 'wa-auto' } }))
+        }
+      })
+      .catch(() => {})
+  }, [phone, storeId])
 
   const [activeCampaign, setActiveCampaign] = useState(() => campaigns[0])
   const [copied,  setCopied]  = useState(false)
