@@ -462,7 +462,7 @@ async function askLLM(userMessage, senderNum, systemMsg) {
   const endpoint = useGroq
     ? 'https://api.groq.com/openai/v1/chat/completions'
     : 'https://api.openai.com/v1/chat/completions'
-  const model    = useGroq ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'gpt-4o-mini'
+  const model    = useGroq ? 'qwen/qwen3.8-27b' : 'gpt-4o-mini'
 
   if (!key) throw new OpenAIQuotaError('sem_credito')
 

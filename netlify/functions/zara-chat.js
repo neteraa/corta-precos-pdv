@@ -102,14 +102,10 @@ export default async (req) => {
   if (!GROQ_KEY && !OPENAI_KEY)
     return jr({ reply: 'Serviço temporariamente indisponível.' }, 503)
 
-  // Groq mudou nomenclatura em 2025: modelos agora usam prefixo "meta-llama/" ou "google/"
-  // Os nomes curtos antigos (llama3-8b-8192, gemma2-9b-it etc) foram descontinuados
+  // Modelos disponíveis no projeto Groq (habilitados em console.groq.com/settings/project/limits)
   const GROQ_MODELS = [
-    'meta-llama/llama-4-scout-17b-16e-instruct',    // Llama 4 Scout — atual
-    'meta-llama/llama-4-maverick-17b-128e-instruct', // Llama 4 Maverick — atual
-    'meta-llama/llama-3.3-70b-versatile',            // Llama 3.3 70B
-    'meta-llama/llama-3.1-8b-instant',               // Llama 3.1 8B
-    'meta-llama/llama-3.2-3b-preview',               // Llama 3.2 3B
+    'qwen/qwen3.8-27b',    // Qwen 3.8 27B — principal (multilíngue, bom em pt-BR)
+    'openai/gpt-oss-20b',  // GPT OSS 20B — fallback
   ]
   const CANDIDATES = [
     ...GROQ_MODELS.map(m => GROQ_KEY && { url: 'https://api.groq.com/openai/v1/chat/completions', model: m, key: GROQ_KEY, timeout: 8000 }),
@@ -159,5 +155,5 @@ export default async (req) => {
   }
 
   console.error('[zara-chat] all candidates failed:', JSON.stringify(errors))
-  return jr({ reply: 'Assistente temporariamente indisponível. 😔 Use o WhatsApp de suporte: (15) 9979-6930', _e: errors }, 503)
+  return jr({ reply: 'Assistente temporariamente indisponível. 😔 Use o WhatsApp de suporte: (15) 9979-6930' }, 503)
 }
