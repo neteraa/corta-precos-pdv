@@ -355,3 +355,16 @@ curl https://ws-relay-production-42a7.up.railway.app/health
 
 # Railway vars (ws-relay)
 /tmp/node_modules/.bin/railway variables set --project df6bcfe6 --service ws-relay --environment production KEY=VALUE
+
+## GROQ API — Modelos Ativos (atualizado 2025-09)
+- Projeto Groq: org_01m3a7jvd2e6s874cptyc8qmf0 (Personal / Default Project)
+- Habilitar em: console.groq.com → Project → Limits → Allowed Models
+- Modelos ATIVOS no projeto:
+  * qwen/qwen3.8-27b     ← principal Zara chat + wa-bot (multilíngue, bom pt-BR)
+  * openai/gpt-oss-20b   ← fallback
+- DECOMMISSIONED: llama3-8b-8192, gemma2-9b-it, gemma-7b-it, llama-3.1-70b-versatile, mixtral-8x7b-32768
+- SEM ACESSO (404): llama-3.1-8b-instant, llama-3.3-70b-versatile (requer ToS Meta aceito)
+- zara-chat.js: qwen/qwen3.8-27b → openai/gpt-oss-20b → gpt-4o-mini (se OpenAI tiver crédito)
+- wa-bot.js: qwen/qwen3.8-27b via Groq (fallback gpt-4o-mini se GROQ_KEY falhar)
+- OpenAI sem créditos em 09/2025 — manter Groq como primário
+
