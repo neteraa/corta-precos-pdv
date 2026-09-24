@@ -6,23 +6,26 @@ import React, { useState, useEffect, useCallback } from 'react'
 import {
   RefreshCw, MapPin, CheckCircle, XCircle, Copy, Phone,
   Clock, Package, Bike, AlertCircle, ChevronDown, ChevronUp,
+  BadgeCheck, Send,
 } from 'lucide-react'
 import { getMktStoreId } from '../utils/tenantStorage.js'
 
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
 const STATUS_CONFIG = {
-  pending:   { label: 'Aguardando',   color: '#f59e0b', bg: '#fef3c7', icon: Clock },
-  confirmed: { label: 'Confirmado',   color: '#3b82f6', bg: '#dbeafe', icon: Package },
-  delivering:{ label: 'Em rota',      color: '#8b5cf6', bg: '#ede9fe', icon: Bike },
-  delivered: { label: 'Entregue',     color: '#22c55e', bg: '#dcfce7', icon: CheckCircle },
-  cancelled: { label: 'Cancelado',    color: '#ef4444', bg: '#fee2e2', icon: XCircle },
+  awaiting_pix: { label: 'Aguardando PIX', color: '#f59e0b', bg: '#fef3c7', icon: Clock },
+  pending:      { label: 'Aguardando',     color: '#f59e0b', bg: '#fef3c7', icon: Clock },
+  confirmed:    { label: 'PIX Confirmado', color: '#3b82f6', bg: '#dbeafe', icon: BadgeCheck },
+  delivering:   { label: 'Em rota',        color: '#8b5cf6', bg: '#ede9fe', icon: Bike },
+  delivered:    { label: 'Entregue',       color: '#22c55e', bg: '#dcfce7', icon: CheckCircle },
+  cancelled:    { label: 'Cancelado',      color: '#ef4444', bg: '#fee2e2', icon: XCircle },
 }
 
 const STATUS_NEXT = {
-  pending:    'confirmed',
-  confirmed:  'delivering',
-  delivering: 'delivered',
+  awaiting_pix: 'confirmed',
+  pending:      'confirmed',
+  confirmed:    'delivering',
+  delivering:   'delivered',
 }
 
 function copyToClipboard(text) {
@@ -33,12 +36,15 @@ function copyToClipboard(text) {
   })
 }
 
-function OrderCard({ order, onUpdate }) {
-  const [open,    setOpen]    = useState(order.status === 'pending')
-  const [loading, setLoading] = useState(false)
-  const [copied,  setCopied]  = useState(false)
+function OrderCard({ order, onUpdate, storeId }) {
+  const isAwaitingPix = order.status === 'awaiting_pix' || order.status === 'pending'
+  const [open,       setOpen]       = useState(isAwaitingPix)
+  const [loading,    setLoading]    = useState(false)
+  const [copied,     setCopied]     = useState(false)
+  const [pixLoading, setPixLoading] = useState(false)
+  const [pixResult,  setPixResult]  = useState(null) // null | 'ok' | 'error'
 
-  const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending
+  const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.awaiting_pix
   const StatusIcon = cfg.icon
 
   const handleCopyAddress = () => {
@@ -51,6 +57,32 @@ function OrderCard({ order, onUpdate }) {
     setLoading(true)
     await onUpdate(order.id, { status: newStatus })
     setLoading(false)
+  }
+
+  const handlePixConfirm = async () => {
+    setPixLoading(true)
+    setPixResult(null)
+    // 1. Atualiza status para confirmado
+    await onUpdate(order.id, { status: 'confirmed' })
+    // 2. Envia WA pro cliente
+    const phone = (order.phone || '').replace(/\D/g, '')
+    if (phone.length >= 10) {
+      const clientName = order.name || order.waName || 'cliente'
+      const msg = `🎉 Olá, ${clientName}! Seu PIX foi confirmado! Estamos preparando seu pedido agora e ele sai em breve 🛵\nObrigado pela preferência! 💚 *Corta Preços*`
+      try {
+        const res = await fetch('/api/wa-send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ instance: storeId, number: phone, text: msg }),
+        })
+        const json = await res.json()
+        setPixResult(json.ok ? 'ok' : 'error')
+      } catch { setPixResult('error') }
+    } else {
+      setPixResult('ok') // sem telefone, só atualiza status
+    }
+    setPixLoading(false)
+    setTimeout(() => setPixResult(null), 4000)
   }
 
   const waLink = `https://wa.me/${(order.phone || '').replace(/\D/g, '')}?text=Oi+${encodeURIComponent(order.name || '')}!+Seu+pedido+está+a+caminho!+🛵`
@@ -138,7 +170,7 @@ function OrderCard({ order, onUpdate }) {
             </button>
 
             {/* WhatsApp cliente */}
-            {order.phone && (
+            {order.phone && order.status !== 'awaiting_pix' && order.status !== 'pending' && (
               <a href={waLink} target="_blank" rel="noopener noreferrer"
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, textDecoration: 'none', fontWeight: 700, fontSize: 12, background: '#dcfce7', color: '#15803d' }}>
                 <Phone style={{ width: 13, height: 13 }} />
@@ -146,14 +178,23 @@ function OrderCard({ order, onUpdate }) {
               </a>
             )}
 
-            {/* Avançar status */}
-            {STATUS_NEXT[order.status] && (
+            {/* ✅ PIX CONFIRMADO — botão principal para awaiting_pix */}
+            {isAwaitingPix && (
+              <button onClick={handlePixConfirm} disabled={pixLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', borderRadius: 12, border: 'none', cursor: pixLoading ? 'not-allowed' : 'pointer', fontWeight: 900, fontSize: 14, background: pixResult === 'ok' ? '#22c55e' : pixResult === 'error' ? '#f59e0b' : 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff', opacity: pixLoading ? 0.7 : 1, transition: 'all .2s', boxShadow: pixResult ? 'none' : '0 4px 14px rgba(34,197,94,0.4)', marginLeft: 'auto', minWidth: 180 }}>
+                {pixLoading
+                  ? <RefreshCw style={{ width: 15, height: 15, animation: 'spin 1s linear infinite' }} />
+                  : <BadgeCheck style={{ width: 16, height: 16 }} />}
+                {pixLoading ? 'Confirmando...' : pixResult === 'ok' ? '✓ PIX Confirmado + WA enviado!' : pixResult === 'error' ? '⚠ Confirmado (WA falhou)' : '✅ PIX Confirmado'}
+              </button>
+            )}
+
+            {/* Avançar status (para confirmed, delivering) */}
+            {!isAwaitingPix && STATUS_NEXT[order.status] && (
               <button onClick={() => handleStatus(STATUS_NEXT[order.status])} disabled={loading}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 800, fontSize: 12, background: cfg.color, color: '#fff', opacity: loading ? 0.6 : 1, transition: 'all .15s', marginLeft: 'auto' }}>
                 {loading ? <RefreshCw style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} /> : null}
-                {order.status === 'pending'    ? '✓ Confirmar pedido'    :
-                 order.status === 'confirmed'  ? '🛵 Saiu para entrega'  :
-                                                  '✅ Marcar como entregue'}
+                {order.status === 'confirmed'  ? '🛵 Saiu para entrega'  : '✅ Marcar como entregue'}
               </button>
             )}
 
@@ -213,12 +254,12 @@ export default function Entrega() {
     } catch (e) { console.error('Entrega update:', e.message) }
   }
 
-  const ACTIVE_STATUS = new Set(['pending', 'confirmed', 'delivering'])
+  const ACTIVE_STATUS = new Set(['awaiting_pix', 'pending', 'confirmed', 'delivering'])
   const shown = filter === 'active'
     ? orders.filter(o => ACTIVE_STATUS.has(o.status))
     : orders
 
-  const pendingCount = orders.filter(o => o.status === 'pending').length
+  const pendingCount = orders.filter(o => o.status === 'awaiting_pix' || o.status === 'pending').length
 
   return (
     <div>
@@ -275,7 +316,7 @@ export default function Entrega() {
       {/* ── Orders list ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {shown.map(order => (
-          <OrderCard key={order.id} order={order} onUpdate={handleUpdate} />
+          <OrderCard key={order.id} order={order} onUpdate={handleUpdate} storeId={storeId} />
         ))}
       </div>
 

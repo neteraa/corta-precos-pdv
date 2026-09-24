@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { Component } from 'react'
 import IconTour, { shouldShowTour } from './IconTour.jsx'
 
@@ -31,6 +31,7 @@ import {
   Warehouse, Users, Settings, Menu,
   QrCode, Tag, Star, Download, Monitor, Camera, HandCoins, LogOut,
   BarChart2, Printer, CalendarClock, Megaphone, RefreshCw, Truck, X, Bike,
+  ArrowLeft, Home,
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import { useOnlineStatus } from '../hooks/useOnlineStatus.js'
@@ -237,6 +238,11 @@ export default function Layout() {
   const { supplierOffers, products, expiryAlertDays } = useStore()
   const online            = useOnlineStatus()
   const navigate          = useNavigate()
+  const location          = useLocation()
+
+  // Back button: show on mobile when not on a root nav page
+  const ROOT_PATHS = new Set(['/', '/pdv', '/dashboard', '/home'])
+  const canGoBack  = !ROOT_PATHS.has(location.pathname) && (window.history.state?.idx ?? 0) > 0
 
   // Re-run seed on mount so stale branding names (e.g. "CORTA PREÇOS") are replaced
   useEffect(() => {
@@ -497,14 +503,22 @@ export default function Layout() {
       {/* ── Main area ──────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* mobile topbar */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 shadow-sm">
-          <button onClick={() => setOpen(true)} className="p-1.5 rounded-lg hover:bg-gray-100 active:scale-95 transition-transform">
+        <header className="md:hidden flex items-center gap-2 px-3 bg-white border-b border-gray-200 shadow-sm"
+          style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)', paddingBottom: 10 }}>
+          {/* hamburger always visible */}
+          <button onClick={() => setOpen(true)} className="p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 active:scale-95 transition-all shrink-0">
             <Menu className="w-5 h-5 text-gray-600" />
           </button>
-          <div className="flex items-center gap-2">
-            <img src="/icon.svg" alt="logo" className="w-6 h-6" />
-            <span className="text-base leading-none" aria-hidden="true">{nicheMeta.emoji}</span>
-            <span className="font-black text-base tracking-tight truncate" style={{ color: themeColor }}>{storeName}</span>
+          {/* back button — visible when navigated deeper */}
+          {canGoBack && (
+            <button onClick={() => navigate(-1)} className="p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 active:scale-95 transition-all shrink-0">
+              <ArrowLeft className="w-5 h-5" style={{ color: themeColor }} />
+            </button>
+          )}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <img src="/icon.svg" alt="logo" className="w-5 h-5 shrink-0" />
+            <span className="text-sm leading-none shrink-0" aria-hidden="true">{nicheMeta.emoji}</span>
+            <span className="font-black text-sm tracking-tight truncate" style={{ color: themeColor }}>{storeName}</span>
           </div>
         </header>
 
@@ -534,9 +548,41 @@ export default function Layout() {
               className="underline whitespace-nowrap">Renovar agora →</a>
           </div>
         )}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-4 pb-24 md:p-6 md:pb-6">
           <PageErrorBoundary><Outlet /></PageErrorBoundary>
         </main>
+
+        {/* ── Bottom Navigation Bar (mobile only) ── */}
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-gray-200"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', boxShadow: '0 -2px 12px rgba(0,0,0,0.08)' }}>
+          <div className="flex items-stretch">
+            {[
+              { to: '/pdv',       icon: ShoppingCart,    label: 'PDV'       },
+              { to: '/entrega',   icon: Bike,            label: 'Entregas'  },
+              { to: '/estoque',   icon: Warehouse,       label: 'Estoque'   },
+              { to: '/fiado',     icon: HandCoins,       label: 'Fiado'     },
+            ].map(({ to, icon: Icon, label }) => (
+              <NavLink key={to} to={to}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 active:bg-gray-50 transition-colors"
+                style={({ isActive }) => ({ color: isActive ? themeColor : '#9ca3af' })}>
+                {({ isActive }) => (
+                  <>
+                    <Icon style={{ width: 22, height: 22, strokeWidth: isActive ? 2.5 : 1.8 }} />
+                    <span style={{ fontSize: 10, fontWeight: isActive ? 800 : 500, lineHeight: 1 }}>{label}</span>
+                    {isActive && <span style={{ width: 4, height: 4, borderRadius: '50%', background: themeColor, marginTop: 1 }} />}
+                  </>
+                )}
+              </NavLink>
+            ))}
+            {/* Mais — abre o drawer */}
+            <button onClick={() => setOpen(true)}
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 active:bg-gray-50 transition-colors"
+              style={{ color: '#9ca3af', border: 'none', background: 'none', cursor: 'pointer' }}>
+              <Menu style={{ width: 22, height: 22, strokeWidth: 1.8 }} />
+              <span style={{ fontSize: 10, fontWeight: 500, lineHeight: 1 }}>Mais</span>
+            </button>
+          </div>
+        </nav>
       </div>
 
       {/* Icon tour overlay */}

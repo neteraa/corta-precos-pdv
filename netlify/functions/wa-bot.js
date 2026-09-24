@@ -83,7 +83,7 @@ async function saveDeliveryOrder(order) {
       ...order,
       id:        `del_${Date.now()}`,
       createdAt: new Date().toISOString(),
-      status:    'pending',
+      status:    order.status || 'awaiting_pix', // aguarda confirmação do painel
     })
     await store.set(key, JSON.stringify(orders.slice(0, 300)))
   } catch (e) { console.error('saveDeliveryOrder:', e.message) }
@@ -133,11 +133,11 @@ FLUXO DE ENTREGA (siga SEMPRE nessa ordem exata):
 
    <zs_delivery>{"phone":"NUMERO_DO_CLIENTE","name":"NOME_DO_CLIENTE","address":"ENDEREÇO_COMPLETO","items":"LISTA_DE_ITENS_COM_QTD","total":VALOR_TOTAL_FLOAT,"deliveryFee":7}</zs_delivery>
 
-   Depois da tag, escreva ao cliente:
-   "Comprovante recebido! ✅ Seu pedido está sendo preparado. Chega em até 30-60min 🛵 Obrigado!"
+   Depois da tag, escreva ao cliente exatamente:
+   "✅ Comprovante recebido! Assim que confirmarmos o PIX, seu pedido sai na hora 🛵 Te avisamos assim que confirmar!"
 
 REGRAS DO COMPROVANTE:
-- "[comprovante enviado]" → CONFIRME e emita a tag <zs_delivery> como descrito acima
+- "[comprovante enviado]" → CONFIRME com a mensagem acima e emita a tag <zs_delivery>
 - "[imagem enviada]" → NÃO é comprovante automático. Pergunte: "Que foto! O que você tá querendo? 😊"
 - Cliente diz "paguei" sem foto → "Consegue mandar o comprovante pra gente confirmar? 📸"
 - NUNCA cancele pedido — apenas incentive o envio do comprovante
