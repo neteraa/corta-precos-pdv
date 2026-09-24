@@ -519,7 +519,6 @@ function parseLeadTag(rawReply) {
 // (dura enquanto a instância da função estiver quente — ~minutos/horas)
 const conversations  = new Map()   // senderNum → [{role, content}, ...]
 const MAX_HISTORY    = 12          // 12 msgs — garante endereço + itens + total no contexto delivery
-const pendingOrders  = new Map()   // senderNum → draft order salvo quando bot manda PIX, usado como fallback
 
 // ─── Rate limiting por número ─────────────────────────────────────────────────
 // Evita dreno de crédito por spam ou loops involuntários
@@ -554,10 +553,10 @@ function pushHistory(senderNum, role, content) {
 
 /**
  * Quando o bot envia a mensagem de pagamento PIX (passo 4 do fluxo),
- * guarda um draft do pedido extraído da conversa.
- * Fallback: usado em saveDeliveryFromPending() se o LLM não emitir <zs_delivery>.
+ * persiste um draft do pedido no Netlify Blob — sobrevive a cold starts.
+ * Se o LLM não emitir <zs_delivery>, o fallback lê daqui.
  */
-function maybeStorePendingOrder(botReply, senderNum, senderName) {
+async function maybeStorePendingOrder(botReply, senderNum, senderName) {
   if (!/pague via pix|cnpj.*60\.662|pagar.*pix/i.test(botReply)) return
   const totalMatch = botReply.match(/total[:\s]+(?:r\$)?\s*([\d,.]+)/i)
                   || botReply.match(/r\$\s*([\d,.]+)\s*\(/i)
@@ -566,24 +565,37 @@ function maybeStorePendingOrder(botReply, senderNum, senderName) {
   if (isNaN(total) || total < 7) return
 
   const hist = getHistory(senderNum)
-  // Pega última msg do usuário que parece endereço (não é tag [])
-  const addrMsg = [...hist].reverse().find(m =>
+  const addrMsg  = [...hist].reverse().find(m =>
     m.role === 'user' && m.content.length > 5 && !/^\[/.test(m.content)
   )
-  // Pega msg do usuário que menciona quantidade ou produto
   const itemsMsg = [...hist].find(m =>
     m.role === 'user' && /\dx\s|\d+\s*(kg|l\b|un|pack)|coca|arroz|feij|frango|biscoito/i.test(m.content)
   )
-
-  pendingOrders.set(senderNum, {
+  const pending = {
     phone:       senderNum,
     name:        senderName,
-    address:     addrMsg?.content?.slice(0, 200) || 'Ver conversa WhatsApp',
+    address:     addrMsg?.content?.slice(0, 200)  || 'Ver conversa WhatsApp',
     items:       itemsMsg?.content?.slice(0, 300) || 'Ver conversa WhatsApp',
     total,
     deliveryFee: 7,
-  })
-  console.log(`wa-bot: pendingOrder armazenado para ${senderNum} — total R$${total}`)
+  }
+  try {
+    const blobStore = getStore({ name: 'corta-precos', consistency: 'strong' })
+    await blobStore.set(`pending_delivery:${senderNum}`, JSON.stringify(pending))
+    console.log(`wa-bot: pendingOrder salvo em blob para ${senderNum} — R$${total}`)
+  } catch (e) { console.error('wa-bot: erro pendingOrder blob:', e.message) }
+}
+
+/** Lê e apaga o draft do blob — retorna null se não existir. */
+async function popPendingOrder(senderNum) {
+  try {
+    const blobStore = getStore({ name: 'corta-precos', consistency: 'strong' })
+    const key = `pending_delivery:${senderNum}`
+    const raw = await blobStore.get(key, { type: 'text' })
+    if (!raw) return null
+    await blobStore.delete(key)
+    return JSON.parse(raw)
+  } catch (e) { console.error('wa-bot: erro popPendingOrder:', e.message); return null }
 }
 
 // Track recently processed message IDs to avoid duplicate responses
@@ -797,19 +809,22 @@ export default async (req, context) => {
         context.waitUntil(saveDeliveryOrder({ ...delivery, waName: senderName || delivery.name || senderNum }))
         console.log(`wa-bot [CortaPrecos]: delivery via tag para ${senderNum}:`, JSON.stringify(delivery))
         tagSaved = true
-        pendingOrders.delete(senderNum) // limpeza — tag salvou, pending não precisa mais
+        // Limpa draft do blob — tag já salvou
+        const bs = getStore({ name: 'corta-precos', consistency: 'strong' })
+        bs.delete(`pending_delivery:${senderNum}`).catch(() => {})
       }
 
-      // Fallback: LLM não emitiu tag mas comprovante chegou e temos pending order
-      if (!tagSaved && finalText === '[comprovante enviado]' && pendingOrders.has(senderNum)) {
-        const pending = pendingOrders.get(senderNum)
-        pendingOrders.delete(senderNum)
-        context.waitUntil(saveDeliveryOrder({ ...pending, waName: senderName }))
-        console.log(`wa-bot [CortaPrecos]: delivery via fallback para ${senderNum}:`, JSON.stringify(pending))
+      // Fallback: LLM não emitiu tag mas comprovante chegou — tenta blob
+      if (!tagSaved && finalText === '[comprovante enviado]') {
+        const pending = await popPendingOrder(senderNum)
+        if (pending) {
+          context.waitUntil(saveDeliveryOrder({ ...pending, waName: senderName }))
+          console.log(`wa-bot [CortaPrecos]: delivery via fallback blob para ${senderNum}:`, JSON.stringify(pending))
+        }
       }
 
-      // Se bot enviou msg de pagamento PIX, armazena draft do pedido para fallback
-      maybeStorePendingOrder(cpReply, senderNum, senderName)
+      // Se bot enviou msg de pagamento PIX, persiste draft no blob (sobrevive cold starts)
+      context.waitUntil(maybeStorePendingOrder(cpReply, senderNum, senderName))
 
       pushHistory(senderNum, 'assistant', cpReply)
       context.waitUntil(sendReply(senderNum, cpReply, instanceName))
