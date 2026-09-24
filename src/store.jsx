@@ -280,18 +280,18 @@ export function StoreProvider({ children }) {
       })
     } catch {}
     if (data.cp_supplier_offers) try { setSupplierOffers(JSON.parse(data.cp_supplier_offers)); try { localStorage.setItem(mktKey('cp_supplier_offers'), data.cp_supplier_offers); localStorage.setItem('cp_supplier_offers', data.cp_supplier_offers) } catch {} } catch {}
-    // Sync configurações (phone, address, instagram, pixKey, pixCity, themeColor) cross-device
+    // Sync configurações cross-device — servidor é fonte da verdade
+    // logoImage local é preservado se o servidor não tiver (compatibilidade com saves antigos)
     if (data.cp_settings) try {
       const serverCfg = JSON.parse(data.cp_settings)
       const lsKey     = mktKey('cp_printer_settings')
       const localCfg  = JSON.parse(localStorage.getItem(lsKey) || '{}')
-      // Só aplica campos do servidor que estão vazios localmente (preserva edições locais)
-      let changed = false
-      for (const [k, v] of Object.entries(serverCfg)) {
-        if (v && !localCfg[k]) { localCfg[k] = v; changed = true }
-      }
+      const merged    = { ...localCfg, ...serverCfg }
+      // Preserva logoImage local caso o servidor não a tenha (saves antigos sem logo)
+      if (!serverCfg.logoImage && localCfg.logoImage) merged.logoImage = localCfg.logoImage
+      const changed = JSON.stringify(merged) !== JSON.stringify(localCfg)
       if (changed) {
-        localStorage.setItem(lsKey, JSON.stringify(localCfg))
+        localStorage.setItem(lsKey, JSON.stringify(merged))
         window.dispatchEvent(new CustomEvent('cp-settings-saved', { detail: { sourceId: 'sync' } }))
       }
     } catch {}

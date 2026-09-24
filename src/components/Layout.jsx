@@ -211,7 +211,7 @@ function StoreAvatar({ name, emoji, themeColor, logoImg }) {
       <div className="relative w-10 h-10 rounded-2xl flex items-center justify-center font-black text-base overflow-hidden"
         style={{ background: `linear-gradient(135deg, ${themeColor}, color-mix(in srgb, ${themeColor} 60%, #000))`, boxShadow: `0 4px 14px color-mix(in srgb, ${themeColor} 40%, transparent)` }}>
         {logoImg
-          ? <img src={logoImg} alt="logo" className="w-full h-full object-cover" />
+          ? <img src={logoImg} alt="logo" className="w-full h-full object-contain p-1" />
           : <span className="text-white text-sm leading-none select-none">{emoji}</span>
         }
       </div>

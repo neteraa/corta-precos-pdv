@@ -744,10 +744,9 @@ export default function Configuracoes() {
     // Persiste storeName legado (cross-device /caixa)
     fetch('/api/persist', { method: 'POST', headers: hdr,
       body: JSON.stringify({ key: 'cp_store_name', value: form.storeName, storeId }) }).catch(() => {})
-    // Persiste configurações completas (phone, address, instagram, pixKey, pixCity, themeColor)
-    const { logoImage, ...settingsToSync } = merged  // exclui imagem grande do blob
+    // Persiste configurações completas incluindo logoImage (já comprimida ≤ 400px no upload)
     fetch('/api/persist', { method: 'POST', headers: hdr,
-      body: JSON.stringify({ key: 'cp_settings', value: JSON.stringify(settingsToSync), storeId }) }).catch(() => {})
+      body: JSON.stringify({ key: 'cp_settings', value: JSON.stringify(merged), storeId }) }).catch(() => {})
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
