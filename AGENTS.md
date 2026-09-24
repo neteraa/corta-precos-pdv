@@ -356,6 +356,30 @@ curl https://ws-relay-production-42a7.up.railway.app/health
 # Railway vars (ws-relay)
 /tmp/node_modules/.bin/railway variables set --project df6bcfe6 --service ws-relay --environment production KEY=VALUE
 
+## MOBILE PWA — src/components/Layout.jsx (atualizado 2025-09)
+- Bottom Nav Bar (md:hidden) com 5 tabs: PDV / Entregas / Estoque / Fiado / Mais (drawer)
+  → NavLink com isActive → cor do themeColor + dot indicator + strokeWidth mais grosso
+  → Botão "Mais" chama setOpen(true) para abrir o drawer lateral
+- Safe Area iOS:
+  → topbar: paddingTop = calc(env(safe-area-inset-top, 0px) + 10px)
+  → bottom nav: paddingBottom = env(safe-area-inset-bottom, 0px)
+  → main: pb-24 (mobile) / pb-6 (md+)
+- Back button no topbar mobile:
+  → canGoBack = !ROOT_PATHS.has(location.pathname) && window.history.state?.idx > 0
+  → ROOT_PATHS = ['/', '/pdv', '/dashboard', '/home']
+  → Usa ArrowLeft icon + navigate(-1) na cor do themeColor
+
+## ENTREGA — src/pages/Entrega.jsx (atualizado 2025-09)
+- status awaiting_pix: label "Aguardando PIX", cor amber (=pending)
+  → Bot salva com status 'awaiting_pix' (era 'pending')
+  → ACTIVE_STATUS inclui awaiting_pix
+- Botão "✅ PIX Confirmado" (verde gradiente, só para awaiting_pix/pending):
+  → 1. PATCH /api/delivery → status 'confirmed'
+  → 2. POST /api/wa-send → instance=storeId, envia msg ao cliente
+  → Mensagem WA: "🎉 Olá, {nome}! Seu PIX foi confirmado! Estamos preparando seu pedido..."
+  → pixResult: null | 'ok' | 'error' — feedback visual no botão por 4s
+  → storeId passado como prop de Entrega para OrderCard
+
 ## WA-BOT DELIVERY — netlify/functions/wa-bot.js (atualizado 2025-09)
 - MAX_HISTORY = 12 (era 4) — garante que endereço + itens + total ficam no contexto do LLM
 - FLUXO de registro de pedido tem 3 camadas (mais confiável):
