@@ -1,22 +1,22 @@
 {
-  "name": "Terminal Corta Preços",
-  "short_name": "Caixa",
-  "description": "Terminal de Caixa — Corta Preços",
+  "name": "Terminal de Caixa",
+  "short_name": "Caixa PDV",
+  "description": "Terminal de Caixa — PDV profissional para operadores",
   "start_url": "/caixa",
   "scope": "/",
   "display": "standalone",
   "orientation": "landscape",
-  "background_color": "#04080f",
-  "theme_color": "#f97316",
+  "background_color": "#030303",
+  "theme_color": "#030303",
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -24,11 +24,13 @@
   ],
   "shortcuts": [
     {
-      "name": "Abrir Caixa",
+      "name": "Terminal de Caixa",
       "short_name": "Caixa",
       "url": "/caixa",
-      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      "description": "Abrir terminal com seleção de operador",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ],
-  "categories": ["business", "productivity"]
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false
 }

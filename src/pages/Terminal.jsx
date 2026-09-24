@@ -5,12 +5,13 @@
  */
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import {
-  ShoppingCart, Trash2, Plus, Minus, Search, X, Check,
+  ShoppingCart, Trash2, Plus, Minus, Search, X, Check, Download,
   Barcode, Smartphone, CreditCard, Wallet, Banknote,
   LogOut, Settings, Monitor, QrCode, Users, HandCoins, ChevronDown, Printer
 } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
 import { usePrinter } from '../hooks/usePrinter.js'
+import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import { useBroadcastSend } from '../hooks/useBroadcast.js'
 import { useScanReceiver }  from '../hooks/useScanRelay.js'
 import PixQR from '../components/PixQR.jsx'
@@ -66,6 +67,10 @@ export default function Terminal() {
   const printer   = usePrinter()
   const broadcast = useBroadcastSend()
   const clock     = useClock()
+  const { canInstall, install } = useInstallPWA()
+  const isStandalone = useMemo(() =>
+    window.matchMedia('(display-mode: standalone)').matches || !!window.navigator.standalone
+  , [])
 
   // ── Cart ────────────────────────────────────────────────────
   const [cart,    setCart]    = useState([])
@@ -88,7 +93,8 @@ export default function Terminal() {
   const inputRef = useRef(null)
 
   const timeStr = clock.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-  const dateStr = clock.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })
+  const secStr  = clock.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const dateStr = clock.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
 
   // ── Totals (with promo engine) ──────────────────────────────
   const promoResults       = useMemo(() => calcPromoEngine(cart, products, promos), [cart, products, promos])
@@ -390,7 +396,14 @@ export default function Terminal() {
             <button onClick={doLock} style={{ ...pill(false), cursor: 'pointer' }}>F11 🔒</button>
             <button onClick={() => setShowClose(true)} style={{ ...pill(false), cursor: 'pointer', color: '#fca5a5', background: '#2d0808', border: '1px solid #7f1d1d22' }}>Fechar Caixa</button>
           </>}
-          <a href="/pdv" style={{ ...pill(false), textDecoration: 'none' }}>← Admin</a>
+          {canInstall && !isStandalone && (
+            <button onClick={install} style={{ ...pill(true, '#4ade80'), cursor: 'pointer', color: '#000', background: '#4ade80', border: 'none', fontWeight: 900 }}>
+              <Download style={{ width: 10, height: 10, display: 'inline', marginRight: 3 }} />Instalar
+            </button>
+          )}
+          {!isStandalone && (
+            <a href="/pdv" style={{ ...pill(false), textDecoration: 'none' }}>← Admin</a>
+          )}
         </div>
       </div>
 
@@ -479,13 +492,20 @@ export default function Terminal() {
                   : <span style={{ fontSize: 52, opacity: 0.5 }}>🏪</span>
                 }
                 <div style={{ fontFamily: 'monospace', fontSize: 20, fontWeight: 900, color: '#fff', letterSpacing: 2 }}>{_storeName}</div>
-                <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: 56, fontWeight: 900, color: acc, letterSpacing: 6, lineHeight: 1 }}>{timeStr}</div>
-                <div style={{ fontSize: 10, color: txt2, letterSpacing: 4, fontWeight: 700, textTransform: 'uppercase' }}>{dateStr}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 22px', background: '#011a0a', border: '1px solid #16a34a18', borderRadius: 100, marginTop: 6 }}>
+                <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: 54, fontWeight: 900, color: acc, letterSpacing: 4, lineHeight: 1 }}>{secStr}</div>
+                <div style={{ fontSize: 11, color: txt2, letterSpacing: 3, fontWeight: 600, textTransform: 'capitalize', marginTop: 2 }}>{dateStr}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 22px', background: '#011a0a', border: '1px solid #16a34a18', borderRadius: 100, marginTop: 10 }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
                   <span style={{ color: '#4ade80', fontWeight: 800, fontSize: 12, letterSpacing: 2 }}>AGUARDANDO</span>
                 </div>
                 <div style={{ color: txt2, fontSize: 12, marginTop: 2 }}>Escaneie um produto para iniciar</div>
+                {!isStandalone && (
+                  <a href="/instalar-caixa" target="_blank" rel="noopener"
+                    style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: txt2, textDecoration: 'none', background: bg2, border: `1px solid ${brd}`, padding: '5px 12px', borderRadius: 6 }}>
+                    <Download style={{ width: 10, height: 10 }} />
+                    Instalar terminal como app
+                  </a>
+                )}
               </div>
 
             ) : (
@@ -915,7 +935,9 @@ export default function Terminal() {
               </div>
             )}
 
-            <a href="/pdv" style={{ color: txt2, fontSize: 10, textDecoration: 'none', opacity: 0.35 }}>← Painel Admin</a>
+            {!isStandalone && (
+              <a href="/pdv" style={{ color: txt2, fontSize: 10, textDecoration: 'none', opacity: 0.35 }}>← Painel Admin</a>
+            )}
           </div>
         </div>
       )}

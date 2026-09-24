@@ -1,52 +1,201 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Terminal Corta Preços</title>
-  <meta name="description" content="Terminal de Caixa — Corta Preços" />
-  <meta name="theme-color" content="#f97316" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Caixa" />
-  <link rel="manifest" href="/terminal-manifest.json" />
-  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
-  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Instalar Terminal de Caixa</title>
+  <link rel="manifest" href="/terminal-manifest.json">
+  <meta name="theme-color" content="#030303">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Caixa PDV">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
-      height: 100%; background: #04080f;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:  #030303; --bg2: #0a0a0a; --bg3: #111; --bg4: #181818;
+      --brd: #1c1c1c; --acc: #f97316; --txt: #efefef; --txt2: #555;
+      --green: #4ade80;
+    }
+    body {
+      background: var(--bg); color: var(--txt);
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; padding: 24px;
+    }
+    .wrap { max-width: 460px; width: 100%; }
+
+    /* ── header card ── */
+    .card {
+      background: var(--bg2); border: 1px solid var(--brd);
+      border-radius: 20px; padding: 36px 32px 28px;
+      text-align: center; margin-bottom: 12px;
+    }
+    .icon-wrap {
+      width: 80px; height: 80px; border-radius: 20px;
+      background: linear-gradient(135deg, var(--acc), #c2410c);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 38px; margin-bottom: 18px;
+      box-shadow: 0 8px 36px rgba(249,115,22,.35);
+    }
+    h1 { font-size: 22px; font-weight: 900; letter-spacing: -.5px; margin-bottom: 5px; }
+    .sub { color: var(--txt2); font-size: 13px; }
+
+    .sep { height: 1px; background: var(--brd); margin: 24px 0; }
+
+    /* ── install button ── */
+    #btn-install {
+      display: none; width: 100%; padding: 16px;
+      border-radius: 12px; border: none; cursor: pointer;
+      background: linear-gradient(135deg, var(--acc), #c2410c);
+      color: #000; font-weight: 900; font-size: 16px;
+      letter-spacing: .5px; margin-bottom: 10px;
+      box-shadow: 0 4px 24px rgba(249,115,22,.4);
+      transition: transform .1s, box-shadow .1s;
+    }
+    #btn-install:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(249,115,22,.5); }
+
+    /* ── open button (always) ── */
+    #btn-open {
+      display: block; width: 100%; padding: 13px;
+      border-radius: 12px; border: 1px solid var(--brd);
+      background: var(--bg3); color: var(--txt2);
+      font-weight: 700; font-size: 14px; cursor: pointer;
+      text-decoration: none; letter-spacing: .5px;
+      transition: border-color .15s, color .15s;
+    }
+    #btn-open:hover { border-color: var(--acc); color: var(--acc); }
+
+    /* ── success ── */
+    #msg-ok {
+      display: none; background: #011a0c; border: 1px solid #16a34a22;
+      border-radius: 12px; padding: 13px; margin-bottom: 10px;
+      color: var(--green); font-weight: 700; font-size: 14px;
+    }
+
+    /* ── steps card ── */
+    .steps-card {
+      background: var(--bg2); border: 1px solid var(--brd);
+      border-radius: 20px; padding: 24px 28px;
+    }
+    .steps-title {
+      font-size: 10px; font-weight: 700; color: var(--txt2);
+      letter-spacing: 2.5px; text-transform: uppercase; margin-bottom: 16px;
+    }
+    .step {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 10px 0; border-bottom: 1px solid var(--brd);
+    }
+    .step:last-child { border-bottom: none; }
+    .num {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--acc); color: #000;
+      font-weight: 900; font-size: 11px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
-      flex-direction: column; gap: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
-    .spinner {
-      width: 44px; height: 44px; border: 3px solid rgba(249,115,22,.2);
-      border-top-color: #f97316; border-radius: 50%;
-      animation: spin .7s linear infinite;
+    .step-body { padding-top: 2px; }
+    .step-body p { font-size: 13px; color: var(--txt); line-height: 1.45; }
+    .step-body p strong { color: var(--acc); }
+    kbd {
+      background: var(--bg3); border: 1px solid var(--brd);
+      border-radius: 4px; padding: 1px 6px;
+      font-size: 11px; font-family: monospace; font-weight: 700;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    p { color: #475569; font-size: 13px; font-weight: 600; letter-spacing: .5px; }
-    .btn {
-      margin-top: 8px; padding: 10px 24px; border-radius: 12px;
-      background: linear-gradient(135deg, #f97316, #ea580c);
-      color: #fff; font-weight: 800; font-size: 14px;
-      border: none; cursor: pointer; text-decoration: none;
-      display: inline-block;
+    .url-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--bg3); border: 1px solid var(--brd);
+      border-radius: 8px; padding: 6px 14px;
+      font-family: monospace; font-size: 11px; color: var(--txt2);
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <div class="spinner"></div>
-  <p>Abrindo terminal de caixa...</p>
+  <div class="wrap">
+
+    <!-- header -->
+    <div class="card">
+      <div class="icon-wrap">🖥️</div>
+      <h1>Terminal de Caixa</h1>
+      <p class="sub">Instale o PDV neste computador e abra direto na tela do operador</p>
+
+      <div class="sep"></div>
+
+      <div id="msg-ok">✅ App instalado! Abrindo o caixa…</div>
+      <button id="btn-install">⬇ &nbsp;Instalar Terminal de Caixa</button>
+      <a id="btn-open" href="/caixa">Abrir sem instalar →</a>
+    </div>
+
+    <!-- steps -->
+    <div class="steps-card">
+      <div class="steps-title" id="steps-label">Como instalar pelo Chrome</div>
+
+      <div class="step" id="s1">
+        <div class="num">1</div>
+        <div class="step-body"><p>Abra esta página no <strong>Google Chrome</strong> para desktop (não Edge, Safari ou Firefox)</p></div>
+      </div>
+      <div class="step" id="s2">
+        <div class="num">2</div>
+        <div class="step-body"><p>Clique em <kbd>⋮</kbd> no canto superior direito do Chrome</p></div>
+      </div>
+      <div class="step" id="s3">
+        <div class="num">3</div>
+        <div class="step-body"><p>Escolha <strong>"Instalar Terminal de Caixa…"</strong> — ou use o ícone de instalação na barra de endereço</p></div>
+      </div>
+      <div class="step" id="s4">
+        <div class="num">4</div>
+        <div class="step-body"><p>Clique em <strong>Instalar</strong> na caixa de confirmação</p></div>
+      </div>
+      <div class="step" id="s5">
+        <div class="num">5</div>
+        <div class="step-body"><p>O ícone <strong>"Caixa PDV"</strong> aparece na área de trabalho — abra direto no caixa! 🚀</p></div>
+      </div>
+
+      <div style="text-align:center">
+        <div class="url-chip">📍&nbsp; zatendestok.com.br/instalar-caixa</div>
+      </div>
+    </div>
+
+  </div>
+
   <script>
-    // Redireciona para /caixa (seleção de operador + PIN)
-    // Se instalado como PWA, abre direto sem precisar da URL principal
-    window.location.replace('/caixa');
+    // Se já instalado (standalone), vai direto pro caixa
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+      window.location.replace('/caixa');
+    }
+
+    const btnInstall = document.getElementById('btn-install');
+    const btnOpen    = document.getElementById('btn-open');
+    const msgOk      = document.getElementById('msg-ok');
+
+    let deferred = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferred = e;
+      btnInstall.style.display = 'block';
+      // Update steps when prompt is available
+      document.getElementById('steps-label').textContent = 'Ou siga os passos manuais';
+    });
+
+    window.addEventListener('appinstalled', () => {
+      deferred = null;
+      btnInstall.style.display = 'none';
+      msgOk.style.display = 'block';
+      setTimeout(() => window.location.replace('/caixa'), 1400);
+    });
+
+    btnInstall.addEventListener('click', async () => {
+      if (!deferred) return;
+      deferred.prompt();
+      const { outcome } = await deferred.userChoice;
+      if (outcome === 'accepted') {
+        btnInstall.style.display = 'none';
+        msgOk.style.display = 'block';
+      }
+      deferred = null;
+    });
   </script>
-  <noscript>
-    <a href="/caixa" class="btn">Abrir Terminal de Caixa →</a>
-  </noscript>
 </body>
 </html>

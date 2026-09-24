@@ -10,6 +10,12 @@
 [functions."wa-bot"]
   timeout = 26
 
+# /instalar-caixa → página de instalação do PWA Terminal de Caixa
+[[redirects]]
+  from   = "/instalar-caixa"
+  to     = "/terminal-app.html"
+  status = 200
+
 # /ofertas → função Node.js que injeta OG tags corretos por ?s=TENANT_ID
 # Funciona para browser E bots (WhatsApp, Telegram, Google)
 [[redirects]]
