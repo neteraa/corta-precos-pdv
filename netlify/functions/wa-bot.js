@@ -465,8 +465,8 @@ async function askOpenAI(userMessage, senderNum, systemMsg) {
     signal:  ac.signal,
     body:    JSON.stringify({
       model:       'gpt-4o-mini',
-      max_tokens:  350,
-      temperature: 0.75,
+      max_tokens:  200,
+      temperature: 0.5,
       messages: [
         { role: 'system', content: systemMsg },
         ...history,
@@ -505,7 +505,7 @@ function parseLeadTag(rawReply) {
 // Memória de conversa por contato — mantém contexto entre mensagens
 // (dura enquanto a instância da função estiver quente — ~minutos/horas)
 const conversations = new Map()   // senderNum → [{role, content}, ...]
-const MAX_HISTORY   = 8           // últimas 8 trocas (4 pares) — reduzido para economizar tokens
+const MAX_HISTORY   = 4           // 4 mensagens (2 pares) — contexto suficiente, tokens mínimos
 
 // ─── Rate limiting por número ─────────────────────────────────────────────────
 // Evita dreno de crédito por spam ou loops involuntários
@@ -540,6 +540,37 @@ function pushHistory(senderNum, role, content) {
 
 // Track recently processed message IDs to avoid duplicate responses
 const recentIds = new Set()
+
+// ─── Fast-path sem LLM para o bot Corta Preços ───────────────────────────────
+// Retorna string de resposta pronta ou null (→ cai no LLM)
+// Economiza ~40% das chamadas para mensagens simples e saudações
+function quickReply(text, senderName, promoText) {
+  const t   = text.toLowerCase().trim()
+  const nom = senderName ? `, ${senderName.split(' ')[0]}` : ''
+
+  // Saudação pura (sem outra intenção na mensagem)
+  if (/^(oi+|ol[aá]+|hello|hi+|e[- ]?a[ií]|ei+|hey|bom dia|boa tarde|boa noite|tudo bem|tudo bom|oi tudo|ol[aá] tudo)[\s!.,?]*$/.test(t)) {
+    return `Oi${nom}! 👋 Bem-vindo ao Corta Preços!\nPosso te ajudar com:\n🛒 Preços e produtos\n🔥 Promoções do dia\n🛵 Pedido de entrega\n\nÉ só falar! 😊`
+  }
+
+  // Promoções / ofertas
+  if (/^(promo[çc][õo]es?|ofertas?|promo[çc][õo]|o que.*promo|qual.*promo|tem.*promo|promo.*hoje|desconto)[\s!?]*$/.test(t)) {
+    const p = promoText || 'Nenhuma promoção ativa no momento.'
+    return `🔥 Promoções de hoje${nom}:\n${p}\n\nQuer fazer um pedido? 🛒`
+  }
+
+  // Horário de funcionamento
+  if (/hor[aá]rio|que hora|abre|fecha|funcionamento/.test(t) && t.length < 50) {
+    return `⏰ Horário Corta Preços${nom}:\nSeg–Sex: 7h às 20h\nSábado: 7h às 18h\nDomingo: 8h às 13h\n\nDúvidas: (15) 9979-6930 📱`
+  }
+
+  // Forma de pagamento / pix
+  if (/pagamento|aceita|pix|cart[aã]o|dinheiro|forma de pag/.test(t) && t.length < 60) {
+    return `💳 Formas de pagamento${nom}:\nPIX ✅ | Dinheiro ✅ | Débito ✅ | Crédito ✅\n\nPara entrega: pagamento SOMENTE por PIX 🛵`
+  }
+
+  return null  // sem fast-path → vai para OpenAI
+}
 
 export default async (req, context) => {
   if (req.method === 'GET') {
@@ -635,6 +666,16 @@ export default async (req, context) => {
            lastBot.content.includes('📸') ||
            lastBot.content.includes('Pague via PIX'))
         if (botPediuComprovante) finalText = '[comprovante enviado]'
+      }
+
+      // Fast-path: responde saudações/promoções/horário sem chamar OpenAI
+      const quick = quickReply(finalText, senderName, promoText)
+      if (quick) {
+        pushHistory(senderNum, 'user', finalText)
+        pushHistory(senderNum, 'assistant', quick)
+        context.waitUntil(sendReply(senderNum, quick, instanceName))
+        console.log(`wa-bot [CortaPrecos]: fast-path para ${senderNum}: ${quick.slice(0, 60)}`)
+        return new Response('OK', { status: 200 })
       }
 
       pushHistory(senderNum, 'user', finalText)

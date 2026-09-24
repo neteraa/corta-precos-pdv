@@ -8,7 +8,7 @@ import {
   ShoppingCart, LayoutDashboard, Package, Receipt,
   Warehouse, Users, HandCoins, BarChart2, Tag,
   Printer, CalendarClock, Megaphone, QrCode, Star, Settings,
-  Monitor, Camera, Truck, Sparkles, Bike,
+  Monitor, Camera, Truck, Sparkles, Bike, Building2,
 } from 'lucide-react'
 import { usePrinter, getNicheMeta } from '../hooks/usePrinter.js'
 import { getRole } from '../utils/auth.js'
@@ -28,8 +28,9 @@ const ALL_MODULES = [
   { to: '/produtos',    icon: Package,         label: 'Produtos',        roles: ['admin'] },
   { to: '/vendas',      icon: Receipt,         label: 'Vendas',          roles: ['admin','gerente'] },
   { to: '/estoque',     icon: Warehouse,       label: 'Estoque',         roles: ['admin','gerente'] },
-  { to: '/clientes',    icon: Users,           label: 'Clientes',        roles: ['admin','gerente'] },
-  { to: '/fiado',       icon: HandCoins,       label: 'Fiado',           roles: null },
+  { to: '/clientes',     icon: Users,      label: 'Clientes',     roles: ['admin','gerente'] },
+  { to: '/fornecedores', icon: Building2,  label: 'Fornecedores', roles: ['admin','gerente'] },
+  { to: '/fiado',        icon: HandCoins,  label: 'Fiado',        roles: null },
   { to: '/relatorio',   icon: BarChart2,       label: 'Relatório',       roles: ['admin','gerente'] },
   // Marketing & Extras
   { to: '/campanhas',   icon: Megaphone,       label: 'Campanhas ZAP',   roles: ['admin','gerente'], badge: 'NOVO' },
