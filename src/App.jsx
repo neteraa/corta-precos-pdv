@@ -74,7 +74,7 @@ function RequireCaixaAuth({ children }) {
 }
 
 /* Routes only admin/gerente can access — caixa goes to /pdv */
-const ADMIN_ONLY = new Set(['/home','/dashboard','/produtos','/vendas','/estoque','/clientes','/relatorio','/etiquetas','/validade','/campanhas','/fidelidade','/flyer','/configuracoes','/promocoes','/ofertas','/entrega'])
+const ADMIN_ONLY = new Set(['/home','/dashboard','/produtos','/vendas','/estoque','/clientes','/relatorio','/etiquetas','/validade','/campanhas','/fidelidade','/flyer','/configuracoes','/promocoes','/ofertas','/entrega','/fornecedores'])
 
 function RequireRole({ children }) {
   const location = useLocation()
