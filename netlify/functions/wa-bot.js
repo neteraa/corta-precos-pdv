@@ -124,6 +124,9 @@ FLUXO DE ENTREGA (siga SEMPRE nessa ordem exata):
 3. Calcula: total dos produtos + R$7 entrega = TOTAL FINAL
 4. Manda exatamente esta mensagem de pagamento (substitua os valores):
    "✅ Pedido confirmado! Total: R$XX,XX (produtos + R$7 entrega)\n💳 Pague via PIX:\nCNPJ: 60.662.362/0001-70\nFavorecido: Corta Preços\nApós pagar, me manda o comprovante aqui 📸"
+   E INCLUA (antes da mensagem ao cliente) a tag interna de rascunho — o sistema usa para registrar o pedido:
+   <zs_pending>{"address":"ENDEREÇO","items":"PRODUTOS COM QTD","total":VALOR_FLOAT_TOTAL_INCLUINDO_ENTREGA}</zs_pending>
+
 5. Quando a mensagem for "[comprovante enviado]":
    OBRIGATÓRIO: inclua SEMPRE na sua resposta a tag abaixo (ANTES da mensagem ao cliente).
    A tag é interna — o sistema a remove automaticamente. NUNCA omita a tag nessa situação.
@@ -551,38 +554,61 @@ function pushHistory(senderNum, role, content) {
   if (hist.length > MAX_HISTORY) hist.splice(0, hist.length - MAX_HISTORY)
 }
 
-/**
- * Quando o bot envia a mensagem de pagamento PIX (passo 4 do fluxo),
- * persiste um draft do pedido no Netlify Blob — sobrevive a cold starts.
- * Se o LLM não emitir <zs_delivery>, o fallback lê daqui.
- */
-async function maybeStorePendingOrder(botReply, senderNum, senderName) {
-  if (!/pague via pix|cnpj.*60\.662|pagar.*pix/i.test(botReply)) return
-  const totalMatch = botReply.match(/total[:\s]+(?:r\$)?\s*([\d,.]+)/i)
-                  || botReply.match(/r\$\s*([\d,.]+)\s*\(/i)
-  if (!totalMatch) return
-  const total = parseFloat(totalMatch[1].replace(/\./g, '').replace(',', '.'))
-  if (isNaN(total) || total < 7) return
-
-  const hist = getHistory(senderNum)
-  const addrMsg  = [...hist].reverse().find(m =>
-    m.role === 'user' && m.content.length > 5 && !/^\[/.test(m.content)
-  )
-  const itemsMsg = [...hist].find(m =>
-    m.role === 'user' && /\dx\s|\d+\s*(kg|l\b|un|pack)|coca|arroz|feij|frango|biscoito/i.test(m.content)
-  )
-  const pending = {
-    phone:       senderNum,
-    name:        senderName,
-    address:     addrMsg?.content?.slice(0, 200)  || 'Ver conversa WhatsApp',
-    items:       itemsMsg?.content?.slice(0, 300) || 'Ver conversa WhatsApp',
-    total,
-    deliveryFee: 7,
+/** Extrai <zs_pending>{...}</zs_pending> da resposta do bot (passo 4 do fluxo). */
+function parsePendingTag(rawReply) {
+  const match = rawReply?.match(/<zs_pending>([\s\S]*?)<\/zs_pending>/i)
+  if (!match) return { clean: rawReply, pending: null }
+  try {
+    const pending = JSON.parse(match[1].trim())
+    const clean   = rawReply.replace(/<zs_pending>[\s\S]*?<\/zs_pending>/gi, '').trim()
+    return { clean, pending }
+  } catch {
+    return { clean: rawReply.replace(/<zs_pending>[\s\S]*?<\/zs_pending>/gi, '').trim(), pending: null }
   }
+}
+
+/**
+ * Persiste draft do pedido no Netlify Blob quando bot envia msg de pagamento PIX.
+ * Usa dados da <zs_pending> tag (LLM) ou extração por regex como fallback.
+ * Sobrevive a cold starts da função.
+ */
+async function maybeStorePendingOrder(botReply, senderNum, senderName, pendingFromTag) {
+  // Preferir dados da tag <zs_pending> (LLM já extraiu address, items, total corretos)
+  let pending = null
+  if (pendingFromTag?.total && pendingFromTag.total > 7) {
+    pending = {
+      phone:       senderNum,
+      name:        senderName,
+      address:     pendingFromTag.address || 'Ver conversa WhatsApp',
+      items:       pendingFromTag.items   || 'Ver conversa WhatsApp',
+      total:       pendingFromTag.total,
+      deliveryFee: 7,
+    }
+  } else if (/pague via pix|cnpj.*60\.662|pagar.*pix/i.test(botReply)) {
+    // Fallback: sem tag → tenta regex no texto do bot
+    const totalMatch = botReply.match(/total[^:]*:\s*r?\$?\s*([\d,.]+)/i)
+                    || botReply.match(/r\$\s*([\d]{2,}[.,][\d]{2})/i) // ex: R$50,40
+    if (totalMatch) {
+      const total = parseFloat(totalMatch[1].replace(/\./g, '').replace(',', '.'))
+      if (!isNaN(total) && total > 7) {
+        const hist     = getHistory(senderNum)
+        const addrMsg  = [...hist].reverse().find(m => m.role === 'user' && m.content.length > 5 && !/^\[/.test(m.content))
+        const itemsMsg = [...hist].find(m => m.role === 'user' && /\dx\s|\d+\s*(kg|l\b|un|pack)|coca|arroz|feij|frango|biscoito/i.test(m.content))
+        pending = {
+          phone: senderNum, name: senderName,
+          address: addrMsg?.content?.slice(0, 200) || 'Ver conversa WhatsApp',
+          items:   itemsMsg?.content?.slice(0, 300) || 'Ver conversa WhatsApp',
+          total, deliveryFee: 7,
+        }
+      }
+    }
+  }
+  if (!pending) return
+
   try {
     const blobStore = getStore({ name: 'corta-precos', consistency: 'strong' })
     await blobStore.set(`pending_delivery:${senderNum}`, JSON.stringify(pending))
-    console.log(`wa-bot: pendingOrder salvo em blob para ${senderNum} — R$${total}`)
+    console.log(`wa-bot: pendingOrder blob para ${senderNum} — R$${pending.total} | ${pending.items?.slice(0,50)}`)
   } catch (e) { console.error('wa-bot: erro pendingOrder blob:', e.message) }
 }
 
@@ -802,8 +828,10 @@ export default async (req, context) => {
       rawReply = await askLLM(finalText, senderNum, systemMsg)
       if (!rawReply) return new Response('OK', { status: 200 })
 
-      // Extrai e salva pedido de entrega se LLM emitiu a tag
-      const { clean: cpReply, delivery } = parseDeliveryTag(rawReply)
+      // Extrai tags internas — <zs_pending> (passo 4) e <zs_delivery> (passo 5)
+      const { clean: afterPending, pending: pendingData } = parsePendingTag(rawReply)
+      const { clean: cpReply,      delivery }              = parseDeliveryTag(afterPending)
+
       let tagSaved = false
       if (delivery && delivery.address) {
         context.waitUntil(saveDeliveryOrder({ ...delivery, waName: senderName || delivery.name || senderNum }))
@@ -814,7 +842,7 @@ export default async (req, context) => {
         bs.delete(`pending_delivery:${senderNum}`).catch(() => {})
       }
 
-      // Fallback: LLM não emitiu tag mas comprovante chegou — tenta blob
+      // Fallback: LLM não emitiu <zs_delivery> mas comprovante chegou — usa draft do blob
       if (!tagSaved && finalText === '[comprovante enviado]') {
         const pending = await popPendingOrder(senderNum)
         if (pending) {
@@ -823,8 +851,8 @@ export default async (req, context) => {
         }
       }
 
-      // Se bot enviou msg de pagamento PIX, persiste draft no blob (sobrevive cold starts)
-      context.waitUntil(maybeStorePendingOrder(cpReply, senderNum, senderName))
+      // Se bot enviou msg de pagamento PIX (passo 4), persiste draft no blob com dados da <zs_pending> tag
+      context.waitUntil(maybeStorePendingOrder(cpReply, senderNum, senderName, pendingData))
 
       pushHistory(senderNum, 'assistant', cpReply)
       context.waitUntil(sendReply(senderNum, cpReply, instanceName))
