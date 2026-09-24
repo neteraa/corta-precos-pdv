@@ -356,6 +356,30 @@ curl https://ws-relay-production-42a7.up.railway.app/health
 # Railway vars (ws-relay)
 /tmp/node_modules/.bin/railway variables set --project df6bcfe6 --service ws-relay --environment production KEY=VALUE
 
+## WA-BOT DELIVERY — netlify/functions/wa-bot.js (atualizado 2025-09)
+- MAX_HISTORY = 12 (era 4) — garante que endereço + itens + total ficam no contexto do LLM
+- FLUXO de registro de pedido tem 3 camadas (mais confiável):
+
+  CAMADA 1 — Tag <zs_delivery> (LLM emite no passo 5 = comprovante recebido)
+    → parseDeliveryTag() extrai e salva via saveDeliveryOrder() direto
+    → limpa blob pending_delivery:{senderNum}
+
+  CAMADA 2 — Tag <zs_pending> (LLM emite no passo 4 = envio da msg PIX)
+    → parsePendingTag() extrai {address, items, total}
+    → maybeStorePendingOrder() salva no blob com dados exatos da LLM
+    → quando comprovante chega → popPendingOrder() lê blob → saveDeliveryOrder()
+
+  CAMADA 3 — Fallback regex (quando LLM não emite <zs_pending>)
+    → detecta "Pague via PIX" no cpReply
+    → extrai total por regex (total[^:]*:\s*r?\$?\s*([\d,.]+) OU r\$\s*([\d]{2,}[.,][\d]{2}))
+    → REQUER total > 7 (não captura apenas a taxa de entrega)
+    → extrai address/items do histórico em memória
+
+- blob key para draft: `pending_delivery:{senderNum}` na store 'corta-precos'
+- saveDeliveryOrder() → blob key `cortaprecos_1789770018182:cp_deliveries`
+- IMAGEM → [imagem enviada] → vira [comprovante enviado] SE o bot pediu comprovante/📸/PIX
+- Correção PIX: [imagem enviada] permanece como tal até confirmar que bot estava esperando comprovante
+
 ## CAMPANHAS WhatsApp — src/pages/Campanhas.jsx (atualizado 2025-09)
 - storeName: vem de `usePrinter().settings.storeName` (NÃO do store context, NÃO do getSession)
   → fallback: instance (storeId). Nunca usar 'MEU MERCADO' hardcoded.
