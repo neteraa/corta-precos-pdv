@@ -102,11 +102,19 @@ export default async (req) => {
   if (!GROQ_KEY && !OPENAI_KEY)
     return jr({ reply: 'Serviço temporariamente indisponível.' }, 503)
 
-  // Candidatos em ordem de preferência (mais barato primeiro)
+  // Candidatos em ordem de preferência — tenta vários modelos Groq
+  // (llama3-8b-8192 decommissioned; llama-3.1-8b-instant → acesso por ToS; gemma2-9b-it → aberto)
+  const GROQ_MODELS = [
+    'gemma2-9b-it',
+    'gemma-7b-it',
+    'llama-3.1-8b-instant',
+    'llama-3.1-70b-versatile',
+    'llama-3.3-70b-versatile',
+    'mixtral-8x7b-32768',
+  ]
   const CANDIDATES = [
-    GROQ_KEY   && { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama3-8b-8192',       key: GROQ_KEY,   timeout: 8000 },
-    GROQ_KEY   && { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile', key: GROQ_KEY, timeout: 8000 },
-    OPENAI_KEY && { url: 'https://api.openai.com/v1/chat/completions',      model: 'gpt-4o-mini',          key: OPENAI_KEY, timeout: 9000 },
+    ...GROQ_MODELS.map(m => GROQ_KEY && { url: 'https://api.groq.com/openai/v1/chat/completions', model: m, key: GROQ_KEY, timeout: 8000 }),
+    OPENAI_KEY && { url: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o-mini', key: OPENAI_KEY, timeout: 9000 },
   ].filter(Boolean)
 
   const llmPayload = (model) => JSON.stringify({
