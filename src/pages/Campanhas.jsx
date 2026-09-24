@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Copy, Check, Search, MessageCircle, Phone, Plus, Flame, ExternalLink, Wifi, WifiOff, Bot, Users, List, RefreshCw, AlertTriangle, Send } from 'lucide-react'
 import { useStore, BRL } from '../store.jsx'
-import { getConfiguredStoreId } from '../utils/auth.js'
+import { getConfiguredStoreId, getSession } from '../utils/auth.js'
 
 /* ── helpers ─────────────────────────────────────────────── */
 const cleanPhone = p =>
@@ -84,9 +84,9 @@ function ProductRow({ p, onAdd }) {
    MAIN
 ══════════════════════════════════════════════════════════ */
 export default function Campanhas() {
-  const { products, customers, sales, promos, storeName } = useStore()
+  const { products, customers, sales, promos } = useStore()
   const instance   = getConfiguredStoreId() || 'zatendestok'
-  const lojaNome   = storeName || instance
+  const lojaNome   = getSession()?.storeName || instance
 
   // bot connection status
   const [botStatus, setBotStatus] = useState(null) // null | 'open' | 'connecting'
