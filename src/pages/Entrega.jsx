@@ -5,8 +5,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import {
   RefreshCw, MapPin, CheckCircle, XCircle, Copy, Phone,
-  Clock, Package, Bike, AlertCircle, ChevronDown, ChevronUp,
-  BadgeCheck, Send,
+  Clock, Bike, AlertCircle, ChevronDown, ChevronUp,
+  BadgeCheck,
 } from 'lucide-react'
 import { getMktStoreId } from '../utils/tenantStorage.js'
 
@@ -98,8 +98,8 @@ function OrderCard({ order, onUpdate, storeId }) {
     <div style={{
       background: '#fff',
       borderRadius: 16,
-      border: `1.5px solid ${order.status === 'pending' ? cfg.color + '55' : '#e5e7eb'}`,
-      boxShadow: order.status === 'pending' ? `0 4px 20px ${cfg.color}20` : '0 1px 3px rgba(0,0,0,0.06)',
+      border: `1.5px solid ${isAwaitingPix ? cfg.color + '55' : '#e5e7eb'}`,
+      boxShadow: isAwaitingPix ? `0 4px 20px ${cfg.color}20` : '0 1px 3px rgba(0,0,0,0.06)',
       transition: 'all .2s',
     }}>
       {/* ── Header ── */}

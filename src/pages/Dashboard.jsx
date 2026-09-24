@@ -1,13 +1,14 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from 'recharts'
-import { TrendingUp, ShoppingCart, Package, AlertTriangle, ArrowRight, Receipt, ClipboardList, X, Printer, Download, MessageCircle, Target, ArrowDownCircle, ArrowUpCircle, Plus, Zap, CalendarClock, Truck } from 'lucide-react'
+import { TrendingUp, ShoppingCart, Package, AlertTriangle, ArrowRight, Receipt, ClipboardList, X, Printer, Download, MessageCircle, Target, ArrowDownCircle, ArrowUpCircle, Plus, Zap, CalendarClock, Truck, Bike } from 'lucide-react'
 import { useStore, BRL, fmtDate } from '../store.jsx'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import OnboardingWizard from '../components/OnboardingWizard.jsx'
+import { getMktStoreId } from '../utils/tenantStorage.js'
 
 const COLORS = ['#ea580c', '#fb923c', '#f97316', '#c2410c', '#fed7aa', '#9a3412']
 
@@ -145,6 +146,30 @@ export default function Dashboard() {
     (supplierOffers || []).filter(o => o.status === 'pending'),
   [supplierOffers])
 
+  // ── Delivery stats (fetched from Netlify Blob via API) ──────
+  const [deliveryStats, setDeliveryStats] = useState(null)
+  useEffect(() => {
+    const storeId = getMktStoreId()
+    if (!storeId || storeId === 'default') return
+    fetch(`/api/delivery?storeId=${storeId}`)
+      .then(r => r.json())
+      .then(json => {
+        if (!json.ok) return
+        const now = new Date()
+        const thisMonth = (o) => {
+          const d = new Date(o.createdAt)
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+        }
+        const monthly   = json.orders.filter(thisMonth)
+        const delivered = monthly.filter(o => o.status === 'delivered')
+        const awaiting  = json.orders.filter(o => o.status === 'awaiting_pix' || o.status === 'pending')
+        const inRoute   = json.orders.filter(o => o.status === 'delivering')
+        const revenue   = delivered.reduce((s, o) => s + (o.total || 0) + (o.deliveryFee || 7), 0)
+        setDeliveryStats({ total: monthly.length, delivered: delivered.length, awaiting: awaiting.length, inRoute: inRoute.length, revenue })
+      })
+      .catch(() => {})
+  }, [])
+
   // ── Sales heatmap: revenue by hour (last 30 days) ─────────
   const heatmapData = useMemo(() => {
     const cutoff = Date.now() - 30 * 86_400_000
@@ -279,6 +304,36 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* ── Delivery Stats ─────────────────────────────────── */}
+      {deliveryStats !== null && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+          style={{ borderLeft: '4px solid #8b5cf6' }}>
+          <div className="flex items-center justify-between px-5 pt-4 pb-3">
+            <div className="flex items-center gap-2">
+              <Bike className="w-4 h-4" style={{ color: '#8b5cf6' }} />
+              <span className="font-black text-sm text-gray-800">Delivery — {new Date().toLocaleDateString('pt-BR', { month: 'long' })}</span>
+            </div>
+            <button onClick={() => navigate('/entrega')}
+              className="text-xs font-bold text-purple-600 hover:underline flex items-center gap-1">
+              Ver pedidos <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+          <div className="grid grid-cols-4 divide-x divide-gray-100 border-t border-gray-100">
+            {[
+              { label: 'Pedidos/mês', value: deliveryStats.total,     color: '#6b7280' },
+              { label: 'Entregues',   value: deliveryStats.delivered,  color: '#22c55e' },
+              { label: 'Aguard. PIX', value: deliveryStats.awaiting,   color: deliveryStats.awaiting > 0 ? '#f59e0b' : '#6b7280' },
+              { label: 'Receita',     value: BRL.format(deliveryStats.revenue), color: '#8b5cf6' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="flex flex-col items-center justify-center py-3 px-2">
+                <div className="text-lg font-black" style={{ color }}>{value}</div>
+                <div className="text-[10px] font-bold text-gray-400 text-center leading-tight mt-0.5">{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Meta de Vendas ──────────────────────────────────── */}
       {salesGoal.daily > 0 && (
