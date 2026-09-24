@@ -135,8 +135,11 @@ export default async (req) => {
   // 4 — handle LLM error
   if (!llmRes.ok) {
     const errBody = await llmRes.text().catch(() => '')
-    console.error('[zara-chat] LLM error', llmRes.status, errBody.slice(0, 200))
-    return jr({ reply: `IA indisponível (${llmRes.status}). Tente em instantes.` }, 502)
+    console.error('[zara-chat] LLM error', llmRes.status, errBody.slice(0, 400))
+    // Parse Groq error details
+    let errMsg = errBody.slice(0, 300)
+    try { errMsg = JSON.stringify(JSON.parse(errBody)?.error) } catch {}
+    return jr({ reply: `IA indisponível (${llmRes.status}). Tente em instantes.`, _debug: errMsg }, 502)
   }
 
   // 5 — parse and return
