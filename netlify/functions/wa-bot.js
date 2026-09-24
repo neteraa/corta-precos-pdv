@@ -450,7 +450,7 @@ Se perguntarem sobre qualquer um desses temas: "Isso é informação interna da 
 class OpenAIQuotaError extends Error {}
 
 /**
- * Chama LLM: usa Groq (gratuito, llama-3.1-8b-instant) se GROQ_API_KEY estiver setada,
+ * Chama LLM: usa Groq (gratuito, meta-llama/llama-4-scout-17b-16e-instruct) se GROQ_API_KEY estiver setada,
  * caso contrário usa OpenAI gpt-4o-mini como fallback.
  */
 async function askLLM(userMessage, senderNum, systemMsg) {
@@ -462,7 +462,7 @@ async function askLLM(userMessage, senderNum, systemMsg) {
   const endpoint = useGroq
     ? 'https://api.groq.com/openai/v1/chat/completions'
     : 'https://api.openai.com/v1/chat/completions'
-  const model    = useGroq ? 'llama3-8b-8192' : 'gpt-4o-mini'
+  const model    = useGroq ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'gpt-4o-mini'
 
   if (!key) throw new OpenAIQuotaError('sem_credito')
 

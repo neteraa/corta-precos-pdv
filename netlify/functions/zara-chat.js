@@ -102,14 +102,14 @@ export default async (req) => {
   if (!GROQ_KEY && !OPENAI_KEY)
     return jr({ reply: 'Serviço temporariamente indisponível.' }, 503)
 
-  // Candidatos: Groq (grátis) → OpenAI fallback
-  // Atenção: modelos Groq mais novos exigem aceitar ToS em console.groq.com
-  // Modelos decommissionados em 2025: llama3-8b-8192, gemma2-9b-it, gemma-7b-it, llama-3.1-70b, mixtral
+  // Groq mudou nomenclatura em 2025: modelos agora usam prefixo "meta-llama/" ou "google/"
+  // Os nomes curtos antigos (llama3-8b-8192, gemma2-9b-it etc) foram descontinuados
   const GROQ_MODELS = [
-    'llama-3.1-8b-instant',   // ativo — requer aceite de ToS Meta
-    'llama-3.3-70b-versatile', // ativo — requer aceite de ToS Meta
-    'llama-3.2-3b-preview',    // preview
-    'llama-3.2-1b-preview',    // preview menor
+    'meta-llama/llama-4-scout-17b-16e-instruct',    // Llama 4 Scout — atual
+    'meta-llama/llama-4-maverick-17b-128e-instruct', // Llama 4 Maverick — atual
+    'meta-llama/llama-3.3-70b-versatile',            // Llama 3.3 70B
+    'meta-llama/llama-3.1-8b-instant',               // Llama 3.1 8B
+    'meta-llama/llama-3.2-3b-preview',               // Llama 3.2 3B
   ]
   const CANDIDATES = [
     ...GROQ_MODELS.map(m => GROQ_KEY && { url: 'https://api.groq.com/openai/v1/chat/completions', model: m, key: GROQ_KEY, timeout: 8000 }),
