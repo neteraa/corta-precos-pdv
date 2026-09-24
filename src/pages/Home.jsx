@@ -2,13 +2,14 @@
  * /home — Tela inicial do admin: launcher de ícones estilo ERP.
  * Fundo claro, ícones outline laranja, label acima, grid 5 colunas.
  */
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ShoppingCart, LayoutDashboard, Package, Receipt,
   Warehouse, Users, HandCoins, BarChart2, Tag,
   Printer, CalendarClock, Megaphone, QrCode, Star, Settings,
   Monitor, Camera, Truck, Sparkles, Bike, Building2,
+  Check, X, AlertTriangle,
 } from 'lucide-react'
 import { usePrinter, getNicheMeta } from '../hooks/usePrinter.js'
 import { getRole } from '../utils/auth.js'
@@ -99,15 +100,18 @@ function ModuleCard({ icon: Icon, label, badge, themeColor, onClick }) {
 export default function Home() {
   const navigate     = useNavigate()
   const { settings } = usePrinter()
-  const { supplierOffers, products, expiryAlertDays } = useStore()
+  const { supplierOffers, products, expiryAlertDays, cancelRequests, resolveCancel } = useStore()
   const role         = getRole()
+  const [showCancelModal, setShowCancelModal] = useState(false)
   const session      = (() => { try { return JSON.parse(localStorage.getItem('cp_session') || '{}') } catch { return {} } })()
   const storeName    = session.storeName || settings.storeName || 'MEU MERCADO'
   const themeColor   = settings.themeColor || '#f97316'
   const nicheMeta    = getNicheMeta(session.niche || 'mercado')
   const logoImg      = settings.logoImage
 
-  const pendingOffers = (supplierOffers || []).filter(o => o.status === 'pending').length
+  const pendingOffers   = (supplierOffers || []).filter(o => o.status === 'pending').length
+  const pendingCancels  = (cancelRequests || []).filter(r => r.status === 'pending').length
+  const BRL = v => v?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? 'R$ 0,00'
 
   const expiringCount = useMemo(() => {
     const warn   = expiryAlertDays || 30
@@ -142,6 +146,31 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: '100%' }}>
+
+      {/* ── Cancel requests banner ──────────────────── */}
+      {pendingCancels > 0 && (
+        <button
+          onClick={() => setShowCancelModal(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+            background: '#1a0800', border: '1.5px solid #c2410c55',
+            borderRadius: 12, padding: '12px 18px', marginBottom: 20,
+            cursor: 'pointer', textAlign: 'left',
+          }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <AlertTriangle style={{ width: 18, height: 18, color: '#000' }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 900, fontSize: 14, color: '#fb923c' }}>
+              {pendingCancels} solicitação{pendingCancels > 1 ? 'ões' : ''} de cancelamento pendente{pendingCancels > 1 ? 's' : ''}
+            </div>
+            <div style={{ fontSize: 11, color: '#9a3412', marginTop: 1 }}>
+              Caixa aguardando sua autorização — clique para revisar
+            </div>
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#fb923c', background: '#ea580c22', padding: '4px 10px', borderRadius: 6 }}>Revisar →</div>
+        </button>
+      )}
 
       {/* ── Store header ──────────────────────────────── */}
       <div style={{
@@ -211,6 +240,82 @@ export default function Home() {
           ZatendeStok · sistema inteligente para varejo
         </span>
       </div>
+
+      {/* ════════════════════════════════════════════════════
+          CANCEL APPROVAL MODAL
+      ════════════════════════════════════════════════════ */}
+      {showCancelModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+             onClick={() => setShowCancelModal(false)}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: '#0a0a0a', border: '1px solid #1c1c1c', borderRadius: 18, padding: 28, width: '100%', maxWidth: 520, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,.9)' }}>
+
+            {/* header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontWeight: 900, fontSize: 17, color: '#efefef' }}>Autorização de Cancelamento</div>
+                <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>Revise cada solicitação e aprove ou negue</div>
+              </div>
+              <button onClick={() => setShowCancelModal(false)} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', padding: 4 }}>
+                <X style={{ width: 18, height: 18 }} />
+              </button>
+            </div>
+
+            {(cancelRequests || []).length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#555', padding: '24px 0', fontSize: 13 }}>Nenhuma solicitação de cancelamento</div>
+            ) : [...(cancelRequests || [])].sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt)).map(req => {
+              const ago = Math.round((Date.now() - new Date(req.requestedAt).getTime()) / 60000)
+              const isPending = req.status === 'pending'
+              return (
+                <div key={req.id} style={{ background: '#111', border: `1px solid ${isPending ? '#c2410c33' : '#1c1c1c'}`, borderRadius: 12, padding: '14px 16px', marginBottom: 10 }}>
+                  {/* info row */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontWeight: 900, fontSize: 13, color: '#efefef' }}>PDV {req.terminal} — {req.operatorName}</span>
+                        <span style={{ fontSize: 9, color: '#555', fontFamily: 'monospace' }}>{ago}min atrás</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#555', marginBottom: 2 }}>Forma: {req.payment}</div>
+                      {(req.items || []).slice(0, 3).map((it, i) => (
+                        <div key={i} style={{ fontSize: 10, color: '#444' }}>{it.qty}× {it.name}</div>
+                      ))}
+                      {(req.items || []).length > 3 && <div style={{ fontSize: 10, color: '#333' }}>+{req.items.length - 3} item(s)</div>}
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+                      <div style={{ fontFamily: 'monospace', fontSize: 22, fontWeight: 900, color: '#ea580c' }}>{BRL(req.total)}</div>
+                      <div style={{ fontSize: 10, color: isPending ? '#f59e0b' : req.status === 'approved' ? '#4ade80' : '#f87171', fontWeight: 700, marginTop: 3 }}>
+                        {isPending ? '⏳ Pendente' : req.status === 'approved' ? '✅ Aprovado' : '❌ Negado'}
+                        {!isPending && req.resolvedBy && <span style={{ color: '#444' }}> · {req.resolvedBy}</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* action buttons (only for pending) */}
+                  {isPending && (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => resolveCancel(req.id, 'denied', session.storeName || 'Admin')}
+                        style={{ flex: 1, padding: '9px', borderRadius: 8, background: 'transparent', border: '1px solid #7f1d1d', color: '#f87171', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                        <X style={{ width: 13, height: 13, display: 'inline', marginRight: 4 }} />Negar
+                      </button>
+                      <button
+                        onClick={() => resolveCancel(req.id, 'approved', session.storeName || 'Admin')}
+                        style={{ flex: 2, padding: '9px', borderRadius: 8, background: '#16a34a', border: 'none', color: '#fff', fontWeight: 900, fontSize: 13, cursor: 'pointer' }}>
+                        <Check style={{ width: 13, height: 13, display: 'inline', marginRight: 4 }} />Aprovar Cancelamento
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            <button onClick={() => setShowCancelModal(false)}
+              style={{ width: '100%', padding: '10px', borderRadius: 10, background: '#111', border: '1px solid #1c1c1c', color: '#555', fontWeight: 700, fontSize: 12, cursor: 'pointer', marginTop: 6 }}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

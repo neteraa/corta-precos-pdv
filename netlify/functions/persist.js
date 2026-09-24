@@ -8,6 +8,7 @@ const ALLOWED_KEYS = new Set([
   'cp_goal','cp_operators','cp_store_name','cp_supplier_offers',
   'cp_fornecedor_estoque','cp_supplier_orders','cp_distribuidor_markets',
   'cp_forn_profile_v1','cp_sellout_events','cp_settings',
+  'cp_cancel_requests',
 ])
 
 function makeStoreToken(storeId) {

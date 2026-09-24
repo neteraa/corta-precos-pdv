@@ -59,7 +59,8 @@ const PAYMENTS = ['PIX', 'Débito', 'Crédito', 'Dinheiro']
 const PAY_ICON = { PIX: Smartphone, Débito: CreditCard, Crédito: CreditCard, Dinheiro: Banknote }
 
 export default function Terminal() {
-  const { products, registerSale, promos, sales, customers, addFiado, operators, syncNow } = useStore()
+  const { products, registerSale, promos, sales, customers, addFiado, operators, syncNow,
+          cancelRequests, requestCancel, cancelSale } = useStore()
   const todaySales = useMemo(() => {
     const today = new Date().toDateString()
     return sales.filter(s => new Date(s.date).toDateString() === today).length
@@ -92,6 +93,13 @@ export default function Terminal() {
   const [showCamera, setShowCamera] = useState(false)
   const inputRef = useRef(null)
 
+  // ── Split payment ────────────────────────────────────────────
+  const [splitMode, setSplitMode] = useState(false)
+  const [splits,    setSplits]    = useState([]) // [{id,method,amount}]
+
+  // ── Cancel request ───────────────────────────────────────────
+  const [pendingCancelId, setPendingCancelId] = useState(null)
+
   const timeStr = clock.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   const secStr  = clock.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   const dateStr = clock.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
@@ -104,7 +112,28 @@ export default function Terminal() {
   const total      = Math.max(0, subtotal - discAmt - totalPromoDiscount)
   const receivedVal = parseFloat(received) || 0
   const troco = receivedVal - total
-  const trocoOk = payment !== 'Dinheiro' || received === '' || receivedVal >= total
+
+  // Split payment totals
+  const splitTotal     = splits.reduce((s, sp) => s + (parseFloat(sp.amount) || 0), 0)
+  const splitRemaining = Math.max(0, total - splitTotal)
+  const splitComplete  = splitMode ? splitTotal >= total - 0.005 : true
+  const splitTroco     = splitMode ? Math.max(0, splitTotal - total) : 0
+
+  const trocoOk = splitMode
+    ? splitComplete
+    : payment !== 'Dinheiro' || received === '' || receivedVal >= total
+
+  // Split helpers
+  const addSplit = () =>
+    setSplits(prev => [...prev, { id: Date.now(), method: 'PIX', amount: splitRemaining > 0.005 ? splitRemaining.toFixed(2) : '' }])
+  const updateSplit = (id, field, val) =>
+    setSplits(prev => prev.map(sp => sp.id === id ? { ...sp, [field]: val } : sp))
+  const removeSplit = (id) =>
+    setSplits(prev => { const next = prev.filter(sp => sp.id !== id); if (!next.length) setSplitMode(false); return next })
+  const enterSplitMode = () => {
+    setSplits([{ id: Date.now(), method: payment !== 'Fiado' ? payment : 'PIX', amount: total.toFixed(2) }])
+    setSplitMode(true)
+  }
 
   // ── Search ──────────────────────────────────────────────────
   useEffect(() => {
@@ -285,15 +314,26 @@ export default function Terminal() {
   // ── Finish sale ─────────────────────────────────────────────
   const finish = () => {
     if (!cart.length) return
-    const isFiado = payment === 'Fiado'
-    const t = receivedVal > 0 && payment === 'Dinheiro' ? receivedVal - total : 0
-    const payLabel = isFiado
-      ? `Fiado — ${selectedCustomer?.name}`
-      : payment === 'Crédito' && installments > 1 ? `Crédito ${installments}×` : payment
+    const isFiado = !splitMode && payment === 'Fiado'
+
+    let t = 0
+    let payLabel
+    if (splitMode && splits.length > 0) {
+      t = splitTroco
+      payLabel = splits
+        .map(sp => `${sp.method} ${BRL.format(parseFloat(sp.amount) || 0)}`)
+        .join(' + ')
+    } else {
+      t = receivedVal > 0 && payment === 'Dinheiro' ? receivedVal - total : 0
+      payLabel = isFiado
+        ? `Fiado — ${selectedCustomer?.name}`
+        : payment === 'Crédito' && installments > 1 ? `Crédito ${installments}×` : payment
+    }
+
     const sale = {
       items: cart, subtotal, discount: discAmt, promoDiscount: totalPromoDiscount, total,
-      payment: payLabel,
-      troco: t, date: new Date().toISOString(), id: Date.now(),
+      payment: payLabel, troco: t,
+      date: new Date().toISOString(), id: Date.now(),
       customerId: selectedCustomer?.id || null,
       operatorName: activeOperator?.name || '',
     }
@@ -304,7 +344,8 @@ export default function Terminal() {
     }
     setLastSale({ ...sale, troco: t, isFiado, customerName: selectedCustomer?.name })
     setCart([]); setDiscount(0); setReceived(''); setShowPay(false); setInstallments(1)
-    if (!isFiado) setSelectedCustomerId(null)  // keep customer for next fiado if desired
+    setSplitMode(false); setSplits([])
+    if (!isFiado) setSelectedCustomerId(null)
     broadcast({ type: 'cart', cart: [], promoResults: [], subtotal: 0, total: 0 })
     printer.printReceipt(sale)
   }
@@ -322,6 +363,28 @@ export default function Terminal() {
     return next
   }, [])
 
+
+  // ── Watch cancel request resolution ─────────────────────────
+  useEffect(() => {
+    if (!pendingCancelId) return
+    const req = cancelRequests.find(r => r.id === pendingCancelId)
+    if (!req) return
+    if (req.status === 'approved') {
+      setPendingCancelId(null)
+      setLastSale(null)
+      setScanFeed({ msg: `✅ Cancelamento autorizado por ${req.resolvedBy}`, ok: true })
+      setTimeout(() => setScanFeed(null), 4000)
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
+    // denied: keep showing denied status — user closes manually
+  }, [cancelRequests, pendingCancelId])
+
+  // Sync every 5s while there's a pending cancel request
+  useEffect(() => {
+    if (!pendingCancelId) return
+    const id = setInterval(syncNow, 5000)
+    return () => clearInterval(id)
+  }, [pendingCancelId, syncNow])
 
   // ── Palette (ultra dark, one accent) ──────────────────────
   const _storeName = printer.settings?.storeName || 'MEU MERCADO'
@@ -625,37 +688,101 @@ export default function Terminal() {
 
             <div style={{ height: 1, background: brd }} />
 
-            {/* ── PAGAMENTO (BIG BUTTONS) ── */}
+            {/* ── PAGAMENTO ── */}
             <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: txt2, letterSpacing: 2.5, marginBottom: 8 }}>PAGAMENTO</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                {PAYMENTS.map((p, i) => {
-                  const Icon = PAY_ICON[p]
-                  const fKeys = ['F5','F6','F7','F8']
-                  const active = payment === p
-                  return (
-                    <button key={p} onClick={() => setPayment(p)}
-                      style={{ padding: '13px 6px 9px', borderRadius: 10, background: active ? acc + '16' : bg3, border: `2px solid ${active ? acc : brd}`, color: active ? acc : txt2, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, transition: 'all .1s' }}>
-                      <Icon style={{ width: 19, height: 19 }} />
-                      <span style={{ fontWeight: 900, fontSize: 12, letterSpacing: 0.5 }}>{p.toUpperCase()}</span>
-                      <span style={{ fontFamily: 'monospace', fontSize: 8, color: active ? acc + 'aa' : txt3, background: bg4, padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>{fKeys[i]}</span>
-                    </button>
-                  )
-                })}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: txt2, letterSpacing: 2.5 }}>PAGAMENTO</div>
+                {!splitMode
+                  ? <button onClick={enterSplitMode} style={{ fontSize: 9, fontWeight: 700, color: acc, background: acc + '12', border: `1px solid ${acc}33`, padding: '2px 8px', borderRadius: 5, cursor: 'pointer' }}>÷ Dividir</button>
+                  : <button onClick={() => { setSplitMode(false); setSplits([]) }} style={{ fontSize: 9, fontWeight: 700, color: txt2, background: bg3, border: `1px solid ${brd}`, padding: '2px 8px', borderRadius: 5, cursor: 'pointer' }}>← Único</button>
+                }
               </div>
-              <button
-                onClick={() => { if (!selectedCustomer) { setPickerFromFiado(true); setShowCustomerPicker(true) } else setPayment('Fiado') }}
-                style={{ marginTop: 5, width: '100%', padding: '10px 12px', borderRadius: 10, background: payment === 'Fiado' ? '#200' : bg3, border: `2px solid ${payment === 'Fiado' ? '#ef4444' : brd}`, color: payment === 'Fiado' ? '#f87171' : txt2, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
-                <HandCoins style={{ width: 15, height: 15 }} />
-                {selectedCustomer ? `Fiado — ${selectedCustomer.name}` : 'Fiado (selecionar cliente)'}
-                {selectedCustomer && (selectedCustomer.fiadoBalance || 0) > 0 && (
-                  <span style={{ marginLeft: 'auto', fontSize: 10, color: '#f87171', fontWeight: 800 }}>deve {BRL.format(selectedCustomer.fiadoBalance)}</span>
-                )}
-              </button>
+
+              {!splitMode ? (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    {PAYMENTS.map((p, i) => {
+                      const Icon = PAY_ICON[p]
+                      const fKeys = ['F5','F6','F7','F8']
+                      const active = payment === p
+                      return (
+                        <button key={p} onClick={() => setPayment(p)}
+                          style={{ padding: '13px 6px 9px', borderRadius: 10, background: active ? acc + '16' : bg3, border: `2px solid ${active ? acc : brd}`, color: active ? acc : txt2, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, transition: 'all .1s' }}>
+                          <Icon style={{ width: 19, height: 19 }} />
+                          <span style={{ fontWeight: 900, fontSize: 12, letterSpacing: 0.5 }}>{p.toUpperCase()}</span>
+                          <span style={{ fontFamily: 'monospace', fontSize: 8, color: active ? acc + 'aa' : txt3, background: bg4, padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>{fKeys[i]}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <button
+                    onClick={() => { if (!selectedCustomer) { setPickerFromFiado(true); setShowCustomerPicker(true) } else setPayment('Fiado') }}
+                    style={{ marginTop: 5, width: '100%', padding: '10px 12px', borderRadius: 10, background: payment === 'Fiado' ? '#200' : bg3, border: `2px solid ${payment === 'Fiado' ? '#ef4444' : brd}`, color: payment === 'Fiado' ? '#f87171' : txt2, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <HandCoins style={{ width: 15, height: 15 }} />
+                    {selectedCustomer ? `Fiado — ${selectedCustomer.name}` : 'Fiado (selecionar cliente)'}
+                    {selectedCustomer && (selectedCustomer.fiadoBalance || 0) > 0 && (
+                      <span style={{ marginLeft: 'auto', fontSize: 10, color: '#f87171', fontWeight: 800 }}>deve {BRL.format(selectedCustomer.fiadoBalance)}</span>
+                    )}
+                  </button>
+                </>
+              ) : (
+                /* ── SPLIT MODE ── */
+                <div style={{ background: bg3, border: `1px solid ${acc}22`, borderRadius: 10, padding: '10px 10px 6px' }}>
+                  {splits.map((sp, idx) => {
+                    const Icon = PAY_ICON[sp.method] || Wallet
+                    return (
+                      <div key={sp.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                        {/* method select */}
+                        <select
+                          value={sp.method}
+                          onChange={e => updateSplit(sp.id, 'method', e.target.value)}
+                          style={{ flex: '0 0 100px', background: bg4, border: `1px solid ${brd}`, borderRadius: 7, padding: '7px 8px', color: txt, fontSize: 12, fontWeight: 700, cursor: 'pointer', outline: 'none' }}>
+                          {PAYMENTS.map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                        {/* amount input */}
+                        <div style={{ flex: 1, position: 'relative' }}>
+                          <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: txt2, fontWeight: 700 }}>R$</span>
+                          <input
+                            type="number" min="0" step="0.01"
+                            value={sp.amount}
+                            onChange={e => updateSplit(sp.id, 'amount', e.target.value)}
+                            placeholder="0,00"
+                            style={{ width: '100%', background: bg4, border: `1.5px solid ${idx === splits.length - 1 ? acc + '66' : brd}`, borderRadius: 7, padding: '7px 8px 7px 28px', color: txt, fontSize: 14, fontWeight: 900, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <button onClick={() => removeSplit(sp.id)}
+                          style={{ width: 28, height: 28, borderRadius: 6, background: 'transparent', border: 'none', color: txt2, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                          onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                          onMouseLeave={e => e.currentTarget.style.color = txt2}>
+                          <X style={{ width: 13, height: 13 }} />
+                        </button>
+                      </div>
+                    )
+                  })}
+
+                  {/* add split button */}
+                  <button onClick={addSplit} disabled={splitRemaining < 0.005}
+                    style={{ width: '100%', padding: '7px', borderRadius: 7, background: 'transparent', border: `1px dashed ${brd}`, color: splitRemaining > 0.005 ? acc : txt3, fontSize: 11, fontWeight: 700, cursor: 'pointer', marginBottom: 8 }}>
+                    ＋ Adicionar forma {splitRemaining > 0.005 ? `— R$ ${splitRemaining.toFixed(2)} restante` : ''}
+                  </button>
+
+                  {/* coverage indicator */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 2px', borderTop: `1px solid ${brd}` }}>
+                    <span style={{ fontSize: 10, color: txt2, fontWeight: 700 }}>
+                      {splitComplete ? 'Coberto ✓' : 'Restante'}
+                    </span>
+                    <span style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 900, color: splitComplete ? '#4ade80' : '#f59e0b' }}>
+                      {splitComplete
+                        ? (splitTroco > 0.005 ? `Troco: ${BRL.format(splitTroco)}` : '✓ OK')
+                        : BRL.format(splitRemaining)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* parcelamento crédito */}
-            {payment === 'Crédito' && (
+            {/* parcelamento crédito (apenas modo único) */}
+            {!splitMode && payment === 'Crédito' && (
               <div style={{ background: '#080e1a', border: '1px solid #1a2d4a', borderRadius: 9, padding: '9px 11px' }}>
                 <div style={{ color: '#93c5fd', fontSize: 9, fontWeight: 700, letterSpacing: 2, marginBottom: 6 }}>PARCELAMENTO</div>
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -819,10 +946,42 @@ export default function Terminal() {
             ) : (
               <div style={{ color: txt2, fontSize: 10, marginBottom: 14 }}>Acima de <strong style={{ color: acc }}>R$100</strong> ganha Cupom Premiado 🎟️</div>
             )}
-            <button onClick={() => { setLastSale(null); setTimeout(() => inputRef.current?.focus(), 50) }}
-              style={{ width: '100%', padding: '13px', borderRadius: 9, background: acc, border: 'none', color: '#000', fontWeight: 900, fontSize: 15, cursor: 'pointer', letterSpacing: 1 }}>
+            <button onClick={() => { setLastSale(null); setPendingCancelId(null); setTimeout(() => inputRef.current?.focus(), 50) }}
+              style={{ width: '100%', padding: '13px', borderRadius: 9, background: acc, border: 'none', color: '#000', fontWeight: 900, fontSize: 15, cursor: 'pointer', letterSpacing: 1, marginBottom: 8 }}>
               PRÓXIMO CLIENTE →
             </button>
+
+            {/* ── Cancel request ── */}
+            {!pendingCancelId ? (
+              <button
+                onClick={() => {
+                  const id = requestCancel(lastSale, activeOperator?.name, terminalNum)
+                  setPendingCancelId(id)
+                  syncNow()
+                }}
+                style={{ width: '100%', padding: '8px', borderRadius: 8, background: 'transparent', border: `1px solid ${brd}`, color: txt2, fontSize: 10, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.5 }}>
+                Solicitar cancelamento desta venda
+              </button>
+            ) : (
+              <div style={{ padding: '10px 12px', borderRadius: 8, background: bg3, border: `1px solid ${brd}`, textAlign: 'center' }}>
+                {(() => {
+                  const req = cancelRequests.find(r => r.id === pendingCancelId)
+                  if (!req || req.status === 'pending') return (
+                    <div>
+                      <div style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700, marginBottom: 3 }}>⏳ Aguardando autorização do supervisor…</div>
+                      <div style={{ fontSize: 9, color: txt2 }}>sincronizando a cada 5s</div>
+                    </div>
+                  )
+                  if (req.status === 'denied') return (
+                    <div>
+                      <div style={{ fontSize: 11, color: '#f87171', fontWeight: 700 }}>❌ Cancelamento negado por {req.resolvedBy}</div>
+                      <button onClick={() => setPendingCancelId(null)} style={{ marginTop: 4, fontSize: 9, background: 'none', border: 'none', color: txt2, cursor: 'pointer', textDecoration: 'underline' }}>Fechar</button>
+                    </div>
+                  )
+                  return <div style={{ fontSize: 11, color: '#4ade80', fontWeight: 700 }}>✅ Aprovado — cancelando…</div>
+                })()}
+              </div>
+            )}
           </div>
         </div>
       )}

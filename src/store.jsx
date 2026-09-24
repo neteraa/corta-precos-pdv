@@ -296,6 +296,13 @@ export function StoreProvider({ children }) {
       }
     } catch {}
 
+    // Sync cancel requests — sempre sobrescreve com versão do servidor (admin aprova lá)
+    if (data.cp_cancel_requests) try {
+      const serverReqs = JSON.parse(data.cp_cancel_requests)
+      setCancelRequests(serverReqs)
+      try { localStorage.setItem(mktKey('cp_cancel_requests'), data.cp_cancel_requests) } catch {}
+    } catch {}
+
     // Push local keys not yet on server
     if (!data.cp_customers)  setCustomers(c  => { syncToServer('cp_customers',  JSON.stringify(c));  return c })
     if (!data.cp_promos)     setPromos(pr    => { syncToServer('cp_promos',     JSON.stringify(pr)); return pr })
@@ -472,6 +479,52 @@ export function StoreProvider({ children }) {
     })
   }, [persist])
 
+  // ── Cancel requests (remote authorization flow) ────────────
+  const [cancelRequests, setCancelRequests] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(mktKey('cp_cancel_requests')) || '[]') } catch { return [] }
+  })
+
+  const requestCancel = useCallback((sale, operatorName, terminalNum) => {
+    const req = {
+      id: `cr_${Date.now()}`,
+      saleId: sale.id,
+      operatorName: operatorName || 'Operador',
+      terminal: terminalNum || 1,
+      total: sale.total,
+      payment: sale.payment,
+      items: (sale.items || []).slice(0, 6),
+      requestedAt: new Date().toISOString(),
+      status: 'pending',
+      resolvedAt: null,
+      resolvedBy: null,
+    }
+    setCancelRequests(prev => {
+      // Mantém só os últimos 10 min + o novo
+      const cutoff = Date.now() - 10 * 60 * 1000
+      const cleaned = prev.filter(r => new Date(r.requestedAt).getTime() > cutoff)
+      const next = [req, ...cleaned]
+      persist('cp_cancel_requests', next)
+      return next
+    })
+    return req.id
+  }, [persist])
+
+  const resolveCancel = useCallback((requestId, action, resolvedBy) => {
+    let saleIdToCancel = null
+    setCancelRequests(prev => {
+      const req = prev.find(r => r.id === requestId)
+      if (action === 'approved' && req) saleIdToCancel = req.saleId
+      const next = prev.map(r => r.id === requestId
+        ? { ...r, status: action, resolvedAt: new Date().toISOString(), resolvedBy: resolvedBy || 'Admin' }
+        : r
+      )
+      persist('cp_cancel_requests', next)
+      return next
+    })
+    // State updater runs synchronously — saleIdToCancel is already set
+    if (saleIdToCancel) cancelSale(saleIdToCancel)
+  }, [persist, cancelSale])
+
   const upsertPromo = useCallback((p) => {
     setPromos(prev => {
       const id   = p.id || `pr${Date.now()}`
@@ -631,6 +684,7 @@ export function StoreProvider({ children }) {
       cashMovements, salesGoal, operators,
       photos, saveProductPhoto,
       upsertProduct, deleteProduct, bulkUpsertProducts, addLot, registerSale, cancelSale,
+      cancelRequests, requestCancel, resolveCancel,
       upsertCustomer, deleteCustomer, importProducts,
       upsertPromo, deletePromo, assignPromoGroup,
       addFiado, payFiado,
