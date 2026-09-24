@@ -159,5 +159,5 @@ export default async (req) => {
   }
 
   console.error('[zara-chat] all candidates failed:', JSON.stringify(errors))
-  return jr({ reply: 'Assistente temporariamente indisponível. 😔 Use o WhatsApp de suporte: (15) 9979-6930' }, 503)
+  return jr({ reply: 'Assistente temporariamente indisponível. 😔 Use o WhatsApp de suporte: (15) 9979-6930', _e: errors }, 503)
 }
