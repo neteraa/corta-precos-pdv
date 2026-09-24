@@ -446,27 +446,38 @@ ${about}${policy}${promos}
 Se perguntarem sobre qualquer um desses temas: "Isso é informação interna da loja, não consigo te ajudar com isso 😅 Mas posso te ajudar com [redireciona para produtos/promoções/horário]"`
 }
 
-/** Chama OpenAI com system prompt, histórico e mensagem. Retorna resposta bruta.
- *  Lança OpenAIQuotaError quando conta está sem crédito (429 + credit_balance_exhausted).
- */
+// Sinaliza ausência de crédito/cota em qualquer provedor LLM
 class OpenAIQuotaError extends Error {}
 
-async function askOpenAI(userMessage, senderNum, systemMsg) {
-  const key = process.env.OPENAI_API_KEY
-  if (!key) throw new Error('OPENAI_API_KEY not set')
+/**
+ * Chama LLM: usa Groq (gratuito, llama-3.1-8b-instant) se GROQ_API_KEY estiver setada,
+ * caso contrário usa OpenAI gpt-4o-mini como fallback.
+ */
+async function askLLM(userMessage, senderNum, systemMsg) {
+  const groqKey = process.env.GROQ_API_KEY
+  const oaiKey  = process.env.OPENAI_API_KEY
+  const useGroq  = !!groqKey
+
+  const key      = useGroq ? groqKey : oaiKey
+  const endpoint = useGroq
+    ? 'https://api.groq.com/openai/v1/chat/completions'
+    : 'https://api.openai.com/v1/chat/completions'
+  const model    = useGroq ? 'llama-3.1-8b-instant' : 'gpt-4o-mini'
+
+  if (!key) throw new OpenAIQuotaError('sem_credito')
 
   const history = getHistory(senderNum)
   const ac = new AbortController()
-  setTimeout(() => ac.abort(), 12000) // 12s timeout no OpenAI
+  setTimeout(() => ac.abort(), 10000)
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetch(endpoint, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
     signal:  ac.signal,
     body:    JSON.stringify({
-      model:       'gpt-4o-mini',
-      max_tokens:  200,
-      temperature: 0.5,
+      model,
+      max_tokens:  180,
+      temperature: 0.45,
       messages: [
         { role: 'system', content: systemMsg },
         ...history,
@@ -477,11 +488,8 @@ async function askOpenAI(userMessage, senderNum, systemMsg) {
 
   if (!res.ok) {
     const body = await res.text()
-    // 429 com crédito esgotado — sinaliza para o handler usar fallback
-    if (res.status === 429 && body.includes('credit_balance_exhausted')) {
-      throw new OpenAIQuotaError('sem_credito')
-    }
-    throw new Error(`OpenAI error ${res.status}: ${body}`)
+    if (res.status === 429) throw new OpenAIQuotaError('sem_credito')
+    throw new Error(`LLM error ${res.status}: ${body}`)
   }
 
   const data = await res.json()
@@ -542,34 +550,94 @@ function pushHistory(senderNum, role, content) {
 const recentIds = new Set()
 
 // ─── Fast-path sem LLM para o bot Corta Preços ───────────────────────────────
-// Retorna string de resposta pronta ou null (→ cai no LLM)
-// Economiza ~40% das chamadas para mensagens simples e saudações
-function quickReply(text, senderName, promoText) {
-  const t   = text.toLowerCase().trim()
+// Cobre saudações, promoções, horário, pagamento e busca de preços no catálogo.
+// Retorna string pronta ou null (→ cai no LLM). Economiza ~60% das chamadas.
+
+function normStr(s) {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+}
+
+function findProduct(query, products) {
+  if (!products?.length) return null
+  const q = normStr(query)
+  if (q.length < 3) return null
+  // Exact name match first
+  let hit = products.find(p => normStr(p.name) === q)
+  if (hit) return hit
+  // Name contains query
+  hit = products.find(p => normStr(p.name).includes(q))
+  if (hit) return hit
+  // Query contains first word of product name (ex: "arroz" → "Arroz Tipo 1 5kg")
+  hit = products.find(p => {
+    const words = normStr(p.name).split(' ')
+    return words.length > 0 && q.includes(words[0]) && words[0].length > 3
+  })
+  return hit || null
+}
+
+function quickReply(text, senderName, promoText, products) {
+  const t   = normStr(text)
   const nom = senderName ? `, ${senderName.split(' ')[0]}` : ''
 
-  // Saudação pura (sem outra intenção na mensagem)
-  if (/^(oi+|ol[aá]+|hello|hi+|e[- ]?a[ií]|ei+|hey|bom dia|boa tarde|boa noite|tudo bem|tudo bom|oi tudo|ol[aá] tudo)[\s!.,?]*$/.test(t)) {
-    return `Oi${nom}! 👋 Bem-vindo ao Corta Preços!\nPosso te ajudar com:\n🛒 Preços e produtos\n🔥 Promoções do dia\n🛵 Pedido de entrega\n\nÉ só falar! 😊`
+  // Saudação pura
+  if (/^(oi+|ola+|hello|hi+|e[- ]?ai+|ei+|hey|bom dia|boa tarde|boa noite|tudo bem|tudo bom|oi tudo|ola tudo|boas|salve)[\s!.,?]*$/.test(t)) {
+    return `Oi${nom}! 👋 Bem-vindo ao Corta Preços!\n\n🛒 Preços · 🔥 Promoções · 🛵 Delivery\n\nMe fala o que você precisa! 😊`
   }
 
   // Promoções / ofertas
-  if (/^(promo[çc][õo]es?|ofertas?|promo[çc][õo]|o que.*promo|qual.*promo|tem.*promo|promo.*hoje|desconto)[\s!?]*$/.test(t)) {
-    const p = promoText || 'Nenhuma promoção ativa no momento.'
+  if (/^(promocoes?|ofertas?|promocao|o que.*promo|qual.*promo|tem.*promo|promo.*hoje|descontos?|novidade)[\s!?]*$/.test(t)) {
+    const p = promoText || 'Nenhuma promoção ativa agora.'
     return `🔥 Promoções de hoje${nom}:\n${p}\n\nQuer fazer um pedido? 🛒`
   }
 
-  // Horário de funcionamento
-  if (/hor[aá]rio|que hora|abre|fecha|funcionamento/.test(t) && t.length < 50) {
-    return `⏰ Horário Corta Preços${nom}:\nSeg–Sex: 7h às 20h\nSábado: 7h às 18h\nDomingo: 8h às 13h\n\nDúvidas: (15) 9979-6930 📱`
+  // Horário
+  if (/horario|que hora|abre|fecha|funcionamento|ta aberto|esta aberto/.test(t) && t.length < 55) {
+    return `⏰ Horário Corta Preços${nom}:\nSeg–Sex: 7h–20h\nSábado: 7h–18h\nDomingo: 8h–13h\n\nDúvidas: (15) 9979-6930 📱`
   }
 
-  // Forma de pagamento / pix
-  if (/pagamento|aceita|pix|cart[aã]o|dinheiro|forma de pag/.test(t) && t.length < 60) {
-    return `💳 Formas de pagamento${nom}:\nPIX ✅ | Dinheiro ✅ | Débito ✅ | Crédito ✅\n\nPara entrega: pagamento SOMENTE por PIX 🛵`
+  // Pagamento / PIX
+  if (/pagamento|aceita|pix|cartao|dinheiro|forma de pag|como pago|como pagar/.test(t) && t.length < 65) {
+    return `💳 Pagamentos${nom}:\nPIX ✅ | Dinheiro ✅ | Débito ✅ | Crédito ✅\n\nDelivery: somente PIX (CNPJ 60.662.362/0001-70) 🛵`
   }
 
-  return null  // sem fast-path → vai para OpenAI
+  // Endereço / localização
+  if (/endereco|localizacao|onde fica|onde voces ficam|como chegar|maps|googl/.test(t) && t.length < 60) {
+    return `📍 Corta Preços${nom}:\nBoituva - SP\nWhatsApp: (15) 9979-6930\n\nQuer fazer um pedido por entrega? 🛵`
+  }
+
+  // Taxa de entrega
+  if (/taxa|frete|entrega.*custa|custa.*entrega|quanto.*entrega|entrega.*quanto|delivery.*taxa/.test(t) && t.length < 60) {
+    return `🛵 Taxa de entrega${nom}: R$7,00 fixo!\nPagamento somente PIX.\n\nMe passa seu endereço pra começar o pedido 😊`
+  }
+
+  // Busca de preço: "preço do arroz", "quanto custa leite", "tem feijão?", "valor da carne"
+  const priceRx = /^(?:preco d[oa]?|quanto custa|valor d[oa]?|tem |qual.*preco|me fala.*preco|preco)\s+(.+)$/
+  const priceM  = t.match(priceRx)
+  if (priceM) {
+    const query = priceM[1].replace(/[?!.]+$/, '').trim()
+    const found = findProduct(query, products)
+    if (found) {
+      const preco = `R$${Number(found.price).toFixed(2).replace('.', ',')}`
+      return `🏷️ ${found.name}: ${preco}${nom}\n\nQuer pedir? Me passa seu endereço! 🛵`
+    }
+    // Produto não encontrado no catálogo → deixa o LLM responder
+    return null
+  }
+
+  // "tem X?" simples
+  const temRx = /^tem\s+(.+)[?!.]?$/
+  const temM  = t.match(temRx)
+  if (temM) {
+    const query = temM[1].trim()
+    const found = findProduct(query, products)
+    if (found) {
+      const preco = `R$${Number(found.price).toFixed(2).replace('.', ',')}`
+      return `Sim${nom}! Temos ${found.name} por ${preco} 🛒\nQuer pedir?`
+    }
+    return null  // deixa LLM sugerir alternativa
+  }
+
+  return null  // sem fast-path → LLM
 }
 
 export default async (req, context) => {
@@ -668,8 +736,8 @@ export default async (req, context) => {
         if (botPediuComprovante) finalText = '[comprovante enviado]'
       }
 
-      // Fast-path: responde saudações/promoções/horário sem chamar OpenAI
-      const quick = quickReply(finalText, senderName, promoText)
+      // Fast-path: responde saudações/promoções/horário/preços sem chamar LLM
+      const quick = quickReply(finalText, senderName, promoText, products)
       if (quick) {
         pushHistory(senderNum, 'user', finalText)
         pushHistory(senderNum, 'assistant', quick)
@@ -679,7 +747,7 @@ export default async (req, context) => {
       }
 
       pushHistory(senderNum, 'user', finalText)
-      rawReply = await askOpenAI(finalText, senderNum, systemMsg)
+      rawReply = await askLLM(finalText, senderNum, systemMsg)
       if (!rawReply) return new Response('OK', { status: 200 })
 
       // Extrai e salva pedido de entrega se houver
@@ -729,7 +797,7 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
 
       systemMsg = SYSTEM_PROMPT + profileCtx
       pushHistory(senderNum, 'user', text)
-      rawReply = await askOpenAI(text, senderNum, systemMsg)
+      rawReply = await askLLM(text, senderNum, systemMsg)
       if (!rawReply) return new Response('OK', { status: 200 })
 
       const { clean: reply, lead: extracted } = parseLeadTag(rawReply)
@@ -756,7 +824,7 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
       }
 
       pushHistory(senderNum, 'user', text)
-      rawReply = await askOpenAI(text, senderNum, systemMsg)
+      rawReply = await askLLM(text, senderNum, systemMsg)
       if (!rawReply) return new Response('OK', { status: 200 })
 
       // Bot do mercado não usa <zs_lead> — resposta direta
