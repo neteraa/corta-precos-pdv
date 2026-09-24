@@ -84,8 +84,9 @@ function ProductRow({ p, onAdd }) {
    MAIN
 ══════════════════════════════════════════════════════════ */
 export default function Campanhas() {
-  const { products, customers, sales, promos } = useStore()
-  const instance = getConfiguredStoreId() || 'zatendestok'
+  const { products, customers, sales, promos, storeName } = useStore()
+  const instance   = getConfiguredStoreId() || 'zatendestok'
+  const lojaNome   = storeName || instance
 
   // bot connection status
   const [botStatus, setBotStatus] = useState(null) // null | 'open' | 'connecting'
@@ -244,7 +245,7 @@ export default function Campanhas() {
 
   /* ── preview ── */
   const previewCustomer = audienceList[previewIdx] || { name: 'Cliente', saldo: 0 }
-  const previewText = renderMsg(template, previewCustomer)
+  const previewText = renderMsg(template, previewCustomer, lojaNome)
 
   /* ── copy numbers ── */
   const copyNumbers = () => {
@@ -256,7 +257,7 @@ export default function Campanhas() {
 
   /* ── open single wa.me ── */
   const openWaMe = (customer) => {
-    const text = encodeURIComponent(renderMsg(template, customer))
+    const text = encodeURIComponent(renderMsg(template, customer, lojaNome))
     const phone = cleanPhone(customer.phone)
     window.open(`https://wa.me/${phone}?text=${text}`, '_blank')
   }
@@ -285,7 +286,7 @@ export default function Campanhas() {
     setGroupResult(null)
     const text = template
       .replace(/\{\{nome\}\}/gi, 'pessoal')
-      .replace(/\{\{loja\}\}/gi, instance)
+      .replace(/\{\{loja\}\}/gi, lojaNome)
       .replace(/\{\{saldo\}\}/gi, 'R$ 0,00')
       .replace(/\{\{data\}\}/gi,  new Date().toLocaleDateString('pt-BR'))
     try {
@@ -359,7 +360,7 @@ export default function Campanhas() {
 
       const c = list[i]
       try {
-        await sendViaBot(instance, cleanPhone(c.phone), renderMsg(template, c))
+        await sendViaBot(instance, cleanPhone(c.phone), renderMsg(template, c, lojaNome))
         ok++
       } catch {
         fail++
@@ -380,9 +381,9 @@ export default function Campanhas() {
     const list = audienceList.filter(hasPhone)
     if (idx >= list.length) { setLocalMode(false); setLocalIdx(0); return }
     const c = list[idx]
-    window.open(`https://wa.me/${cleanPhone(c.phone)}?text=${encodeURIComponent(renderMsg(template, c))}`, '_blank')
+    window.open(`https://wa.me/${cleanPhone(c.phone)}?text=${encodeURIComponent(renderMsg(template, c, lojaNome))}`, '_blank')
     setLocalIdx(idx + 1)
-  }, [audienceList, template])
+  }, [audienceList, template, lojaNome])
 
   /* ── ImportBlock — reutilizável nos 3 tabs ───────────────── */
   const ImportBlock = (
@@ -444,7 +445,7 @@ export default function Campanhas() {
 
   const groupText = template
     .replace(/\{\{nome\}\}/gi, 'pessoal')
-    .replace(/\{\{loja\}\}/gi, instance)
+    .replace(/\{\{loja\}\}/gi, lojaNome)
     .replace(/\{\{saldo\}\}/gi, 'R$ 0,00')
     .replace(/\{\{data\}\}/gi, new Date().toLocaleDateString('pt-BR'))
 
