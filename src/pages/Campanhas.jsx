@@ -370,6 +370,8 @@ export default function Campanhas() {
       try {
         await sendViaBot(instance, cleanPhone(c.phone), renderMsg(template, c, lojaNome))
         ok++
+        addDailyCount(1)               // persiste no localStorage imediatamente
+        setDailyCount(getDailyCount()) // atualiza UI em tempo real
       } catch {
         fail++
       }
@@ -377,8 +379,6 @@ export default function Campanhas() {
       if (i < canSend - 1) await randDelay()
     }
 
-    addDailyCount(ok)
-    setDailyCount(getDailyCount())
     setResults({ ok, fail })
     setSending(false)
     abortRef.current = false
@@ -396,7 +396,7 @@ export default function Campanhas() {
   /* ── enviar para número digitado manualmente ─────────────── */
   const sendManual = useCallback(async () => {
     const digits = manualPhone.replace(/\D/g, '').replace(/^0/, '')
-    if (digits.length < 8) { setManualResult({ ok: false, msg: 'Número inválido' }); return }
+    if (digits.length < 8) { setManualResult({ ok: false, msg: 'Número inválido — informe DDD + número.' }); return }
     const number = '55' + digits.slice(-11)
     const customer = { name: manualName.trim() || 'Cliente', saldo: 0 }
     const text = renderMsg(template, customer, lojaNome)
@@ -405,7 +405,9 @@ export default function Campanhas() {
     try {
       if (botConnected) {
         await sendViaBot(instance, number, text)
-        setManualResult({ ok: true, msg: `✅ Enviado via bot para ${number}` })
+        addDailyCount(1)
+        setDailyCount(getDailyCount())
+        setManualResult({ ok: true, msg: `✅ Enviado via bot para +${number}` })
       } else {
         window.open(`https://wa.me/${number}?text=${encodeURIComponent(text)}`, '_blank')
         setManualResult({ ok: true, msg: '✅ WhatsApp aberto — confirme o envio no celular' })
