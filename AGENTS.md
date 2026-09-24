@@ -356,6 +356,21 @@ curl https://ws-relay-production-42a7.up.railway.app/health
 # Railway vars (ws-relay)
 /tmp/node_modules/.bin/railway variables set --project df6bcfe6 --service ws-relay --environment production KEY=VALUE
 
+## CAMPANHAS WhatsApp — src/pages/Campanhas.jsx (atualizado 2025-09)
+- storeName: vem de `usePrinter().settings.storeName` (NÃO do store context, NÃO do getSession)
+  → fallback: instance (storeId). Nunca usar 'MEU MERCADO' hardcoded.
+- lojaNome: `settings?.storeName || instance` — usado em renderMsg() em TODOS os pontos de envio
+- renderMsg(template, customer, lojaNome): substitui {{nome}}, {{loja}}, {{saldo}}, {{data}}
+- 3 tabs: contatos (individual/bot), grupo (via JID), lista (manual copy-paste)
+- Tab contatos: sendAll() — anti-ban: delay 1.5-4s, pausa 5min/30msgs, limite 80/dia
+- Tab contatos: campo número manual (manualPhone/manualName) — envia via bot se conectado, wa.me se não
+- Tab grupo: fetchGroups() → /api/wa-groups?instance=X → sendToGroup() → /api/wa-send com JID do grupo
+- Tab lista: 100% manual — copia números e mensagem, usuário cria lista no próprio WhatsApp
+- sendViaBot(instance, number, text) → POST /api/wa-send → Evolution API sendText/{instance}
+- wa-send.js: sem auth (gateado pelo ADMIN_ONLY em App.jsx) — qualquer instance válida pode ser usada
+- botConnected: /api/wa-status?instance=X → status=='open' → habilita botões automáticos
+- ImportBlock: CSV/TXT — separadores vírgula|ponto-e-vírgula|tab|pipe — colunas nome,telefone ou só telefone
+
 ## GROQ API — Modelos Ativos (atualizado 2025-09)
 - Projeto Groq: org_01m3a7jvd2e6s874cptyc8qmf0 (Personal / Default Project)
 - Habilitar em: console.groq.com → Project → Limits → Allowed Models
