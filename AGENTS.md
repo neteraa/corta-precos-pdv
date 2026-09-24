@@ -370,15 +370,32 @@ curl https://ws-relay-production-42a7.up.railway.app/health
   → Usa ArrowLeft icon + navigate(-1) na cor do themeColor
 
 ## ENTREGA — src/pages/Entrega.jsx (atualizado 2025-09)
-- status awaiting_pix: label "Aguardando PIX", cor amber (=pending)
-  → Bot salva com status 'awaiting_pix' (era 'pending')
-  → ACTIVE_STATUS inclui awaiting_pix
+- STATUS: awaiting_pix | pending | confirmed | delivering | delivered | cancelled
+  → awaiting_pix = borda + sombra âmbar (igual a pending)
+  → isAwaitingPix = status === 'awaiting_pix' || status === 'pending' (guard p/ borda + botão)
+- TOTAL model: order.total = produtos SOMENTE (sem entrega); PIX TOTAL = total + deliveryFee(7)
 - Botão "✅ PIX Confirmado" (verde gradiente, só para awaiting_pix/pending):
   → 1. PATCH /api/delivery → status 'confirmed'
   → 2. POST /api/wa-send → instance=storeId, envia msg ao cliente
   → Mensagem WA: "🎉 Olá, {nome}! Seu PIX foi confirmado! Estamos preparando seu pedido..."
   → pixResult: null | 'ok' | 'error' — feedback visual no botão por 4s
   → storeId passado como prop de Entrega para OrderCard
+
+## DASHBOARD — src/pages/Dashboard.jsx (delivery widget 2025-09)
+- deliveryStats: fetched via useEffect → GET /api/delivery?storeId + processado no cliente
+  → thisMonth: pedidos do mês corrente
+  → revenue: soma de (total + deliveryFee) dos pedidos com status='delivered'
+  → awaiting: orders com awaiting_pix ou pending (ATIVOS — todos, não só do mês)
+  → Widget só aparece se storeId !== 'default' e a API retornar ok
+
+## PWA ICONS — public/ (atualizado 2025-09)
+- icon.svg = logo Corta Preços (tesoura + price tag + wordmark CORTA PREÇOS)
+- icon-192.png = renderizado com sharp.js do SVG (17KB real)
+- icon-512.png = renderizado com sharp.js do SVG (50KB real)
+- manifest.json → "purpose": "any maskable" em ambos os tamanhos
+- index.html → <link rel="apple-touch-icon" href="/icon-192.png" />
+- Para REGENERAR os ícones:
+  node -e "const s=require('sharp'),f=require('fs');const b=Buffer.from(f.readFileSync('public/icon.svg','utf8'));Promise.all([s(b).resize(192,192).png().toFile('public/icon-192.png'),s(b).resize(512,512).png().toFile('public/icon-512.png')])"
 
 ## WA-BOT DELIVERY — netlify/functions/wa-bot.js (atualizado 2025-09)
 - MAX_HISTORY = 12 (era 4) — garante que endereço + itens + total ficam no contexto do LLM
