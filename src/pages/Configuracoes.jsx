@@ -591,7 +591,9 @@ function MarketBotProfileSection({ storeId }) {
 }
 
 export default function Configuracoes() {
-  const { products, sales, customers, importProducts, operators, upsertOperator, deleteOperator, syncOperators, clearBusinessData } = useStore()
+  const { products, sales, customers, promos, operators, cashMovements, importProducts,
+          upsertOperator, deleteOperator, syncOperators, clearBusinessData, bulkUpsertProducts,
+          upsertPromo, upsertCustomer } = useStore()
   const [clearing, setClearing] = useState(null) // null | 'confirm-products' | 'confirm-all' | 'done'
   const { settings, setSettings } = usePrinter()
   const [form, setForm] = useState(() => ({
@@ -754,10 +756,50 @@ export default function Configuracoes() {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const exportBackup = () => {
-    const data = JSON.stringify({ products, sales, customers, exportedAt: new Date().toISOString() }, null, 2)
-    const blob = new Blob([data], { type: 'application/json' })
+    const storeId = getConfiguredStoreId() || 'default'
+    const payload = {
+      version: 2,
+      storeId,
+      storeName: settings.storeName || storeId,
+      exportedAt: new Date().toISOString(),
+      products,
+      sales,
+      customers,
+      promos: promos || [],
+      operators: operators || [],
+      cashMovements: cashMovements || [],
+      settings: (() => { const { logoImage, ...s } = settings; return s })(),
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
-    a.download = `cortaprecos-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click()
+    a.download = `backup-${(settings.storeName || storeId).replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.json`
+    a.click(); URL.revokeObjectURL(a.href)
+  }
+
+  const importBackup = async (e) => {
+    const file = e.target.files?.[0]; if (!file) return
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      if (!data.products && !data.customers && !data.sales)
+        return alert('❌ Arquivo de backup inválido.')
+      const confirm = window.confirm(
+        `Restaurar backup de ${data.storeName || 'mercado'}?\n` +
+        `• ${(data.products||[]).length} produtos\n` +
+        `• ${(data.customers||[]).length} clientes\n` +
+        `• ${(data.sales||[]).length} vendas\n` +
+        `• ${(data.promos||[]).length} promoções\n\n` +
+        `Dados atuais NÃO serão apagados — apenas mesclados.`
+      )
+      if (!confirm) return
+      if (data.products?.length) bulkUpsertProducts(data.products)
+      if (data.customers?.length) data.customers.forEach(c => upsertCustomer(c))
+      if (data.promos?.length) data.promos.forEach(p => upsertPromo(p))
+      alert(`✅ Backup restaurado com sucesso!\n${(data.products||[]).length} produtos importados.`)
+    } catch (err) {
+      alert('❌ Erro ao restaurar: ' + err.message)
+    }
+    e.target.value = ''
   }
 
   const handleImportCsv = async (e) => {
@@ -952,11 +994,28 @@ export default function Configuracoes() {
       </Section>
 
       {/* ── Backup ─────────────────────────────────────────────── */}
-      <Section icon={Download} title="Backup & Exportação">
-        <p className="text-sm text-gray-500 mb-3">Exporta todos os dados em JSON.</p>
-        <button onClick={exportBackup} className="btn-ghost">
-          <Download className="w-4 h-4" /> Exportar backup (.json)
-        </button>
+      <Section icon={Download} title="Backup & Restauração">
+        {/* storeId badge — confirma isolamento multi-tenant */}
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-gray-900 border border-gray-800">
+          <span className="text-xs font-black text-green-400">🔐 DADOS ISOLADOS</span>
+          <span className="font-mono text-xs text-gray-400 flex-1 truncate">{getConfiguredStoreId() || 'default'}</span>
+          <span className="text-[10px] text-gray-600">storeId único</span>
+        </div>
+        <p className="text-xs text-gray-500 mb-4">
+          Inclui: <strong className="text-gray-400">{products.length} produtos</strong> · {customers.length} clientes · {sales.length} vendas · {(promos||[]).length} promoções · {(operators||[]).length} operadores
+        </p>
+        <div className="flex gap-3 flex-wrap">
+          <button onClick={exportBackup} className="btn-primary">
+            <Download className="w-4 h-4" /> Salvar backup no computador
+          </button>
+          <label className="btn-ghost cursor-pointer">
+            <Upload className="w-4 h-4" /> Restaurar backup (.json)
+            <input type="file" accept=".json" className="hidden" onChange={importBackup} />
+          </label>
+        </div>
+        <p className="text-xs text-gray-500 mt-3">
+          💡 Restaurar mescla os dados — não apaga o que já existe.
+        </p>
       </Section>
 
       {/* ── Status ─────────────────────────────────────────────── */}

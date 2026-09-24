@@ -24,6 +24,11 @@
   status = 200
 
 [[redirects]]
+  from   = "/api/zara-chat"
+  to     = "/.netlify/functions/zara-chat"
+  status = 200
+
+[[redirects]]
   from   = "/api/priceref"
   to     = "/.netlify/functions/priceref"
   status = 200

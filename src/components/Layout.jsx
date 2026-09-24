@@ -25,6 +25,7 @@ class PageErrorBoundary extends Component {
   }
 }
 import { ZSMark } from './ZatendeStokLogo.jsx'
+import ZaraChat from './ZaraChat.jsx'
 import {
   LayoutDashboard, ShoppingCart, Package, Receipt,
   Warehouse, Users, Settings, Menu,
@@ -540,6 +541,9 @@ export default function Layout() {
 
       {/* Icon tour overlay */}
       {showTour && <IconTour onClose={closeTour} />}
+
+      {/* Zara — chat de suporte IA (global) */}
+      <ZaraChat />
     </div>
   )
 }
