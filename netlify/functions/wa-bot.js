@@ -130,7 +130,8 @@ FLUXO DE ENTREGA (siga SEMPRE nessa ordem exata):
    <zs_delivery>{"phone":"NUMERO_CLIENTE","name":"NOME","address":"ENDEREÇO","items":"LISTA DE ITENS","total":TOTAL_FLOAT,"deliveryFee":7}</zs_delivery>
 
 REGRAS DO COMPROVANTE:
-- Se a mensagem for "[comprovante enviado]" → o cliente mandou foto do comprovante. Responda: "Comprovante recebido! ✅ Seu pedido está sendo preparado e chega em breve. Obrigado! 🛵"
+- Se a mensagem for "[comprovante enviado]" → o cliente mandou o comprovante do PIX. Responda: "Comprovante recebido! ✅ Seu pedido está sendo preparado e chega em breve. Obrigado! 🛵"
+- Se a mensagem for "[imagem enviada]" → cliente mandou uma foto qualquer (produto, dúvida, etc.) — NÃO é comprovante. Pergunte o que ele precisa: "Que foto! O que você tá querendo? Me conta que eu te ajudo 😊"
 - Se cliente apenas disser "paguei" sem comprovante → responda "Ótimo! Consegue mandar o comprovante pra gente confirmar? 📸"
 - NUNCA cancele pedido por falta de comprovante — apenas incentive o envio
 
@@ -344,7 +345,8 @@ Sempre que souber ou atualizar dados, inclua ao FINAL da resposta (cliente não 
 - Inclua só os campos que souber`
 
 /** Extrai o texto de qualquer tipo de mensagem do Evolution API.
- *  Imagens sem legenda → "[comprovante enviado]" para que o bot responda ao pagamento.
+ *  Imagens sem legenda → "[imagem enviada]" (genérico).
+ *  A lógica de comprovante é decidida pelo contexto da conversa, não aqui.
  */
 function extractText(data) {
   const msg = data?.message
@@ -354,7 +356,7 @@ function extractText(data) {
     msg.extendedTextMessage?.text ||
     msg.imageMessage?.caption ||
     msg.videoMessage?.caption ||
-    (msg.imageMessage   ? '[comprovante enviado]' : null) ||
+    (msg.imageMessage ? '[imagem enviada]' : null) ||
     null
   )
 }
@@ -623,8 +625,20 @@ export default async (req, context) => {
         systemMsg += `\n\n📌 Cliente: ${senderName}. Use o nome naturalmente.`
       }
 
-      pushHistory(senderNum, 'user', text)
-      rawReply = await askOpenAI(text, senderNum, systemMsg)
+      // Imagem sem legenda: só vira "[comprovante enviado]" se o bot tinha acabado de pedir
+      let finalText = text
+      if (text === '[imagem enviada]') {
+        const hist = getHistory(senderNum)
+        const lastBot = [...hist].reverse().find(m => m.role === 'assistant')
+        const botPediuComprovante = lastBot?.content &&
+          (lastBot.content.includes('comprovante') ||
+           lastBot.content.includes('📸') ||
+           lastBot.content.includes('Pague via PIX'))
+        if (botPediuComprovante) finalText = '[comprovante enviado]'
+      }
+
+      pushHistory(senderNum, 'user', finalText)
+      rawReply = await askOpenAI(finalText, senderNum, systemMsg)
       if (!rawReply) return new Response('OK', { status: 200 })
 
       // Extrai e salva pedido de entrega se houver
