@@ -124,16 +124,21 @@ FLUXO DE ENTREGA (siga SEMPRE nessa ordem exata):
 3. Calcula: total dos produtos + R$7 entrega = TOTAL FINAL
 4. Manda exatamente esta mensagem de pagamento (substitua os valores):
    "✅ Pedido confirmado! Total: R$XX,XX (produtos + R$7 entrega)\n💳 Pague via PIX:\nCNPJ: 60.662.362/0001-70\nFavorecido: Corta Preços\nApós pagar, me manda o comprovante aqui 📸"
-5. Quando cliente confirmar pagamento OU mandar comprovante, responde:
-   "Perfeito! 🎉 Seu pedido está sendo preparado. Entregamos em até [30-60min]. Qualquer dúvida é só chamar! 🛵"
-6. Registra o pedido (tag interna, nunca mostre ao cliente):
-   <zs_delivery>{"phone":"NUMERO_CLIENTE","name":"NOME","address":"ENDEREÇO","items":"LISTA DE ITENS","total":TOTAL_FLOAT,"deliveryFee":7}</zs_delivery>
+5. Quando a mensagem for "[comprovante enviado]":
+   OBRIGATÓRIO: inclua SEMPRE na sua resposta a tag abaixo (ANTES da mensagem ao cliente).
+   A tag é interna — o sistema a remove automaticamente. NUNCA omita a tag nessa situação.
+
+   <zs_delivery>{"phone":"NUMERO_DO_CLIENTE","name":"NOME_DO_CLIENTE","address":"ENDEREÇO_COMPLETO","items":"LISTA_DE_ITENS_COM_QTD","total":VALOR_TOTAL_FLOAT,"deliveryFee":7}</zs_delivery>
+
+   Depois da tag, escreva ao cliente:
+   "Comprovante recebido! ✅ Seu pedido está sendo preparado. Chega em até 30-60min 🛵 Obrigado!"
 
 REGRAS DO COMPROVANTE:
-- Se a mensagem for "[comprovante enviado]" → o cliente mandou o comprovante do PIX. Responda: "Comprovante recebido! ✅ Seu pedido está sendo preparado e chega em breve. Obrigado! 🛵"
-- Se a mensagem for "[imagem enviada]" → cliente mandou uma foto qualquer (produto, dúvida, etc.) — NÃO é comprovante. Pergunte o que ele precisa: "Que foto! O que você tá querendo? Me conta que eu te ajudo 😊"
-- Se cliente apenas disser "paguei" sem comprovante → responda "Ótimo! Consegue mandar o comprovante pra gente confirmar? 📸"
-- NUNCA cancele pedido por falta de comprovante — apenas incentive o envio
+- "[comprovante enviado]" → CONFIRME e emita a tag <zs_delivery> como descrito acima
+- "[imagem enviada]" → NÃO é comprovante automático. Pergunte: "Que foto! O que você tá querendo? 😊"
+- Cliente diz "paguei" sem foto → "Consegue mandar o comprovante pra gente confirmar? 📸"
+- NUNCA cancele pedido — apenas incentive o envio do comprovante
+- O TOTAL da tag deve ser o valor COMPLETO incluindo R$7 de entrega
 
 ━━━━━━━━━━━━━━━━━━━━━━
 🧠 COMO SE COMPORTAR
@@ -512,8 +517,9 @@ function parseLeadTag(rawReply) {
 
 // Memória de conversa por contato — mantém contexto entre mensagens
 // (dura enquanto a instância da função estiver quente — ~minutos/horas)
-const conversations = new Map()   // senderNum → [{role, content}, ...]
-const MAX_HISTORY   = 4           // 4 mensagens (2 pares) — contexto suficiente, tokens mínimos
+const conversations  = new Map()   // senderNum → [{role, content}, ...]
+const MAX_HISTORY    = 12          // 12 msgs — garante endereço + itens + total no contexto delivery
+const pendingOrders  = new Map()   // senderNum → draft order salvo quando bot manda PIX, usado como fallback
 
 // ─── Rate limiting por número ─────────────────────────────────────────────────
 // Evita dreno de crédito por spam ou loops involuntários
@@ -544,6 +550,40 @@ function pushHistory(senderNum, role, content) {
   hist.push({ role, content })
   // Mantém só as últimas MAX_HISTORY mensagens pra não explodir o contexto
   if (hist.length > MAX_HISTORY) hist.splice(0, hist.length - MAX_HISTORY)
+}
+
+/**
+ * Quando o bot envia a mensagem de pagamento PIX (passo 4 do fluxo),
+ * guarda um draft do pedido extraído da conversa.
+ * Fallback: usado em saveDeliveryFromPending() se o LLM não emitir <zs_delivery>.
+ */
+function maybeStorePendingOrder(botReply, senderNum, senderName) {
+  if (!/pague via pix|cnpj.*60\.662|pagar.*pix/i.test(botReply)) return
+  const totalMatch = botReply.match(/total[:\s]+(?:r\$)?\s*([\d,.]+)/i)
+                  || botReply.match(/r\$\s*([\d,.]+)\s*\(/i)
+  if (!totalMatch) return
+  const total = parseFloat(totalMatch[1].replace(/\./g, '').replace(',', '.'))
+  if (isNaN(total) || total < 7) return
+
+  const hist = getHistory(senderNum)
+  // Pega última msg do usuário que parece endereço (não é tag [])
+  const addrMsg = [...hist].reverse().find(m =>
+    m.role === 'user' && m.content.length > 5 && !/^\[/.test(m.content)
+  )
+  // Pega msg do usuário que menciona quantidade ou produto
+  const itemsMsg = [...hist].find(m =>
+    m.role === 'user' && /\dx\s|\d+\s*(kg|l\b|un|pack)|coca|arroz|feij|frango|biscoito/i.test(m.content)
+  )
+
+  pendingOrders.set(senderNum, {
+    phone:       senderNum,
+    name:        senderName,
+    address:     addrMsg?.content?.slice(0, 200) || 'Ver conversa WhatsApp',
+    items:       itemsMsg?.content?.slice(0, 300) || 'Ver conversa WhatsApp',
+    total,
+    deliveryFee: 7,
+  })
+  console.log(`wa-bot: pendingOrder armazenado para ${senderNum} — total R$${total}`)
 }
 
 // Track recently processed message IDs to avoid duplicate responses
@@ -750,12 +790,26 @@ export default async (req, context) => {
       rawReply = await askLLM(finalText, senderNum, systemMsg)
       if (!rawReply) return new Response('OK', { status: 200 })
 
-      // Extrai e salva pedido de entrega se houver
+      // Extrai e salva pedido de entrega se LLM emitiu a tag
       const { clean: cpReply, delivery } = parseDeliveryTag(rawReply)
+      let tagSaved = false
       if (delivery && delivery.address) {
         context.waitUntil(saveDeliveryOrder({ ...delivery, waName: senderName || delivery.name || senderNum }))
-        console.log(`wa-bot [CortaPrecos]: delivery registrado para ${senderNum}:`, JSON.stringify(delivery))
+        console.log(`wa-bot [CortaPrecos]: delivery via tag para ${senderNum}:`, JSON.stringify(delivery))
+        tagSaved = true
+        pendingOrders.delete(senderNum) // limpeza — tag salvou, pending não precisa mais
       }
+
+      // Fallback: LLM não emitiu tag mas comprovante chegou e temos pending order
+      if (!tagSaved && finalText === '[comprovante enviado]' && pendingOrders.has(senderNum)) {
+        const pending = pendingOrders.get(senderNum)
+        pendingOrders.delete(senderNum)
+        context.waitUntil(saveDeliveryOrder({ ...pending, waName: senderName }))
+        console.log(`wa-bot [CortaPrecos]: delivery via fallback para ${senderNum}:`, JSON.stringify(pending))
+      }
+
+      // Se bot enviou msg de pagamento PIX, armazena draft do pedido para fallback
+      maybeStorePendingOrder(cpReply, senderNum, senderName)
 
       pushHistory(senderNum, 'assistant', cpReply)
       context.waitUntil(sendReply(senderNum, cpReply, instanceName))
