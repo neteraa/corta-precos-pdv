@@ -102,15 +102,14 @@ export default async (req) => {
   if (!GROQ_KEY && !OPENAI_KEY)
     return jr({ reply: 'Serviço temporariamente indisponível.' }, 503)
 
-  // Candidatos em ordem de preferência — tenta vários modelos Groq
-  // (llama3-8b-8192 decommissioned; llama-3.1-8b-instant → acesso por ToS; gemma2-9b-it → aberto)
+  // Candidatos: Groq (grátis) → OpenAI fallback
+  // Atenção: modelos Groq mais novos exigem aceitar ToS em console.groq.com
+  // Modelos decommissionados em 2025: llama3-8b-8192, gemma2-9b-it, gemma-7b-it, llama-3.1-70b, mixtral
   const GROQ_MODELS = [
-    'gemma2-9b-it',
-    'gemma-7b-it',
-    'llama-3.1-8b-instant',
-    'llama-3.1-70b-versatile',
-    'llama-3.3-70b-versatile',
-    'mixtral-8x7b-32768',
+    'llama-3.1-8b-instant',   // ativo — requer aceite de ToS Meta
+    'llama-3.3-70b-versatile', // ativo — requer aceite de ToS Meta
+    'llama-3.2-3b-preview',    // preview
+    'llama-3.2-1b-preview',    // preview menor
   ]
   const CANDIDATES = [
     ...GROQ_MODELS.map(m => GROQ_KEY && { url: 'https://api.groq.com/openai/v1/chat/completions', model: m, key: GROQ_KEY, timeout: 8000 }),
@@ -159,6 +158,6 @@ export default async (req) => {
     }
   }
 
-  console.error('[zara-chat] all candidates failed:', errors)
-  return jr({ reply: 'Serviço de IA temporariamente indisponível. Tente em alguns instantes.', _errors: errors }, 503)
+  console.error('[zara-chat] all candidates failed:', JSON.stringify(errors))
+  return jr({ reply: 'Assistente temporariamente indisponível. 😔 Use o WhatsApp de suporte: (15) 9979-6930' }, 503)
 }
