@@ -110,6 +110,7 @@ export default async (req) => {
       date,
       sessions: [...(existing.sessions || []), { sessionId, startedAt, endedAt }].slice(-50),
       zones: mergeZones(existing.zones || [], zones),
+      topEvents: (body.topEvents || []).slice(0, 50),
       updatedAt: new Date().toISOString(),
     }
 

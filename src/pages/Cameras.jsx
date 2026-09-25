@@ -1,9 +1,10 @@
 /**
- * /cameras — ZS Analytics de Câmera
+ * /cameras — ZS Analytics de Câmera (v2)
  *
- * Detecção de pessoas + dwell time por zona via TF.js COCO-SSD.
- * Roda 100% no browser — zero custo de infra adicional.
- * Padrão visual e de auth igual ao ScanMobile.
+ * TF.js COCO-SSD: person detection + object detection, IoU tracking,
+ * dwell time por zona, timer individual por pessoa, heatmap acumulado,
+ * log de eventos, alerta WhatsApp, auto-save 5min, export CSV.
+ * Mobile full-screen. 100% browser — zero nova infra.
  */
 
 /* ── IIFE auth — executa antes do React montar ─────────────── */
@@ -25,16 +26,30 @@
 })()
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Video, Settings, Save, Link2, X, Plus } from 'lucide-react'
+import { Video, Settings, Save, Link2, X, Plus, Download, Thermometer, List } from 'lucide-react'
 import { getConfiguredStoreId } from '../utils/auth.js'
 import { getMktStoreId, getMktStoreToken } from '../utils/tenantStorage.js'
 
 /* ── Constants ─────────────────────────────────────────────── */
-const ZONE_COLORS   = ['#22c55e','#3b82f6','#f59e0b','#ec4899','#8b5cf6','#06b6d4']
-const MIN_DWELL_MS  = 5_000   // visitas < 5s são passagens, não contam
+const ZONE_COLORS        = ['#22c55e','#3b82f6','#f59e0b','#ec4899','#8b5cf6','#06b6d4']
+const MIN_DWELL_MS       = 5_000
 const DETECT_INTERVAL_MS = 500
 const PERSON_SCORE_MIN   = 0.5
+const OBJ_SCORE_MIN      = 0.55
 const IOU_MATCH_THRESH   = 0.35
+const OBJ_FLOOD_MS       = 10_000  // anti-flood: não re-logar mesmo obj+zona antes de 10s
+const AUTO_SAVE_MS       = 300_000 // 5 minutos
+const HEAT_RENDER_MS     = 3_000
+const LOG_RENDER_MS      = 2_000
+const EVENT_LOG_MAX      = 200
+
+const OBJECT_EMOJI = {
+  bottle:'🍾', 'wine glass':'🥂', cup:'☕', handbag:'👜', backpack:'🎒',
+  banana:'🍌', apple:'🍎', orange:'🍊', 'hot dog':'🌭', pizza:'🍕',
+  donut:'🍩', cake:'🎂', 'cell phone':'📱', book:'📚', scissors:'✂️',
+  chair:'🪑', 'potted plant':'🌿', umbrella:'☂️', 'shopping bag':'🛍️',
+  knife:'🔪', fork:'🍴', spoon:'🥄', bowl:'🥣', 'teddy bear':'🧸',
+}
 
 /* ── Helpers ───────────────────────────────────────────────── */
 function iou([ax, ay, aw, ah], [bx, by, bw, bh]) {
@@ -60,24 +75,40 @@ function fmtDuration(ms) {
   return `${Math.floor(s / 60)}m ${s % 60}s`
 }
 
+function fmtTime(ts) {
+  return new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
 function loadZones(storeId) {
-  try {
-    return JSON.parse(localStorage.getItem(`zs_camera_zones_${storeId}`) || '[]')
-  } catch { return [] }
+  try { return JSON.parse(localStorage.getItem(`zs_camera_zones_${storeId}`) || '[]') }
+  catch { return [] }
 }
 
 function saveZones(storeId, zones) {
   try { localStorage.setItem(`zs_camera_zones_${storeId}`, JSON.stringify(zones)) } catch {}
 }
 
-/* ── Canvas drawing ─────────────────────────────────────────── */
-function drawOverlay(canvas, persons, zones, configMode, drawingRect) {
+function pushEvent(logRef, ev) {
+  logRef.current.unshift({ ts: Date.now(), ...ev })
+  if (logRef.current.length > EVENT_LOG_MAX) logRef.current.length = EVENT_LOG_MAX
+}
+
+function timerColor(ms) {
+  const s = ms / 1000
+  if (s < 60)  return '#4ade80'
+  if (s < 180) return '#facc15'
+  if (s < 300) return '#fb923c'
+  return '#f87171'
+}
+
+/* ── Canvas drawing (v2: timers + objects) ──────────────────── */
+function drawOverlay(canvas, persons, objects, zones, configMode, drawingRect) {
   if (!canvas) return
   const ctx = canvas.getContext('2d')
   const W = canvas.width, H = canvas.height
   ctx.clearRect(0, 0, W, H)
 
-  // Draw defined zones
+  // Zones
   for (const z of zones) {
     const rx = z.x * W, ry = z.y * H, rw = z.w * W, rh = z.h * H
     ctx.fillStyle = z.color + '1a'
@@ -86,13 +117,12 @@ function drawOverlay(canvas, persons, zones, configMode, drawingRect) {
     ctx.lineWidth = 2.5
     ctx.setLineDash([])
     ctx.strokeRect(rx, ry, rw, rh)
-    // Zone label
     ctx.fillStyle = z.color
     ctx.font = 'bold 13px system-ui, sans-serif'
     ctx.fillText(z.name, rx + 6, ry + 18)
   }
 
-  // Draw in-progress zone
+  // In-progress zone draw
   if (configMode && drawingRect) {
     const { x, y, w, h } = drawingRect
     ctx.strokeStyle = '#fff'
@@ -104,61 +134,134 @@ function drawOverlay(canvas, persons, zones, configMode, drawingRect) {
     ctx.setLineDash([])
   }
 
-  // Draw person bboxes
-  if (!configMode) {
-    for (const p of persons) {
-      const [px, py, pw, ph] = p.bbox
-      ctx.strokeStyle = '#4ade80'
-      ctx.lineWidth = 2
-      ctx.strokeRect(px, py, pw, ph)
-      ctx.fillStyle = '#4ade80cc'
-      ctx.font = 'bold 11px system-ui'
-      ctx.fillText(`pessoa`, px, Math.max(py - 4, 14))
-    }
+  if (configMode) return
+
+  // Person bboxes + individual timer
+  const now = Date.now()
+  for (const p of persons) {
+    const [px, py, pw] = p.bbox
+    const elapsed = now - (p.entryTime || now)
+    const color = timerColor(elapsed)
+    const label = elapsed < 60000
+      ? `${Math.floor(elapsed / 1000)}s`
+      : `${Math.floor(elapsed / 60000)}m${Math.floor((elapsed % 60000) / 1000)}s`
+
+    ctx.strokeStyle = color
+    ctx.lineWidth = 2
+    ctx.strokeRect(...p.bbox)
+
+    // Timer badge
+    const badgeW = ctx.measureText(label).width + 10
+    const badgeY = Math.max(p.bbox[1] - 22, 0)
+    ctx.fillStyle = color + 'cc'
+    ctx.fillRect(px, badgeY, badgeW, 18)
+    ctx.fillStyle = '#000'
+    ctx.font = 'bold 12px system-ui'
+    ctx.fillText(label, px + 5, badgeY + 13)
+  }
+
+  // Object bboxes (orange dashed + emoji)
+  for (const obj of objects) {
+    const [ox, oy, ow, oh] = obj.bbox
+    ctx.strokeStyle = '#fb923c'
+    ctx.lineWidth = 2
+    ctx.setLineDash([5, 3])
+    ctx.strokeRect(ox, oy, ow, oh)
+    ctx.setLineDash([])
+    ctx.font = '16px system-ui'
+    ctx.fillText(obj.emoji, ox + 2, Math.max(oy - 4, 18))
   }
 }
 
-/* ── Main component ─────────────────────────────────────────── */
+/* ── Zone config modal ──────────────────────────────────────── */
+function ZoneConfigModal({ pending, onSave, onCancel }) {
+  const [name, setName]           = useState('')
+  const [threshold, setThreshold] = useState(0)
+  const [phone, setPhone]         = useState('')
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div style={{ background:'#fff', borderRadius:18, padding:24, width:'100%', maxWidth:360, boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ fontWeight:900, fontSize:17, marginBottom:16 }}>📍 Nova zona</div>
+        <label style={{ fontSize:13, fontWeight:700, color:'#374151' }}>Nome da zona *</label>
+        <input autoFocus value={name} onChange={e => setName(e.target.value)}
+          placeholder="ex: Corredor A, Bebidas, Frios"
+          style={{ width:'100%', border:'1.5px solid #e5e7eb', borderRadius:10, padding:'8px 12px', fontSize:14, marginTop:4, marginBottom:14, boxSizing:'border-box', outline:'none' }} />
+        <label style={{ fontSize:13, fontWeight:700, color:'#374151' }}>🚨 Alertar quando mais de N pessoas (0 = desativado)</label>
+        <input type="number" min="0" max="50" value={threshold} onChange={e => setThreshold(+e.target.value)}
+          style={{ width:'100%', border:'1.5px solid #e5e7eb', borderRadius:10, padding:'8px 12px', fontSize:14, marginTop:4, marginBottom:14, boxSizing:'border-box' }} />
+        <label style={{ fontSize:13, fontWeight:700, color:'#374151' }}>📱 WhatsApp do responsável (com DDD)</label>
+        <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+          placeholder="+55 15 99999-9999"
+          style={{ width:'100%', border:'1.5px solid #e5e7eb', borderRadius:10, padding:'8px 12px', fontSize:14, marginTop:4, marginBottom:20, boxSizing:'border-box' }} />
+        <div style={{ display:'flex', gap:10 }}>
+          <button onClick={onCancel} style={{ flex:1, padding:'10px', borderRadius:10, border:'1.5px solid #e5e7eb', background:'#fff', fontWeight:700, cursor:'pointer' }}>Cancelar</button>
+          <button disabled={!name.trim()} onClick={() => name.trim() && onSave({ name:name.trim(), threshold, phone:phone.replace(/\D/g,'') })}
+            style={{ flex:2, padding:'10px', borderRadius:10, border:'none', background: name.trim() ? '#8b5cf6' : '#e5e7eb', color: name.trim() ? '#fff' : '#9ca3af', fontWeight:800, cursor: name.trim() ? 'pointer' : 'default' }}>
+            Criar zona
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Main component (v2) ────────────────────────────────────── */
 export default function Cameras() {
   const storeId = getMktStoreId() || getConfiguredStoreId()
 
-  // Core state
-  const [modelState, setModelState] = useState('idle') // idle | loading | ready | error
-  const [cameraError, setCameraError] = useState(null)
-  const [zones, setZones]             = useState(() => loadZones(storeId))
-  const [configMode, setConfigMode]   = useState(false)
-  const [liveStats, setLiveStats]     = useState({})   // { [zoneId]: {count, visits, avgMs, maxMs} }
-  const [saving, setSaving]           = useState(false)
-  const [saved, setSaved]             = useState(false)
+  // ── State ───────────────────────────────────────────────────
+  const [modelState, setModelState]     = useState('idle')
+  const [cameraError, setCameraError]   = useState(null)
+  const [zones, setZones]               = useState(() => loadZones(storeId))
+  const [configMode, setConfigMode]     = useState(false)
+  const [pendingZone, setPendingZone]   = useState(null) // normalized rect waiting for modal
+  const [liveStats, setLiveStats]       = useState({})
+  const [logState, setLogState]         = useState([])
+  const [saving, setSaving]             = useState(false)
+  const [saved, setSaved]               = useState(false)
   const [totalPersons, setTotalPersons] = useState(0)
+  const [showLog, setShowLog]           = useState(false)
+  const [showHeatmap, setShowHeatmap]   = useState(false)
+  const [nextSaveIn, setNextSaveIn]     = useState(AUTO_SAVE_MS / 1000)
+  const [isMobile, setIsMobile]         = useState(window.innerWidth <= 640)
+  const [activeTab, setActiveTab]       = useState('stats') // 'stats' | 'log'
 
   // Zone drawing
   const [drawingRect, setDrawingRect] = useState(null)
   const drawStart = useRef(null)
 
-  // Refs (avoid stale closures in intervals)
-  const videoRef   = useRef(null)
-  const canvasRef  = useRef(null)
-  const modelRef   = useRef(null)
-  const streamRef  = useRef(null)
-  const personsRef = useRef([])  // [{id, bbox, lastSeen}]
-  const nextIdRef  = useRef(1)
-  const zonesRef   = useRef(zones)
-  const zoneDataRef = useRef({})  // { [zoneId]: {activePersonIds, entryTimes, visits, totalDwellMs, maxDwellMs, peakCount} }
-  const sessionStart = useRef(new Date().toISOString())
-  const detectTimer  = useRef(null)
-  const statsTimer   = useRef(null)
+  // ── Refs ────────────────────────────────────────────────────
+  const videoRef          = useRef(null)
+  const canvasRef         = useRef(null)
+  const heatCanvasRef     = useRef(null)
+  const modelRef          = useRef(null)
+  const streamRef         = useRef(null)
+  const personsRef        = useRef([])   // [{id, bbox, lastSeen, entryTime}]
+  const nextIdRef         = useRef(1)
+  const zonesRef          = useRef(zones)
+  const zoneDataRef       = useRef({})
+  const eventLogRef       = useRef([])
+  const heatPositionsRef  = useRef([])   // [{x,y}] normalized 0-1
+  const lastObjEventRef   = useRef(new Map()) // 'class:zoneId' → ts
+  const sessionStart      = useRef(new Date().toISOString())
+  const nextSaveAtRef     = useRef(Date.now() + AUTO_SAVE_MS)
 
-  // Keep zonesRef in sync
+  // ── Mobile resize ────────────────────────────────────────────
+  useEffect(() => {
+    const fn = () => setIsMobile(window.innerWidth <= 640)
+    window.addEventListener('resize', fn)
+    return () => window.removeEventListener('resize', fn)
+  }, [])
+
+  // ── Sync zones to ref + init zoneData ───────────────────────
   useEffect(() => {
     zonesRef.current = zones
-    // Init zoneData for new zones
     for (const z of zones) {
       if (!zoneDataRef.current[z.id]) {
         zoneDataRef.current[z.id] = {
-          activePersonIds: new Set(),
-          entryTimes: new Map(),
+          activePersonIds: new Set(), entryTimes: new Map(),
           visits: 0, totalDwellMs: 0, maxDwellMs: 0, peakCount: 0,
+          lastAlertSent: 0,
         }
       }
     }
