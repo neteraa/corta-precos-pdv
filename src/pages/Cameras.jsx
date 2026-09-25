@@ -599,8 +599,9 @@ export default function Cameras() {
     </div>
   )
 
-  const CameraArea = ({ style = {} }) => (
-    <div style={{ position: 'relative', background: '#000', overflow: 'hidden', ...style }}>
+  /* cameraBlock — inlinado nos dois returns para manter identidade do <video> */
+  const cameraBlockMobile = (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 10, background: '#000', overflow: 'hidden' }}>
       <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
       <canvas ref={heatCanvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: showHeatmap ? 0.75 : 0, pointerEvents: 'none', transition: 'opacity 0.3s' }} />
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: configMode ? 'crosshair' : 'default' }}
@@ -611,11 +612,23 @@ export default function Cameras() {
           <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>Carregando modelo COCO-SSD...</span>
         </div>
       )}
-      {configMode && (
-        <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(139,92,246,0.9)', color: '#fff', padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', zIndex: 5 }}>
-          ✏️ Arraste para definir uma zona
+      {configMode && <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(139,92,246,0.9)', color: '#fff', padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', zIndex: 5 }}>✏️ Arraste para definir uma zona</div>}
+    </div>
+  )
+
+  const cameraBlockDesktop = (
+    <div style={{ position: 'relative', background: '#000', overflow: 'hidden', borderRadius: 16, aspectRatio: '16/9' }}>
+      <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      <canvas ref={heatCanvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: showHeatmap ? 0.75 : 0, pointerEvents: 'none', transition: 'opacity 0.3s' }} />
+      <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: configMode ? 'crosshair' : 'default' }}
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} />
+      {modelState === 'loading' && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', gap: 12 }}>
+          <div style={{ width: 40, height: 40, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: '#8b5cf6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>Carregando modelo COCO-SSD...</span>
         </div>
       )}
+      {configMode && <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(139,92,246,0.9)', color: '#fff', padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', zIndex: 5 }}>✏️ Arraste para definir uma zona</div>}
     </div>
   )
 
@@ -632,7 +645,7 @@ export default function Cameras() {
   if (isMobile) return (
     <>
       {pendingZone && <ZoneConfigModal pending={pendingZone} onSave={handleZoneSave} onCancel={() => setPendingZone(null)} />}
-      <CameraArea style={{ position: 'fixed', inset: 0, zIndex: 10, borderRadius: 0 }} />
+      {cameraBlockMobile}
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 100%)' }}>
         <div style={{ color: '#fff', fontWeight: 900, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
           <Video style={{ width: 16, height: 16, color: '#a78bfa' }} /> Analytics
@@ -704,7 +717,7 @@ export default function Cameras() {
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, alignItems: 'start' }}>
-        <CameraArea style={{ borderRadius: 16, aspectRatio: '16/9' }} />
+        {cameraBlockDesktop}
         <div>
           <div style={{ display: 'flex', marginBottom: 12, background: '#f3f4f6', borderRadius: 12, padding: 3 }}>
             {[{ id: 'stats', label: '📊 Stats' }, { id: 'log', label: '📋 Eventos' }].map(t => (
