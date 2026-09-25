@@ -381,22 +381,23 @@ curl https://ws-relay-production-42a7.up.railway.app/health
   → pixResult: null | 'ok' | 'error' — feedback visual no botão por 4s
   → storeId passado como prop de Entrega para OrderCard
 
-## CAMERAS — src/pages/Cameras.jsx (novo 2025-09)
+## CAMERAS — src/pages/Cameras.jsx (v2 2025-09)
 - Rota: /cameras | Auth: admin/gerente | Nav: GESTAO "Analytics 📹" (badge NOVO)
-- Stack: TF.js COCO-SSD (browser-only, ~2s load) | React + Canvas overlay
-- IIFE auth no topo: ?storeId=X&t=TOKEN → auto-login como scanner (igual ScanMobile)
-- Detecção: setInterval 500ms → model.detect(videoEl) → filtra class=person, score≥0.5
-- Tracking IoU: bbox novo ∩/∪ bbox anterior > 0.35 → mesma pessoa, senão novo ID
-- Zonas: retângulos em % do frame, salvas em localStorage `zs_camera_zones_{storeId}`
-  - Limite: 6 zonas | 6 cores rotativas | configuração por pointer drag no canvas
-  - Modo config: usuário arrasta no canvas → prompt para nome → salva
-- Dwell time: MIN_DWELL_MS=5000 (passagens rápidas <5s não contam)
-  - activePersonIds: Set por zona | entryTimes: Map<id, ts>
-  - Saída → dwell calculado → visits++, totalDwellMs+=, maxDwellMs=Math.max
-- Live stats: setInterval 1s → atualiza estado de exibição (count, visits, avgMs, maxMs)
-- Salvar sessão: POST /api/cameras-analytics → merge com blob do dia
-- Link compartilhável: getMktStoreToken() → URL /cameras?storeId=X&t=TOKEN
-- Layout: grid 1fr/320px (câmera | painel de stats) | responsive
+- Stack: TF.js COCO-SSD lite_mobilenet_v2 (browser-only, ~2s load) | React + 2x Canvas
+- IIFE auth: ?storeId=X&t=TOKEN → auto-login scanner (igual ScanMobile)
+- V2 FEATURES:
+  - Timer individual por pessoa: entryTime preservado no IoU tracking → badge colorido (verde→amarelo→vermelho) no canvas
+  - Object detection: rawAll filtrado por OBJECT_EMOJI (24 classes) → bbox laranja tracejado + emoji
+  - Event log: eventLogRef (circular 200 itens) → zone_entry | zone_exit | object | alert | logState sync 2s
+  - Heatmap: segundo canvas (heatCanvasRef) + radial gradients 3s | toggle ON/OFF | limpar buffer
+  - WA alert: z.alertThreshold + z.alertPhone → POST /api/wa-send se threshold atingido (cooldown 5min)
+  - Auto-save: setInterval 300s silencioso + countdown nextSaveIn na topbar
+  - Export CSV: eventos + resumo por zona → Blob download
+  - Mobile full-screen: isMobile (≤640px) → fixed video + overlay stats + topbar ícones
+  - ZoneConfigModal: modal React com nome + alertThreshold + alertPhone (substitui window.prompt)
+  - Tabs desktop: 📊 Stats | 📋 Eventos no painel lateral
+- Zonas: retângulos em % do frame | saveZones em localStorage `zs_camera_zones_{storeId}` | max 6
+- Dwell time: MIN_DWELL_MS=5000 | entryTimes Map<id,ts> | saída ≥5s → visits++/totalDwellMs/maxDwellMs
 
 ## CAMERAS-ANALYTICS — netlify/functions/cameras-analytics.js (novo 2025-09)
 - GET  /api/cameras-analytics?storeId=X&date=YYYY-MM-DD → dados do dia (padrão: hoje)
