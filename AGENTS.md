@@ -381,6 +381,31 @@ curl https://ws-relay-production-42a7.up.railway.app/health
   → pixResult: null | 'ok' | 'error' — feedback visual no botão por 4s
   → storeId passado como prop de Entrega para OrderCard
 
+## CAMERAS — src/pages/Cameras.jsx (novo 2025-09)
+- Rota: /cameras | Auth: admin/gerente | Nav: GESTAO "Analytics 📹" (badge NOVO)
+- Stack: TF.js COCO-SSD (browser-only, ~2s load) | React + Canvas overlay
+- IIFE auth no topo: ?storeId=X&t=TOKEN → auto-login como scanner (igual ScanMobile)
+- Detecção: setInterval 500ms → model.detect(videoEl) → filtra class=person, score≥0.5
+- Tracking IoU: bbox novo ∩/∪ bbox anterior > 0.35 → mesma pessoa, senão novo ID
+- Zonas: retângulos em % do frame, salvas em localStorage `zs_camera_zones_{storeId}`
+  - Limite: 6 zonas | 6 cores rotativas | configuração por pointer drag no canvas
+  - Modo config: usuário arrasta no canvas → prompt para nome → salva
+- Dwell time: MIN_DWELL_MS=5000 (passagens rápidas <5s não contam)
+  - activePersonIds: Set por zona | entryTimes: Map<id, ts>
+  - Saída → dwell calculado → visits++, totalDwellMs+=, maxDwellMs=Math.max
+- Live stats: setInterval 1s → atualiza estado de exibição (count, visits, avgMs, maxMs)
+- Salvar sessão: POST /api/cameras-analytics → merge com blob do dia
+- Link compartilhável: getMktStoreToken() → URL /cameras?storeId=X&t=TOKEN
+- Layout: grid 1fr/320px (câmera | painel de stats) | responsive
+
+## CAMERAS-ANALYTICS — netlify/functions/cameras-analytics.js (novo 2025-09)
+- GET  /api/cameras-analytics?storeId=X&date=YYYY-MM-DD → dados do dia (padrão: hoje)
+  → com &range=7 → array dos últimos 7 dias
+- POST /api/cameras-analytics → merge acumulativo por zona (visitas, avg ponderado, maxDwell)
+- Blob store: 'corta-precos' | Key: {storeId}:zs_cameras:{YYYY-MM-DD}
+- Estrutura blob: { date, sessions:[], zones:[{name,visits,avgDwellSec,maxDwellSec,peakCount}] }
+- PARA REGENERAR chunk TF.js: vendor-tfjs no vite.config.js manualChunks (311KB gzip)
+
 ## DASHBOARD — src/pages/Dashboard.jsx (delivery widget 2025-09)
 - deliveryStats: fetched via useEffect → GET /api/delivery?storeId + processado no cliente
   → thisMonth: pedidos do mês corrente
