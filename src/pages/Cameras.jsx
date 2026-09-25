@@ -691,7 +691,7 @@ export default function Cameras() {
       {cameraBlockMobile}
       
       {/* Topbar com botões */}
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 100%)' }}>
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)', background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 100%)' }}>
         <div style={{ color: '#fff', fontWeight: 900, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
           <Video style={{ width: 16, height: 16, color: '#a78bfa' }} /> Analytics
         </div>
@@ -710,7 +710,7 @@ export default function Cameras() {
 
       {/* Card de métricas compacto - sempre visível */}
       {!showLog && !configMode && modelState === 'ready' && (
-        <div style={{ position: 'fixed', top: 60, left: 12, right: 12, zIndex: 19, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', borderRadius: 16, padding: '12px 14px', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+        <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 60px)', left: 12, right: 12, zIndex: 19, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', borderRadius: 16, padding: '12px 14px', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: zones.length > 0 ? 10 : 0 }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
@@ -755,7 +755,7 @@ export default function Cameras() {
       )}
 
       {/* Painel inferior completo */}
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(12px)', padding: '14px 16px', maxHeight: '45vh', overflowY: 'auto', borderTop: '2px solid rgba(139,92,246,0.4)' }}>
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(12px)', padding: '14px 16px', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 14px)', maxHeight: '45vh', overflowY: 'auto', borderTop: '2px solid rgba(139,92,246,0.4)' }}>
         {showLog ? (
           <><div style={{ color: '#a78bfa', fontWeight: 800, fontSize: 13, marginBottom: 8 }}>📋 Eventos</div><LogPanel logState={logState} /></>
         ) : (
