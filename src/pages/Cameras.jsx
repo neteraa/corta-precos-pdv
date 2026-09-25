@@ -34,21 +34,48 @@ import { getMktStoreId, getMktStoreToken } from '../utils/tenantStorage.js'
 const ZONE_COLORS        = ['#22c55e','#3b82f6','#f59e0b','#ec4899','#8b5cf6','#06b6d4']
 const MIN_DWELL_MS       = 5_000
 const DETECT_INTERVAL_MS = 500
-const PERSON_SCORE_MIN   = 0.5
-const OBJ_SCORE_MIN      = 0.55
+const PERSON_SCORE_MIN   = 0.45   // pessoas: threshold razoável
+const OBJ_SCORE_MIN      = 0.30   // objetos: 0.30 capta oclusão parcial e ângulos difíceis
 const IOU_MATCH_THRESH   = 0.35
-const OBJ_FLOOD_MS       = 10_000  // anti-flood: não re-logar mesmo obj+zona antes de 10s
-const AUTO_SAVE_MS       = 300_000 // 5 minutos
+const OBJ_FLOOD_MS       = 8_000  // anti-flood: não re-logar mesmo obj+zona antes de 8s
+const AUTO_SAVE_MS       = 300_000
 const HEAT_RENDER_MS     = 3_000
 const LOG_RENDER_MS      = 2_000
 const EVENT_LOG_MAX      = 200
 
+// Todas as 79 classes COCO-SSD (exceto 'person') com emoji representativo
 const OBJECT_EMOJI = {
-  bottle:'🍾', 'wine glass':'🥂', cup:'☕', handbag:'👜', backpack:'🎒',
-  banana:'🍌', apple:'🍎', orange:'🍊', 'hot dog':'🌭', pizza:'🍕',
-  donut:'🍩', cake:'🎂', 'cell phone':'📱', book:'📚', scissors:'✂️',
-  chair:'🪑', 'potted plant':'🌿', umbrella:'☂️', 'shopping bag':'🛍️',
-  knife:'🔪', fork:'🍴', spoon:'🥄', bowl:'🥣', 'teddy bear':'🧸',
+  // Alimentos e bebidas
+  bottle:'🍶', 'wine glass':'🥂', cup:'☕', bowl:'🥣',
+  banana:'🍌', apple:'🍎', sandwich:'🥪', orange:'🍊',
+  broccoli:'🥦', carrot:'🥕', 'hot dog':'🌭', pizza:'🍕',
+  donut:'🍩', cake:'🎂', fork:'🍴', knife:'🔪', spoon:'🥄',
+  // Eletrônicos
+  'cell phone':'📱', laptop:'💻', tv:'📺', keyboard:'⌨️',
+  mouse:'🖱️', remote:'🎮',
+  // Eletrodomésticos
+  microwave:'🫙', oven:'♨️', toaster:'🍞', refrigerator:'🧊', sink:'🚰',
+  // Acessórios / vestuário
+  backpack:'🎒', handbag:'👜', umbrella:'☂️', suitcase:'🧳', tie:'👔',
+  // Móveis / decoração
+  chair:'🪑', couch:'🛋️', bed:'🛏️', 'dining table':'🪑',
+  'potted plant':'🌿', vase:'🏺', clock:'🕐', book:'📚',
+  // Brinquedos / esportes
+  'teddy bear':'🧸', 'sports ball':'⚽', 'tennis racket':'🎾',
+  frisbee:'🥏', skis:'🎿', snowboard:'🏂', kite:'🪁',
+  'baseball bat':'🏏', 'baseball glove':'🧤', skateboard:'🛹',
+  surfboard:'🏄', scissors:'✂️',
+  // Higiene
+  'hair drier':'💨', toothbrush:'🪥',
+  // Outros objetos
+  toilet:'🚽', bench:'🪑', 'traffic light':'🚦',
+  'fire hydrant':'🚒', 'stop sign':'🛑', 'parking meter':'🅿️',
+  // Animais
+  bird:'🐦', cat:'🐱', dog:'🐶', horse:'🐴', sheep:'🐑',
+  cow:'🐄', elephant:'🐘', bear:'🐻', zebra:'🦓', giraffe:'🦒',
+  // Veículos (útil em estacionamentos/entradas)
+  bicycle:'🚲', car:'🚗', motorcycle:'🏍️', airplane:'✈️',
+  bus:'🚌', train:'🚂', truck:'🚚', boat:'⛵',
 }
 
 /* ── Helpers ───────────────────────────────────────────────── */
@@ -160,7 +187,7 @@ function drawOverlay(canvas, persons, objects, zones, configMode, drawingRect) {
     ctx.fillText(label, px + 5, badgeY + 13)
   }
 
-  // Object bboxes (orange dashed + emoji)
+  // Object bboxes (orange dashed + emoji + classe + score)
   for (const obj of objects) {
     const [ox, oy, ow, oh] = obj.bbox
     ctx.strokeStyle = '#fb923c'
@@ -168,9 +195,103 @@ function drawOverlay(canvas, persons, objects, zones, configMode, drawingRect) {
     ctx.setLineDash([5, 3])
     ctx.strokeRect(ox, oy, ow, oh)
     ctx.setLineDash([])
-    ctx.font = '16px system-ui'
-    ctx.fillText(obj.emoji, ox + 2, Math.max(oy - 4, 18))
+    // Badge: emoji + nome + score
+    const scoreStr = `${obj.emoji} ${obj.class} ${Math.round(obj.score * 100)}%`
+    const badgeW = ctx.measureText(scoreStr).width + 12
+    const badgeY = Math.max(oy - 20, 0)
+    ctx.fillStyle = 'rgba(251,146,60,0.85)'
+    ctx.fillRect(ox, badgeY, badgeW, 18)
+    ctx.fillStyle = '#fff'
+    ctx.font = 'bold 11px system-ui'
+    ctx.fillText(scoreStr, ox + 6, badgeY + 13)
   }
+}
+
+/* ── Stats panel (fora do Cameras para evitar re-mount) ──────── */
+function StatsPanel({ zones, liveStats, totalPersons, configMode, removeZone, setConfigMode }) {
+  return (
+    <>
+      <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1.5px solid #e5e7eb', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: 1, marginBottom: 8 }}>SESSÃO AO VIVO</div>
+        <div style={{ display: 'flex', gap: 20 }}>
+          <div>
+            <div style={{ fontSize: 28, fontWeight: 900, color: '#8b5cf6' }}>{totalPersons}</div>
+            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>pessoas agora</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 28, fontWeight: 900, color: '#374151' }}>{Object.values(liveStats).reduce((s, z) => s + z.visits, 0)}</div>
+            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>visitas totais</div>
+          </div>
+        </div>
+      </div>
+      {zones.length === 0 ? (
+        <div style={{ background: '#faf5ff', border: '1.5px dashed #d8b4fe', borderRadius: 14, padding: 20, textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📍</div>
+          <div style={{ fontWeight: 800, fontSize: 14, color: '#7c3aed', marginBottom: 4 }}>Nenhuma zona definida</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>Clique em <strong>Configurar zonas</strong> e arraste sobre a câmera para definir áreas de interesse (ex: Bebidas, Corredor A, Frios).</div>
+        </div>
+      ) : zones.map(z => {
+        const s = liveStats[z.id] || {}
+        const fmtMs = ms => { if (!ms || ms < 1000) return '0s'; const sec = Math.floor(ms/1000); return sec < 60 ? `${sec}s` : `${Math.floor(sec/60)}m ${sec%60}s` }
+        return (
+          <div key={z.id} style={{ background: '#fff', borderRadius: 14, padding: '12px 16px', border: `1.5px solid ${z.color}33`, borderLeft: `4px solid ${z.color}`, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontWeight: 800, fontSize: 14, color: '#111827' }}>{z.name}</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {z.alertThreshold > 0 && <span style={{ fontSize: 11, color: '#9ca3af' }}>🚨{z.alertThreshold}</span>}
+                <button onClick={() => removeZone(z.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 2 }}><X style={{ width: 14, height: 14 }} /></button>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {[
+                { label: 'Agora', value: `${s.count || 0} pessoa${s.count !== 1 ? 's' : ''}`, color: s.count > 0 ? z.color : '#9ca3af' },
+                { label: 'Visitas', value: s.visits || 0, color: '#374151' },
+                { label: 'Média', value: fmtMs(s.avgMs), color: '#374151' },
+                { label: 'Máx', value: fmtMs(s.maxMs), color: '#374151' },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ background: '#f9fafb', borderRadius: 8, padding: '6px 10px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', letterSpacing: 0.5 }}>{label.toUpperCase()}</div>
+                  <div style={{ fontWeight: 800, fontSize: 15, color, marginTop: 2 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+      {zones.length < 6 && (
+        <button onClick={() => setConfigMode(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px', borderRadius: 12, border: '1.5px dashed #d1d5db', background: 'transparent', color: '#6b7280', fontWeight: 700, fontSize: 13, cursor: 'pointer', width: '100%', marginTop: 4 }}>
+          <Plus style={{ width: 14, height: 14 }} />Nova zona ({zones.length}/6)
+        </button>
+      )}
+    </>
+  )
+}
+
+/* ── Log panel (fora do Cameras para evitar re-mount) ───────── */
+function LogPanel({ logState }) {
+  const evIcon = (e) => ({ zone_entry: '🟢', zone_exit: '🔴', object: e.emoji || '📦', alert: '🚨' }[e.type] || '•')
+  const evText = (e) => {
+    const fmtMs = ms => { if (!ms || ms < 1000) return '0s'; const s = Math.floor(ms/1000); return s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s` }
+    const t = e.ts ? new Date(e.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''
+    if (e.type === 'zone_entry') return `${t} — #${e.personId} entrou em ${e.zone}`
+    if (e.type === 'zone_exit')  return `${t} — #${e.personId} saiu de ${e.zone}${e.dwell ? ' — ' + fmtMs(e.dwell) : ''}`
+    if (e.type === 'object')     return `${t} — ${e.emoji} ${e.objectClass} em ${e.zone}`
+    if (e.type === 'alert')      return `${t} — 🚨 alerta: ${e.zone} lotada`
+    return t
+  }
+  return (
+    <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+      {logState.length === 0
+        ? <div style={{ textAlign: 'center', color: '#9ca3af', padding: 24, fontSize: 13 }}>Nenhum evento ainda.<br />Entre em uma zona para registrar.</div>
+        : logState.map((e, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: '1px solid #f3f4f6', fontSize: 12, alignItems: 'flex-start' }}>
+            <span style={{ width: 18, flexShrink: 0 }}>{evIcon(e)}</span>
+            <span style={{ color: '#374151', lineHeight: 1.4 }}>{evText(e)}</span>
+          </div>
+        ))
+      }
+    </div>
+  )
 }
 
 /* ── Zone config modal ──────────────────────────────────────── */
@@ -314,7 +435,10 @@ export default function Cameras() {
       try { rawAll = await modelRef.current.detect(video) } catch { return }
 
       const detections = rawAll.filter(d => d.class === 'person' && d.score >= PERSON_SCORE_MIN).map(d => ({ bbox: d.bbox }))
-      const detectedObjects = rawAll.filter(d => d.class !== 'person' && d.score >= OBJ_SCORE_MIN && OBJECT_EMOJI[d.class]).map(d => ({ class: d.class, bbox: d.bbox, emoji: OBJECT_EMOJI[d.class] }))
+      // Detecta TODOS os objetos não-pessoa com emoji mapeado — threshold 0.30 capta oclusão parcial
+      const detectedObjects = rawAll
+        .filter(d => d.class !== 'person' && d.score >= OBJ_SCORE_MIN && OBJECT_EMOJI[d.class])
+        .map(d => ({ class: d.class, bbox: d.bbox, emoji: OBJECT_EMOJI[d.class], score: d.score }))
 
       const now = Date.now(), prev = personsRef.current, matched = [], usedPrev = new Set()
       for (const det of detections) {
@@ -516,88 +640,7 @@ export default function Cameras() {
     navigator.clipboard?.writeText(url).then(() => alert('Link copiado! Envie pelo WhatsApp para abrir a câmera no celular dedicado.'))
   }, [storeId])
 
-  const evIcon = (e) => ({ zone_entry: '🟢', zone_exit: '🔴', object: e.emoji || '📦', alert: '🚨' }[e.type] || '•')
-  const evText = (e) => {
-    if (e.type === 'zone_entry') return `#${e.personId} entrou em ${e.zone}`
-    if (e.type === 'zone_exit') return `#${e.personId} saiu de ${e.zone}${e.dwell ? ' — ' + fmtDuration(e.dwell) : ''}`
-    if (e.type === 'object') return `${e.emoji} ${e.objectClass} em ${e.zone}`
-    if (e.type === 'alert') return `alerta enviado: ${e.zone} lotada`
-    return 'evento'
-  }
-
   const autoLabel = nextSaveIn > 60 ? `⏰ auto em ${Math.ceil(nextSaveIn / 60)}min` : nextSaveIn <= 10 ? '⏰ salvando...' : `⏰ ${nextSaveIn}s`
-
-  /* ── Sub-components ─────────────────────────────────────────── */
-  const StatsPanel = () => (
-    <>
-      <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1.5px solid #e5e7eb', marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: 1, marginBottom: 8 }}>SESSÃO AO VIVO</div>
-        <div style={{ display: 'flex', gap: 20 }}>
-          <div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: '#8b5cf6' }}>{totalPersons}</div>
-            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>pessoas agora</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: '#374151' }}>{Object.values(liveStats).reduce((s, z) => s + z.visits, 0)}</div>
-            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>visitas totais</div>
-          </div>
-        </div>
-      </div>
-      {zones.length === 0 ? (
-        <div style={{ background: '#faf5ff', border: '1.5px dashed #d8b4fe', borderRadius: 14, padding: 20, textAlign: 'center' }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>📍</div>
-          <div style={{ fontWeight: 800, fontSize: 14, color: '#7c3aed', marginBottom: 4 }}>Nenhuma zona definida</div>
-          <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>Clique em <strong>Configurar zonas</strong> e arraste sobre a câmera para definir áreas de interesse (ex: Bebidas, Corredor A, Frios).</div>
-        </div>
-      ) : zones.map(z => {
-        const s = liveStats[z.id] || {}
-        return (
-          <div key={z.id} style={{ background: '#fff', borderRadius: 14, padding: '12px 16px', border: `1.5px solid ${z.color}33`, borderLeft: `4px solid ${z.color}`, marginBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontWeight: 800, fontSize: 14, color: '#111827' }}>{z.name}</span>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {z.alertThreshold > 0 && <span style={{ fontSize: 11, color: '#9ca3af' }}>🚨{z.alertThreshold}</span>}
-                <button onClick={() => removeZone(z.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 2 }}><X style={{ width: 14, height: 14 }} /></button>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-              {[
-                { label: 'Agora', value: `${s.count || 0} pessoa${s.count !== 1 ? 's' : ''}`, color: s.count > 0 ? z.color : '#9ca3af' },
-                { label: 'Visitas', value: s.visits || 0, color: '#374151' },
-                { label: 'Média', value: fmtDuration(s.avgMs), color: '#374151' },
-                { label: 'Máx', value: fmtDuration(s.maxMs), color: '#374151' },
-              ].map(({ label, value, color }) => (
-                <div key={label} style={{ background: '#f9fafb', borderRadius: 8, padding: '6px 10px' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', letterSpacing: 0.5 }}>{label.toUpperCase()}</div>
-                  <div style={{ fontWeight: 800, fontSize: 15, color, marginTop: 2 }}>{value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      })}
-      {zones.length < 6 && (
-        <button onClick={() => setConfigMode(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px', borderRadius: 12, border: '1.5px dashed #d1d5db', background: 'transparent', color: '#6b7280', fontWeight: 700, fontSize: 13, cursor: 'pointer', width: '100%', marginTop: 4 }}>
-          <Plus style={{ width: 14, height: 14 }} />Nova zona ({zones.length}/6)
-        </button>
-      )}
-    </>
-  )
-
-  const LogPanel = () => (
-    <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-      {logState.length === 0
-        ? <div style={{ textAlign: 'center', color: '#9ca3af', padding: 24, fontSize: 13 }}>Nenhum evento ainda.<br />Entre em uma zona para registrar.</div>
-        : logState.map((e, i) => (
-          <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: '1px solid #f3f4f6', fontSize: 12 }}>
-            <span style={{ width: 18, flexShrink: 0 }}>{evIcon(e)}</span>
-            <span style={{ color: '#6b7280', flexShrink: 0 }}>{fmtTime(e.ts)}</span>
-            <span style={{ color: '#374151' }}>{evText(e)}</span>
-          </div>
-        ))
-      }
-    </div>
-  )
 
   /* cameraBlock — inlinado nos dois returns para manter identidade do <video> */
   const cameraBlockMobile = (
@@ -664,7 +707,7 @@ export default function Cameras() {
       </div>
       <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20, background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(8px)', padding: '12px 16px', maxHeight: '40vh', overflowY: 'auto' }}>
         {showLog ? (
-          <><div style={{ color: '#a78bfa', fontWeight: 800, fontSize: 13, marginBottom: 8 }}>📋 Eventos</div><LogPanel /></>
+          <><div style={{ color: '#a78bfa', fontWeight: 800, fontSize: 13, marginBottom: 8 }}>📋 Eventos</div><LogPanel logState={logState} /></>
         ) : (
           <>
             <div style={{ display: 'flex', gap: 16, marginBottom: 10 }}>
@@ -724,7 +767,10 @@ export default function Cameras() {
               <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, padding: '7px 0', borderRadius: 10, border: 'none', background: activeTab === t.id ? '#fff' : 'transparent', fontWeight: activeTab === t.id ? 800 : 600, fontSize: 13, color: activeTab === t.id ? '#111827' : '#6b7280', cursor: 'pointer', boxShadow: activeTab === t.id ? '0 1px 4px rgba(0,0,0,0.08)' : 'none' }}>{t.label}</button>
             ))}
           </div>
-          {activeTab === 'stats' ? <StatsPanel /> : <LogPanel />}
+          {activeTab === 'stats'
+            ? <StatsPanel zones={zones} liveStats={liveStats} totalPersons={totalPersons} configMode={configMode} removeZone={removeZone} setConfigMode={setConfigMode} />
+            : <LogPanel logState={logState} />
+          }
         </div>
       </div>
       <div style={{ marginTop: 16, padding: '12px 16px', background: '#faf5ff', borderRadius: 12, border: '1px solid #e9d5ff', fontSize: 13, color: '#7c3aed' }}>
