@@ -8,7 +8,7 @@ import {
   ShoppingCart, LayoutDashboard, Package, Receipt,
   Warehouse, Users, HandCoins, BarChart2, Tag,
   Printer, CalendarClock, Megaphone, QrCode, Star, Settings,
-  Monitor, Camera, Truck, Sparkles, Bike, Building2,
+  Monitor, Camera, Truck, Sparkles, Bike, Building2, Video,
   Check, X, AlertTriangle,
 } from 'lucide-react'
 import { usePrinter, getNicheMeta } from '../hooks/usePrinter.js'
@@ -33,6 +33,7 @@ const ALL_MODULES = [
   { to: '/fornecedores', icon: Building2,  label: 'Fornecedores', roles: ['admin','gerente'] },
   { to: '/fiado',        icon: HandCoins,  label: 'Fiado',        roles: null },
   { to: '/relatorio',   icon: BarChart2,       label: 'Relatório',       roles: ['admin','gerente'] },
+  { to: '/cameras',    icon: Video,           label: 'Analytics 📹',    roles: ['admin','gerente'], badge: 'NOVO' },
   // Marketing & Extras
   { to: '/campanhas',   icon: Megaphone,       label: 'Campanhas ZAP',   roles: ['admin','gerente'], badge: 'NOVO' },
   { to: '/fidelidade',  icon: QrCode,          label: 'Fidelidade ZAP',  roles: ['admin','gerente'] },
