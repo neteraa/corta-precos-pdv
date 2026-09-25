@@ -31,7 +31,7 @@ import {
   Warehouse, Users, Settings, Menu,
   QrCode, Tag, Star, Download, Monitor, Camera, HandCoins, LogOut,
   BarChart2, Printer, CalendarClock, Megaphone, RefreshCw, Truck, X, Bike,
-  ArrowLeft, Home,
+  ArrowLeft, Home, Video,
 } from 'lucide-react'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import { useOnlineStatus } from '../hooks/useOnlineStatus.js'
@@ -56,7 +56,8 @@ const GESTAO = [
   { to: '/clientes',     icon: Users,    label: 'Clientes',     roles: ['admin','gerente'] },
   { to: '/fornecedores', icon: Truck,    label: 'Fornecedores', roles: ['admin','gerente'] },
   { to: '/fiado',        icon: HandCoins,label: 'Fiado' },
-  { to: '/relatorio',  icon: BarChart2,       label: 'Relatório',  roles: ['admin','gerente'] },
+  { to: '/relatorio',  icon: BarChart2, label: 'Relatório',      roles: ['admin','gerente'] },
+  { to: '/cameras',   icon: Video,    label: 'Analytics 📹',   roles: ['admin','gerente'], badge: 'NOVO' },
 ]
 const EXTRAS = [
   { to: '/etiquetas',     icon: Printer,       label: 'Etiquetas',        roles: ['admin','gerente'] },

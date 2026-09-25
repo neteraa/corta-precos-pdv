@@ -39,6 +39,7 @@ const MasterPainel   = lazy(() => import('./pages/MasterPainel.jsx'))
 const CaixaLogin     = lazy(() => import('./pages/CaixaLogin.jsx'))
 const Home           = lazy(() => import('./pages/Home.jsx'))
 const Entrega        = lazy(() => import('./pages/Entrega.jsx'))
+const Cameras        = lazy(() => import('./pages/Cameras.jsx'))
 
 function PageSpinner() {
   return (
@@ -74,7 +75,7 @@ function RequireCaixaAuth({ children }) {
 }
 
 /* Routes only admin/gerente can access — caixa goes to /pdv */
-const ADMIN_ONLY = new Set(['/home','/dashboard','/produtos','/vendas','/estoque','/clientes','/relatorio','/etiquetas','/validade','/campanhas','/fidelidade','/flyer','/configuracoes','/promocoes','/ofertas','/entrega','/fornecedores'])
+const ADMIN_ONLY = new Set(['/home','/dashboard','/produtos','/vendas','/estoque','/clientes','/relatorio','/etiquetas','/validade','/campanhas','/fidelidade','/flyer','/configuracoes','/promocoes','/ofertas','/entrega','/fornecedores','/cameras'])
 
 function RequireRole({ children }) {
   const location = useLocation()
@@ -135,6 +136,7 @@ export default function App() {
             <Route path="/validade"     element={<Validade />} />
             <Route path="/campanhas"    element={<Campanhas />} />
             <Route path="/fornecedores" element={<Fornecedores />} />
+            <Route path="/cameras"      element={<Cameras />} />
           </Route>
         </Routes>
       </Suspense>

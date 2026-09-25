@@ -4,7 +4,7 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from 'recharts'
-import { TrendingUp, ShoppingCart, Package, AlertTriangle, ArrowRight, Receipt, ClipboardList, X, Printer, Download, MessageCircle, Target, ArrowDownCircle, ArrowUpCircle, Plus, Zap, CalendarClock, Truck, Bike } from 'lucide-react'
+import { TrendingUp, ShoppingCart, Package, AlertTriangle, ArrowRight, Receipt, ClipboardList, X, Printer, Download, MessageCircle, Target, ArrowDownCircle, ArrowUpCircle, Plus, Zap, CalendarClock, Truck, Bike, Video } from 'lucide-react'
 import { useStore, BRL, fmtDate } from '../store.jsx'
 import { useInstallPWA } from '../hooks/useInstallPWA.js'
 import OnboardingWizard from '../components/OnboardingWizard.jsx'
@@ -145,6 +145,17 @@ export default function Dashboard() {
   const pendingOffers = useMemo(() =>
     (supplierOffers || []).filter(o => o.status === 'pending'),
   [supplierOffers])
+
+  // ── Camera analytics (fetched from Netlify Blob via API) ──────
+  const [cameraStats, setCameraStats] = useState(null)
+  useEffect(() => {
+    const storeId = getMktStoreId()
+    if (!storeId || storeId === 'default') return
+    fetch(`/api/cameras-analytics?storeId=${storeId}`)
+      .then(r => r.json())
+      .then(json => { if (json.ok && json.data) setCameraStats(json.data) })
+      .catch(() => {})
+  }, [])
 
   // ── Delivery stats (fetched from Netlify Blob via API) ──────
   const [deliveryStats, setDeliveryStats] = useState(null)
@@ -331,6 +342,49 @@ export default function Dashboard() {
                 <div className="text-[10px] font-bold text-gray-400 text-center leading-tight mt-0.5">{label}</div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Camera Analytics ────────────────────────────────── */}
+      {cameraStats && (cameraStats.zones || []).length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+          style={{ borderLeft: '4px solid #8b5cf6' }}>
+          <div className="flex items-center justify-between px-5 pt-4 pb-3">
+            <div className="flex items-center gap-2">
+              <Video className="w-4 h-4" style={{ color: '#8b5cf6' }} />
+              <span className="font-black text-sm text-gray-800">Movimento na Loja — hoje</span>
+            </div>
+            <button onClick={() => navigate('/cameras')}
+              className="text-xs font-bold text-purple-600 hover:underline flex items-center gap-1">
+              Ver câmera ao vivo <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+          <div className="px-5 pb-4 border-t border-gray-100 pt-3 flex flex-col gap-2">
+            {[...(cameraStats.zones || [])].sort((a, b) => b.visits - a.visits).slice(0, 3).map(z => {
+              const avgMin = Math.floor(z.avgDwellSec / 60)
+              const avgSec = Math.floor(z.avgDwellSec % 60)
+              const avgFmt = avgMin > 0 ? `${avgMin}m ${avgSec}s` : `${avgSec}s`
+              return (
+                <div key={z.name} className="flex items-center justify-between text-sm">
+                  <span className="font-bold text-gray-700">{z.name}</span>
+                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                    <span className="font-bold text-gray-800">{z.visits} visitas</span>
+                    <span>⏱ {avgFmt} médio</span>
+                  </div>
+                </div>
+              )
+            })}
+            {(() => {
+              const best = [...(cameraStats.zones || [])].sort((a, b) => b.avgDwellSec - a.avgDwellSec)[0]
+              if (!best || best.avgDwellSec < 5) return null
+              const m = Math.floor(best.avgDwellSec / 60), s = Math.floor(best.avgDwellSec % 60)
+              return (
+                <div className="mt-1 text-xs text-purple-600 font-bold">
+                  🏆 Maior atenção: {best.name} — {m > 0 ? `${m}m ${s}s` : `${s}s`} médio
+                </div>
+              )
+            })()}
           </div>
         </div>
       )}

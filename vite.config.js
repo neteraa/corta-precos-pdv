@@ -35,6 +35,10 @@ export default defineConfig({
   define: {
     '__BUILD_TS__': JSON.stringify(Date.now()),
   },
+  // TF.js uses dynamic WASM backends — exclude from Vite pre-bundling
+  optimizeDeps: {
+    exclude: ['@tensorflow/tfjs', '@tensorflow-models/coco-ssd'],
+  },
   build: {
     rollupOptions: {
       output: {
@@ -44,6 +48,7 @@ export default defineConfig({
           'vendor-pdf':      ['jspdf', 'html2canvas'],
           'vendor-qr':       ['qrcode.react'],
           'vendor-dompurify': ['dompurify'],
+          'vendor-tfjs':     ['@tensorflow/tfjs', '@tensorflow-models/coco-ssd'],
         },
       },
     },
