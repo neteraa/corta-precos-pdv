@@ -689,6 +689,8 @@ export default function Cameras() {
     <>
       {pendingZone && <ZoneConfigModal pending={pendingZone} onSave={handleZoneSave} onCancel={() => setPendingZone(null)} />}
       {cameraBlockMobile}
+      
+      {/* Topbar com botões */}
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 100%)' }}>
         <div style={{ color: '#fff', fontWeight: 900, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
           <Video style={{ width: 16, height: 16, color: '#a78bfa' }} /> Analytics
@@ -705,26 +707,98 @@ export default function Cameras() {
           ))}
         </div>
       </div>
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20, background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(8px)', padding: '12px 16px', maxHeight: '40vh', overflowY: 'auto' }}>
+
+      {/* Card de métricas compacto - sempre visível */}
+      {!showLog && !configMode && modelState === 'ready' && (
+        <div style={{ position: 'fixed', top: 60, left: 12, right: 12, zIndex: 19, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', borderRadius: 16, padding: '12px 14px', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: zones.length > 0 ? 10 : 0 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontSize: 28, fontWeight: 900, color: '#a78bfa', lineHeight: 1 }}>{totalPersons}</span>
+                <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>pessoa{totalPersons !== 1 ? 's' : ''} agora</span>
+              </div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontSize: 28, fontWeight: 900, color: '#22c55e', lineHeight: 1 }}>{Object.values(liveStats).reduce((s, z) => s + z.visits, 0)}</span>
+                <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>visitas</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Zonas resumidas - máximo 2 principais */}
+          {zones.length > 0 && (
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {zones.slice(0, 2).map(z => {
+                const s = liveStats[z.id] || {}
+                return (
+                  <div key={z.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: z.color, boxShadow: `0 0 8px ${z.color}` }} />
+                      <span style={{ color: '#fff', fontWeight: 700, fontSize: 12 }}>{z.name}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, fontSize: 11 }}>
+                      <span style={{ color: '#a78bfa', fontWeight: 700 }}>{s.count || 0} 👥</span>
+                      <span style={{ color: '#9ca3af' }}>{s.visits || 0} visitas</span>
+                    </div>
+                  </div>
+                )
+              })}
+              {zones.length > 2 && (
+                <div style={{ fontSize: 10, color: '#6b7280', textAlign: 'center', marginTop: 2 }}>
+                  +{zones.length - 2} zona{zones.length - 2 !== 1 ? 's' : ''} (ver abaixo)
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Painel inferior completo */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(12px)', padding: '14px 16px', maxHeight: '45vh', overflowY: 'auto', borderTop: '2px solid rgba(139,92,246,0.4)' }}>
         {showLog ? (
           <><div style={{ color: '#a78bfa', fontWeight: 800, fontSize: 13, marginBottom: 8 }}>📋 Eventos</div><LogPanel logState={logState} /></>
         ) : (
           <>
-            <div style={{ display: 'flex', gap: 16, marginBottom: 10 }}>
-              <div style={{ color: '#fff' }}><span style={{ fontSize: 24, fontWeight: 900, color: '#a78bfa' }}>{totalPersons}</span><span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 4 }}>agora</span></div>
-              <div style={{ color: '#fff' }}><span style={{ fontSize: 24, fontWeight: 900 }}>{Object.values(liveStats).reduce((s, z) => s + z.visits, 0)}</span><span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 4 }}>visitas</span></div>
-              <div style={{ marginLeft: 'auto', fontSize: 11, color: '#6b7280', alignSelf: 'center' }}>{autoLabel}</div>
+            {/* Header com status */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', letterSpacing: 0.5 }}>DETALHES DAS ZONAS</div>
+              <div style={{ fontSize: 10, color: '#6b7280' }}>{autoLabel}</div>
             </div>
-            {zones.map(z => { const s = liveStats[z.id] || {}; return (
-              <div key={z.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                <span style={{ color: z.color, fontWeight: 700, fontSize: 13 }}>{z.name}</span>
-                <div style={{ display: 'flex', gap: 10, fontSize: 12 }}>
-                  <span style={{ color: '#fff', fontWeight: 700 }}>{s.count || 0} 👥</span>
-                  <span style={{ color: '#9ca3af' }}>{s.visits || 0} visitas</span>
-                  <span style={{ color: '#9ca3af' }}>{fmtDuration(s.avgMs)} médio</span>
-                </div>
+
+            {zones.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px 10px' }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>📍</div>
+                <div style={{ fontWeight: 800, fontSize: 13, color: '#a78bfa', marginBottom: 4 }}>Nenhuma zona definida</div>
+                <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.4 }}>Toque em <strong>⚙️</strong> no topo para criar zonas</div>
               </div>
-            )})}
+            ) : (
+              zones.map(z => {
+                const s = liveStats[z.id] || {}
+                return (
+                  <div key={z.id} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: '10px 12px', marginBottom: 8, borderLeft: `3px solid ${z.color}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ color: z.color, fontWeight: 800, fontSize: 14 }}>{z.name}</span>
+                      <span style={{ fontSize: 18, fontWeight: 900, color: s.count > 0 ? '#22c55e' : '#6b7280' }}>{s.count || 0} 👥</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 11 }}>
+                      <div>
+                        <div style={{ color: '#9ca3af', fontSize: 10, marginBottom: 2 }}>Visitas</div>
+                        <div style={{ color: '#fff', fontWeight: 700 }}>{s.visits || 0}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: '#9ca3af', fontSize: 10, marginBottom: 2 }}>Média</div>
+                        <div style={{ color: '#fff', fontWeight: 700 }}>{fmtDuration(s.avgMs)}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: '#9ca3af', fontSize: 10, marginBottom: 2 }}>Máximo</div>
+                        <div style={{ color: '#fff', fontWeight: 700 }}>{fmtDuration(s.maxMs)}</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })
+            )}
           </>
         )}
       </div>
