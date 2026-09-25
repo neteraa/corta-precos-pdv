@@ -267,28 +267,23 @@ export default function Cameras() {
     }
   }, [zones])
 
-  // Load TF.js model
+  // ── Model loading
   useEffect(() => {
     setModelState('loading')
     let cancelled = false
-
-    import('@tensorflow/tfjs').then(tf =>
-      import('@tensorflow-models/coco-ssd').then(cocoSsd => {
-        if (cancelled) return
-        return cocoSsd.load({ base: 'lite_mobilenet_v2' }).then(model => {
+    import('@tensorflow/tfjs').then(() =>
+      import('@tensorflow-models/coco-ssd').then(cocoSsd =>
+        cocoSsd.load({ base: 'lite_mobilenet_v2' }).then(model => {
           if (cancelled) return
           modelRef.current = model
           setModelState('ready')
         })
-      })
-    ).catch(err => {
-      if (!cancelled) { console.error('TF.js load error:', err); setModelState('error') }
-    })
-
+      )
+    ).catch(err => { if (!cancelled) { console.error('TF.js:', err); setModelState('error') } })
     return () => { cancelled = true }
   }, [])
 
-  // Start camera
+  // ── Camera start
   useEffect(() => {
     let active = true
     navigator.mediaDevices?.getUserMedia({
@@ -301,234 +296,328 @@ export default function Cameras() {
         videoRef.current.srcObject = stream
         videoRef.current.onloadedmetadata = () => {
           const v = videoRef.current
-          if (canvasRef.current) {
-            canvasRef.current.width  = v.videoWidth
-            canvasRef.current.height = v.videoHeight
-          }
+          const sync = (c) => { if (c) { c.width = v.videoWidth; c.height = v.videoHeight } }
+          sync(canvasRef.current); sync(heatCanvasRef.current)
         }
       }
-    }).catch(err => {
-      if (active) setCameraError(err.message || 'Câmera não autorizada')
-    })
-
-    return () => {
-      active = false
-      streamRef.current?.getTracks().forEach(t => t.stop())
-    }
+    }).catch(err => { if (active) setCameraError(err.message || 'Câmera não autorizada') })
+    return () => { active = false; streamRef.current?.getTracks().forEach(t => t.stop()) }
   }, [])
 
-  // Detection loop
+  // ── Detection loop
   useEffect(() => {
     if (modelState !== 'ready') return
-
     const detect = async () => {
-      const video = videoRef.current
-      const canvas = canvasRef.current
+      const video = videoRef.current, canvas = canvasRef.current
       if (!video || video.readyState < 2 || !modelRef.current) return
+      let rawAll = []
+      try { rawAll = await modelRef.current.detect(video) } catch { return }
 
-      let detections = []
-      try {
-        const raw = await modelRef.current.detect(video)
-        detections = raw.filter(d => d.class === 'person' && d.score >= PERSON_SCORE_MIN)
-          .map(d => ({ bbox: d.bbox }))
-      } catch { return }
+      const detections = rawAll.filter(d => d.class === 'person' && d.score >= PERSON_SCORE_MIN).map(d => ({ bbox: d.bbox }))
+      const detectedObjects = rawAll.filter(d => d.class !== 'person' && d.score >= OBJ_SCORE_MIN && OBJECT_EMOJI[d.class]).map(d => ({ class: d.class, bbox: d.bbox, emoji: OBJECT_EMOJI[d.class] }))
 
-      // IoU tracking: match new detections to existing tracked persons
-      const prev = personsRef.current
-      const matched = []
-      const usedPrev = new Set()
-
+      const now = Date.now(), prev = personsRef.current, matched = [], usedPrev = new Set()
       for (const det of detections) {
         let bestIdx = -1, bestScore = IOU_MATCH_THRESH
         for (let i = 0; i < prev.length; i++) {
           if (usedPrev.has(i)) continue
-          const score = iou(prev[i].bbox, det.bbox)
-          if (score > bestScore) { bestScore = score; bestIdx = i }
+          const s = iou(prev[i].bbox, det.bbox)
+          if (s > bestScore) { bestScore = s; bestIdx = i }
         }
         if (bestIdx >= 0) {
-          matched.push({ id: prev[bestIdx].id, bbox: det.bbox, lastSeen: Date.now() })
+          matched.push({ id: prev[bestIdx].id, bbox: det.bbox, lastSeen: now, entryTime: prev[bestIdx].entryTime || now })
           usedPrev.add(bestIdx)
         } else {
-          matched.push({ id: nextIdRef.current++, bbox: det.bbox, lastSeen: Date.now() })
+          matched.push({ id: nextIdRef.current++, bbox: det.bbox, lastSeen: now, entryTime: now })
         }
       }
       personsRef.current = matched
       setTotalPersons(matched.length)
 
-      // Dwell time per zone
-      const now = Date.now()
       const vw = video.videoWidth, vh = video.videoHeight
+      for (const p of matched) {
+        const [bx, by, bw, bh] = p.bbox
+        heatPositionsRef.current.push({ x: (bx + bw / 2) / vw, y: (by + bh / 2) / vh })
+        if (heatPositionsRef.current.length > 5000) heatPositionsRef.current.splice(0, 1000)
+      }
+
       for (const z of zonesRef.current) {
-        const zd = zoneDataRef.current[z.id]
-        if (!zd) continue
-
-        const personsInZone = new Set(
-          matched.filter(p => centerInRect(p.bbox, z, vw, vh)).map(p => p.id)
-        )
-
-        // Entering zone
+        const zd = zoneDataRef.current[z.id]; if (!zd) continue
+        const personsInZone = new Set(matched.filter(p => centerInRect(p.bbox, z, vw, vh)).map(p => p.id))
         for (const id of personsInZone) {
-          if (!zd.activePersonIds.has(id)) {
-            zd.activePersonIds.add(id)
-            zd.entryTimes.set(id, now)
-          }
+          if (!zd.activePersonIds.has(id)) { zd.activePersonIds.add(id); zd.entryTimes.set(id, now); pushEvent(eventLogRef, { type: 'zone_entry', zone: z.name, personId: id }) }
         }
-
-        // Leaving zone
         for (const id of [...zd.activePersonIds]) {
           if (!personsInZone.has(id)) {
             const dwell = now - (zd.entryTimes.get(id) || now)
-            if (dwell >= MIN_DWELL_MS) {
-              zd.visits++
-              zd.totalDwellMs += dwell
-              zd.maxDwellMs = Math.max(zd.maxDwellMs, dwell)
-            }
-            zd.activePersonIds.delete(id)
-            zd.entryTimes.delete(id)
+            if (dwell >= MIN_DWELL_MS) { zd.visits++; zd.totalDwellMs += dwell; zd.maxDwellMs = Math.max(zd.maxDwellMs, dwell); pushEvent(eventLogRef, { type: 'zone_exit', zone: z.name, personId: id, dwell }) }
+            zd.activePersonIds.delete(id); zd.entryTimes.delete(id)
           }
         }
-
         zd.peakCount = Math.max(zd.peakCount, personsInZone.size)
+        if (z.alertThreshold > 0 && z.alertPhone && personsInZone.size >= z.alertThreshold && now - (zd.lastAlertSent || 0) > 300_000) {
+          zd.lastAlertSent = now
+          const msg = `🚨 *Zona lotada: ${z.name}*\n${personsInZone.size} pessoas agora.\n📍 ${new Date().toLocaleTimeString('pt-BR')}`
+          fetch('/api/wa-send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ instance: storeId, number: z.alertPhone, text: msg }) }).catch(() => {})
+          pushEvent(eventLogRef, { type: 'alert', zone: z.name })
+        }
+        for (const obj of detectedObjects) {
+          if (!centerInRect(obj.bbox, z, vw, vh)) continue
+          const key = `${obj.class}:${z.id}`
+          if (now - (lastObjEventRef.current.get(key) || 0) > OBJ_FLOOD_MS) { lastObjEventRef.current.set(key, now); pushEvent(eventLogRef, { type: 'object', zone: z.name, objectClass: obj.class, emoji: obj.emoji }) }
+        }
       }
-
-      // Draw overlay
       if (canvas) {
-        if (canvas.width !== video.videoWidth) canvas.width = video.videoWidth
-        if (canvas.height !== video.videoHeight) canvas.height = video.videoHeight
-        drawOverlay(canvas, matched, zonesRef.current, false, null)
+        if (canvas.width !== vw) canvas.width = vw
+        if (canvas.height !== vh) canvas.height = vh
+        drawOverlay(canvas, matched, detectedObjects, zonesRef.current, false, null)
       }
     }
+    const timer = setInterval(detect, DETECT_INTERVAL_MS)
+    return () => clearInterval(timer)
+  }, [modelState, storeId])
 
-    detectTimer.current = setInterval(detect, DETECT_INTERVAL_MS)
-    return () => clearInterval(detectTimer.current)
-  }, [modelState])
-
-  // Live stats refresh (every second)
+  // ── Live stats 1s
   useEffect(() => {
-    statsTimer.current = setInterval(() => {
+    const timer = setInterval(() => {
       const stats = {}
-      const now = Date.now()
       for (const z of zonesRef.current) {
-        const zd = zoneDataRef.current[z.id]
-        if (!zd) continue
-        const activeCount = zd.activePersonIds.size
-        // Ongoing dwells count towards average
-        const ongoingMs = [...zd.entryTimes.values()].reduce((s, t) => s + (now - t), 0)
-        const totalVisits = zd.visits + (activeCount > 0 ? 0 : 0)
-        const avgMs = zd.visits > 0 ? zd.totalDwellMs / zd.visits : 0
-        stats[z.id] = { count: activeCount, visits: zd.visits, avgMs, maxMs: zd.maxDwellMs, peak: zd.peakCount }
+        const zd = zoneDataRef.current[z.id]; if (!zd) continue
+        stats[z.id] = { count: zd.activePersonIds.size, visits: zd.visits, avgMs: zd.visits > 0 ? zd.totalDwellMs / zd.visits : 0, maxMs: zd.maxDwellMs, peak: zd.peakCount }
       }
       setLiveStats(stats)
     }, 1_000)
-    return () => clearInterval(statsTimer.current)
+    return () => clearInterval(timer)
   }, [])
 
-  // Zone configuration — canvas pointer events
+  // ── Log sync 2s
+  useEffect(() => {
+    const timer = setInterval(() => setLogState([...eventLogRef.current]), LOG_RENDER_MS)
+    return () => clearInterval(timer)
+  }, [])
+
+  // ── Heatmap render 3s
+  useEffect(() => {
+    if (!showHeatmap) return
+    const timer = setInterval(() => {
+      const canvas = heatCanvasRef.current; if (!canvas) return
+      const ctx = canvas.getContext('2d')
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      for (const { x, y } of heatPositionsRef.current) {
+        const cx = x * canvas.width, cy = y * canvas.height
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 50)
+        g.addColorStop(0, 'rgba(255,0,0,0.04)'); g.addColorStop(1, 'rgba(255,0,0,0)')
+        ctx.fillStyle = g; ctx.fillRect(cx - 50, cy - 50, 100, 100)
+      }
+    }, HEAT_RENDER_MS)
+    return () => clearInterval(timer)
+  }, [showHeatmap])
+
+  useEffect(() => {
+    if (!showHeatmap && heatCanvasRef.current) {
+      const ctx = heatCanvasRef.current.getContext('2d')
+      ctx.clearRect(0, 0, heatCanvasRef.current.width, heatCanvasRef.current.height)
+    }
+  }, [showHeatmap])
+
+  // ── Auto-save + countdown
+  useEffect(() => {
+    if (modelState !== 'ready') return
+    nextSaveAtRef.current = Date.now() + AUTO_SAVE_MS
+    const autoTimer = setInterval(() => handleSave({ silent: true }), AUTO_SAVE_MS)
+    const countTimer = setInterval(() => setNextSaveIn(Math.max(0, Math.round((nextSaveAtRef.current - Date.now()) / 1000))), 10_000)
+    return () => { clearInterval(autoTimer); clearInterval(countTimer) }
+  }, [modelState]) // eslint-disable-line
+
+  // ── Zone draw pointer events
   const onPointerDown = useCallback((e) => {
     if (!configMode) return
-    const canvas = canvasRef.current
-    if (!canvas) return
+    const canvas = canvasRef.current; if (!canvas) return
     const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
-    const x = (e.clientX - rect.left) * scaleX
-    const y = (e.clientY - rect.top)  * scaleY
-    drawStart.current = { x, y }
-    setDrawingRect({ x, y, w: 0, h: 0 })
+    const sx = canvas.width / rect.width, sy = canvas.height / rect.height
+    drawStart.current = { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy }
+    setDrawingRect({ ...drawStart.current, w: 0, h: 0 })
   }, [configMode])
 
   const onPointerMove = useCallback((e) => {
     if (!configMode || !drawStart.current) return
-    const canvas = canvasRef.current
-    if (!canvas) return
+    const canvas = canvasRef.current; if (!canvas) return
     const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
-    const x = (e.clientX - rect.left) * scaleX
-    const y = (e.clientY - rect.top)  * scaleY
-    const dr = {
-      x: Math.min(drawStart.current.x, x),
-      y: Math.min(drawStart.current.y, y),
-      w: Math.abs(x - drawStart.current.x),
-      h: Math.abs(y - drawStart.current.y),
-    }
-    setDrawingRect(dr)
-    drawOverlay(canvas, personsRef.current, zonesRef.current, true, dr)
+    const sx = canvas.width / rect.width, sy = canvas.height / rect.height
+    const x = (e.clientX - rect.left) * sx, y = (e.clientY - rect.top) * sy
+    const dr = { x: Math.min(drawStart.current.x, x), y: Math.min(drawStart.current.y, y), w: Math.abs(x - drawStart.current.x), h: Math.abs(y - drawStart.current.y) }
+    setDrawingRect(dr); drawOverlay(canvas, personsRef.current, [], zonesRef.current, true, dr)
   }, [configMode])
 
   const onPointerUp = useCallback((e) => {
     if (!configMode || !drawStart.current || !drawingRect) return
-    const { x, y, w, h } = drawingRect
-    drawStart.current = null
-    if (w < 20 || h < 20) { setDrawingRect(null); return } // too small
-
+    const { x, y, w, h } = drawingRect; drawStart.current = null
+    if (w < 20 || h < 20) { setDrawingRect(null); return }
     const canvas = canvasRef.current
     const vw = canvas?.width || 1, vh = canvas?.height || 1
-    const zoneNorm = { x: x / vw, y: y / vh, w: w / vw, h: h / vh }
+    setPendingZone({ x: x / vw, y: y / vh, w: w / vw, h: h / vh })
+    setDrawingRect(null); setConfigMode(false)
+  }, [configMode, drawingRect])
 
-    const name = window.prompt('Nome da zona (ex: Corredor A, Bebidas, Frios):')
-    if (!name?.trim()) { setDrawingRect(null); return }
-
-    const newZone = {
-      id: `z_${Date.now()}`,
-      name: name.trim(),
-      ...zoneNorm,
+  const handleZoneSave = useCallback(({ name, threshold, phone }) => {
+    const pz = pendingZone; if (!pz) return
+    const updated = [...zonesRef.current, {
+      id: `z_${Date.now()}`, name,
+      x: pz.x, y: pz.y, w: pz.w, h: pz.h,
       color: ZONE_COLORS[zonesRef.current.length % ZONE_COLORS.length],
-    }
-    const updated = [...zonesRef.current, newZone]
-    setZones(updated)
-    saveZones(storeId, updated)
-    setDrawingRect(null)
-    setConfigMode(false)
-  }, [configMode, drawingRect, storeId])
+      alertThreshold: threshold || 0, alertPhone: phone || '',
+    }]
+    setZones(updated); saveZones(storeId, updated); setPendingZone(null)
+  }, [pendingZone, storeId])
 
   const removeZone = useCallback((id) => {
     const updated = zonesRef.current.filter(z => z.id !== id)
-    setZones(updated)
-    saveZones(storeId, updated)
-    delete zoneDataRef.current[id]
+    setZones(updated); saveZones(storeId, updated); delete zoneDataRef.current[id]
   }, [storeId])
 
-  // Save session to blob
-  const handleSave = useCallback(async () => {
-    setSaving(true)
+  // ── Save session (silent mode for auto-save)
+  const handleSave = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setSaving(true)
+    nextSaveAtRef.current = Date.now() + AUTO_SAVE_MS; setNextSaveIn(AUTO_SAVE_MS / 1000)
     try {
-      const payload = {
-        storeId,
-        sessionId: `sess_${Date.now()}`,
-        startedAt: sessionStart.current,
-        endedAt: new Date().toISOString(),
-        zones: zonesRef.current.map(z => {
-          const zd = zoneDataRef.current[z.id] || {}
-          const visits = zd.visits || 0
-          const avgDwellSec = visits > 0 ? (zd.totalDwellMs || 0) / visits / 1000 : 0
-          return {
-            name: z.name,
-            visits,
-            avgDwellSec: +avgDwellSec.toFixed(1),
-            maxDwellSec: +((zd.maxDwellMs || 0) / 1000).toFixed(1),
-            peakCount: zd.peakCount || 0,
-          }
-        }),
-      }
       const res = await fetch('/api/cameras-analytics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storeId, sessionId: `sess_${Date.now()}`,
+          startedAt: sessionStart.current, endedAt: new Date().toISOString(),
+          topEvents: eventLogRef.current.slice(0, 50),
+          zones: zonesRef.current.map(z => {
+            const zd = zoneDataRef.current[z.id] || {}; const v = zd.visits || 0
+            return { name: z.name, visits: v, avgDwellSec: +(v > 0 ? (zd.totalDwellMs || 0) / v / 1000 : 0).toFixed(1), maxDwellSec: +((zd.maxDwellMs || 0) / 1000).toFixed(1), peakCount: zd.peakCount || 0 }
+          }),
+        }),
       })
-      if ((await res.json()).ok) { setSaved(true); setTimeout(() => setSaved(false), 3000) }
-    } catch (err) { console.error('Save session error:', err) }
-    setSaving(false)
+      if (!silent && (await res.json()).ok) { setSaved(true); setTimeout(() => setSaved(false), 3000) }
+    } catch (err) { console.error('Save:', err) }
+    if (!silent) setSaving(false)
   }, [storeId])
 
-  // Shareable link
+  // ── Export CSV
+  const handleExportCSV = useCallback(() => {
+    const rows = [
+      ['timestamp', 'tipo', 'zona', 'pessoa_id', 'tempo_segundos', 'objeto'].join(','),
+      ...eventLogRef.current.map(e => [new Date(e.ts).toLocaleString('pt-BR'), e.type, e.zone || '', e.personId || '', e.dwell ? Math.floor(e.dwell / 1000) : '', e.objectClass || ''].join(',')),
+      '', 'RESUMO POR ZONA',
+      ['zona', 'visitas', 'media_seg', 'max_seg', 'pico_pessoas'].join(','),
+      ...zonesRef.current.map(z => { const zd = zoneDataRef.current[z.id] || {}; return [z.name, zd.visits || 0, zd.visits ? Math.floor((zd.totalDwellMs || 0) / zd.visits / 1000) : 0, Math.floor((zd.maxDwellMs || 0) / 1000), zd.peakCount || 0].join(',') }),
+    ]
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `zs-cameras-${storeId}-${new Date().toISOString().slice(0, 10)}.csv` })
+    a.click(); URL.revokeObjectURL(a.href)
+  }, [storeId])
+
   const handleCopyLink = useCallback(() => {
-    const token = getMktStoreToken() || ''
-    const url = `${window.location.origin}/cameras?storeId=${storeId}&t=${token}`
+    const url = `${window.location.origin}/cameras?storeId=${storeId}&t=${getMktStoreToken() || ''}`
     navigator.clipboard?.writeText(url).then(() => alert('Link copiado! Envie pelo WhatsApp para abrir a câmera no celular dedicado.'))
   }, [storeId])
 
-  /* ── Render ─────────────────────────────────────────────── */
+  const evIcon = (e) => ({ zone_entry: '🟢', zone_exit: '🔴', object: e.emoji || '📦', alert: '🚨' }[e.type] || '•')
+  const evText = (e) => {
+    if (e.type === 'zone_entry') return `#${e.personId} entrou em ${e.zone}`
+    if (e.type === 'zone_exit') return `#${e.personId} saiu de ${e.zone}${e.dwell ? ' — ' + fmtDuration(e.dwell) : ''}`
+    if (e.type === 'object') return `${e.emoji} ${e.objectClass} em ${e.zone}`
+    if (e.type === 'alert') return `alerta enviado: ${e.zone} lotada`
+    return 'evento'
+  }
+
+  const autoLabel = nextSaveIn > 60 ? `⏰ auto em ${Math.ceil(nextSaveIn / 60)}min` : nextSaveIn <= 10 ? '⏰ salvando...' : `⏰ ${nextSaveIn}s`
+
+  /* ── Sub-components ─────────────────────────────────────────── */
+  const StatsPanel = () => (
+    <>
+      <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1.5px solid #e5e7eb', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: 1, marginBottom: 8 }}>SESSÃO AO VIVO</div>
+        <div style={{ display: 'flex', gap: 20 }}>
+          <div>
+            <div style={{ fontSize: 28, fontWeight: 900, color: '#8b5cf6' }}>{totalPersons}</div>
+            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>pessoas agora</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 28, fontWeight: 900, color: '#374151' }}>{Object.values(liveStats).reduce((s, z) => s + z.visits, 0)}</div>
+            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>visitas totais</div>
+          </div>
+        </div>
+      </div>
+      {zones.length === 0 ? (
+        <div style={{ background: '#faf5ff', border: '1.5px dashed #d8b4fe', borderRadius: 14, padding: 20, textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📍</div>
+          <div style={{ fontWeight: 800, fontSize: 14, color: '#7c3aed', marginBottom: 4 }}>Nenhuma zona definida</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>Clique em <strong>Configurar zonas</strong> e arraste sobre a câmera para definir áreas de interesse (ex: Bebidas, Corredor A, Frios).</div>
+        </div>
+      ) : zones.map(z => {
+        const s = liveStats[z.id] || {}
+        return (
+          <div key={z.id} style={{ background: '#fff', borderRadius: 14, padding: '12px 16px', border: `1.5px solid ${z.color}33`, borderLeft: `4px solid ${z.color}`, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontWeight: 800, fontSize: 14, color: '#111827' }}>{z.name}</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {z.alertThreshold > 0 && <span style={{ fontSize: 11, color: '#9ca3af' }}>🚨{z.alertThreshold}</span>}
+                <button onClick={() => removeZone(z.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 2 }}><X style={{ width: 14, height: 14 }} /></button>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {[
+                { label: 'Agora', value: `${s.count || 0} pessoa${s.count !== 1 ? 's' : ''}`, color: s.count > 0 ? z.color : '#9ca3af' },
+                { label: 'Visitas', value: s.visits || 0, color: '#374151' },
+                { label: 'Média', value: fmtDuration(s.avgMs), color: '#374151' },
+                { label: 'Máx', value: fmtDuration(s.maxMs), color: '#374151' },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ background: '#f9fafb', borderRadius: 8, padding: '6px 10px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', letterSpacing: 0.5 }}>{label.toUpperCase()}</div>
+                  <div style={{ fontWeight: 800, fontSize: 15, color, marginTop: 2 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+      {zones.length < 6 && (
+        <button onClick={() => setConfigMode(true)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px', borderRadius: 12, border: '1.5px dashed #d1d5db', background: 'transparent', color: '#6b7280', fontWeight: 700, fontSize: 13, cursor: 'pointer', width: '100%', marginTop: 4 }}>
+          <Plus style={{ width: 14, height: 14 }} />Nova zona ({zones.length}/6)
+        </button>
+      )}
+    </>
+  )
+
+  const LogPanel = () => (
+    <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+      {logState.length === 0
+        ? <div style={{ textAlign: 'center', color: '#9ca3af', padding: 24, fontSize: 13 }}>Nenhum evento ainda.<br />Entre em uma zona para registrar.</div>
+        : logState.map((e, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: '1px solid #f3f4f6', fontSize: 12 }}>
+            <span style={{ width: 18, flexShrink: 0 }}>{evIcon(e)}</span>
+            <span style={{ color: '#6b7280', flexShrink: 0 }}>{fmtTime(e.ts)}</span>
+            <span style={{ color: '#374151' }}>{evText(e)}</span>
+          </div>
+        ))
+      }
+    </div>
+  )
+
+  const CameraArea = ({ style = {} }) => (
+    <div style={{ position: 'relative', background: '#000', overflow: 'hidden', ...style }}>
+      <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      <canvas ref={heatCanvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: showHeatmap ? 0.75 : 0, pointerEvents: 'none', transition: 'opacity 0.3s' }} />
+      <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: configMode ? 'crosshair' : 'default' }}
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} />
+      {modelState === 'loading' && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', gap: 12 }}>
+          <div style={{ width: 40, height: 40, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: '#8b5cf6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>Carregando modelo COCO-SSD...</span>
+        </div>
+      )}
+      {configMode && (
+        <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(139,92,246,0.9)', color: '#fff', padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', zIndex: 5 }}>
+          ✏️ Arraste para definir uma zona
+        </div>
+      )}
+    </div>
+  )
 
   if (cameraError) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 16, textAlign: 'center' }}>
@@ -539,156 +628,95 @@ export default function Cameras() {
     </div>
   )
 
+  /* ── MOBILE ─────────────────────────────────────────────────── */
+  if (isMobile) return (
+    <>
+      {pendingZone && <ZoneConfigModal pending={pendingZone} onSave={handleZoneSave} onCancel={() => setPendingZone(null)} />}
+      <CameraArea style={{ position: 'fixed', inset: 0, zIndex: 10, borderRadius: 0 }} />
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 100%)' }}>
+        <div style={{ color: '#fff', fontWeight: 900, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Video style={{ width: 16, height: 16, color: '#a78bfa' }} /> Analytics
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[
+            { icon: <Settings style={{ width: 18, height: 18 }} />, onClick: () => setConfigMode(c => !c), active: configMode },
+            { icon: <Thermometer style={{ width: 18, height: 18 }} />, onClick: () => setShowHeatmap(h => !h), active: showHeatmap },
+            { icon: <List style={{ width: 18, height: 18 }} />, onClick: () => setShowLog(l => !l), active: showLog },
+            { icon: <Download style={{ width: 18, height: 18 }} />, onClick: handleExportCSV, active: false },
+            { icon: <Save style={{ width: 18, height: 18 }} />, onClick: () => handleSave(), active: false },
+          ].map(({ icon, onClick, active }, i) => (
+            <button key={i} onClick={onClick} style={{ width: 36, height: 36, borderRadius: 10, border: 'none', background: active ? 'rgba(139,92,246,0.85)' : 'rgba(0,0,0,0.5)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>{icon}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 20, background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(8px)', padding: '12px 16px', maxHeight: '40vh', overflowY: 'auto' }}>
+        {showLog ? (
+          <><div style={{ color: '#a78bfa', fontWeight: 800, fontSize: 13, marginBottom: 8 }}>📋 Eventos</div><LogPanel /></>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 16, marginBottom: 10 }}>
+              <div style={{ color: '#fff' }}><span style={{ fontSize: 24, fontWeight: 900, color: '#a78bfa' }}>{totalPersons}</span><span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 4 }}>agora</span></div>
+              <div style={{ color: '#fff' }}><span style={{ fontSize: 24, fontWeight: 900 }}>{Object.values(liveStats).reduce((s, z) => s + z.visits, 0)}</span><span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 4 }}>visitas</span></div>
+              <div style={{ marginLeft: 'auto', fontSize: 11, color: '#6b7280', alignSelf: 'center' }}>{autoLabel}</div>
+            </div>
+            {zones.map(z => { const s = liveStats[z.id] || {}; return (
+              <div key={z.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                <span style={{ color: z.color, fontWeight: 700, fontSize: 13 }}>{z.name}</span>
+                <div style={{ display: 'flex', gap: 10, fontSize: 12 }}>
+                  <span style={{ color: '#fff', fontWeight: 700 }}>{s.count || 0} 👥</span>
+                  <span style={{ color: '#9ca3af' }}>{s.visits || 0} visitas</span>
+                  <span style={{ color: '#9ca3af' }}>{fmtDuration(s.avgMs)} médio</span>
+                </div>
+              </div>
+            )})}
+          </>
+        )}
+      </div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </>
+  )
+
+  /* ── DESKTOP ────────────────────────────────────────────────── */
   return (
     <div>
-      {/* ── Header ────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      {pendingZone && <ZoneConfigModal pending={pendingZone} onSave={handleZoneSave} onCancel={() => setPendingZone(null)} />}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 900, color: '#111827', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Video style={{ width: 22, height: 22, color: '#8b5cf6' }} />
-            Analytics de Câmera
+            <Video style={{ width: 22, height: 22, color: '#8b5cf6' }} /> Analytics de Câmera
             {modelState === 'ready' && totalPersons > 0 && (
-              <span style={{ fontSize: 13, fontWeight: 900, background: '#22c55e', color: '#fff', padding: '2px 10px', borderRadius: 100 }}>
-                {totalPersons} pessoa{totalPersons !== 1 ? 's' : ''} detectada{totalPersons !== 1 ? 's' : ''}
-              </span>
+              <span style={{ fontSize: 13, fontWeight: 900, background: '#22c55e', color: '#fff', padding: '2px 10px', borderRadius: 100 }}>{totalPersons} pessoa{totalPersons !== 1 ? 's' : ''}</span>
             )}
           </h1>
           <p style={{ color: '#6b7280', fontSize: 13, margin: '4px 0 0' }}>
-            {modelState === 'loading' ? '⏳ Carregando modelo de IA (~3s)...'
-              : modelState === 'ready'   ? '🟢 Detecção ativa — TF.js COCO-SSD'
-              : modelState === 'error'   ? '🔴 Erro ao carregar modelo'
-              : 'Iniciando...'}
+            {modelState === 'loading' ? '⏳ Carregando COCO-SSD...' : modelState === 'ready' ? `🟢 Detecção ativa — ${autoLabel}` : modelState === 'error' ? '🔴 Erro ao carregar modelo' : 'Iniciando...'}
           </p>
         </div>
-
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {/* Copy link */}
-          <button onClick={handleCopyLink}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#fff', fontWeight: 700, fontSize: 12, color: '#374151', cursor: 'pointer' }}>
-            <Link2 style={{ width: 13, height: 13 }} />
-            Compartilhar link
-          </button>
-
-          {/* Configure zones */}
-          <button onClick={() => setConfigMode(c => !c)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', background: configMode ? '#8b5cf6' : '#ede9fe', color: configMode ? '#fff' : '#7c3aed', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>
-            <Settings style={{ width: 13, height: 13 }} />
-            {configMode ? 'Desenhando zona...' : 'Configurar zonas'}
-          </button>
-
-          {/* Save session */}
-          <button onClick={handleSave} disabled={saving}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: 'none', background: saved ? '#22c55e' : '#8b5cf6', color: '#fff', fontWeight: 800, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}>
-            <Save style={{ width: 13, height: 13 }} />
-            {saved ? '✓ Sessão salva!' : saving ? 'Salvando...' : 'Salvar sessão'}
-          </button>
+          <button onClick={handleCopyLink} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#fff', fontWeight: 700, fontSize: 12, color: '#374151', cursor: 'pointer' }}><Link2 style={{ width: 13, height: 13 }} />Compartilhar</button>
+          <button onClick={() => setShowHeatmap(h => !h)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', background: showHeatmap ? '#ef4444' : '#fee2e2', color: showHeatmap ? '#fff' : '#dc2626', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}><Thermometer style={{ width: 13, height: 13 }} />{showHeatmap ? '🌡️ Heatmap ON' : 'Heatmap'}</button>
+          {showHeatmap && (
+            <button onClick={() => { heatPositionsRef.current = []; const c = heatCanvasRef.current; if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height) }} style={{ padding: '8px 14px', borderRadius: 10, border: 'none', background: '#fee2e2', color: '#dc2626', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>🗑 Limpar</button>
+          )}
+          <button onClick={() => setConfigMode(c => !c)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: 'none', background: configMode ? '#8b5cf6' : '#ede9fe', color: configMode ? '#fff' : '#7c3aed', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}><Settings style={{ width: 13, height: 13 }} />{configMode ? 'Desenhando...' : 'Configurar zonas'}</button>
+          <button onClick={handleExportCSV} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#fff', fontWeight: 700, fontSize: 12, color: '#374151', cursor: 'pointer' }}><Download style={{ width: 13, height: 13 }} />CSV</button>
+          <button onClick={() => handleSave()} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: 'none', background: saved ? '#22c55e' : '#8b5cf6', color: '#fff', fontWeight: 800, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}><Save style={{ width: 13, height: 13 }} />{saved ? '✓ Salvo!' : saving ? 'Salvando...' : 'Salvar sessão'}</button>
         </div>
       </div>
-
-      {/* ── Main layout: camera + stats ───────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16, alignItems: 'start' }}>
-
-        {/* Camera + canvas */}
-        <div style={{ position: 'relative', background: '#000', borderRadius: 16, overflow: 'hidden', aspectRatio: '16/9' }}>
-          <video ref={videoRef} autoPlay playsInline muted
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          <canvas ref={canvasRef}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: configMode ? 'crosshair' : 'default' }}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-          />
-
-          {/* Loading overlay */}
-          {modelState === 'loading' && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', gap: 12 }}>
-              <div style={{ width: 40, height: 40, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: '#8b5cf6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-              <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>Carregando modelo COCO-SSD...</span>
-            </div>
-          )}
-
-          {/* Config mode hint */}
-          {configMode && (
-            <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(139,92,246,0.9)', color: '#fff', padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
-              ✏️ Clique e arraste para definir uma zona
-            </div>
-          )}
-        </div>
-
-        {/* Stats panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-          {/* Detection summary */}
-          <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', border: '1.5px solid #e5e7eb' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: 1, marginBottom: 8 }}>SESSÃO AO VIVO</div>
-            <div style={{ display: 'flex', gap: 16 }}>
-              <div>
-                <div style={{ fontSize: 28, fontWeight: 900, color: '#8b5cf6' }}>{totalPersons}</div>
-                <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>pessoas agora</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 28, fontWeight: 900, color: '#374151' }}>
-                  {Object.values(liveStats).reduce((s, z) => s + z.visits, 0)}
-                </div>
-                <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>visitas totais</div>
-              </div>
-            </div>
+        <CameraArea style={{ borderRadius: 16, aspectRatio: '16/9' }} />
+        <div>
+          <div style={{ display: 'flex', marginBottom: 12, background: '#f3f4f6', borderRadius: 12, padding: 3 }}>
+            {[{ id: 'stats', label: '📊 Stats' }, { id: 'log', label: '📋 Eventos' }].map(t => (
+              <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex: 1, padding: '7px 0', borderRadius: 10, border: 'none', background: activeTab === t.id ? '#fff' : 'transparent', fontWeight: activeTab === t.id ? 800 : 600, fontSize: 13, color: activeTab === t.id ? '#111827' : '#6b7280', cursor: 'pointer', boxShadow: activeTab === t.id ? '0 1px 4px rgba(0,0,0,0.08)' : 'none' }}>{t.label}</button>
+            ))}
           </div>
-
-          {/* Per-zone stats */}
-          {zones.length === 0 ? (
-            <div style={{ background: '#faf5ff', border: '1.5px dashed #d8b4fe', borderRadius: 14, padding: 20, textAlign: 'center' }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📍</div>
-              <div style={{ fontWeight: 800, fontSize: 14, color: '#7c3aed', marginBottom: 4 }}>Nenhuma zona definida</div>
-              <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>
-                Clique em <strong>Configurar zonas</strong> e arraste sobre a câmera para definir áreas de interesse (ex: Bebidas, Corredor A, Frios).
-              </div>
-            </div>
-          ) : (
-            zones.map(z => {
-              const s = liveStats[z.id] || {}
-              return (
-                <div key={z.id} style={{ background: '#fff', borderRadius: 14, padding: '12px 16px', border: `1.5px solid ${z.color}33`, borderLeft: `4px solid ${z.color}` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <span style={{ fontWeight: 800, fontSize: 14, color: '#111827' }}>{z.name}</span>
-                    <button onClick={() => removeZone(z.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', padding: 2 }}>
-                      <X style={{ width: 14, height: 14 }} />
-                    </button>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {[
-                      { label: 'Agora',   value: `${s.count || 0} pessoa${s.count !== 1 ? 's' : ''}`, color: s.count > 0 ? z.color : '#9ca3af' },
-                      { label: 'Visitas', value: s.visits || 0, color: '#374151' },
-                      { label: 'Média',   value: fmtDuration(s.avgMs), color: '#374151' },
-                      { label: 'Máx',     value: fmtDuration(s.maxMs), color: '#374151' },
-                    ].map(({ label, value, color }) => (
-                      <div key={label} style={{ background: '#f9fafb', borderRadius: 8, padding: '8px 10px' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', letterSpacing: 0.5 }}>{label.toUpperCase()}</div>
-                        <div style={{ fontWeight: 800, fontSize: 16, color, marginTop: 2 }}>{value}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })
-          )}
-
-          {/* Add zone button (in config mode or zones list) */}
-          {zones.length < 6 && (
-            <button onClick={() => setConfigMode(true)}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px', borderRadius: 12, border: '1.5px dashed #d1d5db', background: 'transparent', color: '#6b7280', fontWeight: 700, fontSize: 13, cursor: 'pointer', width: '100%' }}>
-              <Plus style={{ width: 14, height: 14 }} />
-              Nova zona ({zones.length}/6)
-            </button>
-          )}
+          {activeTab === 'stats' ? <StatsPanel /> : <LogPanel />}
         </div>
       </div>
-
-      {/* ── Mobile: full-screen video mode hint ──────────── */}
       <div style={{ marginTop: 16, padding: '12px 16px', background: '#faf5ff', borderRadius: 12, border: '1px solid #e9d5ff', fontSize: 13, color: '#7c3aed' }}>
         <strong>💡 Dica:</strong> Para usar como câmera dedicada (celular fixo na loja), clique em <strong>Compartilhar link</strong> → envie pelo WhatsApp → abra no celular dedicado. A câmera traseira ativa automaticamente.
       </div>
-
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
