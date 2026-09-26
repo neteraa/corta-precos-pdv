@@ -53,31 +53,44 @@ export default function Conversas() {
       const storeId = getStoreId()
       const token = getStoreToken()
       
-      console.log('[Conversas] loadClients - mk:', !!mk, 'storeId:', storeId, 'token:', !!token)
+      // DEBUG COMPLETO
+      console.group('🔍 [Conversas] DEBUG COMPLETO')
+      console.log('localStorage keys:', Object.keys(localStorage))
+      console.log('mk:', mk)
+      console.log('storeId:', storeId)
+      console.log('token:', token)
+      console.log('navigator.userAgent:', navigator.userAgent)
+      console.groupEnd()
       
       // Admin (master key) OU mercado específico (storeId+token)
       let url
       if (mk) {
         url = `/api/wa-chat-history?mk=${encodeURIComponent(mk)}`
-        console.log('[Conversas] Usando master key (admin)')
-      } else if (storeId && token) {
+        console.log('✅ Modo: ADMIN (master key)')
+      } else if (storeId && storeId !== 'default' && token) {
         url = `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}`
-        console.log('[Conversas] Usando storeId+token (mercado):', storeId)
+        console.log('✅ Modo: STORE (storeId + token):', storeId)
       } else {
-        console.log('[Conversas] SEM credenciais válidas!')
+        console.error('❌ SEM CREDENCIAIS! mk:', !!mk, '| storeId:', storeId, '| token:', !!token)
         setClients([])
         return
       }
       
-      console.log('[Conversas] Fetching:', url)
+      console.log('📡 Fetching:', url)
       const res = await fetch(url)
       const data = await res.json()
-      console.log('[Conversas] Response:', data.ok ? `${data.clients?.length || 0} clientes` : data.error)
+      console.log('📥 Response status:', res.status)
+      console.log('📥 Response data:', data)
+      
       if (data.ok) {
+        console.log('✅ Clientes recebidos:', data.clients?.length || 0)
         setClients(data.clients || [])
+      } else {
+        console.error('❌ API error:', data.error)
+        setClients([])
       }
     } catch (e) {
-      console.error('loadClients error:', e)
+      console.error('❌ loadClients EXCEPTION:', e)
     } finally {
       setLoading(false)
     }
