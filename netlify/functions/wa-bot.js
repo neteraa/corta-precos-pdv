@@ -95,7 +95,8 @@ function buildCortaPrecosPrompt(catalogText, promoText) {
 ━━━━━━━━━━━━━━━━━━━━━━
 🏪 NOSSA LOJA
 ━━━━━━━━━━━━━━━━━━━━━━
-• Mercado CORTA PREÇOS — Boituva-SP
+• Mercado CORTA PREÇOS — Itapeva-SP
+• Endereço: Rua Capão Bonito, 20 - Itapeva-SP
 • WhatsApp: (15) 9979-6930
 • Pagamento: PIX, Dinheiro, Débito, Crédito
 • Delivery: taxa fixa R$7,00 — pagamento SOMENTE por PIX
@@ -680,7 +681,7 @@ function quickReply(text, senderName, promoText, products) {
 
   // Endereço / localização
   if (/endereco|localizacao|onde fica|onde voces ficam|como chegar|maps|googl/.test(t) && t.length < 60) {
-    return `📍 Corta Preços${nom}:\nBoituva - SP\nWhatsApp: (15) 9979-6930\n\nQuer fazer um pedido por entrega? 🛵`
+    return `📍 Corta Preços${nom}:\nRua Capão Bonito, 20 - Itapeva-SP\nWhatsApp: (15) 9979-6930\n\nQuer fazer um pedido por entrega? 🛵`
   }
 
   // Taxa de entrega
@@ -943,7 +944,7 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
         } else if (/entrega|delivery|manda|mandar|entreg/.test(t)) {
           fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 🛵 Fazemos entrega sim! Taxa fixa R$7,00, pagamento por PIX (CNPJ: 60.662.362/0001-70).\nMe manda o seu endereço + o que você quer pedir! 📦`
         } else if (/preço|valor|quanto|custa|custo|price/.test(t)) {
-          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 😊 Para consultar preços liga no (15) 9979-6930 ou passa aqui na loja — Corta Preços, Boituva-SP!`
+          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 😊 Para consultar preços liga no (15) 9979-6930 ou passa aqui na loja — Corta Preços, Rua Capão Bonito 20, Itapeva-SP!`
         } else if (/hora|horário|abre|fecha|funcionamento/.test(t)) {
           fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! ⏰ Para confirmar nosso horário de funcionamento, liga no (15) 9979-6930. A gente te atende! 😊`
         } else {

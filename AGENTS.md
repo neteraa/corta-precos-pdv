@@ -133,7 +133,7 @@ ZARA_INSTANCES = ['zatendestok']
   - saveSettings em Configuracoes.jsx persiste tudo ao blob
   - store.jsx applyServerData: cp_settings → localStorage (só campos vazios)
   - Configuracoes.jsx: useEffect preenche form quando settings sync chega
-  - Blob pré-populado: pixKey=60662362000170, phone=(15)9979-6930, pixCity=BOITUVA
+  - Blob pré-populado: pixKey=60662362000170, phone=(15)9979-6930, pixCity=ITAPEVA (Rua Capão Bonito 20)
 
 ---
 
