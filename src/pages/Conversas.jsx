@@ -51,15 +51,19 @@ export default function Conversas() {
     }
   }, [])
 
-  const loadMessages = useCallback(async (phone) => {
+  const loadMessages = useCallback(async (phone, blobKey = null) => {
     setMsgLoading(true)
     setSelectedPhone(phone)
     setMessages([]) // Limpa mensagens antigas primeiro
     setDebugInfo(null)
     try {
       const mk = getMK()
-      const url = `/api/wa-chat-history?mk=${encodeURIComponent(mk)}&phone=${phone}`
-      console.log('Carregando mensagens de:', phone)
+      // NOVO: usa blobKey se disponível (ELIMINA problema de match!)
+      const url = blobKey 
+        ? `/api/wa-chat-history?mk=${encodeURIComponent(mk)}&blobKey=${encodeURIComponent(blobKey)}`
+        : `/api/wa-chat-history?mk=${encodeURIComponent(mk)}&phone=${phone}`
+      
+      console.log('Carregando mensagens - phone:', phone, 'blobKey:', blobKey)
       const res = await fetch(url)
       const data = await res.json()
       console.log('Resposta:', data)
@@ -67,6 +71,7 @@ export default function Conversas() {
       // DEBUG: salva info completa da API
       setDebugInfo({
         phone,
+        blobKey,
         foundKey: data.foundKey,
         count: data.count,
         messagesLength: (data.messages || []).length,
@@ -173,7 +178,7 @@ export default function Conversas() {
           {!loading && filteredClients.map((client) => (
             <button
               key={client.phone}
-              onClick={() => loadMessages(client.phone)}
+              onClick={() => loadMessages(client.phone, client.blobKey)}
               className={`w-full text-left p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
                 selectedPhone === client.phone ? 'bg-green-50 border-l-4 border-l-green-600' : ''
               }`}

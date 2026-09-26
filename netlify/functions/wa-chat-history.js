@@ -36,6 +36,7 @@ export default async (req) => {
   const storeId = url.searchParams.get('storeId')
   const token   = url.searchParams.get('token')
   const phone   = url.searchParams.get('phone')
+  const blobKey = url.searchParams.get('blobKey')  // NOVO: key direta do blob!
 
   // Autenticação: MASTER KEY (admin vê tudo) ou STOREID+TOKEN (cliente vê só suas conversas)
   const isMaster = mk === process.env.ZS_MASTER_KEY
@@ -48,47 +49,62 @@ export default async (req) => {
   const store = leadsStore()
 
   // ── GET histórico de um cliente específico ────────────────────────────────────
-  if (phone) {
-    console.log('[wa-chat-history] Buscando phone:', phone)
+  if (phone || blobKey) {
+    console.log('[wa-chat-history] Buscando - phone:', phone, 'blobKey:', blobKey)
     console.log('[wa-chat-history] isMaster:', isMaster, 'isStore:', isStore)
     
     let messages = null
     let foundKey = null
+    let actualPhone = phone
     
-    if (isStore) {
-      // Cliente: busca APENAS suas próprias conversas
-      const key = `chat_history:${storeId}:${phone}`
-      console.log('[wa-chat-history] Tentando key (store):', key)
-      messages = await store.get(key, { type: 'json' }).catch(() => null)
-    } else if (isMaster) {
-      // Master: busca em AMBOS formatos (retrocompatibilidade)
-      console.log('[wa-chat-history] Listando blobs...')
-      const { blobs } = await store.list()
-      const chatBlobs = blobs.filter(b => b.key.startsWith('chat_history:'))
-      console.log('[wa-chat-history] Total chat_history blobs:', chatBlobs.length)
-      console.log('[wa-chat-history] Primeiras 5 keys:', chatBlobs.slice(0, 5).map(b => b.key))
-      
-      const matchingBlob = blobs.find(b => 
-        b.key.startsWith('chat_history:') && 
-        (b.key.endsWith(`:${phone}`) || b.key === `chat_history:${phone}`)
-      )
-      
-      if (matchingBlob) {
-        foundKey = matchingBlob.key
-        console.log('[wa-chat-history] Key encontrada:', foundKey)
-        messages = await store.get(matchingBlob.key, { type: 'json' }).catch(() => null)
-        console.log('[wa-chat-history] Mensagens carregadas:', messages?.length || 0)
-      } else {
-        console.log('[wa-chat-history] NENHUMA key encontrada para phone:', phone)
+    // NOVO: Se veio blobKey, usa DIRETO!
+    if (blobKey) {
+      console.log('[wa-chat-history] Usando blobKey direto:', blobKey)
+      foundKey = blobKey
+      messages = await store.get(blobKey, { type: 'json' }).catch(() => null)
+      // Extrai phone da key: chat_history:storeId:PHONE ou chat_history:PHONE
+      const parts = blobKey.split(':')
+      actualPhone = parts[parts.length - 1]
+      console.log('[wa-chat-history] Phone extraído da key:', actualPhone)
+      console.log('[wa-chat-history] Mensagens carregadas:', messages?.length || 0)
+    } 
+    // Fallback: busca por phone (mantém retrocompatibilidade)
+    else if (phone) {
+      if (isStore) {
+        // Cliente: busca APENAS suas próprias conversas
+        const key = `chat_history:${storeId}:${phone}`
+        console.log('[wa-chat-history] Tentando key (store):', key)
+        messages = await store.get(key, { type: 'json' }).catch(() => null)
+      } else if (isMaster) {
+        // Master: busca em AMBOS formatos (retrocompatibilidade)
+        console.log('[wa-chat-history] Listando blobs...')
+        const { blobs } = await store.list()
+        const chatBlobs = blobs.filter(b => b.key.startsWith('chat_history:'))
+        console.log('[wa-chat-history] Total chat_history blobs:', chatBlobs.length)
+        console.log('[wa-chat-history] Primeiras 5 keys:', chatBlobs.slice(0, 5).map(b => b.key))
+        
+        const matchingBlob = blobs.find(b => 
+          b.key.startsWith('chat_history:') && 
+          (b.key.endsWith(`:${phone}`) || b.key === `chat_history:${phone}`)
+        )
+        
+        if (matchingBlob) {
+          foundKey = matchingBlob.key
+          console.log('[wa-chat-history] Key encontrada:', foundKey)
+          messages = await store.get(matchingBlob.key, { type: 'json' }).catch(() => null)
+          console.log('[wa-chat-history] Mensagens carregadas:', messages?.length || 0)
+        } else {
+          console.log('[wa-chat-history] NENHUMA key encontrada para phone:', phone)
+        }
       }
     }
     
     // Busca também os dados do lead
-    const leadData = await store.get(phone, { type: 'json' }).catch(() => null)
+    const leadData = await store.get(actualPhone, { type: 'json' }).catch(() => null)
     
     return new Response(JSON.stringify({
       ok: true,
-      phone,
+      phone: actualPhone,
       foundKey,  // DEBUG: mostra qual key foi usada
       lead: leadData,
       messages: messages || [],
@@ -126,6 +142,7 @@ export default async (req) => {
         
         return {
           phone,
+          blobKey: b.key,  // ADICIONA A KEY COMPLETA!
           name: leadData?.name || leadData?.waName || null,
           market: leadData?.market || null,
           city: leadData?.city || null,
