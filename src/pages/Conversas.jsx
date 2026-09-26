@@ -53,34 +53,25 @@ export default function Conversas() {
       const storeId = getStoreId()
       const token = getStoreToken()
       
-      // DEBUG COMPLETO
-      console.group('🔍 [Conversas] DEBUG COMPLETO')
-      console.log('localStorage keys:', Object.keys(localStorage))
-      console.log('mk:', mk)
-      console.log('storeId:', storeId)
-      console.log('token:', token)
-      console.log('navigator.userAgent:', navigator.userAgent)
-      console.groupEnd()
+      // Log básico
+      console.log('[Conversas] Carregando - storeId:', storeId || 'master')
       
       // Admin (master key) OU mercado específico (storeId)
       let url
       if (mk) {
         url = `/api/wa-chat-history?mk=${encodeURIComponent(mk)}`
-        console.log('✅ Modo: ADMIN (master key)')
       } else if (storeId && storeId !== 'default') {
-        // CRÍTICO: Token é opcional (login local não tem token)
+        // Token é opcional (login local não tem token)
         url = token 
           ? `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}`
           : `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}`
-        console.log('✅ Modo: STORE:', storeId, token ? '(com token)' : '(SEM token - login local)')
       } else {
-        console.error('❌ SEM CREDENCIAIS! mk:', !!mk, '| storeId:', storeId, '| token:', !!token)
+        console.error('[Conversas] Sem credenciais')
         setClients([])
         return
       }
       
-      console.log('📡 Fetching:', url)
-      // FORÇA Chrome a NÃO cachear! Cache-bust + no-cache header
+      // Cache-bust para evitar cache do navegador
       const cacheBust = `${url}${url.includes('?') ? '&' : '?'}_t=${Date.now()}`
       const res = await fetch(cacheBust, {
         cache: 'no-store',
@@ -90,14 +81,11 @@ export default function Conversas() {
         }
       })
       const data = await res.json()
-      console.log('📥 Response status:', res.status)
-      console.log('📥 Response data:', data)
       
       if (data.ok) {
-        console.log('✅ Clientes recebidos:', data.clients?.length || 0)
         setClients(data.clients || [])
       } else {
-        console.error('❌ API error:', data.error)
+        console.error('[Conversas] Erro ao carregar:', data.error)
         setClients([])
       }
     } catch (e) {
@@ -203,10 +191,7 @@ export default function Conversas() {
     )
   })
   
-  // DEBUG: Log quando filteredClients muda
-  React.useEffect(() => {
-    console.log('[Conversas] Clientes:', clients.length, '| Filtrados:', filteredClients.length, '| Filtro store:', filterStore, '| Busca:', searchQuery)
-  }, [clients.length, filteredClients.length, filterStore, searchQuery])
+
   
   // Extrai storeIds únicos para as abas (SÓ QUANDO TEM MASTER KEY!)
   const mk = getMK()
@@ -263,24 +248,6 @@ export default function Conversas() {
                 v{new Date().toISOString().slice(0,10)}
               </span>
             </p>
-            {/* DEBUG BOX - Mostra conta logada */}
-            <div className="mt-3 p-3 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
-              <p className="text-xs font-bold text-yellow-900 mb-1">🔑 DEBUG - Conta Logada:</p>
-              <p className="text-xs text-yellow-800 font-mono">
-                {getMK() ? `Admin (master key)` : `Store: ${getStoreId()} ${getStoreToken() ? '✅' : '❌ SEM TOKEN'}`}
-              </p>
-              <button
-                onClick={() => {
-                  if (confirm('Limpar login e voltar pra tela inicial?')) {
-                    localStorage.clear()
-                    window.location.href = '/'
-                  }
-                }}
-                className="mt-2 px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold rounded"
-              >
-                🔄 Trocar Conta / Re-logar
-              </button>
-            </div>
           </div>
           <div className="flex gap-2">
             <button onClick={loadClients} disabled={loading}
