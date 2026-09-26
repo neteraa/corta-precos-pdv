@@ -909,8 +909,18 @@ export default async (req, context) => {
       const { catalogText, categoryList, promoText } = buildCatalogText(products, promos)
       systemMsg = buildCortaPrecosPrompt(catalogText, categoryList, promoText)
 
+      // Personalização baseada no perfil do cliente
       if (senderName) {
         systemMsg += `\n\n📌 Cliente: ${senderName}. Use o nome naturalmente.`
+      }
+      
+      // Se cliente já comprou antes, mencione sutilmente (sem ser invasivo)
+      if (customerProfile.orders && customerProfile.orders.length > 0) {
+        const totalPedidos = customerProfile.orders.length
+        const lastOrder = customerProfile.orders[0] // mais recente
+        systemMsg += `\n\n🛒 HISTÓRICO DO CLIENTE:\n• Total de pedidos: ${totalPedidos}\n• Último pedido: ${lastOrder.items} (${new Date(lastOrder.date).toLocaleDateString('pt-BR')})\n• Total gasto: R$${customerProfile.totalSpent?.toFixed(2) || '0,00'}\n\n💡 DICA: Se cliente já comprou antes, seja receptivo tipo "Oi de novo!" ou "Que bom te ver por aqui!". NÃO mencione valores ou histórico diretamente (privacidade), apenas seja mais caloroso com clientes recorrentes.`
+      } else if (isFirstContact) {
+        systemMsg += `\n\n👋 Este é o PRIMEIRO CONTATO deste cliente! Seja extra simpático e receptivo.`
       }
 
       // Imagem sem legenda: só vira "[comprovante enviado]" se o bot tinha acabado de pedir
