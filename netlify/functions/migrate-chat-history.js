@@ -1,10 +1,12 @@
 /**
  * migrate-chat-history — Popula histórico de conversas com base nos leads existentes
  * 
- * POST /api/migrate-chat-history?mk=MASTER_KEY
+ * POST /api/migrate-chat-history?mk=MASTER_KEY&instance=zara
  * 
  * Cria histórico inicial para leads que não tem chat_history ainda.
  * Útil para migrar conversas antigas que foram perdidas.
+ * 
+ * ISOLAMENTO: cria históricos no formato chat_history:{instance}:{phone}
  */
 
 import { getStore } from '@netlify/blobs'
@@ -23,6 +25,7 @@ export default async (req) => {
 
   const url = new URL(req.url)
   const mk = url.searchParams.get('mk')
+  const instance = url.searchParams.get('instance') || 'zara' // default: zara (bot de vendas ZatendeStok)
 
   if (mk !== process.env.ZS_MASTER_KEY) {
     return new Response(JSON.stringify({ ok: false, error: 'Não autorizado' }), { status: 401, headers: CORS })
@@ -53,8 +56,9 @@ export default async (req) => {
           continue
         }
 
-        // Verifica se já tem histórico
-        const existingHistory = await store.get(`chat_history:${phone}`, { type: 'json' }).catch(() => null)
+        // Verifica se já tem histórico (NOVA KEY: chat_history:{instance}:{phone})
+        const historyKey = `chat_history:${instance}:${phone}`
+        const existingHistory = await store.get(historyKey, { type: 'json' }).catch(() => null)
         
         if (existingHistory && existingHistory.length > 0) {
           skipped++
@@ -112,8 +116,8 @@ export default async (req) => {
           })
         }
 
-        // Salva histórico
-        await store.set(`chat_history:${phone}`, JSON.stringify(messages))
+        // Salva histórico (NOVA KEY com instance)
+        await store.set(historyKey, JSON.stringify(messages))
         created++
 
       } catch (e) {

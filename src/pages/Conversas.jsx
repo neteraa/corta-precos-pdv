@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { MessageCircle, RefreshCw, Search, Phone, MapPin, Building2, Clock, ExternalLink, User, Bot, AlertCircle } from 'lucide-react'
+import { getMktStoreId, getMktStoreToken } from '../utils/tenantStorage.js'
 
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -27,18 +28,19 @@ export default function Conversas() {
   const [searchQuery,   setSearchQuery]   = useState('')
   const messagesEndRef = useRef(null)
 
-  // Pega master key do localStorage (MasterPainel)
-  const getMK = () => localStorage.getItem('zs_master_key') || ''
-
   const loadClients = useCallback(async () => {
     setLoading(true)
     try {
-      const mk = getMK()
-      if (!mk) {
+      // ISOLAMENTO: usa storeId + token do cliente logado (NÃO master key!)
+      const storeId = getMktStoreId()
+      const token = getMktStoreToken()
+      
+      if (!storeId || !token) {
         setClients([])
         return
       }
-      const res = await fetch(`/api/wa-chat-history?mk=${encodeURIComponent(mk)}`)
+      
+      const res = await fetch(`/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}`)
       const data = await res.json()
       if (data.ok) {
         setClients(data.clients || [])
@@ -54,8 +56,10 @@ export default function Conversas() {
     setMsgLoading(true)
     setSelectedPhone(phone)
     try {
-      const mk = getMK()
-      const res = await fetch(`/api/wa-chat-history?mk=${encodeURIComponent(mk)}&phone=${phone}`)
+      const storeId = getMktStoreId()
+      const token = getMktStoreToken()
+      
+      const res = await fetch(`/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}&phone=${phone}`)
       const data = await res.json()
       if (data.ok) {
         setMessages(data.messages || [])

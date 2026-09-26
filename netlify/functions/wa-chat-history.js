@@ -1,8 +1,9 @@
 /**
- * wa-chat-history — API para buscar histórico de conversas WhatsApp
+ * wa-chat-history — API para buscar histórico de conversas WhatsApp (ISOLADO POR CLIENTE)
  *
- * GET /api/wa-chat-history?mk=MASTER_KEY              → lista todos os clientes com histórico
- * GET /api/wa-chat-history?mk=MASTER_KEY&phone=55...  → histórico de mensagens de um cliente
+ * GET /api/wa-chat-history?storeId=X&token=Y              → lista clientes deste storeId
+ * GET /api/wa-chat-history?storeId=X&token=Y&phone=55...  → histórico de um cliente específico
+ * GET /api/wa-chat-history?mk=MASTER_KEY                  → admin: todos os clientes de TODOS os stores
  */
 
 import { getStore } from '@netlify/blobs'
@@ -16,15 +17,31 @@ function leadsStore() {
   return getStore({ name: 'wa-leads', consistency: 'strong' })
 }
 
+async function validateStoreAuth(storeId, token) {
+  if (!storeId || !token) return false
+  try {
+    const authStore = getStore({ name: 'zs-auth', consistency: 'strong' })
+    const raw = await authStore.get(`${storeId}:token`)
+    return raw === token
+  } catch {
+    return false
+  }
+}
+
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response('', { status: 204, headers: CORS })
 
   const url = new URL(req.url)
-  const mk    = url.searchParams.get('mk')
-  const phone = url.searchParams.get('phone')
+  const mk      = url.searchParams.get('mk')
+  const storeId = url.searchParams.get('storeId')
+  const token   = url.searchParams.get('token')
+  const phone   = url.searchParams.get('phone')
 
-  // Apenas master key pode acessar
-  if (mk !== process.env.ZS_MASTER_KEY) {
+  // Autenticação: MASTER KEY (admin vê tudo) ou STOREID+TOKEN (cliente vê só suas conversas)
+  const isMaster = mk === process.env.ZS_MASTER_KEY
+  const isStore  = !isMaster && storeId && await validateStoreAuth(storeId, token)
+
+  if (!isMaster && !isStore) {
     return new Response(JSON.stringify({ ok: false, error: 'Não autorizado' }), { status: 401, headers: CORS })
   }
 
@@ -32,8 +49,24 @@ export default async (req) => {
 
   // ── GET histórico de um cliente específico ────────────────────────────────────
   if (phone) {
-    const key = `chat_history:${phone}`
-    const messages = await store.get(key, { type: 'json' }).catch(() => null)
+    // ISOLAMENTO: usa storeId na key se for cliente, ou busca em todos se for master
+    let key
+    let messages = null
+    
+    if (isStore) {
+      // Cliente: busca APENAS suas próprias conversas
+      key = `chat_history:${storeId}:${phone}`
+      messages = await store.get(key, { type: 'json' }).catch(() => null)
+    } else if (isMaster) {
+      // Master: busca em todos os stores (tenta encontrar)
+      const { blobs } = await store.list()
+      const matchingBlob = blobs.find(b => 
+        b.key.startsWith('chat_history:') && b.key.endsWith(`:${phone}`)
+      )
+      if (matchingBlob) {
+        messages = await store.get(matchingBlob.key, { type: 'json' }).catch(() => null)
+      }
+    }
     
     // Busca também os dados do lead
     const leadData = await store.get(phone, { type: 'json' }).catch(() => null)
@@ -50,13 +83,22 @@ export default async (req) => {
   // ── GET lista de todos os clientes com histórico ──────────────────────────────
   const { blobs } = await store.list()
   
-  // Filtrar apenas chaves de histórico (chat_history:*)
-  const historyBlobs = blobs.filter(b => b.key.startsWith('chat_history:'))
+  // Filtrar chaves de histórico: chat_history:{storeId}:{phone}
+  let historyBlobs
+  if (isStore) {
+    // Cliente: APENAS histórico deste storeId
+    historyBlobs = blobs.filter(b => b.key.startsWith(`chat_history:${storeId}:`))
+  } else {
+    // Master: todos os históricos
+    historyBlobs = blobs.filter(b => b.key.startsWith('chat_history:'))
+  }
   
   const clients = await Promise.all(
     historyBlobs.map(async b => {
       try {
-        const phone = b.key.replace('chat_history:', '')
+        // Key format: chat_history:{storeId}:{phone}
+        const parts = b.key.split(':')
+        const phone = parts[parts.length - 1] // último segmento é o phone
         const messages = await store.get(b.key, { type: 'json' })
         const leadData = await store.get(phone, { type: 'json' }).catch(() => null)
         

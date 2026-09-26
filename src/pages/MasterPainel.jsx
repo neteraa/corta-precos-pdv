@@ -873,11 +873,12 @@ export default function MasterPainel() {
   useEffect(() => { if (tab === 'leads' && mk) loadLeads() }, [tab, mk, loadLeads])
 
   const migrateHistory = async () => {
-    if (!confirm('Criar histórico de conversas para leads antigos?\n\nIsso vai criar conversas simuladas baseadas nos dados dos leads que ainda não têm histórico.')) return
+    if (!confirm('Criar histórico de conversas para leads antigos?\n\nIsso vai criar conversas simuladas baseadas nos dados dos leads que ainda não têm histórico.\n\nOBS: Isso cria históricos para a instância "zara" (bot de vendas ZatendeStok).')) return
     setMigrating(true)
     setMigrateResult(null)
     try {
-      const res = await api('/api/migrate-chat-history', mk, { method: 'POST' })
+      // Passa instance=zara (bot de vendas ZatendeStok - leads do MasterPainel)
+      const res = await api('/api/migrate-chat-history?instance=zara', mk, { method: 'POST' })
       setMigrateResult(res)
       if (res.ok) {
         setTimeout(() => setMigrateResult(null), 8000)

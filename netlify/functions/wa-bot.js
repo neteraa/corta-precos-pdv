@@ -548,20 +548,23 @@ function getHistory(senderNum) {
   return conversations.get(senderNum)
 }
 
-function pushHistory(senderNum, role, content) {
+function pushHistory(senderNum, role, content, instanceName = null) {
   const hist = getHistory(senderNum)
   hist.push({ role, content })
   // Mantém só as últimas MAX_HISTORY mensagens pra não explodir o contexto
   if (hist.length > MAX_HISTORY) hist.splice(0, hist.length - MAX_HISTORY)
-  // Salva no blob para persistência (fire-and-forget)
-  saveChatHistory(senderNum, role, content).catch(e => console.error('saveChatHistory:', e.message))
+  // Salva no blob para persistência (fire-and-forget) - ISOLADO POR INSTANCE/STOREID
+  if (instanceName) {
+    saveChatHistory(instanceName, senderNum, role, content).catch(e => console.error('saveChatHistory:', e.message))
+  }
 }
 
-/** Persiste histórico de chat no blob (append-only) */
-async function saveChatHistory(phone, role, content) {
+/** Persiste histórico de chat no blob (append-only) - ISOLADO POR STOREID */
+async function saveChatHistory(storeId, phone, role, content) {
   try {
     const store = leadsStore()
-    const key = `chat_history:${phone}`
+    // KEY: chat_history:{storeId}:{phone} — ISOLAMENTO POR CLIENTE!
+    const key = `chat_history:${storeId}:${phone}`
     const raw = await store.get(key, { type: 'json' }).catch(() => null)
     const messages = raw || []
     messages.push({
@@ -838,14 +841,14 @@ export default async (req, context) => {
       // Fast-path: responde saudações/promoções/horário/preços sem chamar LLM
       const quick = quickReply(finalText, senderName, promoText, products)
       if (quick) {
-        pushHistory(senderNum, 'user', finalText)
-        pushHistory(senderNum, 'assistant', quick)
+        pushHistory(senderNum, 'user', finalText, instanceName)
+        pushHistory(senderNum, 'assistant', quick, instanceName)
         context.waitUntil(sendReply(senderNum, quick, instanceName))
         console.log(`wa-bot [CortaPrecos]: fast-path para ${senderNum}: ${quick.slice(0, 60)}`)
         return new Response('OK', { status: 200 })
       }
 
-      pushHistory(senderNum, 'user', finalText)
+      pushHistory(senderNum, 'user', finalText, instanceName)
       rawReply = await askLLM(finalText, senderNum, systemMsg)
       if (!rawReply) return new Response('OK', { status: 200 })
 
@@ -875,7 +878,7 @@ export default async (req, context) => {
       // Se bot enviou msg de pagamento PIX (passo 4), persiste draft no blob com dados da <zs_pending> tag
       context.waitUntil(maybeStorePendingOrder(cpReply, senderNum, senderName, pendingData))
 
-      pushHistory(senderNum, 'assistant', cpReply)
+      pushHistory(senderNum, 'assistant', cpReply, instanceName)
       context.waitUntil(sendReply(senderNum, cpReply, instanceName))
       console.log(`wa-bot [CortaPrecos]: respondeu ${senderNum}: ${cpReply.slice(0, 80)}`)
 
@@ -914,12 +917,12 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
       }
 
       systemMsg = SYSTEM_PROMPT + profileCtx
-      pushHistory(senderNum, 'user', text)
+      pushHistory(senderNum, 'user', text, instanceName)
       rawReply = await askLLM(text, senderNum, systemMsg)
       if (!rawReply) return new Response('OK', { status: 200 })
 
       const { clean: reply, lead: extracted } = parseLeadTag(rawReply)
-      pushHistory(senderNum, 'assistant', reply)
+      pushHistory(senderNum, 'assistant', reply, instanceName)
 
       if (extracted && Object.keys(extracted).length) {
         await saveLead(senderNum, { ...leadProfile, ...extracted, waName: leadProfile.waName || senderName || null })
@@ -941,12 +944,12 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
         systemMsg += `\n\n📌 O cliente que está falando agora se chama *${senderName}*. Use o nome naturalmente.`
       }
 
-      pushHistory(senderNum, 'user', text)
+      pushHistory(senderNum, 'user', text, instanceName)
       rawReply = await askLLM(text, senderNum, systemMsg)
       if (!rawReply) return new Response('OK', { status: 200 })
 
       // Bot do mercado não usa <zs_lead> — resposta direta
-      pushHistory(senderNum, 'assistant', rawReply)
+      pushHistory(senderNum, 'assistant', rawReply, instanceName)
       context.waitUntil(sendReply(senderNum, rawReply, instanceName))
       console.log(`wa-bot [${instanceName}]: respondeu ${senderNum}: ${rawReply.slice(0, 80)}`)
     }
