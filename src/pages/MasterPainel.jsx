@@ -781,6 +781,8 @@ export default function MasterPainel() {
   const [leadsLoading, setLeadsLoading]  = useState(false)
   const [leadsFilter,  setLeadsFilter]   = useState('all') // 'all' | 'novo' | 'curioso' | 'interessado' | 'demo' | 'fechado'
   const [selectedLead, setSelectedLead]  = useState(null)  // modal de detalhes
+  const [migrating,    setMigrating]     = useState(false)
+  const [migrateResult, setMigrateResult] = useState(null)
 
   // ── Prospecção — fila ──────────────────────────────────────
   const [prospInnerTab, setProspInnerTab]   = useState('search')
@@ -869,6 +871,23 @@ export default function MasterPainel() {
 
   // Carrega leads ao entrar na aba
   useEffect(() => { if (tab === 'leads' && mk) loadLeads() }, [tab, mk, loadLeads])
+
+  const migrateHistory = async () => {
+    if (!confirm('Criar histórico de conversas para leads antigos?\n\nIsso vai criar conversas simuladas baseadas nos dados dos leads que ainda não têm histórico.')) return
+    setMigrating(true)
+    setMigrateResult(null)
+    try {
+      const res = await api('/api/migrate-chat-history', mk, { method: 'POST' })
+      setMigrateResult(res)
+      if (res.ok) {
+        setTimeout(() => setMigrateResult(null), 8000)
+      }
+    } catch (e) {
+      setMigrateResult({ ok: false, error: e.message })
+    } finally {
+      setMigrating(false)
+    }
+  }
 
 
 
@@ -1695,11 +1714,36 @@ export default function MasterPainel() {
                 </h2>
                 <p className="text-gray-500 text-sm mt-0.5">Contatos que interagiram com o bot WhatsApp</p>
               </div>
-              <button onClick={loadLeads} disabled={leadsLoading}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-bold text-gray-300 disabled:opacity-50 transition-all">
-                <RefreshCw className={`w-4 h-4 ${leadsLoading ? 'animate-spin' : ''}`} /> Atualizar
-              </button>
+              <div className="flex gap-2">
+                <button onClick={migrateHistory} disabled={migrating}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold disabled:opacity-50 transition-all">
+                  <MessageCircle className={`w-4 h-4 ${migrating ? 'animate-spin' : ''}`} /> Criar Histórico
+                </button>
+                <button onClick={loadLeads} disabled={leadsLoading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-bold text-gray-300 disabled:opacity-50 transition-all">
+                  <RefreshCw className={`w-4 h-4 ${leadsLoading ? 'animate-spin' : ''}`} /> Atualizar
+                </button>
+              </div>
             </div>
+
+            {/* Resultado da migração */}
+            {migrateResult && (
+              <div className={`rounded-xl p-4 ${migrateResult.ok ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+                <div className={`font-bold text-sm ${migrateResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+                  {migrateResult.ok ? '✅ Migração concluída!' : '❌ Erro na migração'}
+                </div>
+                {migrateResult.ok && (
+                  <div className="text-gray-400 text-sm mt-1">
+                    <strong>{migrateResult.created}</strong> histórico(s) criado(s) · 
+                    <strong className="ml-1">{migrateResult.skipped}</strong> já existiam ·
+                    <strong className="ml-1">{migrateResult.total}</strong> total de leads
+                  </div>
+                )}
+                {migrateResult.error && (
+                  <div className="text-red-300 text-sm mt-1">{migrateResult.error}</div>
+                )}
+              </div>
+            )}
 
             {/* Filtros por status */}
             {!leadsLoading && leads.length > 0 && (
