@@ -53,24 +53,31 @@ export default function Conversas() {
       const storeId = getStoreId()
       const token = getStoreToken()
       
+      console.log('[Conversas] loadClients - mk:', !!mk, 'storeId:', storeId, 'token:', !!token)
+      
       // Admin (master key) OU mercado específico (storeId+token)
       let url
       if (mk) {
         url = `/api/wa-chat-history?mk=${encodeURIComponent(mk)}`
+        console.log('[Conversas] Usando master key (admin)')
       } else if (storeId && token) {
         url = `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}`
+        console.log('[Conversas] Usando storeId+token (mercado):', storeId)
       } else {
+        console.log('[Conversas] SEM credenciais válidas!')
         setClients([])
         return
       }
       
+      console.log('[Conversas] Fetching:', url)
       const res = await fetch(url)
       const data = await res.json()
+      console.log('[Conversas] Response:', data.ok ? `${data.clients?.length || 0} clientes` : data.error)
       if (data.ok) {
         setClients(data.clients || [])
       }
     } catch (e) {
-      console.error('loadClients:', e)
+      console.error('loadClients error:', e)
     } finally {
       setLoading(false)
     }
@@ -161,6 +168,11 @@ export default function Conversas() {
       (c.city || '').toLowerCase().includes(q)
     )
   })
+  
+  // DEBUG: Log quando filteredClients muda
+  React.useEffect(() => {
+    console.log('[Conversas] Clientes:', clients.length, '| Filtrados:', filteredClients.length, '| Filtro store:', filterStore, '| Busca:', searchQuery)
+  }, [clients.length, filteredClients.length, filterStore, searchQuery])
   
   // Extrai storeIds únicos para as abas (SÓ QUANDO TEM MASTER KEY!)
   const mk = getMK()
@@ -303,7 +315,12 @@ export default function Conversas() {
                   <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
                     <User className="w-4 h-4 text-green-600" />
                   </div>
-                  {client.name || '(sem nome)'}
+                  {/* Mostra nome real, ou telefone se não tiver nome válido */}
+                  {(client.name && client.name !== 'LEAD' && client.name !== '(sem nome)') 
+                    ? client.name 
+                    : client.phone 
+                      ? `+${client.phone.slice(0,2)} (${client.phone.slice(2,4)}) ${client.phone.slice(4,9)}-${client.phone.slice(9)}`
+                      : '(sem identificação)'}
                 </div>
                 <span className="text-xs text-gray-500">{timeAgo(client.lastMessageTime)}</span>
               </div>

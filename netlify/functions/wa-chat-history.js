@@ -130,6 +130,9 @@ export default async (req) => {
   // ── GET lista de todos os clientes com histórico ──────────────────────────────
   const { blobs } = await store.list()
   
+  console.log('[wa-chat-history] Listando clientes - isStore:', isStore, 'storeId:', storeId, 'isMaster:', isMaster)
+  console.log('[wa-chat-history] Total blobs:', blobs.length)
+  
   // Filtrar chaves de histórico: aceita AMBOS formatos (retrocompatibilidade)
   // Formato antigo: chat_history:{phone}
   // Formato novo: chat_history:{storeId}:{phone}
@@ -143,9 +146,14 @@ export default async (req) => {
       if (b.key.startsWith(`chat_history:${storeId}_`)) return true
       return false
     })
+    console.log('[wa-chat-history] Filtrado para storeId:', storeId, '→', historyBlobs.length, 'conversas')
+    if (historyBlobs.length > 0) {
+      console.log('[wa-chat-history] Primeiras 3 keys encontradas:', historyBlobs.slice(0, 3).map(b => b.key))
+    }
   } else {
     // Master: TODOS os históricos (ambos formatos)
     historyBlobs = blobs.filter(b => b.key.startsWith('chat_history:'))
+    console.log('[wa-chat-history] Master mode → todas conversas:', historyBlobs.length)
   }
   
   const clients = await Promise.all(
