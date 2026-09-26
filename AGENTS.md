@@ -407,6 +407,35 @@ curl https://ws-relay-production-42a7.up.railway.app/health
 - Estrutura blob: { date, sessions:[], zones:[{name,visits,avgDwellSec,maxDwellSec,peakCount}] }
 - PARA REGENERAR chunk TF.js: vendor-tfjs no vite.config.js manualChunks (311KB gzip)
 
+## CAMERAS MOBILE UX — melhorias 2025-09-25 ⚡
+### Card de Métricas Flutuante (sempre visível)
+- position:fixed top:calc(env(safe-area-inset-top)+60px) — respeita status bar iOS/Android
+- Mostra: totalPersons (roxo) + visitas totais (verde) + resumo 2 primeiras zonas
+- Esconde quando: showLog=true || configMode=true
+- Background: rgba(0,0,0,0.85) + backdrop-filter:blur(12px) + border roxo
+- zIndex:19 (abaixo da topbar z:20, acima do vídeo z:10)
+
+### Painel Inferior Renovado
+- paddingBottom: calc(env(safe-area-inset-bottom)+14px) — respeita botão Home iPhone
+- Cards individuais por zona: background semi-transparente + borderLeft colorido
+- Grid 3 colunas: Visitas | Média | Máximo (fontSize:11px)
+- Header: "DETALHES DAS ZONAS" (roxo, uppercase, spacing 0.5)
+- borderTop: 2px solid rgba(139,92,246,0.4) — separação clara
+
+### PWA Safe Area (iOS/Android)
+- index.html: viewport-fit=cover + apple-mobile-web-app-status-bar-style:black-translucent
+- Topbar mobile: paddingTop:calc(env(safe-area-inset-top)+10px)
+- Card métricas: top:calc(env(safe-area-inset-top)+60px)
+- Painel inferior: paddingBottom:calc(env(safe-area-inset-bottom)+14px)
+- Fix: app instalado NÃO sobrepõe mais bateria/horas/botão Home ✅
+
+## CORTA PREÇOS ENDEREÇO — correção 2025-09-25 📍
+- wa-bot.js linha 98: "Mercado CORTA PREÇOS — Itapeva-SP | Rua Capão Bonito, 20"
+- wa-bot.js linha 684: fallback localização → "Rua Capão Bonito, 20 - Itapeva-SP"
+- wa-bot.js linha 947: fallback preço → "Rua Capão Bonito 20, Itapeva-SP"
+- AGENTS.md: pixCity BOITUVA → ITAPEVA (Rua Capão Bonito 20)
+- PENDENTE: atualizar pixCity no painel /configuracoes (manual pelo admin)
+
 ## DASHBOARD — src/pages/Dashboard.jsx (delivery widget 2025-09)
 - deliveryStats: fetched via useEffect → GET /api/delivery?storeId + processado no cliente
   → thisMonth: pedidos do mês corrente
