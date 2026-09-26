@@ -64,21 +64,23 @@ async function loadStoreCatalog() {
 }
 
 function buildCatalogText(products, promos) {
-  // Máx 60 produtos para economizar tokens — priorizamos os com estoque > 0
-  const active = products
-    .filter(p => p.price > 0 && p.active !== false)
-    .sort((a, b) => (b.stock || 0) - (a.stock || 0))
-    .slice(0, 60)
+  // Agrupa TODOS os produtos por categoria (sem limite)
+  const active = products.filter(p => p.price > 0 && p.active !== false)
   const byCategory = {}
   for (const p of active) {
     const cat = p.category || 'Outros'
     if (!byCategory[cat]) byCategory[cat] = []
-    byCategory[cat].push(`• ${p.name} R$${p.price.toFixed(2).replace('.', ',')}`)
+    byCategory[cat].push(`• ${p.name}: R$${p.price.toFixed(2).replace('.', ',')}`)
   }
+
+  // Formata: lista completa POR CATEGORIA (sem truncar)
   const lines = []
   for (const [cat, items] of Object.entries(byCategory)) {
-    lines.push(`${cat}: ${items.slice(0, 10).join(' | ')}`)   // 1 linha por categoria
+    lines.push(`\n📦 ${cat}:\n${items.join('\n')}`)
   }
+
+  // Lista só os nomes das categorias (para o bot sugerir)
+  const categoryList = Object.keys(byCategory).map(cat => `📦 ${cat}`).join('\n')
 
   const promoLines = promos
     .filter(pr => pr.active)
@@ -86,7 +88,8 @@ function buildCatalogText(products, promos) {
 
   return {
     catalogText: lines.join('\n') || 'Catálogo sendo atualizado.',
-    promoText:   promoLines.join('\n') || 'Nenhuma promoção ativa no momento.',
+    categoryList,  // NOVO: lista de categorias
+    promoText: promoLines.join('\n') || 'Nenhuma promoção ativa no momento.',
   }
 }
 
@@ -106,7 +109,7 @@ async function saveDeliveryOrder(order) {
   } catch (e) { console.error('saveDeliveryOrder:', e.message) }
 }
 
-function buildCortaPrecosPrompt(catalogText, promoText) {
+function buildCortaPrecosPrompt(catalogText, categoryList, promoText) {
   return `Você é a Zara, atendente virtual do CORTA PREÇOS. Responde pelo WhatsApp de forma simpática, rápida e informal — como uma atendente boa de mercadinho.
 
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -122,6 +125,15 @@ function buildCortaPrecosPrompt(catalogText, promoText) {
 ━━━━━━━━━━━━━━━━━━━━━━
 🛒 PRODUTOS E PREÇOS
 ━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 ESTRATÉGIA IMPORTANTE: Temos 35+ produtos!
+• Se cliente perguntar "lista de produtos" ou "catálogo" → Mostre APENAS as CATEGORIAS abaixo e pergunte qual quer ver
+• Se cliente pedir categoria específica (ex: "Higiene", "Biscoitos") → Aí sim liste os produtos daquela categoria
+
+CATEGORIAS DISPONÍVEIS:
+${categoryList}
+
+CATÁLOGO COMPLETO (use SOMENTE quando cliente pedir categoria específica):
 ${catalogText}
 
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -846,8 +858,8 @@ export default async (req, context) => {
     if (isCortaPrecos) {
       // ── MODO CORTA PREÇOS: bot de atendimento + delivery + produtos ───────
       const { products, promos } = await loadStoreCatalog()
-      const { catalogText, promoText } = buildCatalogText(products, promos)
-      systemMsg = buildCortaPrecosPrompt(catalogText, promoText)
+      const { catalogText, categoryList, promoText } = buildCatalogText(products, promos)
+      systemMsg = buildCortaPrecosPrompt(catalogText, categoryList, promoText)
 
       if (senderName) {
         systemMsg += `\n\n📌 Cliente: ${senderName}. Use o nome naturalmente.`

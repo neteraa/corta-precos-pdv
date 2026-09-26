@@ -53,15 +53,24 @@ export default function Conversas() {
   const loadMessages = useCallback(async (phone) => {
     setMsgLoading(true)
     setSelectedPhone(phone)
+    setMessages([]) // Limpa mensagens antigas primeiro
     try {
       const mk = getMK()
-      const res = await fetch(`/api/wa-chat-history?mk=${encodeURIComponent(mk)}&phone=${phone}`)
+      const url = `/api/wa-chat-history?mk=${encodeURIComponent(mk)}&phone=${phone}`
+      console.log('Carregando mensagens de:', phone)
+      const res = await fetch(url)
       const data = await res.json()
+      console.log('Resposta:', data)
       if (data.ok) {
-        setMessages(data.messages || [])
+        const msgs = data.messages || []
+        console.log('Mensagens carregadas:', msgs.length)
+        setMessages(msgs)
+      } else {
+        console.error('Erro na API:', data.error)
+        setMessages([])
       }
     } catch (e) {
-      console.error('loadMessages:', e)
+      console.error('loadMessages erro:', e)
       setMessages([])
     } finally {
       setMsgLoading(false)
@@ -75,9 +84,11 @@ export default function Conversas() {
     return () => clearInterval(interval)
   }, [loadClients])
 
-  // Scroll to bottom quando carrega mensagens
+  // Auto-scroll quando mensagens carregarem
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messages.length > 0 && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages])
 
   const filteredClients = clients.filter(c => {
