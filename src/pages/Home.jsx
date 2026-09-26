@@ -21,11 +21,21 @@ function InstallAndGuide({ themeColor }) {
   const [showGuide, setShowGuide] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState(null)
   const [isInstalled, setIsInstalled] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
-  // Detecta se já está instalado como PWA
+  // Detecta se já está instalado como PWA e se é mobile
   React.useEffect(() => {
     const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
     setIsInstalled(standalone)
+    
+    // Detecta se é mobile (tela pequena OU touch device)
+    const checkMobile = () => {
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+      const isSmallScreen = window.innerWidth < 768
+      setIsMobile(isTouchDevice || isSmallScreen)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
 
     // Captura o evento de instalação
     const handler = (e) => {
@@ -33,7 +43,10 @@ function InstallAndGuide({ themeColor }) {
       setDeferredPrompt(e)
     }
     window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler)
+      window.removeEventListener('resize', checkMobile)
+    }
   }, [])
 
   const handleInstall = async () => {
@@ -46,8 +59,8 @@ function InstallAndGuide({ themeColor }) {
 
   return (
     <div style={{ marginTop: 40, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Botão de Instalação (só aparece se não instalado e se o prompt estiver disponível) */}
-      {!isInstalled && deferredPrompt && (
+      {/* Botão de Instalação (só aparece no MOBILE, se não instalado e se o prompt estiver disponível) */}
+      {!isInstalled && deferredPrompt && isMobile && (
         <div style={{
           padding: 20,
           background: `linear-gradient(135deg, ${themeColor}15, ${themeColor}08)`,

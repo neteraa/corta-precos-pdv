@@ -254,29 +254,6 @@ export default function Conversas() {
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-sm transition-all disabled:opacity-50">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Atualizar
             </button>
-            <button 
-              onClick={() => {
-                // Limpa TUDO: cache, service worker, localStorage (exceto login)
-                if (confirm('Limpar cache do app e recarregar? (Você continuará logado)')) {
-                  // Limpa cache do navegador
-                  if ('caches' in window) {
-                    caches.keys().then(keys => keys.forEach(k => caches.delete(k)))
-                  }
-                  // Desregistra service worker
-                  if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.getRegistrations().then(regs => 
-                      regs.forEach(r => r.unregister())
-                    )
-                  }
-                  // Aguarda 500ms e recarrega HARD
-                  setTimeout(() => window.location.reload(true), 500)
-                }
-              }}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs transition-all"
-              title="Limpar cache e forçar atualização"
-            >
-              🔄 Cache
-            </button>
           </div>
         </div>
       </div>
@@ -285,7 +262,8 @@ export default function Conversas() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 lg:divide-x divide-gray-200 h-[calc(100vh-120px)]">
         
         {/* ── LISTA DE CLIENTES ────────────────────────────────── */}
-        <div className="lg:col-span-1 bg-white overflow-y-auto">
+        {/* No mobile: esconde lista quando chat está aberto */}
+        <div className={`lg:col-span-1 bg-white overflow-y-auto ${selectedPhone ? 'hidden lg:block' : 'block'}`}>
           {/* Search */}
           <div className="sticky top-0 bg-white p-4 border-b border-gray-200">
             <div className="relative">
@@ -413,7 +391,8 @@ export default function Conversas() {
         </div>
 
         {/* ── CHAT / MENSAGENS ───────────────────────────────────── */}
-        <div className="lg:col-span-2 bg-gray-50 flex flex-col">
+        {/* No mobile: mostra chat fullscreen quando selecionado */}
+        <div className={`lg:col-span-2 bg-gray-50 flex flex-col ${!selectedPhone ? 'hidden lg:flex' : 'flex'}`}>
           {!selectedPhone && (
             <div className="flex-1 flex items-center justify-center p-8 text-center text-gray-500">
               <div>
@@ -428,23 +407,36 @@ export default function Conversas() {
             <>
               {/* Header do Chat */}
               <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-10">
-                <div>
-                  <div className="font-black text-gray-900 flex items-center gap-2">
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                      <User className="w-5 h-5 text-green-600" />
+                <div className="flex items-center gap-3 flex-1">
+                  {/* Botão Voltar (só mobile) */}
+                  <button
+                    onClick={() => setSelectedPhone(null)}
+                    className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-all"
+                  >
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  
+                  <div className="flex-1">
+                    <div className="font-black text-gray-900 flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                        <User className="w-5 h-5 text-green-600" />
+                      </div>
+                      {selectedClient?.name || '(sem nome)'}
                     </div>
-                    {selectedClient?.name || '(sem nome)'}
-                  </div>
-                  <div className="text-xs text-gray-600 mt-1 flex items-center gap-2">
-                    <Phone className="w-3 h-3" />
-                    {selectedPhone ? `+${selectedPhone.slice(0,2)} (${selectedPhone.slice(2,4)}) ${selectedPhone.slice(4,9)}-${selectedPhone.slice(9)}` : ''}
+                    <div className="text-xs text-gray-600 mt-1 flex items-center gap-2">
+                      <Phone className="w-3 h-3" />
+                      {selectedPhone ? `+${selectedPhone.slice(0,2)} (${selectedPhone.slice(2,4)}) ${selectedPhone.slice(4,9)}-${selectedPhone.slice(9)}` : ''}
+                    </div>
                   </div>
                 </div>
+                
                 <a
                   href={`https://wa.me/${selectedPhone}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-sm transition-all">
+                  className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-sm transition-all">
                   <ExternalLink className="w-4 h-4" /> Abrir no WhatsApp
                 </a>
               </div>
