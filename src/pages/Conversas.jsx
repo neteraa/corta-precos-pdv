@@ -132,6 +132,8 @@ export default function Conversas() {
 
   useEffect(() => {
     loadClients()
+    // Reseta filtro quando carrega clientes (evita bugs de filtro errado)
+    setFilterStore('all')
     // Auto-refresh a cada 30s
     const interval = setInterval(loadClients, 30000)
     return () => clearInterval(interval)
@@ -160,7 +162,12 @@ export default function Conversas() {
     )
   })
   
-  // Extrai storeIds únicos para as abas (só quando tem master key)
+  // Extrai storeIds únicos para as abas (SÓ QUANDO TEM MASTER KEY!)
+  const mk = getMK()
+  const loggedStoreId = getStoreId()
+  const isMasterMode = !!mk  // Admin vê tudo
+  const isStoreMode = !mk && !!loggedStoreId  // Mercado vê só suas conversas
+  
   const uniqueStores = [...new Set(clients.map(c => c.storeId))].filter(Boolean).sort()
   const storeLabels = {
     'zara': 'Zara (Vendas)',
@@ -178,8 +185,20 @@ export default function Conversas() {
             <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
               <MessageCircle className="w-6 h-6 text-green-600" />
               Conversas WhatsApp
+              {isMasterMode && (
+                <span className="ml-2 px-2 py-0.5 text-xs font-bold bg-purple-100 text-purple-700 rounded-full">
+                  ADMIN
+                </span>
+              )}
+              {isStoreMode && (
+                <span className="ml-2 px-2 py-0.5 text-xs font-bold bg-blue-100 text-blue-700 rounded-full">
+                  {storeLabels[loggedStoreId] || loggedStoreId}
+                </span>
+              )}
             </h1>
-            <p className="text-gray-600 text-sm mt-0.5">Histórico completo das conversas da Zara</p>
+            <p className="text-gray-600 text-sm mt-0.5">
+              {isMasterMode ? 'Histórico de TODOS os mercados (modo admin)' : `Histórico do ${storeLabels[loggedStoreId] || 'mercado'}`}
+            </p>
           </div>
           <button onClick={loadClients} disabled={loading}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-sm transition-all disabled:opacity-50">
@@ -207,8 +226,8 @@ export default function Conversas() {
             </div>
           </div>
 
-          {/* Abas de filtro por storeId (só aparece se tiver múltiplos stores - master key) */}
-          {uniqueStores.length > 1 && (
+          {/* Abas de filtro por storeId (SÓ APARECE NO MODO MASTER!) */}
+          {isMasterMode && uniqueStores.length > 1 && (
             <div className="sticky top-[72px] bg-gray-50 p-3 border-b border-gray-200 flex gap-2 overflow-x-auto">
               <button
                 onClick={() => setFilterStore('all')}
