@@ -25,6 +25,7 @@ export default function Conversas() {
   const [messages,      setMessages]      = useState([])
   const [msgLoading,    setMsgLoading]    = useState(false)
   const [searchQuery,   setSearchQuery]   = useState('')
+  const [debugInfo,     setDebugInfo]     = useState(null) // DEBUG: info da API
   const messagesEndRef = useRef(null)
 
   // REVERTIDO: volta a usar master key como antes (que funcionava!)
@@ -54,6 +55,7 @@ export default function Conversas() {
     setMsgLoading(true)
     setSelectedPhone(phone)
     setMessages([]) // Limpa mensagens antigas primeiro
+    setDebugInfo(null)
     try {
       const mk = getMK()
       const url = `/api/wa-chat-history?mk=${encodeURIComponent(mk)}&phone=${phone}`
@@ -61,6 +63,16 @@ export default function Conversas() {
       const res = await fetch(url)
       const data = await res.json()
       console.log('Resposta:', data)
+      
+      // DEBUG: salva info completa da API
+      setDebugInfo({
+        phone,
+        foundKey: data.foundKey,
+        count: data.count,
+        messagesLength: (data.messages || []).length,
+        ok: data.ok,
+      })
+      
       if (data.ok) {
         const msgs = data.messages || []
         console.log('Mensagens carregadas:', msgs.length)
@@ -72,6 +84,7 @@ export default function Conversas() {
     } catch (e) {
       console.error('loadMessages erro:', e)
       setMessages([])
+      setDebugInfo({ error: e.message })
     } finally {
       setMsgLoading(false)
     }
@@ -249,7 +262,25 @@ export default function Conversas() {
                 {!msgLoading && messages.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">Nenhuma mensagem encontrada</p>
+                    <p className="text-sm font-bold">Nenhuma mensagem encontrada</p>
+                    
+                    {/* DEBUG INFO VISUAL */}
+                    {debugInfo && (
+                      <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-left max-w-md mx-auto">
+                        <p className="font-bold text-yellow-800 mb-2">🔍 Debug Info:</p>
+                        <p className="text-xs"><strong>Phone buscado:</strong> {debugInfo.phone}</p>
+                        <p className="text-xs"><strong>Key encontrada:</strong> {debugInfo.foundKey || '❌ NENHUMA!'}</p>
+                        <p className="text-xs"><strong>Count da API:</strong> {debugInfo.count}</p>
+                        <p className="text-xs"><strong>Messages length:</strong> {debugInfo.messagesLength}</p>
+                        <p className="text-xs"><strong>API ok:</strong> {debugInfo.ok ? '✅' : '❌'}</p>
+                        {debugInfo.error && <p className="text-xs text-red-600"><strong>Erro:</strong> {debugInfo.error}</p>}
+                      </div>
+                    )}
+                    
+                    <p className="text-xs text-red-600 mt-4 font-bold">
+                      ⚠️ Se a lista da esquerda mostra mensagens mas aqui não aparece,<br/>
+                      é porque a API não encontrou a key correta no blob!
+                    </p>
                   </div>
                 )}
 
