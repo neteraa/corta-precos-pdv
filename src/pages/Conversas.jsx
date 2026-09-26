@@ -28,18 +28,42 @@ export default function Conversas() {
   const [debugInfo,     setDebugInfo]     = useState(null) // DEBUG: info da API
   const messagesEndRef = useRef(null)
 
-  // REVERTIDO: volta a usar master key como antes (que funcionava!)
+  // AUTH: usa master key (admin) OU storeId+token (mercado específico)
   const getMK = () => localStorage.getItem('zs_master_key') || ''
+  const getStoreId = () => {
+    try {
+      const session = JSON.parse(localStorage.getItem('cp_session') || '{}')
+      return session.storeId || 'default'
+    } catch { return 'default' }
+  }
+  const getStoreToken = () => {
+    try {
+      const storeId = getStoreId()
+      if (storeId === 'default') return null
+      const mkt = JSON.parse(localStorage.getItem(`mkt:${storeId}:cp_session`) || '{}')
+      return mkt.storeToken || null
+    } catch { return null }
+  }
 
   const loadClients = useCallback(async () => {
     setLoading(true)
     try {
       const mk = getMK()
-      if (!mk) {
+      const storeId = getStoreId()
+      const token = getStoreToken()
+      
+      // Admin (master key) OU mercado específico (storeId+token)
+      let url
+      if (mk) {
+        url = `/api/wa-chat-history?mk=${encodeURIComponent(mk)}`
+      } else if (storeId && token) {
+        url = `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}`
+      } else {
         setClients([])
         return
       }
-      const res = await fetch(`/api/wa-chat-history?mk=${encodeURIComponent(mk)}`)
+      
+      const res = await fetch(url)
       const data = await res.json()
       if (data.ok) {
         setClients(data.clients || [])
@@ -58,10 +82,20 @@ export default function Conversas() {
     setDebugInfo(null)
     try {
       const mk = getMK()
+      const storeId = getStoreId()
+      const token = getStoreToken()
+      
       // NOVO: usa blobKey se disponível (ELIMINA problema de match!)
-      const url = blobKey 
-        ? `/api/wa-chat-history?mk=${encodeURIComponent(mk)}&blobKey=${encodeURIComponent(blobKey)}`
-        : `/api/wa-chat-history?mk=${encodeURIComponent(mk)}&phone=${phone}`
+      let url
+      if (mk) {
+        url = blobKey 
+          ? `/api/wa-chat-history?mk=${encodeURIComponent(mk)}&blobKey=${encodeURIComponent(blobKey)}`
+          : `/api/wa-chat-history?mk=${encodeURIComponent(mk)}&phone=${phone}`
+      } else if (storeId && token) {
+        url = blobKey 
+          ? `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}&blobKey=${encodeURIComponent(blobKey)}`
+          : `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}&phone=${phone}`
+      }
       
       console.log('Carregando mensagens - phone:', phone, 'blobKey:', blobKey)
       const res = await fetch(url)
