@@ -134,8 +134,8 @@ export default function Conversas() {
     loadClients()
     // Reseta filtro quando carrega clientes (evita bugs de filtro errado)
     setFilterStore('all')
-    // Auto-refresh a cada 30s
-    const interval = setInterval(loadClients, 30000)
+    // Auto-refresh a cada 10s (mais rápido pra ver mensagens novas)
+    const interval = setInterval(loadClients, 10000)
     return () => clearInterval(interval)
   }, [loadClients])
 
@@ -165,13 +165,28 @@ export default function Conversas() {
   // Extrai storeIds únicos para as abas (SÓ QUANDO TEM MASTER KEY!)
   const mk = getMK()
   const loggedStoreId = getStoreId()
-  const isMasterMode = !!mk  // Admin vê tudo
-  const isStoreMode = !mk && !!loggedStoreId  // Mercado vê só suas conversas
+  
+  // CRÍTICO: Se tem storeId válido (não 'default'), SEMPRE é modo store (ignora master key!)
+  // Isso resolve cache de navegador com master key residual
+  const hasValidStoreId = loggedStoreId && loggedStoreId !== 'default'
+  const isMasterMode = !hasValidStoreId && !!mk  // Admin SOMENTE se não tiver storeId
+  const isStoreMode = hasValidStoreId  // Se tem storeId válido, é modo store
   
   const uniqueStores = [...new Set(clients.map(c => c.storeId))].filter(Boolean).sort()
   const storeLabels = {
     'zara': 'Zara (Vendas)',
+    'cortaprecos': 'Corta Preços',
     'cortaprecos_1789770018182': 'Corta Preços',
+  }
+  
+  // Helper: pega label do storeId (aceita com/sem timestamp)
+  const getStoreLabel = (sid) => {
+    if (!sid) return sid
+    // Tenta exato
+    if (storeLabels[sid]) return storeLabels[sid]
+    // Tenta sem timestamp (cortaprecos_123 → cortaprecos)
+    const base = sid.split('_')[0]
+    return storeLabels[base] || sid
   }
 
   const selectedClient = clients.find(c => c.phone === selectedPhone)
@@ -192,12 +207,12 @@ export default function Conversas() {
               )}
               {isStoreMode && (
                 <span className="ml-2 px-2 py-0.5 text-xs font-bold bg-blue-100 text-blue-700 rounded-full">
-                  {storeLabels[loggedStoreId] || loggedStoreId}
+                  {getStoreLabel(loggedStoreId)}
                 </span>
               )}
             </h1>
             <p className="text-gray-600 text-sm mt-0.5">
-              {isMasterMode ? 'Histórico de TODOS os mercados (modo admin)' : `Histórico do ${storeLabels[loggedStoreId] || 'mercado'}`}
+              {isMasterMode ? 'Histórico de TODOS os mercados (modo admin)' : `Histórico do ${getStoreLabel(loggedStoreId)}`}
             </p>
           </div>
           <button onClick={loadClients} disabled={loading}
@@ -241,7 +256,7 @@ export default function Conversas() {
               </button>
               {uniqueStores.map(storeId => {
                 const count = clients.filter(c => c.storeId === storeId).length
-                const label = storeLabels[storeId] || storeId
+                const label = getStoreLabel(storeId)
                 return (
                   <button
                     key={storeId}
