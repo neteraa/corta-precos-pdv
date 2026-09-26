@@ -934,9 +934,10 @@ export default async (req, context) => {
   console.log(`wa-bot [${instanceName}]: msg de ${senderNum} (${senderName}): ${text.slice(0, 80)}`)
 
   // ── Instâncias: Corta Preços store bot vs Zara sales bot ─────────────────
-  // instanceName pode vir como 'zatendeapi' OU como o storeId 'cortaprecos_*'
-  const CORTA_PRECOS_INSTANCES = ['zatendeapi', 'cortaprecos_1789770018182']
-  const ZARA_INSTANCES         = ['zatendestok']
+  // CRÍTICO: Separação correta entre mercado (Corta Preços) e vendas (Zara)
+  const CORTA_PRECOS_INSTANCES = ['cortaprecos', 'cortaprecos_1789770018182']
+  const ZARA_INSTANCES = ['zara', 'zatendeapi', 'zatendestok']  // VENDAS do sistema
+  
   const isCortaPrecos = CORTA_PRECOS_INSTANCES.includes(instanceName?.toLowerCase())
                      || String(instanceName || '').toLowerCase().startsWith('cortaprecos_')
   const isZara        = ZARA_INSTANCES.includes(instanceName?.toLowerCase())
