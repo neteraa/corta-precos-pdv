@@ -49,23 +49,37 @@ export default async (req) => {
 
   // ── GET histórico de um cliente específico ────────────────────────────────────
   if (phone) {
+    console.log('[wa-chat-history] Buscando phone:', phone)
+    console.log('[wa-chat-history] isMaster:', isMaster, 'isStore:', isStore)
+    
     let messages = null
+    let foundKey = null
     
     if (isStore) {
       // Cliente: busca APENAS suas próprias conversas
       const key = `chat_history:${storeId}:${phone}`
+      console.log('[wa-chat-history] Tentando key (store):', key)
       messages = await store.get(key, { type: 'json' }).catch(() => null)
     } else if (isMaster) {
       // Master: busca em AMBOS formatos (retrocompatibilidade)
-      // Tenta formato novo primeiro: chat_history:{storeId}:{phone}
-      // Depois formato antigo: chat_history:{phone}
+      console.log('[wa-chat-history] Listando blobs...')
       const { blobs } = await store.list()
+      const chatBlobs = blobs.filter(b => b.key.startsWith('chat_history:'))
+      console.log('[wa-chat-history] Total chat_history blobs:', chatBlobs.length)
+      console.log('[wa-chat-history] Primeiras 5 keys:', chatBlobs.slice(0, 5).map(b => b.key))
+      
       const matchingBlob = blobs.find(b => 
         b.key.startsWith('chat_history:') && 
         (b.key.endsWith(`:${phone}`) || b.key === `chat_history:${phone}`)
       )
+      
       if (matchingBlob) {
+        foundKey = matchingBlob.key
+        console.log('[wa-chat-history] Key encontrada:', foundKey)
         messages = await store.get(matchingBlob.key, { type: 'json' }).catch(() => null)
+        console.log('[wa-chat-history] Mensagens carregadas:', messages?.length || 0)
+      } else {
+        console.log('[wa-chat-history] NENHUMA key encontrada para phone:', phone)
       }
     }
     
@@ -75,6 +89,7 @@ export default async (req) => {
     return new Response(JSON.stringify({
       ok: true,
       phone,
+      foundKey,  // DEBUG: mostra qual key foi usada
       lead: leadData,
       messages: messages || [],
       count: (messages || []).length
