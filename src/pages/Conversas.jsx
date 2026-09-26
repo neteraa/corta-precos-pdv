@@ -26,6 +26,7 @@ export default function Conversas() {
   const [msgLoading,    setMsgLoading]    = useState(false)
   const [searchQuery,   setSearchQuery]   = useState('')
   const [debugInfo,     setDebugInfo]     = useState(null) // DEBUG: info da API
+  const [filterStore,   setFilterStore]   = useState('all') // NOVO: filtro por storeId
   const messagesEndRef = useRef(null)
 
   // AUTH: usa master key (admin) OU storeId+token (mercado específico)
@@ -144,6 +145,12 @@ export default function Conversas() {
   }, [messages])
 
   const filteredClients = clients.filter(c => {
+    // Filtro por storeId (separa Zara, Corta Preços, etc)
+    if (filterStore !== 'all') {
+      if (c.storeId !== filterStore) return false
+    }
+    
+    // Filtro por busca
     const q = searchQuery.toLowerCase()
     return (
       (c.name || '').toLowerCase().includes(q) ||
@@ -152,6 +159,13 @@ export default function Conversas() {
       (c.city || '').toLowerCase().includes(q)
     )
   })
+  
+  // Extrai storeIds únicos para as abas (só quando tem master key)
+  const uniqueStores = [...new Set(clients.map(c => c.storeId))].filter(Boolean).sort()
+  const storeLabels = {
+    'zara': 'Zara (Vendas)',
+    'cortaprecos_1789770018182': 'Corta Preços',
+  }
 
   const selectedClient = clients.find(c => c.phone === selectedPhone)
 
@@ -192,6 +206,39 @@ export default function Conversas() {
               />
             </div>
           </div>
+
+          {/* Abas de filtro por storeId (só aparece se tiver múltiplos stores - master key) */}
+          {uniqueStores.length > 1 && (
+            <div className="sticky top-[72px] bg-gray-50 p-3 border-b border-gray-200 flex gap-2 overflow-x-auto">
+              <button
+                onClick={() => setFilterStore('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                  filterStore === 'all' 
+                    ? 'bg-green-600 text-white' 
+                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
+                }`}
+              >
+                Todos ({clients.length})
+              </button>
+              {uniqueStores.map(storeId => {
+                const count = clients.filter(c => c.storeId === storeId).length
+                const label = storeLabels[storeId] || storeId
+                return (
+                  <button
+                    key={storeId}
+                    onClick={() => setFilterStore(storeId)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                      filterStore === storeId 
+                        ? 'bg-green-600 text-white' 
+                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
+                    }`}
+                  >
+                    {label} ({count})
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
           {/* Clients List */}
           {loading && (

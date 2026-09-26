@@ -133,6 +133,7 @@ export default async (req) => {
         // Key format: chat_history:{storeId}:{phone}
         const parts = b.key.split(':')
         const phone = parts[parts.length - 1] // último segmento é o phone
+        const chatStoreId = parts.length === 3 ? parts[1] : 'unknown' // extrai storeId da key
         const messages = await store.get(b.key, { type: 'json' })
         const leadData = await store.get(phone, { type: 'json' }).catch(() => null)
         
@@ -143,6 +144,7 @@ export default async (req) => {
         return {
           phone,
           blobKey: b.key,  // ADICIONA A KEY COMPLETA!
+          storeId: chatStoreId,  // NOVO: storeId da conversa (zara, cortaprecos_123, etc)
           name: leadData?.name || leadData?.waName || null,
           market: leadData?.market || null,
           city: leadData?.city || null,
