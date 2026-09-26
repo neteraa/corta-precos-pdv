@@ -20,12 +20,26 @@ function leadsStore() {
   return getStore({ name: 'wa-leads', consistency: 'strong' })
 }
 
+// ─── Mapeamento Instance Name → StoreId (igual ao wa-bot.js) ──────────────────
+const CORTA_PRECOS_STORE_ID = 'cortaprecos_1789770018182'
+const INSTANCE_TO_STOREID = {
+  'cortaprecos':   CORTA_PRECOS_STORE_ID,
+  'zatendeapi':    'zara',
+  'zara':          'zara',
+}
+
+function getStoreIdFromInstance(instanceName) {
+  if (!instanceName) return 'zara'
+  return INSTANCE_TO_STOREID[instanceName] || instanceName
+}
+
 export default async (req) => {
   if (req.method === 'OPTIONS') return new Response('', { status: 204, headers: CORS })
 
   const url = new URL(req.url)
   const mk = url.searchParams.get('mk')
   const instance = url.searchParams.get('instance') || 'zara' // default: zara (bot de vendas ZatendeStok)
+  const storeId = getStoreIdFromInstance(instance) // Mapeia para storeId consistente
 
   if (mk !== process.env.ZS_MASTER_KEY) {
     return new Response(JSON.stringify({ ok: false, error: 'Não autorizado' }), { status: 401, headers: CORS })
@@ -56,8 +70,8 @@ export default async (req) => {
           continue
         }
 
-        // Verifica se já tem histórico (NOVA KEY: chat_history:{instance}:{phone})
-        const historyKey = `chat_history:${instance}:${phone}`
+        // Verifica se já tem histórico (NOVA KEY: chat_history:{storeId}:{phone})
+        const historyKey = `chat_history:${storeId}:${phone}`
         const existingHistory = await store.get(historyKey, { type: 'json' }).catch(() => null)
         
         if (existingHistory && existingHistory.length > 0) {

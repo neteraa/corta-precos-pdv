@@ -26,6 +26,23 @@ function leadsStore() {
 const CORTA_PRECOS_STORE_ID = 'cortaprecos_1789770018182'
 const catalogCache = { data: null, ts: 0 }
 
+// ─── Mapeamento Instance Name (Evolution API) → StoreId (Sistema) ─────────────
+// IMPORTANTE: instanceName vem do webhook Evolution API (payload.instance)
+// StoreId é o ID único do mercado no sistema (usado no login e blob storage)
+const INSTANCE_TO_STOREID = {
+  'cortaprecos':   CORTA_PRECOS_STORE_ID,  // Corta Preços Itapeva
+  'zatendeapi':    'zara',                  // Zara (bot de vendas ZatendeStok)
+  'zara':          'zara',                  // Zara (alternativa)
+  // Adicionar outros mercados aqui conforme forem criados
+  // 'mercado123': 'mercado123_timestamp',
+}
+
+/** Resolve instanceName → storeId (para consistência nas keys do blob) */
+function getStoreIdFromInstance(instanceName) {
+  if (!instanceName) return 'zara' // fallback
+  return INSTANCE_TO_STOREID[instanceName] || instanceName
+}
+
 async function loadStoreCatalog() {
   const TTL = 20 * 60 * 1000
   if (catalogCache.data && (Date.now() - catalogCache.ts) < TTL) return catalogCache.data
@@ -560,9 +577,11 @@ function pushHistory(senderNum, role, content, instanceName = null) {
 }
 
 /** Persiste histórico de chat no blob (append-only) - ISOLADO POR STOREID */
-async function saveChatHistory(storeId, phone, role, content) {
+async function saveChatHistory(instanceName, phone, role, content) {
   try {
     const store = leadsStore()
+    // Mapeia instanceName → storeId para consistência com o login
+    const storeId = getStoreIdFromInstance(instanceName)
     // KEY: chat_history:{storeId}:{phone} — ISOLAMENTO POR CLIENTE!
     const key = `chat_history:${storeId}:${phone}`
     const raw = await store.get(key, { type: 'json' }).catch(() => null)
@@ -575,6 +594,7 @@ async function saveChatHistory(storeId, phone, role, content) {
     // Mantém últimas 200 mensagens por cliente
     if (messages.length > 200) messages.splice(0, messages.length - 200)
     await store.set(key, JSON.stringify(messages))
+    console.log(`[saveChatHistory] instance:${instanceName} → storeId:${storeId} → key:${key}`)
   } catch (e) { console.error('saveChatHistory:', e.message) }
 }
 
