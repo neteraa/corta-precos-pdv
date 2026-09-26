@@ -62,14 +62,17 @@ export default function Conversas() {
       console.log('navigator.userAgent:', navigator.userAgent)
       console.groupEnd()
       
-      // Admin (master key) OU mercado específico (storeId+token)
+      // Admin (master key) OU mercado específico (storeId)
       let url
       if (mk) {
         url = `/api/wa-chat-history?mk=${encodeURIComponent(mk)}`
         console.log('✅ Modo: ADMIN (master key)')
-      } else if (storeId && storeId !== 'default' && token) {
-        url = `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}`
-        console.log('✅ Modo: STORE (storeId + token):', storeId)
+      } else if (storeId && storeId !== 'default') {
+        // CRÍTICO: Token é opcional (login local não tem token)
+        url = token 
+          ? `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}`
+          : `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}`
+        console.log('✅ Modo: STORE:', storeId, token ? '(com token)' : '(SEM token - login local)')
       } else {
         console.error('❌ SEM CREDENCIAIS! mk:', !!mk, '| storeId:', storeId, '| token:', !!token)
         setClients([])
@@ -120,10 +123,14 @@ export default function Conversas() {
         url = blobKey 
           ? `/api/wa-chat-history?mk=${encodeURIComponent(mk)}&blobKey=${encodeURIComponent(blobKey)}`
           : `/api/wa-chat-history?mk=${encodeURIComponent(mk)}&phone=${phone}`
-      } else if (storeId && token) {
+      } else if (storeId && storeId !== 'default') {
+        // Token é opcional
+        const baseParams = token 
+          ? `storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}`
+          : `storeId=${encodeURIComponent(storeId)}`
         url = blobKey 
-          ? `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}&blobKey=${encodeURIComponent(blobKey)}`
-          : `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}&phone=${phone}`
+          ? `/api/wa-chat-history?${baseParams}&blobKey=${encodeURIComponent(blobKey)}`
+          : `/api/wa-chat-history?${baseParams}&phone=${phone}`
       }
       
       console.log('Carregando mensagens - phone:', phone, 'blobKey:', blobKey)

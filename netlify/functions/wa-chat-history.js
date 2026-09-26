@@ -38,9 +38,12 @@ export default async (req) => {
   const phone   = url.searchParams.get('phone')
   const blobKey = url.searchParams.get('blobKey')  // NOVO: key direta do blob!
 
-  // Autenticação: MASTER KEY (admin vê tudo) ou STOREID+TOKEN (cliente vê só suas conversas)
+  // Autenticação: MASTER KEY (admin vê tudo) ou STOREID (cliente vê só suas conversas)
   const isMaster = mk === process.env.ZS_MASTER_KEY
-  const isStore  = !isMaster && storeId && await validateStoreAuth(storeId, token)
+  // CRÍTICO: Token é opcional! Login local não tem token mas tem storeId
+  const isStore  = !isMaster && storeId && (
+    !token || await validateStoreAuth(storeId, token)  // Aceita SEM token OU com token válido
+  )
 
   if (!isMaster && !isStore) {
     return new Response(JSON.stringify({ ok: false, error: 'Não autorizado' }), { status: 401, headers: CORS })
