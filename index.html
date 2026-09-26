@@ -51,30 +51,35 @@
           try {
             const reg = await navigator.serviceWorker.register('/sw.js')
 
-            const notifyUpdate = () => window.dispatchEvent(new Event('sw-update-ready'))
-
-            // New SW found — wait for it to finish installing, then notify
-            const onUpdateFound = () => {
-              const sw = reg.installing
-              if (!sw) return
-              sw.addEventListener('statechange', () => {
-                if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-                  notifyUpdate()
+            // FORÇA novo SW a ativar imediatamente
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing
+              if (!newWorker) return
+              
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log('[SW] Nova versão instalada! Ativando...')
+                  newWorker.postMessage({ type: 'SKIP_WAITING' })
                 }
               })
-            }
-            reg.addEventListener('updatefound', onUpdateFound)
-
-            // When new SW takes control → reload immediately (startup case)
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-              if (performance.now() < 4000) window.location.reload()
             })
 
-            // Check for updates every 5 min and on visibility change
-            setInterval(() => reg.update(), 5 * 60 * 1000)
+            // Quando novo SW assume controle → RELOAD IMEDIATO
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              console.log('[SW] Novo SW assumiu controle! Recarregando...')
+              window.location.reload()
+            })
+
+            // Check de update AGRESSIVO: a cada 10s
+            setInterval(() => reg.update(), 10000)
+            
+            // Check quando tab fica visível
             document.addEventListener('visibilitychange', () => {
               if (document.visibilityState === 'visible') reg.update()
             })
+            
+            // Check inicial após 2s
+            setTimeout(() => reg.update(), 2000)
           } catch {}
         })
       }
