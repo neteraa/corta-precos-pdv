@@ -9,7 +9,7 @@ import {
   Warehouse, Users, HandCoins, BarChart2, Tag,
   Printer, CalendarClock, Megaphone, QrCode, Star, Settings,
   Monitor, Camera, Truck, Sparkles, Bike, Building2, Video,
-  Check, X, AlertTriangle,
+  Check, X, AlertTriangle, MessageCircle,
 } from 'lucide-react'
 import { usePrinter, getNicheMeta } from '../hooks/usePrinter.js'
 import { getRole } from '../utils/auth.js'
@@ -22,6 +22,7 @@ const ALL_MODULES = [
   { to: '/pdv',         icon: ShoppingCart,   label: 'PDV / Caixa',     roles: null },
   { to: '/terminal',    icon: Monitor,         label: 'Terminal Caixa',  roles: null,      target: '_blank' },
   { to: '/entrega',     icon: Bike,            label: 'Entregas 🛵',     roles: ['admin','gerente'] },
+  { to: '/conversas',   icon: MessageCircle,   label: 'Conversas WhatsApp', roles: ['admin','gerente'], badge: 'NOVO' },
   { to: '/promocoes',   icon: Tag,             label: 'Promoções',       roles: ['admin','gerente'] },
   { to: '/scan',        icon: Camera,          label: 'Scanner Celular', roles: null,      target: '_blank', scanUrl: true },
   // Gestão

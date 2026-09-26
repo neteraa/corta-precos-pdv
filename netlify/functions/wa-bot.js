@@ -553,6 +553,26 @@ function pushHistory(senderNum, role, content) {
   hist.push({ role, content })
   // Mantém só as últimas MAX_HISTORY mensagens pra não explodir o contexto
   if (hist.length > MAX_HISTORY) hist.splice(0, hist.length - MAX_HISTORY)
+  // Salva no blob para persistência (fire-and-forget)
+  saveChatHistory(senderNum, role, content).catch(e => console.error('saveChatHistory:', e.message))
+}
+
+/** Persiste histórico de chat no blob (append-only) */
+async function saveChatHistory(phone, role, content) {
+  try {
+    const store = leadsStore()
+    const key = `chat_history:${phone}`
+    const raw = await store.get(key, { type: 'json' }).catch(() => null)
+    const messages = raw || []
+    messages.push({
+      role,
+      content,
+      timestamp: new Date().toISOString(),
+    })
+    // Mantém últimas 200 mensagens por cliente
+    if (messages.length > 200) messages.splice(0, messages.length - 200)
+    await store.set(key, JSON.stringify(messages))
+  } catch (e) { console.error('saveChatHistory:', e.message) }
 }
 
 /** Extrai <zs_pending>{...}</zs_pending> da resposta do bot (passo 4 do fluxo). */
