@@ -23,18 +23,20 @@ function leadsStore() {
 }
 
 // ─── Corta Preços: catálogo de produtos e promos (cache 20 min) ───────────────
-const CORTA_PRECOS_STORE_ID = 'cortaprecos_1789770018182'
+// CRÍTICO: StoreId SEM timestamp pra consistência com login!
+const CORTA_PRECOS_STORE_ID = 'cortaprecos'
 const catalogCache = { data: null, ts: 0 }
 
 // ─── Mapeamento Instance Name (Evolution API) → StoreId (Sistema) ─────────────
 // IMPORTANTE: instanceName vem do webhook Evolution API (payload.instance)
 // StoreId é o ID único do mercado no sistema (usado no login e blob storage)
+// SEMPRE usar storeId SEM timestamp pra evitar duplicatas!
 const INSTANCE_TO_STOREID = {
-  'cortaprecos':   CORTA_PRECOS_STORE_ID,  // Corta Preços Itapeva
-  'zatendeapi':    'zara',                  // Zara (bot de vendas ZatendeStok)
-  'zara':          'zara',                  // Zara (alternativa)
+  'cortaprecos':   'cortaprecos',  // Corta Preços (SEM timestamp!)
+  'zatendeapi':    'zara',         // Zara (bot de vendas ZatendeStok)
+  'zara':          'zara',         // Zara (alternativa)
   // Adicionar outros mercados aqui conforme forem criados
-  // 'mercado123': 'mercado123_timestamp',
+  // SEMPRE sem timestamp! Ex: 'mercadox': 'mercadox'
 }
 
 /** Resolve instanceName → storeId (para consistência nas keys do blob) */

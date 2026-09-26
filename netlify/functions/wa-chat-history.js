@@ -156,7 +156,8 @@ export default async (req) => {
     console.log('[wa-chat-history] Master mode → todas conversas:', historyBlobs.length)
   }
   
-  const clients = await Promise.all(
+  // CRÍTICO: Deduplica conversas por telefone (pega mais recente)
+  const clientsRaw = await Promise.all(
     historyBlobs.map(async b => {
       try {
         // Key format: chat_history:{storeId}:{phone}
@@ -198,9 +199,21 @@ export default async (req) => {
     })
   )
 
-  // Filtrar nulos e ordenar por última mensagem
+  // DEDUPLICAÇÃO: Agrupa por telefone e pega conversa mais recente
+  const phoneMap = new Map()
+  clientsRaw.filter(Boolean).forEach(client => {
+    const existing = phoneMap.get(client.phone)
+    // Se não existe OU a nova é mais recente → substitui
+    if (!existing || new Date(client.lastMessageTime) > new Date(existing.lastMessageTime)) {
+      phoneMap.set(client.phone, client)
+    }
+  })
+  
+  console.log('[wa-chat-history] Antes deduplica:', clientsRaw.filter(Boolean).length, '| Depois:', phoneMap.size)
+  
+  // Converte Map pra array e ordena por última mensagem
+  const clients = Array.from(phoneMap.values())
   const sorted = clients
-    .filter(Boolean)
     .sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime))
 
   return new Response(JSON.stringify({
