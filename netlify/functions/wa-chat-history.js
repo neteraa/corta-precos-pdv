@@ -75,6 +75,21 @@ export default async (req) => {
         const key = `chat_history:${storeId}:${phone}`
         console.log('[wa-chat-history] Tentando key (store):', key)
         messages = await store.get(key, { type: 'json' }).catch(() => null)
+        
+        // CRÍTICO: Se não achou, tenta com storeId_timestamp (ex: cortaprecos → cortaprecos_*)
+        if (!messages) {
+          console.log('[wa-chat-history] Key exata não encontrada, tentando com storeId_*')
+          const { blobs } = await store.list()
+          const matchingBlob = blobs.find(b => 
+            (b.key.startsWith(`chat_history:${storeId}:`) || b.key.startsWith(`chat_history:${storeId}_`)) &&
+            b.key.endsWith(`:${phone}`)
+          )
+          if (matchingBlob) {
+            foundKey = matchingBlob.key
+            console.log('[wa-chat-history] Key com timestamp encontrada:', foundKey)
+            messages = await store.get(matchingBlob.key, { type: 'json' }).catch(() => null)
+          }
+        }
       } else if (isMaster) {
         // Master: busca em AMBOS formatos (retrocompatibilidade)
         console.log('[wa-chat-history] Listando blobs...')
@@ -121,7 +136,13 @@ export default async (req) => {
   let historyBlobs
   if (isStore) {
     // Cliente: APENAS histórico deste storeId
-    historyBlobs = blobs.filter(b => b.key.startsWith(`chat_history:${storeId}:`))
+    // CRÍTICO: Aceita storeId exato OU storeId com timestamp (ex: cortaprecos → cortaprecos_*)
+    historyBlobs = blobs.filter(b => {
+      if (b.key.startsWith(`chat_history:${storeId}:`)) return true
+      // Fallback: aceita storeId base (sem timestamp) matching com storeId_timestamp
+      if (b.key.startsWith(`chat_history:${storeId}_`)) return true
+      return false
+    })
   } else {
     // Master: TODOS os históricos (ambos formatos)
     historyBlobs = blobs.filter(b => b.key.startsWith('chat_history:'))
