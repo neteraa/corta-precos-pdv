@@ -37,12 +37,25 @@ function InstallAndGuide({ themeColor }) {
     checkMobile()
     window.addEventListener('resize', checkMobile)
 
-    // Captura o evento de instalação
+    // Captura o evento de instalação (pode não disparar em aba anônima)
     const handler = (e) => {
       e.preventDefault()
       setDeferredPrompt(e)
     }
     window.addEventListener('beforeinstallprompt', handler)
+    
+    // NOVO: Se após 2s não disparou o evento mas é mobile, força mostrar prompt
+    setTimeout(() => {
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+      const isSmallScreen = window.innerWidth < 768
+      const isMobileDevice = isTouchDevice || isSmallScreen
+      
+      if (isMobileDevice && !standalone) {
+        // Força deferredPrompt pra mostrar banner (mesmo sem evento)
+        setDeferredPrompt({ manual: true })
+      }
+    }, 2000)
+    
     return () => {
       window.removeEventListener('beforeinstallprompt', handler)
       window.removeEventListener('resize', checkMobile)
@@ -51,6 +64,19 @@ function InstallAndGuide({ themeColor }) {
 
   const handleInstall = async () => {
     if (!deferredPrompt) return
+    
+    // Se é manual (iOS ou aba anônima), mostra instruções
+    if (deferredPrompt.manual) {
+      const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+      if (isIOS) {
+        alert('Para instalar no iPhone/iPad:\n\n1. Toque no ícone de compartilhar (quadrado com seta)\n2. Role e toque em "Adicionar à Tela de Início"\n3. Toque em "Adicionar"')
+      } else {
+        alert('Para instalar:\n\n1. Toque no menu do navegador (⋮)\n2. Toque em "Adicionar à tela inicial" ou "Instalar app"\n3. Confirme')
+      }
+      return
+    }
+    
+    // Se tem evento real, usa o prompt nativo
     deferredPrompt.prompt()
     const { outcome } = await deferredPrompt.userChoice
     if (outcome === 'accepted') setIsInstalled(true)

@@ -392,8 +392,10 @@ export default function Login() {
         try { localStorage.removeItem('zs_session_expired') } catch {}
         wipeLegacyFlatKeys()
         registerStoreId(data.storeId)
-        seedSettingsFromSession()          // pre-populate storeName + themeColor
-        navigate(from, { replace:true }); return
+        seedSettingsFromSession()
+        // CRÍTICO: Força redirect pra /home (não usa 'from' que pode estar vazio no mobile)
+        setTimeout(() => navigate('/home', { replace:true }), 100)
+        return
       }
     } catch {}
 
@@ -403,7 +405,8 @@ export default function Login() {
       const data = await res.json()
       if (data.ok) {
         localStorage.setItem('cp_session_v1', JSON.stringify({ loggedIn:true, id:data.tenantId, username:u, storeName:data.storeName }))
-        navigate('/fornecedor', { replace:true }); return
+        setTimeout(() => navigate('/fornecedor', { replace:true }), 100)
+        return
       }
     } catch {}
 
@@ -414,7 +417,9 @@ export default function Login() {
       localStorage.setItem('cp_session', JSON.stringify({ loggedIn:true, user:u, storeId:sid, role:'admin' }))
       registerStoreId(sid)
       seedSettingsFromSession()
-      navigate(from, { replace:true }); return
+      // CRÍTICO: Força redirect pra /home
+      setTimeout(() => navigate('/home', { replace:true }), 100)
+      return
     }
 
     setErr('Usuário ou senha incorretos.'); setLoading(false)
