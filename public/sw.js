@@ -8,7 +8,7 @@
 
 const CACHE   = '__CACHE_VERSION__'
 const SHELL   = '/'
-const SKIP_RE = /\/(\.netlify|api)\//  // never cache API calls
+const SKIP_RE = /\/(\.netlify|api|version\.json)/  // never cache API calls ou version.json
 
 // Permite que a página dispare skipWaiting manualmente (UpdateBanner)
 self.addEventListener('message', (event) => {

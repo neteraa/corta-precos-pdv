@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
 const BUILD_TS = Date.now()
+const BUILD_VERSION = `v${BUILD_TS}`
 
 /**
  * Injeta a versão de build no service worker após o bundle.
@@ -16,14 +17,40 @@ const swVersionPlugin = {
     const swPath = resolve(__dirname, 'dist/sw.js')
     if (!existsSync(swPath)) return
     const content = readFileSync(swPath, 'utf-8')
-      .replace('__CACHE_VERSION__', `corta-precos-v${BUILD_TS}`)
+      .replace('__CACHE_VERSION__', `corta-precos-${BUILD_VERSION}`)
     writeFileSync(swPath, content)
-    console.info(`[sw-version] cache = corta-precos-v${BUILD_TS}`)
+    console.info(`[sw-version] cache = corta-precos-${BUILD_VERSION}`)
+  },
+}
+
+/**
+ * Injeta versão no index.html E cria version.json para check remoto
+ */
+const versionPlugin = {
+  name: 'build-version',
+  closeBundle() {
+    // Injeta versão no HTML
+    const htmlPath = resolve(__dirname, 'dist/index.html')
+    if (existsSync(htmlPath)) {
+      const html = readFileSync(htmlPath, 'utf-8')
+        .replace('__BUILD_VERSION__', BUILD_VERSION)
+      writeFileSync(htmlPath, html)
+    }
+    
+    // Cria version.json para check remoto
+    const versionPath = resolve(__dirname, 'dist/version.json')
+    writeFileSync(versionPath, JSON.stringify({ 
+      version: BUILD_VERSION, 
+      timestamp: BUILD_TS,
+      date: new Date(BUILD_TS).toISOString()
+    }, null, 2))
+    
+    console.info(`[version] build = ${BUILD_VERSION}`)
   },
 }
 
 export default defineConfig({
-  plugins: [react(), swVersionPlugin],
+  plugins: [react(), swVersionPlugin, versionPlugin],
   server: {
     host: '0.0.0.0',
     port: 8011,
