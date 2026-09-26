@@ -147,6 +147,14 @@ export default async (req) => {
           market: leadData?.market || null,
           city: leadData?.city || null,
           stage: leadData?.stage || 'novo',
+          type: leadData?.type || null,  // 'customer' ou 'lead'
+          
+          // NOVO: Histórico de compras
+          lastOrderDate: leadData?.lastOrderDate || null,
+          totalOrders: leadData?.totalOrders || 0,
+          totalSpent: leadData?.totalSpent || 0,
+          orders: leadData?.orders || [],
+          
           messageCount: messages.length,
           lastMessage: lastMessage.content,
           lastMessageRole: lastMessage.role,

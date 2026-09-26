@@ -205,6 +205,21 @@ export default function Conversas() {
                 <span>{client.phone ? `+${client.phone.slice(0,2)} (${client.phone.slice(2,4)}) ${client.phone.slice(4,9)}-${client.phone.slice(9)}` : '—'}</span>
               </div>
 
+              {/* NOVO: Histórico de compras (só para customers do Corta Preços) */}
+              {client.type === 'customer' && client.totalOrders > 0 && (
+                <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-orange-900">🛒 {client.totalOrders} pedido{client.totalOrders !== 1 ? 's' : ''}</span>
+                    <span className="font-bold text-orange-700">{BRL.format(client.totalSpent)}</span>
+                  </div>
+                  {client.lastOrderDate && (
+                    <div className="text-xs text-orange-700 mt-1">
+                      Último: {timeAgo(client.lastOrderDate)}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="mt-2 text-xs text-gray-600 truncate">
                 <span className={`font-semibold ${client.lastMessageRole === 'user' ? 'text-gray-700' : 'text-green-600'}`}>
                   {client.lastMessageRole === 'user' ? 'Cliente:' : 'Zara:'}
@@ -254,6 +269,44 @@ export default function Conversas() {
                   <ExternalLink className="w-4 h-4" /> Abrir no WhatsApp
                 </a>
               </div>
+
+              {/* NOVO: Histórico de Pedidos (só para customers) */}
+              {selectedClient?.type === 'customer' && selectedClient?.orders && selectedClient.orders.length > 0 && (
+                <div className="bg-orange-50 border-b border-orange-200 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-bold text-orange-900 text-sm">📦 Histórico de Pedidos</h3>
+                    <div className="text-xs text-orange-700">
+                      <span className="font-bold">{selectedClient.totalOrders}</span> pedidos · 
+                      <span className="font-bold ml-1">{BRL.format(selectedClient.totalSpent)}</span> total
+                    </div>
+                  </div>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {selectedClient.orders.slice(0, 5).map((order, i) => (
+                      <div key={i} className="bg-white rounded-lg p-2 text-xs border border-orange-200">
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="font-semibold text-gray-700 truncate flex-1">{order.items}</span>
+                          <span className="font-bold text-orange-700 ml-2">{BRL.format(order.total)}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-500">
+                          <span>{timeAgo(order.date)}</span>
+                          <span className={`font-semibold ${
+                            order.status === 'delivered' ? 'text-green-600' : 
+                            order.status === 'awaiting_pix' ? 'text-yellow-600' : 'text-gray-500'
+                          }`}>
+                            {order.status === 'delivered' ? '✅ Entregue' : 
+                             order.status === 'awaiting_pix' ? '⏳ Aguardando' : order.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {selectedClient.orders.length > 5 && (
+                      <p className="text-xs text-center text-orange-600 font-semibold pt-1">
+                        + {selectedClient.orders.length - 5} pedidos anteriores
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Mensagens */}
               <div className="flex-1 overflow-y-auto p-6 space-y-3">

@@ -99,13 +99,38 @@ async function saveDeliveryOrder(order) {
     const key   = `${CORTA_PRECOS_STORE_ID}:cp_deliveries`
     const raw   = await store.get(key, { type: 'text' }).catch(() => null)
     const orders = raw ? JSON.parse(raw) : []
-    orders.unshift({
+    
+    const newOrder = {
       ...order,
       id:        `del_${Date.now()}`,
       createdAt: new Date().toISOString(),
       status:    order.status || 'awaiting_pix', // aguarda confirmação do painel
-    })
+    }
+    
+    orders.unshift(newOrder)
     await store.set(key, JSON.stringify(orders.slice(0, 300)))
+    
+    // NOVO: Atualiza histórico no perfil do cliente
+    if (order.phone) {
+      const customerProfile = await loadLead(order.phone)
+      const orderHistory = customerProfile.orders || []
+      
+      orderHistory.unshift({
+        id: newOrder.id,
+        date: newOrder.createdAt,
+        items: order.items,
+        total: order.total,
+        deliveryFee: order.deliveryFee || 7,
+        status: newOrder.status,
+      })
+      
+      await saveLead(order.phone, {
+        orders: orderHistory.slice(0, 50), // mantém últimos 50 pedidos
+        lastOrderDate: newOrder.createdAt,
+        totalOrders: orderHistory.length,
+        totalSpent: orderHistory.reduce((sum, o) => sum + (o.total || 0), 0),
+      })
+    }
   } catch (e) { console.error('saveDeliveryOrder:', e.message) }
 }
 
@@ -857,6 +882,26 @@ export default async (req, context) => {
 
     if (isCortaPrecos) {
       // ── MODO CORTA PREÇOS: bot de atendimento + delivery + produtos ───────
+      
+      // Carrega/cria perfil do cliente (salva lead na primeira mensagem)
+      const customerProfile = await loadLead(senderNum)
+      const isFirstContact = !customerProfile.createdAt
+      
+      if (isFirstContact) {
+        await saveLead(senderNum, {
+          waName: senderName || 'Cliente',
+          type: 'customer',  // diferencia de 'lead' (Zara)
+          source: 'cortaprecos',
+          firstContact: new Date().toISOString(),
+        })
+        console.log(`[CortaPrecos] Novo cliente: ${senderName} (${senderNum})`)
+      } else {
+        // Atualiza nome se mudou
+        if (senderName && senderName !== customerProfile.waName) {
+          await saveLead(senderNum, { waName: senderName })
+        }
+      }
+      
       const { products, promos } = await loadStoreCatalog()
       const { catalogText, categoryList, promoText } = buildCatalogText(products, promos)
       systemMsg = buildCortaPrecosPrompt(catalogText, categoryList, promoText)
