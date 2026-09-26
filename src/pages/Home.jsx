@@ -16,6 +16,174 @@ import { getRole } from '../utils/auth.js'
 import { getMktStoreId, getMktStoreToken } from '../utils/tenantStorage.js'
 import { useStore } from '../store.jsx'
 
+/* ── Guia Rápido + Instalação PWA ────────────────────────── */
+function InstallAndGuide({ themeColor }) {
+  const [showGuide, setShowGuide] = useState(false)
+  const [deferredPrompt, setDeferredPrompt] = useState(null)
+  const [isInstalled, setIsInstalled] = useState(false)
+
+  // Detecta se já está instalado como PWA
+  React.useEffect(() => {
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+    setIsInstalled(standalone)
+
+    // Captura o evento de instalação
+    const handler = (e) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return
+    deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+    if (outcome === 'accepted') setIsInstalled(true)
+    setDeferredPrompt(null)
+  }
+
+  return (
+    <div style={{ marginTop: 40, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Botão de Instalação (só aparece se não instalado e se o prompt estiver disponível) */}
+      {!isInstalled && deferredPrompt && (
+        <div style={{
+          padding: 20,
+          background: `linear-gradient(135deg, ${themeColor}15, ${themeColor}08)`,
+          border: `2px dashed ${themeColor}`,
+          borderRadius: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          alignItems: 'center',
+        }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#111', textAlign: 'center' }}>
+            📱 Instale o App no seu Celular!
+          </div>
+          <div style={{ fontSize: 13, color: '#666', textAlign: 'center', maxWidth: 500 }}>
+            Tenha acesso rápido ao sistema direto da tela inicial do seu smartphone. Funciona offline e é muito mais rápido!
+          </div>
+          <button
+            onClick={handleInstall}
+            style={{
+              padding: '12px 32px',
+              borderRadius: 12,
+              background: themeColor,
+              color: '#fff',
+              fontWeight: 800,
+              fontSize: 14,
+              border: 'none',
+              cursor: 'pointer',
+              boxShadow: `0 4px 16px ${themeColor}44`,
+            }}
+          >
+            🚀 Instalar Agora
+          </button>
+        </div>
+      )}
+
+      {/* Guia Rápido (expansível) */}
+      <div style={{
+        padding: 20,
+        background: '#f9fafb',
+        border: '1px solid #e5e7eb',
+        borderRadius: 16,
+      }}>
+        <button
+          onClick={() => setShowGuide(!showGuide)}
+          style={{
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+          }}
+        >
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#111' }}>
+            📚 Guia Rápido - Como Usar o Sistema
+          </div>
+          <div style={{ fontSize: 18, color: '#666' }}>{showGuide ? '▲' : '▼'}</div>
+        </button>
+
+        {showGuide && (
+          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <GuideStep
+              number="1"
+              title="PDV / Caixa"
+              description="Use para registrar vendas rapidamente. Busque produtos por código de barras ou nome, adicione ao carrinho e finalize a venda."
+              themeColor={themeColor}
+            />
+            <GuideStep
+              number="2"
+              title="Estoque"
+              description="Acompanhe o estoque em tempo real. Receba alertas de produtos com baixa quantidade e gerencie reposições."
+              themeColor={themeColor}
+            />
+            <GuideStep
+              number="3"
+              title="Dashboard"
+              description="Veja todas as métricas importantes: vendas do dia, produtos mais vendidos, análise de horários de pico e muito mais."
+              themeColor={themeColor}
+            />
+            <GuideStep
+              number="4"
+              title="Entregas 🛵"
+              description="Gerencie pedidos de delivery do WhatsApp. Acompanhe o status de cada entrega e tenha controle total."
+              themeColor={themeColor}
+            />
+            <GuideStep
+              number="5"
+              title="Conversas WhatsApp"
+              description="Veja todo o histórico de conversas com seus clientes. Todas as mensagens são salvas automaticamente."
+              themeColor={themeColor}
+            />
+            <GuideStep
+              number="6"
+              title="Terminal Caixa"
+              description="Modo simplificado para vendedores. Interface focada apenas em vendas, ideal para funcionários."
+              themeColor={themeColor}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function GuideStep({ number, title, description, themeColor }) {
+  return (
+    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+      <div style={{
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        background: themeColor,
+        color: '#fff',
+        fontWeight: 900,
+        fontSize: 16,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        {number}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#111', marginBottom: 4 }}>
+          {title}
+        </div>
+        <div style={{ fontSize: 12, color: '#666', lineHeight: 1.5 }}>
+          {description}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── catálogo de módulos ─────────────────────────────────── */
 const ALL_MODULES = [
   // Operação
@@ -234,6 +402,9 @@ export default function Home() {
           />
         ))}
       </div>
+
+      {/* ── Guia Rápido + Instalação PWA ──────────── */}
+      <InstallAndGuide themeColor={themeColor} />
 
       {/* ── Powered by footer ───────────────────────── */}
       <div style={{ textAlign: 'center', marginTop: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>

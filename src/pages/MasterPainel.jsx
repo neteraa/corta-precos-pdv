@@ -155,10 +155,10 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
 
   return (
     <div className={`relative flex flex-col rounded-2xl border transition-all ${
-      market.active ? 'bg-gray-800/50 border-gray-700' : 'bg-white/50 border-gray-200 opacity-60'
+      market.active ? 'bg-gray-100/50 border-gray-300' : 'bg-white/50 border-gray-200 opacity-60'
     }`}>
       {/* header */}
-      <div className="flex items-center gap-3 p-4 border-b border-gray-700/50">
+      <div className="flex items-center gap-3 p-4 border-b border-gray-300/50">
         <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-black flex-shrink-0"
           style={{ background: color + '22', color, border: `2px solid ${color}` }}>
           {initial}
@@ -167,7 +167,7 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
           <div className="font-black text-white text-base leading-tight truncate">{market.storeName}</div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${market.active ? 'bg-green-400' : 'bg-gray-600'}`} />
-            <span className="text-xs text-gray-400">{market.active ? 'Ativo' : 'Inativo'}</span>
+            <span className="text-xs text-gray-600">{market.active ? 'Ativo' : 'Inativo'}</span>
           </div>
         </div>
         {/* status badge */}
@@ -182,7 +182,7 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
       <div className="p-4 space-y-2 flex-1">
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-500">Usuário</span>
-          <span className="text-gray-300 font-mono font-bold">{market.username}</span>
+          <span className="text-gray-700 font-mono font-bold">{market.username}</span>
         </div>
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-500">Store ID</span>
@@ -195,18 +195,18 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
         </div>
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-500">Criado em</span>
-          <span className="text-gray-400">{new Date(market.createdAt).toLocaleDateString('pt-BR')}</span>
+          <span className="text-gray-600">{new Date(market.createdAt).toLocaleDateString('pt-BR')}</span>
         </div>
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-500">Último acesso</span>
-          <span className="flex items-center gap-1 text-gray-400">
+          <span className="flex items-center gap-1 text-gray-600">
             <Clock className="w-3 h-3" /> {lastSeen}
           </span>
         </div>
         {market.storePhone && (
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-500">WhatsApp</span>
-            <span className="text-gray-300">{market.storePhone}</span>
+            <span className="text-gray-700">{market.storePhone}</span>
           </div>
         )}
 
@@ -227,7 +227,7 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
                 value={current || ''}
                 disabled={busy}
                 onChange={e => setPlan(e.target.value || null)}
-                className="bg-gray-700 border border-gray-600 text-xs rounded-lg px-2 py-1 outline-none focus:border-orange-500 disabled:opacity-40"
+                className="bg-gray-200 border border-gray-400 text-xs rounded-lg px-2 py-1 outline-none focus:border-orange-500 disabled:opacity-40"
                 style={{ color: PLAN_COLORS[current] || '#9ca3af' }}>
                 <option value="">— sem plano —</option>
                 <option value="Essencial" style={{ color: PLAN_COLORS.Essencial }}>Essencial — R$297/mês</option>
@@ -260,7 +260,7 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
               <span className="text-gray-500">Nicho</span>
               <select value={cur} disabled={busy}
                 onChange={e => setNiche(e.target.value)}
-                className="bg-gray-700 border border-gray-600 text-xs rounded-lg px-2 py-1 outline-none focus:border-indigo-500 disabled:opacity-40 text-gray-200">
+                className="bg-gray-200 border border-gray-400 text-xs rounded-lg px-2 py-1 outline-none focus:border-indigo-500 disabled:opacity-40 text-gray-200">
                 {NICHE_OPTS.map(o => <option key={o.v} value={o.v}>{o.e} {o.l}</option>)}
               </select>
             </div>
@@ -277,7 +277,7 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
           const badge   = expired ? { label: `VENCIDA ${Math.abs(days)}d atrás`, cls: 'bg-red-500/20 text-red-400 border-red-500/30' }
                         : warn    ? { label: `Vence em ${days}d`, cls: 'bg-amber-500/20 text-amber-400 border-amber-500/30' }
                         : exp     ? { label: `OK até ${exp.toLocaleDateString('pt-BR')}`, cls: 'bg-green-500/20 text-green-400 border-green-500/30' }
-                        :           { label: 'Sem vencimento', cls: 'bg-gray-700 text-gray-500 border-gray-600' }
+                        :           { label: 'Sem vencimento', cls: 'bg-gray-200 text-gray-500 border-gray-400' }
           return (
             <div className="pt-1 space-y-1.5">
               <div className="flex items-center justify-between">
@@ -291,7 +291,7 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
                   min="2020-01-01" max="2099-12-31"
                   disabled={busy}
                   onChange={e => setExpiry(e.target.value)}
-                  className="flex-1 bg-gray-700 border border-gray-600 text-gray-200 text-xs rounded-lg px-2 py-1.5 outline-none focus:border-orange-500 disabled:opacity-40"
+                  className="flex-1 bg-gray-200 border border-gray-400 text-gray-200 text-xs rounded-lg px-2 py-1.5 outline-none focus:border-orange-500 disabled:opacity-40"
                   title="Data de vencimento da assinatura"
                 />
                 {exp && (
@@ -309,12 +309,12 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
       {/* reset password inline */}
       {showReset && (
         <div className="px-4 pb-3 flex gap-2">
-          <input className="flex-1 bg-gray-700 border border-gray-600 text-white text-sm rounded-xl px-3 py-2 outline-none focus:border-orange-500"
+          <input className="flex-1 bg-gray-200 border border-gray-400 text-white text-sm rounded-xl px-3 py-2 outline-none focus:border-orange-500"
             placeholder="Nova senha (mín. 4)" type="password" value={newPass}
             onChange={e => setNewPass(e.target.value)} onKeyDown={e => e.key === 'Enter' && resetPass()} />
           <button onClick={resetPass} disabled={newPass.length < 4 || busy}
             className="px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black disabled:opacity-40">OK</button>
-          <button onClick={() => setShowReset(false)} className="px-3 py-2 rounded-xl bg-gray-700 text-gray-400 text-xs hover:bg-gray-600">
+          <button onClick={() => setShowReset(false)} className="px-3 py-2 rounded-xl bg-gray-200 text-gray-600 text-xs hover:bg-gray-600">
             <X className="w-3 h-3" />
           </button>
         </div>
@@ -327,10 +327,10 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
           {resendStatus === 'ok'  && <p className="text-green-400 text-xs font-bold">✅ Enviado com sucesso!</p>}
           {resendStatus === 'err' && <p className="text-yellow-400 text-xs">⚠️ Não enviado — verifique a configuração</p>}
           {!resendStatus && <>
-            <p className="text-xs text-gray-400 font-semibold">Reenviar acesso ao cliente:</p>
-            <input className="w-full bg-gray-700 border border-gray-600 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-orange-500"
+            <p className="text-xs text-gray-600 font-semibold">Reenviar acesso ao cliente:</p>
+            <input className="w-full bg-gray-200 border border-gray-400 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-orange-500"
               placeholder="Nova senha (mín. 4 caracteres)" type="password" value={resendPass} onChange={e => setResendPass(e.target.value)} />
-            <input className="w-full bg-gray-700 border border-gray-600 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-orange-500"
+            <input className="w-full bg-gray-200 border border-gray-400 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-orange-500"
               placeholder="Email do cliente (para envio por email)" type="email" value={resendEmail} onChange={e => setResendEmail(e.target.value)} />
             <div className="flex gap-2">
               {/* WhatsApp — principal */}
@@ -345,14 +345,14 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
                 <Mail className="w-3.5 h-3.5" /> Email
               </button>
               <button onClick={() => { setShowResend(false); setResendPass('') }}
-                className="px-2 py-2 rounded-xl bg-gray-700 text-gray-400 text-xs hover:bg-gray-600"><X className="w-3 h-3" /></button>
+                className="px-2 py-2 rounded-xl bg-gray-200 text-gray-600 text-xs hover:bg-gray-600"><X className="w-3 h-3" /></button>
             </div>
           </>}
         </div>
       )}
 
       {/* actions */}
-      <div className="flex gap-2 p-4 pt-2 border-t border-gray-700/50">
+      <div className="flex gap-2 p-4 pt-2 border-t border-gray-300/50">
         <button onClick={() => onAccess(market)}
           className="flex-1 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black transition-all flex items-center justify-center gap-1.5">
           <LogIn className="w-3.5 h-3.5" /> Acessar
@@ -364,19 +364,19 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
         </button>
         <button onClick={() => setShowReset(v => !v)}
           title="Resetar senha"
-          className="px-3 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs transition-colors">
+          className="px-3 py-2 rounded-xl bg-gray-200 hover:bg-gray-600 text-gray-700 text-xs transition-colors">
           <Key className="w-3.5 h-3.5" />
         </button>
         <button onClick={toggle} disabled={busy}
           title={market.active ? 'Desativar' : 'Ativar'}
           className={`px-3 py-2 rounded-xl text-xs transition-colors ${
-            market.active ? 'bg-gray-700 hover:bg-yellow-500/20 text-gray-300 hover:text-yellow-400' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+            market.active ? 'bg-gray-200 hover:bg-yellow-500/20 text-gray-700 hover:text-yellow-400' : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
           }`}>
           <Power className="w-3.5 h-3.5" />
         </button>
         <button onClick={remove} disabled={busy}
           title="Remover mercado"
-          className="px-3 py-2 rounded-xl bg-gray-700 hover:bg-red-500/20 text-gray-400 hover:text-red-400 text-xs transition-colors">
+          className="px-3 py-2 rounded-xl bg-gray-200 hover:bg-red-500/20 text-gray-600 hover:text-red-400 text-xs transition-colors">
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -401,7 +401,7 @@ function CredSuccess({ title, icon: Icon, iconColor, accentColor, ok, emailResul
   const mode = emailResult?.mode  // 'direct' | 'admin-notify' | undefined
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+      <div className="bg-gray-100 border border-gray-300 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
         <div className="text-center mb-5">
           <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 border-2"
                style={{ background: `${iconColor}20`, borderColor: iconColor }}>
@@ -428,7 +428,7 @@ function CredSuccess({ title, icon: Icon, iconColor, accentColor, ok, emailResul
           {emailResult?.sent && mode === 'admin-notify' && (
             <div className="mt-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
               <p className="text-yellow-400 text-xs font-bold">📬 Notificação enviada para seu email</p>
-              <p className="text-gray-500 text-xs mt-0.5">Abra <strong className="text-gray-400">agn.girardi@gmail.com</strong> e encaminhe para o cliente</p>
+              <p className="text-gray-500 text-xs mt-0.5">Abra <strong className="text-gray-600">agn.girardi@gmail.com</strong> e encaminhe para o cliente</p>
             </div>
           )}
           {!emailResult?.sent && ok.email && (
@@ -439,11 +439,11 @@ function CredSuccess({ title, icon: Icon, iconColor, accentColor, ok, emailResul
           )}
         </div>
 
-        <div className="bg-white rounded-xl p-4 space-y-2 font-mono text-sm border border-gray-700 mb-4">
-          <div className="flex justify-between"><span className="text-gray-400">URL</span><span style={{ color: accentColor }}>zatendestok.com.br</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">Usuário</span><span className="text-white font-bold">{ok.username}</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">Senha</span><span className="text-white font-bold">{ok.password}</span></div>
-          {ok.storeId && <div className="flex justify-between"><span className="text-gray-400">Store ID</span><span className="text-green-400">{ok.storeId}</span></div>}
+        <div className="bg-white rounded-xl p-4 space-y-2 font-mono text-sm border border-gray-300 mb-4">
+          <div className="flex justify-between"><span className="text-gray-600">URL</span><span style={{ color: accentColor }}>zatendestok.com.br</span></div>
+          <div className="flex justify-between"><span className="text-gray-600">Usuário</span><span className="text-white font-bold">{ok.username}</span></div>
+          <div className="flex justify-between"><span className="text-gray-600">Senha</span><span className="text-white font-bold">{ok.password}</span></div>
+          {ok.storeId && <div className="flex justify-between"><span className="text-gray-600">Store ID</span><span className="text-green-400">{ok.storeId}</span></div>}
         </div>
         <button onClick={onClose} className="w-full py-3 rounded-xl text-white font-black transition-colors" style={{ background: accentColor }}>
           Fechar
@@ -492,7 +492,7 @@ function AddMarketModal({ mk, onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="bg-gray-100 border border-gray-300 rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-white font-black text-lg flex items-center gap-2"><Store className="w-5 h-5 text-orange-400" /> Novo Mercado</h3>
           <button onClick={onClose}><X className="w-5 h-5 text-gray-500 hover:text-white" /></button>
@@ -505,18 +505,18 @@ function AddMarketModal({ mk, onClose, onCreated }) {
             { key: 'username',   label: 'Usuário de acesso',        placeholder: 'ex: mercadosaojose' },
           ].map(f => (
             <div key={f.key}>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">{f.label}</label>
-              <input className="w-full bg-gray-700 border border-gray-600 text-white rounded-xl px-4 py-2.5 outline-none focus:border-orange-500 text-sm"
+              <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">{f.label}</label>
+              <input className="w-full bg-gray-200 border border-gray-400 text-white rounded-xl px-4 py-2.5 outline-none focus:border-orange-500 text-sm"
                 placeholder={f.placeholder} value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
             </div>
           ))}
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">Senha inicial</label>
+            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Senha inicial</label>
             <div className="relative">
-              <input className="w-full bg-gray-700 border border-gray-600 text-white rounded-xl px-4 py-2.5 pr-12 outline-none focus:border-orange-500 text-sm"
+              <input className="w-full bg-gray-200 border border-gray-400 text-white rounded-xl px-4 py-2.5 pr-12 outline-none focus:border-orange-500 text-sm"
                 placeholder="mínimo 4 caracteres" type={show ? 'text' : 'password'}
                 value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} onKeyDown={e => e.key === 'Enter' && submit()} />
-              <button type="button" onClick={() => setShow(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200">
+              <button type="button" onClick={() => setShow(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-200">
                 {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
@@ -607,10 +607,10 @@ function DistCard({ dist, mk, onRefresh }) {
     ? { label: `Vence em ${days}d`, cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' }
     : days !== null
     ? { label: `${days}d restantes`, cls: 'bg-green-500/20 text-green-400 border-green-500/30' }
-    : { label: 'Sem vencimento', cls: 'bg-gray-700/50 text-gray-500 border-gray-600/30' }
+    : { label: 'Sem vencimento', cls: 'bg-gray-200/50 text-gray-500 border-gray-400/30' }
 
   return (
-    <div className={`rounded-2xl border p-5 flex flex-col gap-4 transition-all ${dist.active ? 'bg-gray-800/80 border-gray-700 hover:border-gray-600' : 'bg-white/60 border-gray-200 opacity-60'}`}>
+    <div className={`rounded-2xl border p-5 flex flex-col gap-4 transition-all ${dist.active ? 'bg-gray-100/80 border-gray-300 hover:border-gray-400' : 'bg-white/60 border-gray-200 opacity-60'}`}>
       {/* header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-base flex-shrink-0" style={{ background: color }}>
@@ -620,7 +620,7 @@ function DistCard({ dist, mk, onRefresh }) {
           <div className="font-black text-white text-sm truncate">{dist.storeName}</div>
           <div className="text-gray-500 text-xs">@{dist.username}</div>
         </div>
-        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${dist.active ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-gray-700/50 text-gray-500 border-gray-600/30'}`}>
+        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${dist.active ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-gray-200/50 text-gray-500 border-gray-400/30'}`}>
           {dist.active ? 'ATIVO' : 'INATIVO'}
         </span>
       </div>
@@ -638,7 +638,7 @@ function DistCard({ dist, mk, onRefresh }) {
         <input type="date"
           defaultValue={dist.expiresAt && parseInt(dist.expiresAt.slice(0,4),10) >= 2020 ? dist.expiresAt.slice(0,10) : ''}
           min="2020-01-01" max="2099-12-31"
-          className="w-full text-xs bg-gray-700/50 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-300 focus:outline-none focus:border-orange-500"
+          className="w-full text-xs bg-gray-200/50 border border-gray-300 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:border-orange-500"
           onChange={e => setExpiry(e.target.value)} />
       </div>
 
@@ -646,15 +646,15 @@ function DistCard({ dist, mk, onRefresh }) {
       {showReset ? (
         <div className="flex gap-2">
           <input placeholder="Nova senha" value={newPass} onChange={e => setNewPass(e.target.value)}
-            className="flex-1 text-xs bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-gray-200 focus:outline-none focus:border-orange-500" />
+            className="flex-1 text-xs bg-gray-200 border border-gray-400 rounded-lg px-3 py-2 text-gray-200 focus:outline-none focus:border-orange-500" />
           <button onClick={resetPass} disabled={busy || !newPass.trim()}
             className="px-3 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold disabled:opacity-40">OK</button>
           <button onClick={() => setShowReset(false)}
-            className="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-400 text-xs"><X className="w-3 h-3" /></button>
+            className="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-600 text-gray-600 text-xs"><X className="w-3 h-3" /></button>
         </div>
       ) : (
         <button onClick={() => { setShowReset(true); setShowResend(false) }}
-          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-700/50 hover:bg-gray-700 text-gray-400 hover:text-white text-xs transition-colors">
+          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-200/50 hover:bg-gray-200 text-gray-600 hover:text-white text-xs transition-colors">
           <Key className="w-3 h-3" /> Resetar senha
         </button>
       )}
@@ -665,24 +665,24 @@ function DistCard({ dist, mk, onRefresh }) {
           {resendStatus === 'ok'  && <p className="text-green-400 text-xs font-bold">✅ Email enviado!</p>}
           {resendStatus === 'err' && <p className="text-yellow-400 text-xs">⚠️ Não enviado (configure RESEND_API_KEY em resend.com)</p>}
           {!resendStatus && <>
-            <input className="w-full bg-gray-700 border border-gray-600 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-emerald-400"
+            <input className="w-full bg-gray-200 border border-gray-400 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-emerald-400"
               placeholder="Email do distribuidor" type="email" value={resendEmail} onChange={e => setResendEmail(e.target.value)} />
             <div className="flex gap-2">
-              <input className="flex-1 bg-gray-700 border border-gray-600 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-emerald-400"
+              <input className="flex-1 bg-gray-200 border border-gray-400 text-white text-xs rounded-xl px-3 py-2 outline-none focus:border-emerald-400"
                 placeholder="Nova senha (mín. 4)" type="password" value={resendPass} onChange={e => setResendPass(e.target.value)} />
               <button onClick={resendAccess} disabled={!resendEmail || resendPass.length < 4}
                 className="px-3 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold disabled:opacity-40">Enviar</button>
               <button onClick={() => { setShowResend(false); setResendPass('') }}
-                className="px-2 rounded-xl bg-gray-700 text-gray-400 text-xs hover:bg-gray-600"><X className="w-3 h-3" /></button>
+                className="px-2 rounded-xl bg-gray-200 text-gray-600 text-xs hover:bg-gray-600"><X className="w-3 h-3" /></button>
             </div>
           </>}
         </div>
       )}
 
       {/* actions */}
-      <div className="flex gap-2 pt-1 border-t border-gray-700/50">
+      <div className="flex gap-2 pt-1 border-t border-gray-300/50">
         <button onClick={toggle} disabled={busy}
-          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-40 ${dist.active ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-green-500/20 hover:bg-green-500/30 text-green-400'}`}>
+          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-40 ${dist.active ? 'bg-gray-200 hover:bg-gray-600 text-gray-700' : 'bg-green-500/20 hover:bg-green-500/30 text-green-400'}`}>
           <Power className="w-3 h-3" /> {dist.active ? 'Desativar' : 'Ativar'}
         </button>
         <button onClick={() => { setShowResend(v => !v); setShowReset(false) }}
@@ -725,7 +725,7 @@ function AddDistModal({ mk, onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+      <div className="bg-gray-100 border border-gray-300 rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <div className="font-black text-white text-lg flex items-center gap-2"><Truck className="w-5 h-5 text-emerald-400" /> Novo Distribuidor</div>
           <button onClick={onClose}><X className="w-5 h-5 text-gray-500 hover:text-white" /></button>
@@ -739,15 +739,15 @@ function AddDistModal({ mk, onClose, onCreated }) {
             ['password', 'Senha *', show ? 'text' : 'password'],
           ].map(([k, label, type]) => (
             <div key={k}>
-              <label className="block text-xs font-bold text-gray-400 uppercase mb-1">{label}</label>
-              <input className="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-emerald-400"
+              <label className="block text-xs font-bold text-gray-600 uppercase mb-1">{label}</label>
+              <input className="w-full bg-gray-200 border border-gray-400 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-emerald-400"
                 value={form[k]} onChange={e => set(k, e.target.value)} type={type} />
             </div>
           ))}
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Cor do tema</label>
+            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Cor do tema</label>
             <input type="color" value={form.themeColor} onChange={e => set('themeColor', e.target.value)}
-              className="w-12 h-10 rounded-lg border border-gray-600 cursor-pointer bg-gray-700" />
+              className="w-12 h-10 rounded-lg border border-gray-400 cursor-pointer bg-gray-200" />
           </div>
         </div>
         {err && <div className="mt-4 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{err}</div>}
@@ -1256,13 +1256,13 @@ export default function MasterPainel() {
             <ShieldAlert className="w-3.5 h-3.5" /> PAINEL MASTER — ACESSO RESTRITO
           </div>
         </div>
-        <div className="bg-gray-800/60 border border-gray-700 rounded-2xl p-6 backdrop-blur-sm">
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Chave Master</label>
+        <div className="bg-gray-100/60 border border-gray-300 rounded-2xl p-6 backdrop-blur-sm">
+          <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide mb-2">Chave Master</label>
           <div className="relative mb-4">
-            <input className="w-full bg-gray-700 border border-gray-600 text-white rounded-xl px-4 py-3 pr-12 outline-none focus:border-orange-500 transition-colors font-mono"
+            <input className="w-full bg-gray-200 border border-gray-400 text-white rounded-xl px-4 py-3 pr-12 outline-none focus:border-orange-500 transition-colors font-mono"
               type={showMk ? 'text' : 'password'} placeholder="Chave de acesso master"
               value={mkInput} onChange={e => setMkInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} autoFocus />
-            <button onClick={() => setShowMk(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200">
+            <button onClick={() => setShowMk(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-200">
               {showMk ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
@@ -1344,7 +1344,7 @@ export default function MasterPainel() {
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all relative ' + (active ? 'bg-gradient-to-r from-orange-50 to-orange-100 text-orange-600 shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900')}>
                 {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-orange-500 to-orange-600 rounded-r-md shadow-md" />}
-                <Icon className={'w-5 h-5 flex-shrink-0 ' + (active ? 'text-orange-600' : 'text-gray-400')} />
+                <Icon className={'w-5 h-5 flex-shrink-0 ' + (active ? 'text-orange-600' : 'text-gray-600')} />
                 <span className="flex-1 text-left truncate">{t.label}</span>
               </button>
             )
@@ -1368,7 +1368,7 @@ export default function MasterPainel() {
           <aside className="w-[240px] bg-white border-r border-gray-200 flex flex-col">
             <div className="px-5 py-4 border-b border-gray-200/60 flex items-center justify-between">
               <ZatendeStokLogo variant="wordmark" />
-              <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-500">
+              <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -1378,7 +1378,7 @@ export default function MasterPainel() {
                 const active = tab === t.id
                 return (
                   <button key={t.id} onClick={() => { setTab(t.id); setSidebarOpen(false) }}
-                    className={'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ' + (active ? 'bg-orange-500/10 text-orange-400' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-300')}>
+                    className={'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ' + (active ? 'bg-orange-500/10 text-orange-400' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-700')}>
                     <Icon className={'w-4 h-4 flex-shrink-0 ' + (active ? 'text-orange-400' : 'text-gray-600')} />
                     <span className="flex-1 text-left">{t.label}</span>
                   </button>
@@ -1395,7 +1395,7 @@ export default function MasterPainel() {
 
         {/* Top bar mobile */}
         <div className="sticky top-0 z-20 bg-gray-50/90 backdrop-blur-sm border-b border-gray-200 px-4 py-3 flex items-center gap-3 lg:px-6">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-lg hover:bg-gray-800 text-gray-400">
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-600">
             <Menu className="w-5 h-5" />
           </button>
           <div className="lg:hidden"><ZatendeStokLogo variant="wordmark" /></div>
@@ -1403,7 +1403,7 @@ export default function MasterPainel() {
             <span className="text-sm font-bold text-gray-500">{TABS.find(t => t.id === tab)?.label}</span>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={() => load()} className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs font-bold transition-colors">
+            <button onClick={() => load()} className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition-colors">
               <RefreshCw className={'w-3.5 h-3.5 ' + (loading ? 'animate-spin' : '')} /> Atualizar
             </button>
             {(tab === 'markets' || tab === 'dist') && (
@@ -1443,7 +1443,7 @@ export default function MasterPainel() {
                         const d = Math.ceil((new Date(x.expiresAt) - now) / 86_400_000)
                         return (
                           <div key={x.id} className="flex items-center justify-between">
-                            <span className="text-gray-300 text-sm">{x.storeName || x.username}</span>
+                            <span className="text-gray-700 text-sm">{x.storeName || x.username}</span>
                             <span className="text-yellow-400 font-black text-xs bg-yellow-500/10 px-2 py-0.5 rounded-full">{d === 0 ? 'hoje' : `${d}d`}</span>
                           </div>
                         )
@@ -1461,7 +1461,7 @@ export default function MasterPainel() {
                         const d = Math.abs(Math.ceil((new Date(x.expiresAt) - now) / 86_400_000))
                         return (
                           <div key={x.id} className="flex items-center justify-between">
-                            <span className="text-gray-300 text-sm">{x.storeName || x.username}</span>
+                            <span className="text-gray-700 text-sm">{x.storeName || x.username}</span>
                             <span className="text-red-400 font-black text-xs bg-red-500/10 px-2 py-0.5 rounded-full">{d}d atrás</span>
                           </div>
                         )
@@ -1476,7 +1476,7 @@ export default function MasterPainel() {
             <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
               <div className="px-5 py-3.5 border-b border-gray-200 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-green-400" />
-                <span className="text-xs font-black text-gray-400 uppercase tracking-wider">Atividade recente (24h)</span>
+                <span className="text-xs font-black text-gray-600 uppercase tracking-wider">Atividade recente (24h)</span>
               </div>
               {recent24.length === 0 ? (
                 <div className="px-5 py-8 text-center text-gray-600 text-sm">Nenhum acesso nas últimas 24h</div>
@@ -1487,7 +1487,7 @@ export default function MasterPainel() {
                     const label = diff < 3_600_000 ? `${Math.floor(diff/60000)}min` : `${Math.floor(diff/3_600_000)}h`
                     const isDist = !!x.tenantId
                     return (
-                      <div key={x.id} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-800/30 transition-colors">
+                      <div key={x.id} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-100/30 transition-colors">
                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isDist ? 'bg-emerald-400' : 'bg-purple-400'}`} />
                         <span className="text-gray-200 text-sm flex-1 font-medium">{x.storeName || x.username}</span>
                         <span className="text-gray-600 text-xs">{label} atrás</span>
@@ -1508,7 +1508,7 @@ export default function MasterPainel() {
                 { tab:'dist',    icon: Truck, label:'Distribuidores', sub:`${distributors.length} cadastrados · ${dActive.length} ativos`, color:'#34d399' },
               ].map(c => (
                 <button key={c.tab} onClick={() => setTab(c.tab)}
-                  className="flex items-center gap-4 p-5 rounded-2xl border border-gray-200 bg-white hover:bg-gray-800 hover:border-gray-700 transition-all text-left group">
+                  className="flex items-center gap-4 p-5 rounded-2xl border border-gray-200 bg-white hover:bg-gray-100 hover:border-gray-300 transition-all text-left group">
                   <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: `${c.color}18`, border: `1px solid ${c.color}30` }}>
                     <c.icon className="w-5 h-5" style={{ color: c.color }} />
@@ -1542,7 +1542,7 @@ export default function MasterPainel() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-black text-white">Solicitações de cadastro</h2>
-                <p className="text-gray-400 text-sm mt-1">{pendingCount} pendente{pendingCount !== 1 ? 's' : ''} · {requests.length} total</p>
+                <p className="text-gray-600 text-sm mt-1">{pendingCount} pendente{pendingCount !== 1 ? 's' : ''} · {requests.length} total</p>
               </div>
               {pendingCount > 0 && (
                 <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/30 px-3 py-1.5 rounded-xl">
@@ -1568,9 +1568,9 @@ export default function MasterPainel() {
                 const dt = new Date(req.createdAt).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
                 return (
                   <div key={req.id} className={`rounded-2xl border p-5 ${
-                    isPending  ? 'bg-gray-800/60 border-gray-700' :
+                    isPending  ? 'bg-gray-100/60 border-gray-300' :
                     isApproved ? 'bg-green-500/5 border-green-500/20' :
-                    'bg-gray-800/30 border-gray-200 opacity-60'
+                    'bg-gray-100/30 border-gray-200 opacity-60'
                   }`}>
                     <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                       {/* info */}
@@ -1579,7 +1579,7 @@ export default function MasterPainel() {
                           <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
                             isPending  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
                             isApproved ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-                            'bg-gray-700 text-gray-400'
+                            'bg-gray-200 text-gray-600'
                           }`}>
                             {isPending ? '⏳ Pendente' : isApproved ? '✅ Aprovado' : '❌ Rejeitado'}
                           </span>
@@ -1604,7 +1604,7 @@ export default function MasterPainel() {
                             <span className="text-white font-bold text-sm">{req.mercado}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-gray-400 text-sm">{req.nome}</span>
+                            <span className="text-gray-600 text-sm">{req.nome}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <Phone className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
@@ -1613,12 +1613,12 @@ export default function MasterPainel() {
                           </div>
                           <div className="flex items-center gap-2">
                             <MapPin className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                            <span className="text-gray-400 text-sm">{req.cidade}</span>
+                            <span className="text-gray-600 text-sm">{req.cidade}</span>
                           </div>
                           {req.email && (
                             <div className="flex items-center gap-2 sm:col-span-2">
                               <Mail className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                              <span className="text-gray-400 text-sm">{req.email}</span>
+                              <span className="text-gray-600 text-sm">{req.email}</span>
                             </div>
                           )}
                         </div>
@@ -1629,7 +1629,7 @@ export default function MasterPainel() {
                         <div className="flex gap-2 flex-shrink-0">
                           <button
                             onClick={() => rejectRequest(req.id)}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-700 hover:bg-red-500/20 hover:border-red-500/30 border border-gray-600 text-gray-300 hover:text-red-400 text-xs font-bold transition-colors">
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-200 hover:bg-red-500/20 hover:border-red-500/30 border border-gray-400 text-gray-700 hover:text-red-400 text-xs font-bold transition-colors">
                             <XCircle className="w-3.5 h-3.5" /> Rejeitar
                           </button>
                           <button
@@ -1673,7 +1673,7 @@ export default function MasterPainel() {
                 <MarketCard key={m.id} market={m} mk={mk} onRefresh={load} onAccess={accessMarket} />
               ))}
               <button onClick={() => setShowAdd('market')}
-                className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-700 hover:border-orange-500/50 hover:bg-orange-500/5 transition-all min-h-[280px] gap-3 text-gray-500 hover:text-orange-400">
+                className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 hover:border-orange-500/50 hover:bg-orange-500/5 transition-all min-h-[280px] gap-3 text-gray-500 hover:text-orange-400">
                 <Plus className="w-8 h-8" /><span className="text-sm font-bold">Novo mercado</span>
               </button>
             </div>
@@ -1697,7 +1697,7 @@ export default function MasterPainel() {
                 <DistCard key={d.id} dist={d} mk={mk} onRefresh={load} />
               ))}
               <button onClick={() => setShowAdd('dist')}
-                className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-700 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all min-h-[280px] gap-3 text-gray-500 hover:text-emerald-400">
+                className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-300 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all min-h-[280px] gap-3 text-gray-500 hover:text-emerald-400">
                 <Plus className="w-8 h-8" /><span className="text-sm font-bold">Novo distribuidor</span>
               </button>
             </div>
@@ -1719,7 +1719,7 @@ export default function MasterPainel() {
                   <MessageCircle className={`w-4 h-4 ${migrating ? 'animate-spin' : ''}`} /> Criar Histórico
                 </button>
                 <button onClick={loadLeads} disabled={leadsLoading}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-bold text-gray-300 disabled:opacity-50 transition-all">
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm font-bold text-gray-700 disabled:opacity-50 transition-all">
                   <RefreshCw className={`w-4 h-4 ${leadsLoading ? 'animate-spin' : ''}`} /> Atualizar
                 </button>
               </div>
@@ -1732,7 +1732,7 @@ export default function MasterPainel() {
                   {migrateResult.ok ? '✅ Migração concluída!' : '❌ Erro na migração'}
                 </div>
                 {migrateResult.ok && (
-                  <div className="text-gray-400 text-sm mt-1">
+                  <div className="text-gray-600 text-sm mt-1">
                     <strong>{migrateResult.created}</strong> histórico(s) criado(s) · 
                     <strong className="ml-1">{migrateResult.skipped}</strong> já existiam ·
                     <strong className="ml-1">{migrateResult.total}</strong> total de leads
@@ -1759,7 +1759,7 @@ export default function MasterPainel() {
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
                       leadsFilter === f.id
                         ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
-                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800 hover:text-gray-300'
+                        : 'bg-gray-100/50 text-gray-600 hover:bg-gray-100 hover:text-gray-700'
                     }`}>
                     {f.icon && <span>{f.icon}</span>}
                     {f.label} <span className={`ml-1 ${leadsFilter === f.id ? 'text-orange-100' : 'text-gray-600'}`}>({f.count})</span>
@@ -1788,12 +1788,12 @@ export default function MasterPainel() {
                 {/* Resumo */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
-                    { label: 'Total', value: leads.length,                                     color: 'text-white',       bg: 'bg-gray-800' },
+                    { label: 'Total', value: leads.length,                                     color: 'text-white',       bg: 'bg-gray-100' },
                     { label: 'Interessados', value: leads.filter(l => ['interessado','demo','fechado'].includes(l.stage)).length, color: 'text-orange-400', bg: 'bg-orange-500/10' },
                     { label: 'Prontos p/ demo', value: leads.filter(l => l.stage === 'demo').length,   color: 'text-yellow-400',  bg: 'bg-yellow-500/10' },
                     { label: 'Fechados', value: leads.filter(l => l.stage === 'fechado').length,       color: 'text-green-400',   bg: 'bg-green-500/10' },
                   ].map(s => (
-                    <div key={s.label} className={`${s.bg} rounded-2xl p-4 border border-gray-700/50`}>
+                    <div key={s.label} className={`${s.bg} rounded-2xl p-4 border border-gray-300/50`}>
                       <div className={`text-2xl font-black ${s.color}`}>{s.value}</div>
                       <div className="text-xs text-gray-500 mt-1">{s.label}</div>
                     </div>
@@ -1822,7 +1822,7 @@ export default function MasterPainel() {
                           const phone = lead.phone || ''
                           const waLink = `https://wa.me/${phone}`
                           const stageMap = {
-                            novo:        { label: 'Novo',        color: 'bg-gray-700 text-gray-300' },
+                            novo:        { label: 'Novo',        color: 'bg-gray-200 text-gray-700' },
                             curioso:     { label: 'Curioso',     color: 'bg-blue-500/20 text-blue-300' },
                             interessado: { label: 'Interessado', color: 'bg-orange-500/20 text-orange-300' },
                             demo:        { label: 'Quer demo',   color: 'bg-yellow-500/20 text-yellow-300' },
@@ -1840,7 +1840,7 @@ export default function MasterPainel() {
                             return `${Math.floor(hrs / 24)}d`
                           }
                           return (
-                            <tr key={phone || i} onClick={() => setSelectedLead(lead)} className="hover:bg-gray-800/40 transition-colors cursor-pointer group">
+                            <tr key={phone || i} onClick={() => setSelectedLead(lead)} className="hover:bg-gray-100/40 transition-colors cursor-pointer group">
                               <td className="px-4 py-3">
                                 <div className="font-semibold text-white flex items-center gap-2">
                                   {displayName}
@@ -1852,13 +1852,13 @@ export default function MasterPainel() {
                                 </div>
                               </td>
                               <td className="px-4 py-3 hidden sm:table-cell">
-                                <div className="text-gray-300 flex items-center gap-1">
+                                <div className="text-gray-700 flex items-center gap-1">
                                   <Building2 className="w-3 h-3 text-gray-600" />
                                   {lead.market || <span className="text-gray-600 italic">não informado</span>}
                                 </div>
                               </td>
                               <td className="px-4 py-3 hidden md:table-cell">
-                                <div className="text-gray-400 flex items-center gap-1">
+                                <div className="text-gray-600 flex items-center gap-1">
                                   <MapPin className="w-3 h-3 text-gray-600" />
                                   {lead.city || <span className="text-gray-600 italic">—</span>}
                                 </div>
@@ -1890,9 +1890,9 @@ export default function MasterPainel() {
             {/* ── MODAL DETALHES DO LEAD ────────────────────────────────────── */}
             {selectedLead && (
               <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }} onClick={() => setSelectedLead(null)}>
-                <div className="bg-white border border-gray-700 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="bg-white border border-gray-300 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                   {/* Header */}
-                  <div className="sticky top-0 bg-white border-b border-gray-700 px-6 py-4 flex items-center justify-between">
+                  <div className="sticky top-0 bg-white border-b border-gray-300 px-6 py-4 flex items-center justify-between">
                     <div>
                       <h3 className="text-xl font-black text-white flex items-center gap-2">
                         <Bot className="w-5 h-5 text-orange-400" />
@@ -1900,8 +1900,8 @@ export default function MasterPainel() {
                       </h3>
                       <p className="text-gray-500 text-sm mt-0.5">Detalhes do lead</p>
                     </div>
-                    <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-gray-800 rounded-lg transition-colors">
-                      <X className="w-5 h-5 text-gray-400" />
+                    <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                      <X className="w-5 h-5 text-gray-600" />
                     </button>
                   </div>
 
@@ -1909,7 +1909,7 @@ export default function MasterPainel() {
                   <div className="p-6 space-y-5">
                     {/* Info Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                      <div className="bg-gray-100/50 rounded-xl p-4 border border-gray-300/50">
                         <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Telefone</div>
                         <div className="text-white font-bold flex items-center gap-2">
                           <Phone className="w-4 h-4 text-gray-500" />
@@ -1917,12 +1917,12 @@ export default function MasterPainel() {
                         </div>
                       </div>
 
-                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                      <div className="bg-gray-100/50 rounded-xl p-4 border border-gray-300/50">
                         <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Status</div>
                         <div className="text-white font-bold">
                           {(() => {
                             const stageMap = {
-                              novo:        { label: 'Novo',        color: 'bg-gray-700 text-gray-300' },
+                              novo:        { label: 'Novo',        color: 'bg-gray-200 text-gray-700' },
                               curioso:     { label: 'Curioso',     color: 'bg-blue-500/20 text-blue-300' },
                               interessado: { label: 'Interessado', color: 'bg-orange-500/20 text-orange-300' },
                               demo:        { label: 'Quer demo',   color: 'bg-yellow-500/20 text-yellow-300' },
@@ -1935,7 +1935,7 @@ export default function MasterPainel() {
                       </div>
 
                       {selectedLead.market && (
-                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                        <div className="bg-gray-100/50 rounded-xl p-4 border border-gray-300/50">
                           <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Mercado</div>
                           <div className="text-white font-bold flex items-center gap-2">
                             <Building2 className="w-4 h-4 text-gray-500" />
@@ -1945,7 +1945,7 @@ export default function MasterPainel() {
                       )}
 
                       {selectedLead.city && (
-                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                        <div className="bg-gray-100/50 rounded-xl p-4 border border-gray-300/50">
                           <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Cidade</div>
                           <div className="text-white font-bold flex items-center gap-2">
                             <MapPin className="w-4 h-4 text-gray-500" />
@@ -1954,7 +1954,7 @@ export default function MasterPainel() {
                         </div>
                       )}
 
-                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                      <div className="bg-gray-100/50 rounded-xl p-4 border border-gray-300/50">
                         <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Primeiro Contato</div>
                         <div className="text-white font-bold flex items-center gap-2">
                           <Clock className="w-4 h-4 text-gray-500" />
@@ -1962,7 +1962,7 @@ export default function MasterPainel() {
                         </div>
                       </div>
 
-                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                      <div className="bg-gray-100/50 rounded-xl p-4 border border-gray-300/50">
                         <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Última Interação</div>
                         <div className="text-white font-bold flex items-center gap-2">
                           <CalendarClock className="w-4 h-4 text-gray-500" />
@@ -1973,8 +1973,8 @@ export default function MasterPainel() {
 
                     {/* Informações Adicionais */}
                     {(selectedLead.niche || selectedLead.employees || selectedLead.currentSystem) && (
-                      <div className="bg-gray-800/30 rounded-xl p-4 border border-gray-700/50">
-                        <div className="text-sm text-gray-400 font-semibold mb-3">📋 Informações do Negócio</div>
+                      <div className="bg-gray-100/30 rounded-xl p-4 border border-gray-300/50">
+                        <div className="text-sm text-gray-600 font-semibold mb-3">📋 Informações do Negócio</div>
                         <div className="space-y-2 text-sm">
                           {selectedLead.niche && <div className="flex gap-2"><span className="text-gray-500">Nicho:</span> <span className="text-white font-semibold">{selectedLead.niche}</span></div>}
                           {selectedLead.employees && <div className="flex gap-2"><span className="text-gray-500">Funcionários:</span> <span className="text-white font-semibold">{selectedLead.employees}</span></div>}
@@ -1990,7 +1990,7 @@ export default function MasterPainel() {
                         <MessageCircle className="w-4 h-4" /> Chamar no WhatsApp
                       </a>
                       <button onClick={() => setSelectedLead(null)}
-                        className="px-4 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-sm transition-colors">
+                        className="px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm transition-colors">
                         Fechar
                       </button>
                     </div>
@@ -2008,7 +2008,7 @@ export default function MasterPainel() {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h2 className="text-xl font-black text-white">Vendedores externos</h2>
-              <p className="text-gray-400 text-sm mt-0.5">Cada afiliado tem um link único com o código dele. Comissão paga manualmente.</p>
+              <p className="text-gray-600 text-sm mt-0.5">Cada afiliado tem um link único com o código dele. Comissão paga manualmente.</p>
             </div>
             <div className="flex gap-2">
               <button onClick={loadAffiliates} className="btn-ghost flex items-center gap-2 text-sm">
@@ -2022,28 +2022,28 @@ export default function MasterPainel() {
 
           {/* Formulário novo afiliado */}
           {affShowForm && (
-            <div className="bg-white border border-gray-700 rounded-xl p-5 space-y-3">
+            <div className="bg-white border border-gray-300 rounded-xl p-5 space-y-3">
               <h3 className="font-bold text-white text-sm">Cadastrar novo vendedor</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-400 font-semibold mb-1 block">Nome *</label>
+                  <label className="text-xs text-gray-600 font-semibold mb-1 block">Nome *</label>
                   <input value={affForm.nome} onChange={e => setAffForm(f=>({...f,nome:e.target.value}))}
-                    placeholder="Ex: Pedro Vendas" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"/>
+                    placeholder="Ex: Pedro Vendas" className="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-sm text-white"/>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 font-semibold mb-1 block">WhatsApp *</label>
+                  <label className="text-xs text-gray-600 font-semibold mb-1 block">WhatsApp *</label>
                   <input value={affForm.telefone} onChange={e => setAffForm(f=>({...f,telefone:e.target.value}))}
-                    placeholder="(15) 99999-0000" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"/>
+                    placeholder="(15) 99999-0000" className="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-sm text-white"/>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 font-semibold mb-1 block">Código (opcional)</label>
+                  <label className="text-xs text-gray-600 font-semibold mb-1 block">Código (opcional)</label>
                   <input value={affForm.codigo} onChange={e => setAffForm(f=>({...f,codigo:e.target.value.toLowerCase().replace(/[^a-z0-9]/g,'')}))}
-                    placeholder="pedro (gerado auto se vazio)" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white font-mono"/>
+                    placeholder="pedro (gerado auto se vazio)" className="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-sm text-white font-mono"/>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 font-semibold mb-1 block">Comissão (%)</label>
+                  <label className="text-xs text-gray-600 font-semibold mb-1 block">Comissão (%)</label>
                   <input value={affForm.comissaoPct} onChange={e => setAffForm(f=>({...f,comissaoPct:e.target.value}))}
-                    type="number" min="1" max="50" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"/>
+                    type="number" min="1" max="50" className="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-sm text-white"/>
                 </div>
               </div>
               <div className="flex gap-2 pt-1">
@@ -2056,7 +2056,7 @@ export default function MasterPainel() {
             </div>
           )}
 
-          {affLoading && <div className="text-center text-gray-400 py-10 text-sm">Carregando...</div>}
+          {affLoading && <div className="text-center text-gray-600 py-10 text-sm">Carregando...</div>}
 
           {!affLoading && affiliates.length === 0 && (
             <div className="text-center py-14 text-gray-500">
@@ -2073,7 +2073,7 @@ export default function MasterPainel() {
                 const pct           = Math.round((aff.comissaoPct||0.20)*100)
                 const link          = `https://zatendestok.com.br/login?ref=${aff.codigo}`
                 return (
-                  <div key={aff.id} className={`bg-white border rounded-xl p-4 ${aff.ativo ? 'border-gray-700' : 'border-gray-200 opacity-60'}`}>
+                  <div key={aff.id} className={`bg-white border rounded-xl p-4 ${aff.ativo ? 'border-gray-300' : 'border-gray-200 opacity-60'}`}>
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -2081,12 +2081,12 @@ export default function MasterPainel() {
                           <span className="text-xs font-bold px-2 py-0.5 rounded-full border bg-indigo-500/10 text-indigo-400 border-indigo-500/20 font-mono">
                             {aff.codigo}
                           </span>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${aff.ativo ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-gray-700 text-gray-400 border-gray-600'}`}>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${aff.ativo ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-gray-200 text-gray-600 border-gray-400'}`}>
                             {aff.ativo ? '● Ativo' : '○ Inativo'}
                           </span>
                           <span className="text-xs text-yellow-400 font-bold">{pct}% comissão</span>
                         </div>
-                        <div className="flex items-center gap-3 text-sm text-gray-400 flex-wrap">
+                        <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
                           <span>{aff.telefone}</span>
                           <span className="text-gray-600">·</span>
                           <span>{aff.vendas?.length||0} conversões</span>
@@ -2103,19 +2103,19 @@ export default function MasterPainel() {
                       </div>
                       <div className="flex gap-2 flex-shrink-0">
                         <button onClick={() => toggleAffiliate(aff.id)} title={aff.ativo ? 'Desativar' : 'Ativar'}
-                          className="p-1.5 hover:text-white text-gray-400 transition-colors">
+                          className="p-1.5 hover:text-white text-gray-600 transition-colors">
                           {aff.ativo ? <ToggleRight className="w-5 h-5 text-green-400"/> : <ToggleLeft className="w-5 h-5"/>}
                         </button>
                         <button onClick={() => window.open(`https://wa.me/55${aff.telefone.replace(/\D/g,'')}?text=${encodeURIComponent(`Olá ${aff.nome}! Seu link de afiliado: ${link}`)}`, '_blank')}
-                          className="p-1.5 hover:text-green-400 text-gray-400 transition-colors" title="Enviar link por WA">
+                          className="p-1.5 hover:text-green-400 text-gray-600 transition-colors" title="Enviar link por WA">
                           <MessageCircle className="w-4 h-4"/>
                         </button>
                         <button onClick={() => window.open(`/afiliado?code=${aff.codigo}`, '_blank')}
-                          className="p-1.5 hover:text-indigo-400 text-gray-400 transition-colors" title="Ver painel do afiliado">
+                          className="p-1.5 hover:text-indigo-400 text-gray-600 transition-colors" title="Ver painel do afiliado">
                           <Link2 className="w-4 h-4"/>
                         </button>
                         <button onClick={() => deleteAffiliate(aff.id, aff.nome)}
-                          className="p-1.5 hover:text-red-400 text-gray-400 transition-colors">
+                          className="p-1.5 hover:text-red-400 text-gray-600 transition-colors">
                           <Trash2 className="w-4 h-4"/>
                         </button>
                       </div>
@@ -2125,7 +2125,7 @@ export default function MasterPainel() {
                     {aff.vendas?.length > 0 && (
                       <div className="mt-3 border-t border-gray-200 pt-3 space-y-1.5">
                         {aff.vendas.map((v,i) => (
-                          <div key={i} className="flex items-center justify-between text-xs text-gray-400">
+                          <div key={i} className="flex items-center justify-between text-xs text-gray-600">
                             <span>{v.mercado} <span className="text-gray-600">· {v.niche} · {v.plano}</span></span>
                             <span className="text-green-400 font-bold">+R${(v.comissao||0).toFixed(2).replace('.',',')}</span>
                           </div>
@@ -2152,7 +2152,7 @@ export default function MasterPainel() {
               </h2>
               <p className="text-gray-500 text-sm mt-0.5">Cole qualquer texto com telefones — a Zara extrai e envia com delay anti-ban automático.</p>
             </div>
-            <button onClick={loadQueue} disabled={queueLoading} className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-xs font-bold text-gray-400 transition-all disabled:opacity-50">
+            <button onClick={loadQueue} disabled={queueLoading} className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-xs font-bold text-gray-600 transition-all disabled:opacity-50">
               <RefreshCw className={`w-3.5 h-3.5 ${queueLoading ? 'animate-spin' : ''}`} /> Atualizar
             </button>
           </div>
@@ -2160,10 +2160,10 @@ export default function MasterPainel() {
           {/* Barra de limite diário */}
           <div className="bg-white rounded-2xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Limite diário de envios</span>
+              <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Limite diário de envios</span>
               <span className="text-xs font-black text-white">{queueStats.dailySent || 0} / {queueStats.dailyLimit || 30} enviados hoje</span>
             </div>
-            <div className="w-full bg-gray-800 rounded-full h-2.5">
+            <div className="w-full bg-gray-100 rounded-full h-2.5">
               <div className="h-2.5 rounded-full bg-gradient-to-r from-orange-500 to-orange-400 transition-all"
                 style={{ width: `${Math.min(100, ((queueStats.dailySent||0)/(queueStats.dailyLimit||30))*100)}%` }} />
             </div>
@@ -2183,7 +2183,7 @@ export default function MasterPainel() {
               { id:'leads',   label:`🎯 Leads (${prospLeads.length||0})` },
             ].map(t => (
               <button key={t.id} onClick={() => setProspInnerTab(t.id)}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${prospInnerTab===t.id ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${prospInnerTab===t.id ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                 {t.label}
               </button>
             ))}
@@ -2202,12 +2202,12 @@ export default function MasterPainel() {
                     <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0 text-2xl">🗺️</div>
                     <div>
                       <h3 className="text-white font-black text-lg">Ativar busca automática de mercados</h3>
-                      <p className="text-gray-400 text-sm mt-1">Integra com o Google Maps e busca automaticamente os contatos de mercadinhos perto de qualquer cidade — com nome, telefone e avaliação.</p>
+                      <p className="text-gray-600 text-sm mt-1">Integra com o Google Maps e busca automaticamente os contatos de mercadinhos perto de qualquer cidade — com nome, telefone e avaliação.</p>
                     </div>
                   </div>
 
-                  <div className="bg-gray-800/50 rounded-xl p-4 space-y-3">
-                    <p className="text-xs font-black text-gray-400 uppercase tracking-wider">✅ Como ativar (grátis, ~5 minutos)</p>
+                  <div className="bg-gray-100/50 rounded-xl p-4 space-y-3">
+                    <p className="text-xs font-black text-gray-600 uppercase tracking-wider">✅ Como ativar (grátis, ~5 minutos)</p>
                     {[
                       { n:'1', text:'Acesse', link:'https://console.cloud.google.com', linkText:'console.cloud.google.com' },
                       { n:'2', text:'Crie um projeto → ative "Places API (New)"' },
@@ -2215,7 +2215,7 @@ export default function MasterPainel() {
                       { n:'4', text:'Netlify → seu site → Variables → adicione:', code:'GOOGLE_PLACES_API_KEY = sua-chave-aqui' },
                       { n:'5', text:'Redeploy automático → volte aqui e clique "Verificar novamente"' },
                     ].map(s => (
-                      <div key={s.n} className="flex gap-2.5 text-sm text-gray-400">
+                      <div key={s.n} className="flex gap-2.5 text-sm text-gray-600">
                         <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">{s.n}</span>
                         <span>
                           {s.text}{' '}
@@ -2231,7 +2231,7 @@ export default function MasterPainel() {
                       🔄 Verificar novamente
                     </button>
                     <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" rel="noopener noreferrer"
-                      className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-bold text-sm text-center transition-all">
+                      className="flex-1 py-3 rounded-xl bg-gray-200 hover:bg-gray-600 text-white font-bold text-sm text-center transition-all">
                       Ir para Google Cloud →
                     </a>
                   </div>
@@ -2249,7 +2249,7 @@ export default function MasterPainel() {
                       <div className="sm:col-span-1">
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">O que buscar</label>
                         <select value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 text-sm transition-colors">
+                          className="w-full bg-gray-100 border border-gray-300 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 text-sm transition-colors">
                           {[
                             '── Mercados ──','mercado','supermercado','mercearia','mini mercado','mercadinho','conveniência',
                             '── Alimentação ──','padaria','confeitaria','açougue','restaurante','lanchonete','espetinho','pizzaria','bar','sorveteria',
@@ -2268,16 +2268,16 @@ export default function MasterPainel() {
                           onBlur={() => setTimeout(() => setShowCityDrop(false), 150)}
                           onKeyDown={e => { if (e.key === 'Enter') { setShowCityDrop(false); runSearch() } if (e.key === 'Escape') setShowCityDrop(false) }}
                           placeholder="Buscar cidade da região..."
-                          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 text-sm transition-colors" />
+                          className="w-full bg-gray-100 border border-gray-300 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 text-sm transition-colors" />
                         {showCityDrop && (() => {
                           const q = searchCity.toLowerCase().trim()
                           const hits = CITIES_LIST.filter(c => !q || c.toLowerCase().includes(q)).slice(0, 25)
                           return hits.length > 0 ? (
-                            <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto">
+                            <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-gray-100 border border-gray-300 rounded-xl shadow-2xl max-h-56 overflow-y-auto">
                               {hits.map(city => (
                                 <button key={city} type="button"
                                   onMouseDown={() => { setSearchCity(city); setShowCityDrop(false) }}
-                                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-orange-500/10 hover:text-orange-300 text-gray-300 transition-colors border-b border-gray-700/50 last:border-0">
+                                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-orange-500/10 hover:text-orange-300 text-gray-700 transition-colors border-b border-gray-300/50 last:border-0">
                                   <span className="font-bold">{city.split(' ').slice(0,-1).join(' ')}</span>
                                   <span className="text-gray-500 ml-1">{city.split(' ').slice(-1)}</span>
                                 </button>
@@ -2308,7 +2308,7 @@ export default function MasterPainel() {
                           </button>
                           <span className="text-gray-700">·</span>
                           <button onClick={() => setSearchSelected(new Set())}
-                            className="text-xs text-gray-500 hover:text-gray-400 font-bold">
+                            className="text-xs text-gray-500 hover:text-gray-600 font-bold">
                             Limpar
                           </button>
                         </div>
@@ -2321,17 +2321,17 @@ export default function MasterPainel() {
                           return (
                             <button key={r.phone} onClick={() => toggleSelect(r.phone)}
                               className={`flex items-start gap-3 p-4 rounded-xl border text-left transition-all relative ${
-                                contacted ? 'border-gray-700/50 bg-white/40 opacity-60'
+                                contacted ? 'border-gray-300/50 bg-white/40 opacity-60'
                                 : selected ? 'border-orange-500/50 bg-orange-500/10'
-                                : 'border-gray-200 bg-white hover:border-gray-700'}`}>
+                                : 'border-gray-200 bg-white hover:border-gray-300'}`}>
                               <div className={`w-5 h-5 rounded-md border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${
-                                selected ? 'border-orange-500 bg-orange-500' : 'border-gray-600'}`}>
+                                selected ? 'border-orange-500 bg-orange-500' : 'border-gray-400'}`}>
                                 {selected && <Check className="w-3 h-3 text-white" />}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                   <p className={`font-bold text-sm truncate ${contacted ? 'text-gray-500' : 'text-white'}`}>{r.name}</p>
-                                  {contacted && <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-gray-700 text-gray-500 flex-shrink-0">Já enviado</span>}
+                                  {contacted && <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-500 flex-shrink-0">Já enviado</span>}
                                 </div>
                                 {r.rating && (
                                   <p className="text-yellow-400 text-xs mt-0.5">⭐ {r.rating.toFixed(1)} <span className="text-gray-600">({r.reviews})</span></p>
@@ -2346,7 +2346,7 @@ export default function MasterPainel() {
 
                       {searchNextPage && (
                         <button onClick={() => runSearch(searchNextPage)} disabled={searchLoading}
-                          className="w-full py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 text-sm font-bold transition-all disabled:opacity-50">
+                          className="w-full py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm font-bold transition-all disabled:opacity-50">
                           {searchLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Carregar mais resultados'}
                         </button>
                       )}
@@ -2382,11 +2382,11 @@ export default function MasterPainel() {
                   <input value={manualPhone} onChange={e => setManualPhone(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && addManual()}
                     placeholder="(15) 99999-9999"
-                    className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm" />
+                    className="flex-1 bg-gray-100 border border-gray-300 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm" />
                   <input value={manualName} onChange={e => setManualName(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && addManual()}
                     placeholder="Nome do mercado (opcional)"
-                    className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm hidden sm:block" />
+                    className="flex-1 bg-gray-100 border border-gray-300 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm hidden sm:block" />
                   <button onClick={addManual} disabled={addingQueue || !normalizePhone(manualPhone)}
                     className="px-5 py-3 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white font-black text-lg transition-all">
                     {addingQueue ? <Loader2 className="w-5 h-5 animate-spin" /> : '+'}
@@ -2395,11 +2395,11 @@ export default function MasterPainel() {
                 {/* campo de nome no mobile */}
                 <input value={manualName} onChange={e => setManualName(e.target.value)}
                   placeholder="Nome do mercado (opcional)"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm sm:hidden" />
+                  className="w-full bg-gray-100 border border-gray-300 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm sm:hidden" />
 
                 {/* Dica passo-a-passo */}
-                <div className="bg-gray-800/50 rounded-xl p-3 space-y-1.5">
-                  <p className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">📍 Workflow: Google Maps → aqui</p>
+                <div className="bg-gray-100/50 rounded-xl p-3 space-y-1.5">
+                  <p className="text-xs font-black text-gray-600 uppercase tracking-wider mb-2">📍 Workflow: Google Maps → aqui</p>
                   {[
                     'Abre o Google Maps no celular ou computador',
                     'Pesquisa "mercado Itapeva SP" (ou sua cidade)',
@@ -2417,7 +2417,7 @@ export default function MasterPainel() {
 
               {/* ── COLAR TEXTO EM MASSA (secundário) ─── */}
               <details className="group bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                <summary className="px-5 py-4 cursor-pointer flex items-center justify-between text-sm font-bold text-gray-400 hover:text-white select-none">
+                <summary className="px-5 py-4 cursor-pointer flex items-center justify-between text-sm font-bold text-gray-600 hover:text-white select-none">
                   <span>📋 Colar lista de texto com vários números de uma vez</span>
                   <span className="text-gray-600 group-open:rotate-180 transition-transform inline-block">▼</span>
                 </summary>
@@ -2425,15 +2425,15 @@ export default function MasterPainel() {
                   <p className="text-xs text-gray-600 pt-4">Cole aqui qualquer texto que contenha telefones — CSV, lista do WhatsApp, texto copiado de sites. O sistema extrai os números automaticamente.</p>
                   <textarea value={captureText} onChange={e => { setCaptureText(e.target.value); setParsedPhones([]) }}
                     rows={6} placeholder={`(15) 3522-1234\n(15) 99988-7766\nMercado Central: (15) 3523-9999\n15 99777-8888`}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm font-mono resize-none" />
+                    className="w-full bg-gray-100 border border-gray-300 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors text-sm font-mono resize-none" />
                   <button onClick={handleParseText} disabled={!captureText.trim()}
-                    className="w-full py-3 rounded-xl bg-gray-700 hover:bg-gray-600 disabled:opacity-40 text-white font-bold text-sm transition-all">
+                    className="w-full py-3 rounded-xl bg-gray-200 hover:bg-gray-600 disabled:opacity-40 text-white font-bold text-sm transition-all">
                     🔍 Extrair telefones do texto
                   </button>
                   {parsedPhones.length > 0 && (
                     <div className="space-y-3">
                       <p className="text-sm font-bold text-green-400">✅ {parsedPhones.length} encontrado{parsedPhones.length>1?'s':''} — nenhum duplicado</p>
-                      <div className="bg-gray-800 rounded-xl max-h-36 overflow-y-auto divide-y divide-gray-700/40">
+                      <div className="bg-gray-100 rounded-xl max-h-36 overflow-y-auto divide-y divide-gray-700/40">
                         {parsedPhones.map((p, i) => (
                           <div key={i} className="flex items-center gap-3 px-3 py-2">
                             <Phone className="w-3 h-3 text-green-400 flex-shrink-0" />
@@ -2468,7 +2468,7 @@ export default function MasterPainel() {
                   {/* Validar WA primeiro */}
                   {(queueStats.pending || 0) > 0 && (
                     <button onClick={validateQueueWA} disabled={validating}
-                      className="w-full py-3 rounded-xl bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white font-bold text-sm transition-all flex items-center justify-center gap-2 border border-gray-700">
+                      className="w-full py-3 rounded-xl bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-white font-bold text-sm transition-all flex items-center justify-center gap-2 border border-gray-300">
                       {validating
                         ? <><Loader2 className="w-4 h-4 animate-spin" /> Verificando números no WhatsApp...</>
                         : <><CheckCircle2 className="w-4 h-4 text-green-400" /> ① Verificar quais têm WhatsApp</>}
@@ -2476,9 +2476,9 @@ export default function MasterPainel() {
                   )}
 
                   {validResult && (
-                    <div className={`rounded-xl px-4 py-3 text-sm border ${validResult.ok ? 'bg-gray-800/50 border-gray-700' : 'bg-red-500/10 border-red-500/30'}`}>
+                    <div className={`rounded-xl px-4 py-3 text-sm border ${validResult.ok ? 'bg-gray-100/50 border-gray-300' : 'bg-red-500/10 border-red-500/30'}`}>
                       {validResult.ok
-                        ? <span className="text-gray-300">✅ <b className="text-green-400">{validResult.valid}</b> têm WhatsApp · <b className="text-red-400">{validResult.invalid}</b> removidos da fila (sem WA)</span>
+                        ? <span className="text-gray-700">✅ <b className="text-green-400">{validResult.valid}</b> têm WhatsApp · <b className="text-red-400">{validResult.invalid}</b> removidos da fila (sem WA)</span>
                         : <span className="text-red-400">{validResult.error}</span>}
                     </div>
                   )}
@@ -2494,7 +2494,7 @@ export default function MasterPainel() {
                     </button>
                     {((queueStats.sent||0) > 0 || (queueStats.failed||0) > 0) && (
                       <button onClick={() => queueApi({ action:'clear', mode:'done' }).then(loadQueue)}
-                        className="px-4 py-3.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs font-bold transition-all">
+                        className="px-4 py-3.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition-all">
                         Limpar enviados
                       </button>
                     )}
@@ -2525,7 +2525,7 @@ export default function MasterPainel() {
                   </div>
 
                   {/* Barra de progresso */}
-                  <div className="w-full bg-gray-800 rounded-full h-2.5">
+                  <div className="w-full bg-gray-100 rounded-full h-2.5">
                     <div className="h-2.5 rounded-full bg-gradient-to-r from-orange-600 to-orange-400 transition-all duration-500"
                       style={{ width: `${(sendProgress.current/sendProgress.total)*100}%` }} />
                   </div>
@@ -2533,7 +2533,7 @@ export default function MasterPainel() {
                   {/* Countdown visual */}
                   {sendCountdown != null && (
                     <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-gray-800 rounded-full h-1.5">
+                      <div className="flex-1 bg-gray-100 rounded-full h-1.5">
                         <div className="h-1.5 rounded-full bg-yellow-500/60 transition-all duration-1000"
                           style={{ width: `${(sendCountdown / 90) * 100}%` }} />
                       </div>
@@ -2566,8 +2566,8 @@ export default function MasterPainel() {
               {!sendProgress && campaigns.length > 0 && (
                 <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                    <p className="text-xs font-black text-gray-400 uppercase tracking-wider">📊 Histórico de campanhas</p>
-                    <button onClick={loadCampaigns} className="text-xs text-gray-600 hover:text-gray-400">
+                    <p className="text-xs font-black text-gray-600 uppercase tracking-wider">📊 Histórico de campanhas</p>
+                    <button onClick={loadCampaigns} className="text-xs text-gray-600 hover:text-gray-600">
                       <RefreshCw className="w-3 h-3"/>
                     </button>
                   </div>
@@ -2580,14 +2580,14 @@ export default function MasterPainel() {
                       return (
                         <div key={c.id} className="px-4 py-2.5 flex items-center gap-3">
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs text-gray-400">
+                            <p className="text-xs text-gray-600">
                               {start ? start.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—'}
                             </p>
                             <p className="text-xs text-gray-600">{dur != null ? `${dur} min · ${total} msgs` : `${total} msgs`}</p>
                           </div>
                           <span className="text-xs font-bold text-green-400">✅ {c.sent}</span>
                           {c.failed > 0 && <span className="text-xs font-bold text-red-400">❌ {c.failed}</span>}
-                          <div className="w-16 bg-gray-800 rounded-full h-1.5">
+                          <div className="w-16 bg-gray-100 rounded-full h-1.5">
                             <div className="h-1.5 rounded-full bg-green-500"
                               style={{ width: total > 0 ? `${(c.sent/total)*100}%` : '0%' }} />
                           </div>
@@ -2629,11 +2629,11 @@ export default function MasterPainel() {
                           const st = statusMap[c.status] || statusMap.pending
                           const waLink = `https://wa.me/${c.phone}`
                           return (
-                            <tr key={c.id} className="hover:bg-gray-800/30">
+                            <tr key={c.id} className="hover:bg-gray-100/30">
                               <td className="px-4 py-3 font-mono text-sm text-white">
                                 +{c.phone.slice(0,2)} ({c.phone.slice(2,4)}) {c.phone.slice(4,9)}-{c.phone.slice(9)}
                               </td>
-                              <td className="px-4 py-3 text-gray-400 hidden sm:table-cell">{c.name || <span className="text-gray-700 italic">—</span>}</td>
+                              <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{c.name || <span className="text-gray-700 italic">—</span>}</td>
                               <td className="px-4 py-3">
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${st.color}`}>{st.label}</span>
                                 {c.error && <p className="text-xs text-red-400/70 mt-0.5">{c.error}</p>}
@@ -2666,12 +2666,12 @@ export default function MasterPainel() {
                 </div>
                 <div className="flex gap-2 items-center">
                   <button onClick={loadProspLeads} disabled={prospLeadsLoading}
-                    className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 transition-colors">
+                    className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors">
                     <RefreshCw className={`w-4 h-4 ${prospLeadsLoading ? 'animate-spin' : ''}`}/>
                   </button>
                   {['pipeline','list'].map(v => (
                     <button key={v} onClick={() => setLeadsView(v)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${leadsView===v ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${leadsView===v ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                       {v === 'pipeline' ? '⬛ Pipeline' : '☰ Lista'}
                     </button>
                   ))}
@@ -2694,7 +2694,7 @@ export default function MasterPainel() {
                     const byStage = { novo:0, curioso:0, interessado:0, demo:0, fechado:0 }
                     prospLeads.forEach(l => { const s = l.stage || 'novo'; byStage[s] = (byStage[s]||0)+1 })
                     const stages = [
-                      { id:'novo',        label:'Novo',        color:'text-gray-400',   bg:'bg-gray-700/40 border-gray-700',    dot:'bg-gray-500' },
+                      { id:'novo',        label:'Novo',        color:'text-gray-600',   bg:'bg-gray-200/40 border-gray-300',    dot:'bg-gray-500' },
                       { id:'curioso',     label:'Curioso',     color:'text-blue-400',   bg:'bg-blue-500/10 border-blue-500/20', dot:'bg-blue-500' },
                       { id:'interessado', label:'Interessado', color:'text-yellow-400', bg:'bg-yellow-500/10 border-yellow-500/20', dot:'bg-yellow-500' },
                       { id:'demo',        label:'Demo',        color:'text-orange-400', bg:'bg-orange-500/10 border-orange-500/20', dot:'bg-orange-500' },
@@ -2722,7 +2722,7 @@ export default function MasterPainel() {
                               </div>
                               <div className="divide-y divide-gray-800/30">
                                 {stagLeads.map(l => (
-                                  <div key={l.phone} className="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-800/20">
+                                  <div key={l.phone} className="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-100/20">
                                     <div className="flex-1 min-w-0">
                                       <p className="text-sm font-bold text-white truncate">{l.name || l.waName || '—'}</p>
                                       <p className="text-xs text-gray-500 truncate">{l.market || ''}{l.city ? ` · ${l.city}` : ''}</p>
@@ -2761,7 +2761,7 @@ export default function MasterPainel() {
                       <tbody className="divide-y divide-gray-800/60">
                         {prospLeads.map(l => {
                           const stageMap = {
-                            novo:        { label:'Novo',        cls:'bg-gray-700/50 text-gray-400' },
+                            novo:        { label:'Novo',        cls:'bg-gray-200/50 text-gray-600' },
                             curioso:     { label:'Curioso',     cls:'bg-blue-500/20 text-blue-300' },
                             interessado: { label:'Interessado', cls:'bg-yellow-500/20 text-yellow-300' },
                             demo:        { label:'Demo',        cls:'bg-orange-500/20 text-orange-300' },
@@ -2769,12 +2769,12 @@ export default function MasterPainel() {
                           }
                           const st = stageMap[l.stage] || stageMap.novo
                           return (
-                            <tr key={l.phone} className="hover:bg-gray-800/30">
+                            <tr key={l.phone} className="hover:bg-gray-100/30">
                               <td className="px-4 py-3">
                                 <p className="font-bold text-white text-sm truncate">{l.name || l.waName || '—'}</p>
                                 {l.market && <p className="text-xs text-gray-500 truncate">{l.market}</p>}
                               </td>
-                              <td className="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{l.city || '—'}</td>
+                              <td className="px-4 py-3 text-gray-600 text-xs hidden sm:table-cell">{l.city || '—'}</td>
                               <td className="px-4 py-3">
                                 <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${st.cls}`}>{st.label}</span>
                               </td>
