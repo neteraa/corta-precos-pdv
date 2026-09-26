@@ -77,7 +77,15 @@ export default function Conversas() {
       }
       
       console.log('📡 Fetching:', url)
-      const res = await fetch(url)
+      // FORÇA Chrome a NÃO cachear! Cache-bust + no-cache header
+      const cacheBust = `${url}${url.includes('?') ? '&' : '?'}_t=${Date.now()}`
+      const res = await fetch(cacheBust, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      })
       const data = await res.json()
       console.log('📥 Response status:', res.status)
       console.log('📥 Response data:', data)
@@ -119,7 +127,15 @@ export default function Conversas() {
       }
       
       console.log('Carregando mensagens - phone:', phone, 'blobKey:', blobKey)
-      const res = await fetch(url)
+      // FORÇA Chrome a NÃO cachear
+      const cacheBust = `${url}&_t=${Date.now()}`
+      const res = await fetch(cacheBust, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      })
       const data = await res.json()
       console.log('Resposta:', data)
       
