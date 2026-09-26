@@ -92,6 +92,11 @@ export default function Conversas() {
       
       if (data.ok) {
         console.log('✅ Clientes recebidos:', data.clients?.length || 0)
+        console.log('📋 Primeiros 3 clientes:', data.clients?.slice(0, 3).map(c => ({ 
+          phone: c.phone, 
+          name: c.name, 
+          storeId: c.storeId 
+        })))
         setClients(data.clients || [])
       } else {
         console.error('❌ API error:', data.error)
@@ -181,12 +186,27 @@ export default function Conversas() {
   }, [messages])
 
   const filteredClients = clients.filter(c => {
-    // Filtro por storeId (separa Zara, Corta Preços, etc)
+    // CRÍTICO: No modo store (não admin), SEMPRE mostra TODAS conversas!
+    // Ignora filtro de store porque já vem filtrado da API
+    const loggedStoreId = getStoreId()
+    const isStoreMode = loggedStoreId && loggedStoreId !== 'default'
+    
+    if (isStoreMode) {
+      // Modo store: só aplica filtro de busca
+      const q = searchQuery.toLowerCase()
+      return (
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.phone || '').includes(q) ||
+        (c.market || '').toLowerCase().includes(q) ||
+        (c.city || '').toLowerCase().includes(q)
+      )
+    }
+    
+    // Modo admin: aplica filtro por storeId + busca
     if (filterStore !== 'all') {
       if (c.storeId !== filterStore) return false
     }
     
-    // Filtro por busca
     const q = searchQuery.toLowerCase()
     return (
       (c.name || '').toLowerCase().includes(q) ||
@@ -198,7 +218,7 @@ export default function Conversas() {
   
   // DEBUG: Log quando filteredClients muda
   React.useEffect(() => {
-    console.log('[Conversas] Clientes:', clients.length, '| Filtrados:', filteredClients.length, '| Filtro store:', filterStore, '| Busca:', searchQuery)
+    console.log('🔍 [FILTRO] Total:', clients.length, '→ Exibindo:', filteredClients.length, '| filterStore:', filterStore, '| busca:', searchQuery)
   }, [clients.length, filteredClients.length, filterStore, searchQuery])
   
   // Extrai storeIds únicos para as abas (SÓ QUANDO TEM MASTER KEY!)
