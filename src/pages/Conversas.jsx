@@ -141,10 +141,34 @@ export default function Conversas() {
     loadClients()
     // Reseta filtro quando carrega clientes (evita bugs de filtro errado)
     setFilterStore('all')
+    
+    // FORÇA BRUTA: Se não carregar conversas em 5s, recarrega página HARD
+    const forceReloadTimer = setTimeout(() => {
+      const mk = getMK()
+      const storeId = getStoreId()
+      const hasAuth = !!mk || !!storeId
+      
+      console.log('[Conversas] Check força reload - Auth:', hasAuth, '| Clientes:', clients.length)
+      
+      if (hasAuth && clients.length === 0) {
+        console.warn('[Conversas] ⚠️ TEM AUTH MAS ZERO CONVERSAS! Forçando hard reload...')
+        alert('Cache detectado! Recarregando app...')
+        // Limpa tudo e recarrega
+        if ('caches' in window) {
+          caches.keys().then(keys => keys.forEach(k => caches.delete(k)))
+        }
+        setTimeout(() => window.location.reload(true), 500)
+      }
+    }, 5000) // 5 segundos
+    
     // Auto-refresh a cada 10s (mais rápido pra ver mensagens novas)
     const interval = setInterval(loadClients, 10000)
-    return () => clearInterval(interval)
-  }, [loadClients])
+    
+    return () => {
+      clearInterval(interval)
+      clearTimeout(forceReloadTimer)
+    }
+  }, [loadClients, clients.length])
 
   // Auto-scroll quando mensagens carregarem
   useEffect(() => {
@@ -323,10 +347,38 @@ export default function Conversas() {
           )}
 
           {!loading && filteredClients.length === 0 && (
-            <div className="p-8 text-center text-gray-500">
-              <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-20" />
-              <p className="font-semibold">Nenhuma conversa ainda</p>
-              <p className="text-xs mt-1">As conversas aparecem automaticamente quando alguém conversa com a Zara</p>
+            <div className="p-8 text-center">
+              <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-20 text-gray-400" />
+              <p className="font-bold text-gray-700">Nenhuma conversa ainda</p>
+              <p className="text-xs mt-1 text-gray-500">As conversas aparecem automaticamente quando alguém conversa com a Zara</p>
+              
+              {/* AVISO DE CACHE se tem auth mas zero conversas */}
+              {(getMK() || getStoreId() !== 'default') && (
+                <div className="mt-6 p-4 bg-orange-50 border-2 border-orange-200 rounded-lg">
+                  <p className="font-bold text-orange-700 text-sm mb-2">⚠️ Possível cache antigo</p>
+                  <p className="text-xs text-orange-600 mb-3">
+                    Se você tem conversas mas não aparecem, pode ser cache do app.
+                  </p>
+                  <button
+                    onClick={() => {
+                      if (confirm('Limpar cache e recarregar? (Você continuará logado)')) {
+                        if ('caches' in window) {
+                          caches.keys().then(keys => keys.forEach(k => caches.delete(k)))
+                        }
+                        if ('serviceWorker' in navigator) {
+                          navigator.serviceWorker.getRegistrations().then(regs => 
+                            regs.forEach(r => r.unregister())
+                          )
+                        }
+                        setTimeout(() => window.location.reload(true), 500)
+                      }
+                    }}
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm rounded-lg transition-all"
+                  >
+                    🔄 Limpar Cache Agora
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
