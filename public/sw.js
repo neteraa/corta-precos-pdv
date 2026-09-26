@@ -18,20 +18,39 @@ self.addEventListener('message', (event) => {
 })
 
 self.addEventListener('install', e => {
+  console.log('[SW] Nova versão instalando:', CACHE)
   e.waitUntil(
     caches.open(CACHE)
       .then(c => c.addAll([SHELL]))   // pre-cache the SPA shell
-    // NÃO chama skipWaiting aqui — o UpdateBanner controla o momento do reload
+      .then(() => {
+        console.log('[SW] Cache criado, forçando ativação imediata...')
+        return self.skipWaiting()  // FORÇA ativação imediata!
+      })
   )
 })
 
 self.addEventListener('activate', e => {
+  console.log('[SW] Nova versão ativando:', CACHE)
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(
-        keys.filter(k => k !== CACHE).map(k => caches.delete(k))
-      ))
-      .then(() => self.clients.claim())
+      .then(keys => {
+        const oldKeys = keys.filter(k => k !== CACHE)
+        console.log('[SW] Removendo caches antigos:', oldKeys)
+        return Promise.all(oldKeys.map(k => caches.delete(k)))
+      })
+      .then(() => {
+        console.log('[SW] Tomando controle de todas as páginas...')
+        return self.clients.claim()
+      })
+      .then(() => {
+        // FORÇA reload de todas as páginas abertas!
+        console.log('[SW] Notificando clientes para recarregar...')
+        return self.clients.matchAll({ type: 'window' }).then(clients => {
+          clients.forEach(client => {
+            client.postMessage({ type: 'SW_UPDATED', cache: CACHE })
+          })
+        })
+      })
   )
 })
 

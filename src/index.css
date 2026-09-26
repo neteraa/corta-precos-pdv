@@ -114,3 +114,9 @@ html, body { overflow-x: hidden; max-width: 100vw; }
 /* Icon rail — hide scrollbar but keep scroll */
 .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Auto-update toast animation */
+@keyframes slideIn {
+  from { transform: translateX(400px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
