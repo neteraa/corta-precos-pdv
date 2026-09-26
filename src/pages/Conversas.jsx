@@ -256,6 +256,24 @@ export default function Conversas() {
                 v{new Date().toISOString().slice(0,10)}
               </span>
             </p>
+            {/* DEBUG BOX - Mostra conta logada */}
+            <div className="mt-3 p-3 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+              <p className="text-xs font-bold text-yellow-900 mb-1">🔑 DEBUG - Conta Logada:</p>
+              <p className="text-xs text-yellow-800 font-mono">
+                {getMK() ? `Admin (master key)` : `Store: ${getStoreId()} ${getStoreToken() ? '✅' : '❌ SEM TOKEN'}`}
+              </p>
+              <button
+                onClick={() => {
+                  if (confirm('Limpar login e voltar pra tela inicial?')) {
+                    localStorage.clear()
+                    window.location.href = '/'
+                  }
+                }}
+                className="mt-2 px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs font-bold rounded"
+              >
+                🔄 Trocar Conta / Re-logar
+              </button>
+            </div>
           </div>
           <div className="flex gap-2">
             <button onClick={loadClients} disabled={loading}
