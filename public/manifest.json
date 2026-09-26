@@ -2,18 +2,18 @@
   "name": "ZatendeStok",
   "short_name": "ZatendeStok",
   "description": "PDV, estoque, fiado e promoções para mercados. Simples e rápido.",
-  "start_url": "/",
+  "start_url": "/?v=2026092621",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#10b981",
+  "background_color": "#0d0b07",
+  "theme_color": "#f97316",
   "orientation": "any",
   "icons": [
-    { "src": "icon-32.png",  "sizes": "32x32",   "type": "image/png" },
-    { "src": "icon-48.png",  "sizes": "48x48",   "type": "image/png" },
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-256.png", "sizes": "256x256", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icon-32.png?v=2",  "sizes": "32x32",   "type": "image/png" },
+    { "src": "icon-48.png?v=2",  "sizes": "48x48",   "type": "image/png" },
+    { "src": "icon-192.png?v=2", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-256.png?v=2", "sizes": "256x256", "type": "image/png" },
+    { "src": "icon-512.png?v=2", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
     { "name": "PDV Admin",           "url": "/pdv",        "description": "PDV principal com admin" },

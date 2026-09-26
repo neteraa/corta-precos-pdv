@@ -5,6 +5,11 @@ import Layout from './components/Layout.jsx'
 import UpdateBanner from './components/UpdateBanner.jsx'
 import { isLoggedIn, getRole, hasConfiguredStore } from './utils/auth.js'
 
+/* ── Root redirect: se logado → /home, senão → landing ── */
+function RootRedirect() {
+  return isLoggedIn() ? <Navigate to="/home" replace /> : <Landing />
+}
+
 /* ── Lazy page chunks — each page loads only when first visited ── */
 const Landing        = lazy(() => import('./pages/Landing.jsx'))
 const Login          = lazy(() => import('./pages/Login.jsx'))
@@ -98,7 +103,8 @@ export default function App() {
       <Suspense fallback={<PageSpinner />}>
         <Routes>
           {/* Public */}
-          <Route path="/"        element={<Landing />} />
+          <Route path="/"        element={<RootRedirect />} />
+          <Route path="/landing" element={<Landing />} />
           <Route path="/login"   element={<Login />} />
           <Route path="/limpar"  element={<ResetStore />} />
           {/* Full-screen pages — no sidebar */}
