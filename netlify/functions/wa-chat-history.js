@@ -49,19 +49,20 @@ export default async (req) => {
 
   // ── GET histórico de um cliente específico ────────────────────────────────────
   if (phone) {
-    // ISOLAMENTO: usa storeId na key se for cliente, ou busca em todos se for master
-    let key
     let messages = null
     
     if (isStore) {
       // Cliente: busca APENAS suas próprias conversas
-      key = `chat_history:${storeId}:${phone}`
+      const key = `chat_history:${storeId}:${phone}`
       messages = await store.get(key, { type: 'json' }).catch(() => null)
     } else if (isMaster) {
-      // Master: busca em todos os stores (tenta encontrar)
+      // Master: busca em AMBOS formatos (retrocompatibilidade)
+      // Tenta formato novo primeiro: chat_history:{storeId}:{phone}
+      // Depois formato antigo: chat_history:{phone}
       const { blobs } = await store.list()
       const matchingBlob = blobs.find(b => 
-        b.key.startsWith('chat_history:') && b.key.endsWith(`:${phone}`)
+        b.key.startsWith('chat_history:') && 
+        (b.key.endsWith(`:${phone}`) || b.key === `chat_history:${phone}`)
       )
       if (matchingBlob) {
         messages = await store.get(matchingBlob.key, { type: 'json' }).catch(() => null)
@@ -83,13 +84,15 @@ export default async (req) => {
   // ── GET lista de todos os clientes com histórico ──────────────────────────────
   const { blobs } = await store.list()
   
-  // Filtrar chaves de histórico: chat_history:{storeId}:{phone}
+  // Filtrar chaves de histórico: aceita AMBOS formatos (retrocompatibilidade)
+  // Formato antigo: chat_history:{phone}
+  // Formato novo: chat_history:{storeId}:{phone}
   let historyBlobs
   if (isStore) {
     // Cliente: APENAS histórico deste storeId
     historyBlobs = blobs.filter(b => b.key.startsWith(`chat_history:${storeId}:`))
   } else {
-    // Master: todos os históricos
+    // Master: TODOS os históricos (ambos formatos)
     historyBlobs = blobs.filter(b => b.key.startsWith('chat_history:'))
   }
   

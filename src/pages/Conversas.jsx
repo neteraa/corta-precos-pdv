@@ -4,7 +4,6 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { MessageCircle, RefreshCw, Search, Phone, MapPin, Building2, Clock, ExternalLink, User, Bot, AlertCircle } from 'lucide-react'
-import { getMktStoreId, getMktStoreToken } from '../utils/tenantStorage.js'
 
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -28,33 +27,21 @@ export default function Conversas() {
   const [searchQuery,   setSearchQuery]   = useState('')
   const messagesEndRef = useRef(null)
 
+  // REVERTIDO: volta a usar master key como antes (que funcionava!)
+  const getMK = () => localStorage.getItem('zs_master_key') || ''
+
   const loadClients = useCallback(async () => {
     setLoading(true)
     try {
-      // ISOLAMENTO: usa storeId + token do cliente logado (NÃO master key!)
-      const storeId = getMktStoreId()
-      const token = getMktStoreToken()
-      
-      console.log('━━━ CONVERSAS DEBUG ━━━')
-      console.log('storeId:', storeId)
-      console.log('token:', token ? '✓ presente' : '✗ ausente')
-      console.log('━━━━━━━━━━━━━━━━━━━━━━')
-      
-      if (!storeId || !token) {
+      const mk = getMK()
+      if (!mk) {
         setClients([])
         return
       }
-      
-      const url = `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}`
-      console.log('Buscando:', url)
-      
-      const res = await fetch(url)
+      const res = await fetch(`/api/wa-chat-history?mk=${encodeURIComponent(mk)}`)
       const data = await res.json()
-      console.log('Resposta API:', data)
-      
       if (data.ok) {
         setClients(data.clients || [])
-        console.log('Clientes encontrados:', data.clients?.length || 0)
       }
     } catch (e) {
       console.error('loadClients:', e)
@@ -67,10 +54,8 @@ export default function Conversas() {
     setMsgLoading(true)
     setSelectedPhone(phone)
     try {
-      const storeId = getMktStoreId()
-      const token = getMktStoreToken()
-      
-      const res = await fetch(`/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}&phone=${phone}`)
+      const mk = getMK()
+      const res = await fetch(`/api/wa-chat-history?mk=${encodeURIComponent(mk)}&phone=${phone}`)
       const data = await res.json()
       if (data.ok) {
         setMessages(data.messages || [])
