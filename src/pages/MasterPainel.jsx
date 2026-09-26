@@ -779,6 +779,8 @@ export default function MasterPainel() {
   const [sidebarOpen,  setSidebarOpen]   = useState(false)
   const [leads,        setLeads]         = useState([])
   const [leadsLoading, setLeadsLoading]  = useState(false)
+  const [leadsFilter,  setLeadsFilter]   = useState('all') // 'all' | 'novo' | 'curioso' | 'interessado' | 'demo' | 'fechado'
+  const [selectedLead, setSelectedLead]  = useState(null)  // modal de detalhes
 
   // ── Prospecção — fila ──────────────────────────────────────
   const [prospInnerTab, setProspInnerTab]   = useState('search')
@@ -1699,6 +1701,30 @@ export default function MasterPainel() {
               </button>
             </div>
 
+            {/* Filtros por status */}
+            {!leadsLoading && leads.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                {[
+                  { id: 'all',        label: 'Todos',       icon: null,         count: leads.length },
+                  { id: 'novo',       label: 'Novos',       icon: null,         count: leads.filter(l => l.stage === 'novo').length },
+                  { id: 'curioso',    label: 'Curiosos',    icon: null,         count: leads.filter(l => l.stage === 'curioso').length },
+                  { id: 'interessado',label: 'Interessados',icon: '🔥',         count: leads.filter(l => l.stage === 'interessado').length },
+                  { id: 'demo',       label: 'Quer Demo',   icon: '⭐',         count: leads.filter(l => l.stage === 'demo').length },
+                  { id: 'fechado',    label: 'Fechados',    icon: '✅',         count: leads.filter(l => l.stage === 'fechado').length },
+                ].map(f => (
+                  <button key={f.id} onClick={() => setLeadsFilter(f.id)}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
+                      leadsFilter === f.id
+                        ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
+                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800 hover:text-gray-300'
+                    }`}>
+                    {f.icon && <span>{f.icon}</span>}
+                    {f.label} <span className={`ml-1 ${leadsFilter === f.id ? 'text-orange-100' : 'text-gray-600'}`}>({f.count})</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {leadsLoading && (
               <div className="text-center py-20 text-gray-500">
                 <RefreshCw className="w-8 h-8 mx-auto mb-3 animate-spin opacity-40" />
@@ -1746,7 +1772,9 @@ export default function MasterPainel() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-800/60">
-                        {leads.map((lead, i) => {
+                        {leads
+                          .filter(lead => leadsFilter === 'all' || lead.stage === leadsFilter)
+                          .map((lead, i) => {
                           const displayName = lead.name || lead.waName || '(sem nome)'
                           const phone = lead.phone || ''
                           const waLink = `https://wa.me/${phone}`
@@ -1769,9 +1797,12 @@ export default function MasterPainel() {
                             return `${Math.floor(hrs / 24)}d`
                           }
                           return (
-                            <tr key={phone || i} className="hover:bg-gray-800/30 transition-colors">
+                            <tr key={phone || i} onClick={() => setSelectedLead(lead)} className="hover:bg-gray-800/40 transition-colors cursor-pointer group">
                               <td className="px-4 py-3">
-                                <div className="font-semibold text-white">{displayName}</div>
+                                <div className="font-semibold text-white flex items-center gap-2">
+                                  {displayName}
+                                  <span className="text-xs text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">(clique para detalhes)</span>
+                                </div>
                                 <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
                                   <Phone className="w-3 h-3" />
                                   {phone ? `+${phone.slice(0,2)} (${phone.slice(2,4)}) ${phone.slice(4,9)}-${phone.slice(9)}` : '—'}
@@ -1798,7 +1829,7 @@ export default function MasterPainel() {
                                 {timeAgo(lead.updatedAt)}
                               </td>
                               <td className="px-4 py-3 text-right">
-                                <a href={waLink} target="_blank" rel="noopener noreferrer"
+                                <a href={waLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
                                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 text-xs font-bold transition-colors">
                                   <MessageCircle className="w-3.5 h-3.5" /> Chamar
                                 </a>
@@ -1808,6 +1839,118 @@ export default function MasterPainel() {
                         })}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── MODAL DETALHES DO LEAD ────────────────────────────────────── */}
+            {selectedLead && (
+              <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }} onClick={() => setSelectedLead(null)}>
+                <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                  {/* Header */}
+                  <div className="sticky top-0 bg-gray-900 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-black text-white flex items-center gap-2">
+                        <Bot className="w-5 h-5 text-orange-400" />
+                        {selectedLead.name || selectedLead.waName || '(sem nome)'}
+                      </h3>
+                      <p className="text-gray-500 text-sm mt-0.5">Detalhes do lead</p>
+                    </div>
+                    <button onClick={() => setSelectedLead(null)} className="p-2 hover:bg-gray-800 rounded-lg transition-colors">
+                      <X className="w-5 h-5 text-gray-400" />
+                    </button>
+                  </div>
+
+                  {/* Body */}
+                  <div className="p-6 space-y-5">
+                    {/* Info Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                        <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Telefone</div>
+                        <div className="text-white font-bold flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-gray-500" />
+                          {selectedLead.phone ? `+${selectedLead.phone.slice(0,2)} (${selectedLead.phone.slice(2,4)}) ${selectedLead.phone.slice(4,9)}-${selectedLead.phone.slice(9)}` : '—'}
+                        </div>
+                      </div>
+
+                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                        <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Status</div>
+                        <div className="text-white font-bold">
+                          {(() => {
+                            const stageMap = {
+                              novo:        { label: 'Novo',        color: 'bg-gray-700 text-gray-300' },
+                              curioso:     { label: 'Curioso',     color: 'bg-blue-500/20 text-blue-300' },
+                              interessado: { label: 'Interessado', color: 'bg-orange-500/20 text-orange-300' },
+                              demo:        { label: 'Quer demo',   color: 'bg-yellow-500/20 text-yellow-300' },
+                              fechado:     { label: '🔥 Fechado',  color: 'bg-green-500/20 text-green-300' },
+                            }
+                            const stage = stageMap[selectedLead.stage] || stageMap.novo
+                            return <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold ${stage.color}`}>{stage.label}</span>
+                          })()}
+                        </div>
+                      </div>
+
+                      {selectedLead.market && (
+                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                          <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Mercado</div>
+                          <div className="text-white font-bold flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-gray-500" />
+                            {selectedLead.market}
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedLead.city && (
+                        <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                          <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Cidade</div>
+                          <div className="text-white font-bold flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-gray-500" />
+                            {selectedLead.city}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                        <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Primeiro Contato</div>
+                        <div className="text-white font-bold flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-gray-500" />
+                          {selectedLead.createdAt ? new Date(selectedLead.createdAt).toLocaleString('pt-BR') : '—'}
+                        </div>
+                      </div>
+
+                      <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
+                        <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Última Interação</div>
+                        <div className="text-white font-bold flex items-center gap-2">
+                          <CalendarClock className="w-4 h-4 text-gray-500" />
+                          {selectedLead.updatedAt ? new Date(selectedLead.updatedAt).toLocaleString('pt-BR') : '—'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Informações Adicionais */}
+                    {(selectedLead.niche || selectedLead.employees || selectedLead.currentSystem) && (
+                      <div className="bg-gray-800/30 rounded-xl p-4 border border-gray-700/50">
+                        <div className="text-sm text-gray-400 font-semibold mb-3">📋 Informações do Negócio</div>
+                        <div className="space-y-2 text-sm">
+                          {selectedLead.niche && <div className="flex gap-2"><span className="text-gray-500">Nicho:</span> <span className="text-white font-semibold">{selectedLead.niche}</span></div>}
+                          {selectedLead.employees && <div className="flex gap-2"><span className="text-gray-500">Funcionários:</span> <span className="text-white font-semibold">{selectedLead.employees}</span></div>}
+                          {selectedLead.currentSystem && <div className="flex gap-2"><span className="text-gray-500">Sistema atual:</span> <span className="text-white font-semibold">{selectedLead.currentSystem}</span></div>}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Ações */}
+                    <div className="flex gap-3">
+                      <a href={`https://wa.me/${selectedLead.phone}`} target="_blank" rel="noopener noreferrer"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-green-500 hover:bg-green-600 text-white font-bold text-sm transition-all shadow-lg shadow-green-500/30">
+                        <MessageCircle className="w-4 h-4" /> Chamar no WhatsApp
+                      </a>
+                      <button onClick={() => setSelectedLead(null)}
+                        className="px-4 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-sm transition-colors">
+                        Fechar
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
