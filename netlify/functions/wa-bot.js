@@ -143,6 +143,9 @@ function buildCortaPrecosPrompt(catalogText, categoryList, promoText) {
 • Mercado CORTA PREÇOS — Itapeva-SP
 • Endereço: Rua Capão Bonito, 20 - Itapeva-SP
 • WhatsApp: (15) 9979-6930
+• Horário de funcionamento:
+  - Segunda a Sábado: 9h às 19h
+  - Domingo: 9h às 13h
 • Pagamento: PIX, Dinheiro, Débito, Crédito
 • Delivery: taxa fixa R$7,00 — pagamento SOMENTE por PIX
 • Chave PIX do delivery: CNPJ 60.662.362/0001-70 (Corta Preços)
@@ -750,8 +753,8 @@ function quickReply(text, senderName, promoText, products) {
   }
 
   // Horário
-  if (/horario|que hora|abre|fecha|funcionamento|ta aberto|esta aberto/.test(t) && t.length < 55) {
-    return `⏰ Horário Corta Preços${nom}:\nSeg–Sex: 7h–20h\nSábado: 7h–18h\nDomingo: 8h–13h\n\nDúvidas: (15) 9979-6930 📱`
+  if (/horario|que hora|abre|fecha|funcionamento|ta aberto|esta aberto|ficam aberto/.test(t) && t.length < 55) {
+    return `⏰ Horário Corta Preços${nom}:\n• Segunda a Sábado: 9h às 19h\n• Domingo: 9h às 13h\n\nTe espero aqui! 😊`
   }
 
   // Pagamento / PIX
@@ -1053,7 +1056,7 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
         } else if (/preço|valor|quanto|custa|custo|price/.test(t)) {
           fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 😊 Para consultar preços liga no (15) 9979-6930 ou passa aqui na loja — Corta Preços, Rua Capão Bonito 20, Itapeva-SP!`
         } else if (/hora|horário|abre|fecha|funcionamento/.test(t)) {
-          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! ⏰ Para confirmar nosso horário de funcionamento, liga no (15) 9979-6930. A gente te atende! 😊`
+          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! ⏰ Nosso horário:\n• Segunda a Sábado: 9h às 19h\n• Domingo: 9h às 13h\n\nTe espero aqui! 😊`
         } else {
           fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 👋 Tô com uma instabilidade técnica agora, mas já resolvo.\nPode ligar direto: (15) 9979-6930 📱 Estamos aqui!`
         }
