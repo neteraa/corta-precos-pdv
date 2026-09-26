@@ -223,14 +223,42 @@ export default function Conversas() {
                 </span>
               )}
             </h1>
-            <p className="text-gray-600 text-sm mt-0.5">
+            <p className="text-gray-600 text-sm mt-0.5 flex items-center gap-2">
               {isMasterMode ? 'Histórico de TODOS os mercados (modo admin)' : `Histórico do ${getStoreLabel(loggedStoreId)}`}
+              <span className="text-xs text-gray-400 font-mono">
+                v{new Date().toISOString().slice(0,10)}
+              </span>
             </p>
           </div>
-          <button onClick={loadClients} disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-sm transition-all disabled:opacity-50">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Atualizar
-          </button>
+          <div className="flex gap-2">
+            <button onClick={loadClients} disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-sm transition-all disabled:opacity-50">
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Atualizar
+            </button>
+            <button 
+              onClick={() => {
+                // Limpa TUDO: cache, service worker, localStorage (exceto login)
+                if (confirm('Limpar cache do app e recarregar? (Você continuará logado)')) {
+                  // Limpa cache do navegador
+                  if ('caches' in window) {
+                    caches.keys().then(keys => keys.forEach(k => caches.delete(k)))
+                  }
+                  // Desregistra service worker
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(regs => 
+                      regs.forEach(r => r.unregister())
+                    )
+                  }
+                  // Aguarda 500ms e recarrega HARD
+                  setTimeout(() => window.location.reload(true), 500)
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs transition-all"
+              title="Limpar cache e forçar atualização"
+            >
+              🔄 Cache
+            </button>
+          </div>
         </div>
       </div>
 
