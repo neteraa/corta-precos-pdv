@@ -46,16 +46,13 @@ function StatCard({ label, value, sub, color = '#f97316', icon: Icon, onClick })
   const Tag = onClick ? 'button' : 'div'
   return (
     <Tag onClick={onClick}
-      className={`relative overflow-hidden rounded-2xl border border-gray-800/80 bg-gray-900 p-5 text-left w-full transition-all duration-200 group ${onClick ? 'hover:scale-[1.02] hover:border-gray-700 cursor-pointer' : ''}`}>
-      {/* radial glow on hover */}
+      className={`relative overflow-hidden rounded-xl border border-gray-200 bg-white p-6 text-left w-full transition-all duration-200 group shadow-sm hover:shadow-md ${onClick ? 'hover:scale-[1.01] hover:border-gray-300 cursor-pointer' : ''}`}>
+      {/* subtle gradient background */}
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-        style={{ background: `radial-gradient(ellipse at top right, ${color}18 0%, transparent 65%)` }} />
-      {/* corner decoration */}
-      <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-10 blur-xl"
-        style={{ background: color }} />
-      {Icon && <Icon className="w-5 h-5 mb-3 opacity-60" style={{ color }} />}
-      <div className="text-3xl font-black tracking-tight leading-none" style={{ color }}>{value}</div>
-      <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-2">{label}</div>
+        style={{ background: `linear-gradient(135deg, ${color}08 0%, transparent 50%)` }} />
+      {Icon && <Icon className="w-6 h-6 mb-3" style={{ color }} />}
+      <div className="text-3xl font-black tracking-tight leading-none text-gray-900">{value}</div>
+      <div className="text-xs font-semibold uppercase tracking-wider mt-2" style={{ color }}>{label}</div>
       {sub && <div className="text-xs text-gray-600 mt-1">{sub}</div>}
     </Tag>
   )
@@ -158,7 +155,7 @@ function MarketCard({ market, mk, onRefresh, onAccess }) {
 
   return (
     <div className={`relative flex flex-col rounded-2xl border transition-all ${
-      market.active ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-900/50 border-gray-800 opacity-60'
+      market.active ? 'bg-gray-800/50 border-gray-700' : 'bg-white/50 border-gray-200 opacity-60'
     }`}>
       {/* header */}
       <div className="flex items-center gap-3 p-4 border-b border-gray-700/50">
@@ -442,7 +439,7 @@ function CredSuccess({ title, icon: Icon, iconColor, accentColor, ok, emailResul
           )}
         </div>
 
-        <div className="bg-gray-900 rounded-xl p-4 space-y-2 font-mono text-sm border border-gray-700 mb-4">
+        <div className="bg-white rounded-xl p-4 space-y-2 font-mono text-sm border border-gray-700 mb-4">
           <div className="flex justify-between"><span className="text-gray-400">URL</span><span style={{ color: accentColor }}>zatendestok.com.br</span></div>
           <div className="flex justify-between"><span className="text-gray-400">Usuário</span><span className="text-white font-bold">{ok.username}</span></div>
           <div className="flex justify-between"><span className="text-gray-400">Senha</span><span className="text-white font-bold">{ok.password}</span></div>
@@ -613,7 +610,7 @@ function DistCard({ dist, mk, onRefresh }) {
     : { label: 'Sem vencimento', cls: 'bg-gray-700/50 text-gray-500 border-gray-600/30' }
 
   return (
-    <div className={`rounded-2xl border p-5 flex flex-col gap-4 transition-all ${dist.active ? 'bg-gray-800/80 border-gray-700 hover:border-gray-600' : 'bg-gray-900/60 border-gray-800 opacity-60'}`}>
+    <div className={`rounded-2xl border p-5 flex flex-col gap-4 transition-all ${dist.active ? 'bg-gray-800/80 border-gray-700 hover:border-gray-600' : 'bg-white/60 border-gray-200 opacity-60'}`}>
       {/* header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-base flex-shrink-0" style={{ background: color }}>
@@ -1251,7 +1248,7 @@ export default function MasterPainel() {
 
   /* ── login screen ── */
   if (!authed) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4"><ZatendeStokLogo variant="full" /></div>
@@ -1321,6 +1318,7 @@ export default function MasterPainel() {
     { id: 'overview',  label: 'Visão Geral',                                         icon: BarChart2     },
     { id: 'requests',  label: pendingCount > 0 ? `Solicitações (${pendingCount})` : 'Solicitações', icon: ClipboardList },
     { id: 'markets',   label: `Mercados (${markets.length})`,                         icon: Store         },
+    { id: 'conversas', label: 'Conversas Globais 💬',                                 icon: MessageCircle },
     { id: 'dist',      label: `Distribuidores (${distributors.length})`,              icon: Truck         },
     { id: 'leads',     label: leads.length > 0 ? `Leads Bot (${leads.length})` : 'Leads Bot', icon: Bot },
     { id: 'afiliados', label: affiliates.length > 0 ? `Afiliados (${affiliates.length})` : 'Afiliados', icon: Award },
@@ -1328,38 +1326,38 @@ export default function MasterPainel() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex">
+    <div className="min-h-screen bg-gray-50 text-gray-900 flex">
 
       {/* ── SIDEBAR DESKTOP ─────────────────────────────────── */}
-      <aside className="hidden lg:flex flex-col w-[240px] fixed inset-y-0 left-0 bg-gray-900 border-r border-gray-800 z-30">
-        <div className="px-5 py-5 border-b border-gray-800/60">
+      <aside className="hidden lg:flex flex-col w-[260px] fixed inset-y-0 left-0 bg-white border-r border-gray-200 z-30 shadow-sm">
+        <div className="px-6 py-6 border-b border-gray-200">
           <ZatendeStokLogo variant="wordmark" />
-          <div className="mt-2">
-            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/20">PAINEL MASTER</span>
+          <div className="mt-3">
+            <span className="text-[10px] font-black px-2.5 py-1 rounded-md bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-sm">PAINEL MASTER</span>
           </div>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 px-4 py-5 space-y-1 overflow-y-auto">
           {TABS.map(t => {
             const Icon = t.icon
             const active = tab === t.id
             return (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className={'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all relative ' + (active ? 'bg-orange-500/10 text-orange-400' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-300')}>
-                {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-orange-500 rounded-r-full" />}
-                <Icon className={'w-4 h-4 flex-shrink-0 ' + (active ? 'text-orange-400' : 'text-gray-600')} />
+                className={'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all relative ' + (active ? 'bg-gradient-to-r from-orange-50 to-orange-100 text-orange-600 shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900')}>
+                {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-orange-500 to-orange-600 rounded-r-md shadow-md" />}
+                <Icon className={'w-5 h-5 flex-shrink-0 ' + (active ? 'text-orange-600' : 'text-gray-400')} />
                 <span className="flex-1 text-left truncate">{t.label}</span>
               </button>
             )
           })}
         </nav>
-        <div className="px-3 pb-4 pt-3 border-t border-gray-800/60 space-y-1">
-          <button onClick={() => load()} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-600 hover:bg-gray-800 hover:text-gray-400 transition-all">
+        <div className="px-4 pb-5 pt-4 border-t border-gray-200 space-y-2">
+          <button onClick={() => load()} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-all font-semibold">
             <RefreshCw className={'w-4 h-4 ' + (loading ? 'animate-spin' : '')} />
-            <span className="font-bold">Atualizar dados</span>
+            <span>Atualizar dados</span>
           </button>
-          <button onClick={() => { localStorage.removeItem(MK_KEY); window.location.reload() }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-700 hover:bg-red-500/10 hover:text-red-400 transition-all">
+          <button onClick={() => { localStorage.removeItem(MK_KEY); window.location.reload() }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-all font-semibold">
             <LogOut className="w-4 h-4" />
-            <span className="font-bold">Sair</span>
+            <span>Sair</span>
           </button>
         </div>
       </aside>
@@ -1367,8 +1365,8 @@ export default function MasterPainel() {
       {/* ── SIDEBAR MOBILE OVERLAY ──────────────────────────── */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
-          <aside className="w-[240px] bg-gray-900 border-r border-gray-800 flex flex-col">
-            <div className="px-5 py-4 border-b border-gray-800/60 flex items-center justify-between">
+          <aside className="w-[240px] bg-white border-r border-gray-200 flex flex-col">
+            <div className="px-5 py-4 border-b border-gray-200/60 flex items-center justify-between">
               <ZatendeStokLogo variant="wordmark" />
               <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-500">
                 <X className="w-4 h-4" />
@@ -1380,7 +1378,7 @@ export default function MasterPainel() {
                 const active = tab === t.id
                 return (
                   <button key={t.id} onClick={() => { setTab(t.id); setSidebarOpen(false) }}
-                    className={'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ' + (active ? 'bg-orange-500/10 text-orange-400' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-300')}>
+                    className={'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ' + (active ? 'bg-orange-500/10 text-orange-400' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-300')}>
                     <Icon className={'w-4 h-4 flex-shrink-0 ' + (active ? 'text-orange-400' : 'text-gray-600')} />
                     <span className="flex-1 text-left">{t.label}</span>
                   </button>
@@ -1396,7 +1394,7 @@ export default function MasterPainel() {
       <div className="flex-1 lg:ml-[240px] flex flex-col min-h-screen">
 
         {/* Top bar mobile */}
-        <div className="sticky top-0 z-20 bg-gray-950/90 backdrop-blur-sm border-b border-gray-800 px-4 py-3 flex items-center gap-3 lg:px-6">
+        <div className="sticky top-0 z-20 bg-gray-50/90 backdrop-blur-sm border-b border-gray-200 px-4 py-3 flex items-center gap-3 lg:px-6">
           <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-lg hover:bg-gray-800 text-gray-400">
             <Menu className="w-5 h-5" />
           </button>
@@ -1475,8 +1473,8 @@ export default function MasterPainel() {
             )}
 
             {/* Atividade recente */}
-            <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-gray-800 flex items-center gap-2">
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-gray-200 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-green-400" />
                 <span className="text-xs font-black text-gray-400 uppercase tracking-wider">Atividade recente (24h)</span>
               </div>
@@ -1510,7 +1508,7 @@ export default function MasterPainel() {
                 { tab:'dist',    icon: Truck, label:'Distribuidores', sub:`${distributors.length} cadastrados · ${dActive.length} ativos`, color:'#34d399' },
               ].map(c => (
                 <button key={c.tab} onClick={() => setTab(c.tab)}
-                  className="flex items-center gap-4 p-5 rounded-2xl border border-gray-800 bg-gray-900 hover:bg-gray-800 hover:border-gray-700 transition-all text-left group">
+                  className="flex items-center gap-4 p-5 rounded-2xl border border-gray-200 bg-white hover:bg-gray-800 hover:border-gray-700 transition-all text-left group">
                   <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: `${c.color}18`, border: `1px solid ${c.color}30` }}>
                     <c.icon className="w-5 h-5" style={{ color: c.color }} />
@@ -1572,7 +1570,7 @@ export default function MasterPainel() {
                   <div key={req.id} className={`rounded-2xl border p-5 ${
                     isPending  ? 'bg-gray-800/60 border-gray-700' :
                     isApproved ? 'bg-green-500/5 border-green-500/20' :
-                    'bg-gray-800/30 border-gray-800 opacity-60'
+                    'bg-gray-800/30 border-gray-200 opacity-60'
                   }`}>
                     <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                       {/* info */}
@@ -1803,11 +1801,11 @@ export default function MasterPainel() {
                 </div>
 
                 {/* Tabela de leads */}
-                <div className="rounded-2xl border border-gray-800 overflow-hidden">
+                <div className="rounded-2xl border border-gray-200 overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-gray-800 bg-gray-900/60">
+                        <tr className="border-b border-gray-200 bg-white/60">
                           <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider">Contato</th>
                           <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider hidden sm:table-cell">Mercado</th>
                           <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">Cidade</th>
@@ -1892,9 +1890,9 @@ export default function MasterPainel() {
             {/* ── MODAL DETALHES DO LEAD ────────────────────────────────────── */}
             {selectedLead && (
               <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }} onClick={() => setSelectedLead(null)}>
-                <div className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="bg-white border border-gray-700 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                   {/* Header */}
-                  <div className="sticky top-0 bg-gray-900 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
+                  <div className="sticky top-0 bg-white border-b border-gray-700 px-6 py-4 flex items-center justify-between">
                     <div>
                       <h3 className="text-xl font-black text-white flex items-center gap-2">
                         <Bot className="w-5 h-5 text-orange-400" />
@@ -2024,7 +2022,7 @@ export default function MasterPainel() {
 
           {/* Formulário novo afiliado */}
           {affShowForm && (
-            <div className="bg-gray-900 border border-gray-700 rounded-xl p-5 space-y-3">
+            <div className="bg-white border border-gray-700 rounded-xl p-5 space-y-3">
               <h3 className="font-bold text-white text-sm">Cadastrar novo vendedor</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -2075,7 +2073,7 @@ export default function MasterPainel() {
                 const pct           = Math.round((aff.comissaoPct||0.20)*100)
                 const link          = `https://zatendestok.com.br/login?ref=${aff.codigo}`
                 return (
-                  <div key={aff.id} className={`bg-gray-900 border rounded-xl p-4 ${aff.ativo ? 'border-gray-700' : 'border-gray-800 opacity-60'}`}>
+                  <div key={aff.id} className={`bg-white border rounded-xl p-4 ${aff.ativo ? 'border-gray-700' : 'border-gray-200 opacity-60'}`}>
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -2125,7 +2123,7 @@ export default function MasterPainel() {
 
                     {/* Vendas do afiliado */}
                     {aff.vendas?.length > 0 && (
-                      <div className="mt-3 border-t border-gray-800 pt-3 space-y-1.5">
+                      <div className="mt-3 border-t border-gray-200 pt-3 space-y-1.5">
                         {aff.vendas.map((v,i) => (
                           <div key={i} className="flex items-center justify-between text-xs text-gray-400">
                             <span>{v.mercado} <span className="text-gray-600">· {v.niche} · {v.plano}</span></span>
@@ -2160,7 +2158,7 @@ export default function MasterPainel() {
           </div>
 
           {/* Barra de limite diário */}
-          <div className="bg-gray-900 rounded-2xl border border-gray-800 p-4">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Limite diário de envios</span>
               <span className="text-xs font-black text-white">{queueStats.dailySent || 0} / {queueStats.dailyLimit || 30} enviados hoje</span>
@@ -2199,7 +2197,7 @@ export default function MasterPainel() {
               )}
 
               {googleKey === false && (
-                <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 space-y-5">
+                <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0 text-2xl">🗺️</div>
                     <div>
@@ -2222,7 +2220,7 @@ export default function MasterPainel() {
                         <span>
                           {s.text}{' '}
                           {s.link && <a href={s.link} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:underline">{s.linkText}</a>}
-                          {s.code && <code className="block mt-1 bg-gray-900 px-3 py-1.5 rounded-lg text-xs text-green-400 font-mono">{s.code}</code>}
+                          {s.code && <code className="block mt-1 bg-white px-3 py-1.5 rounded-lg text-xs text-green-400 font-mono">{s.code}</code>}
                         </span>
                       </div>
                     ))}
@@ -2245,7 +2243,7 @@ export default function MasterPainel() {
               {googleKey === true && (
                 <div className="space-y-4">
                   {/* Barra de busca */}
-                  <div className="bg-gray-900 rounded-2xl border border-gray-800 p-5 space-y-4">
+                  <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
                     <p className="text-sm font-black text-white">🔍 Buscar estabelecimentos</p>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="sm:col-span-1">
@@ -2323,9 +2321,9 @@ export default function MasterPainel() {
                           return (
                             <button key={r.phone} onClick={() => toggleSelect(r.phone)}
                               className={`flex items-start gap-3 p-4 rounded-xl border text-left transition-all relative ${
-                                contacted ? 'border-gray-700/50 bg-gray-900/40 opacity-60'
+                                contacted ? 'border-gray-700/50 bg-white/40 opacity-60'
                                 : selected ? 'border-orange-500/50 bg-orange-500/10'
-                                : 'border-gray-800 bg-gray-900 hover:border-gray-700'}`}>
+                                : 'border-gray-200 bg-white hover:border-gray-700'}`}>
                               <div className={`w-5 h-5 rounded-md border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${
                                 selected ? 'border-orange-500 bg-orange-500' : 'border-gray-600'}`}>
                                 {selected && <Check className="w-3 h-3 text-white" />}
@@ -2375,7 +2373,7 @@ export default function MasterPainel() {
             <div className="space-y-4">
 
               {/* ── ENTRADA MANUAL (primária) ─── */}
-              <div className="bg-gray-900 rounded-2xl border border-gray-800 p-5 space-y-4">
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
                 <div>
                   <p className="text-sm font-black text-white mb-0.5">➕ Adicionar número manualmente</p>
                   <p className="text-xs text-gray-500">Abre o Google Maps → clica num mercado → copia o telefone → cola aqui</p>
@@ -2418,12 +2416,12 @@ export default function MasterPainel() {
               </div>
 
               {/* ── COLAR TEXTO EM MASSA (secundário) ─── */}
-              <details className="group bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+              <details className="group bg-white rounded-2xl border border-gray-200 overflow-hidden">
                 <summary className="px-5 py-4 cursor-pointer flex items-center justify-between text-sm font-bold text-gray-400 hover:text-white select-none">
                   <span>📋 Colar lista de texto com vários números de uma vez</span>
                   <span className="text-gray-600 group-open:rotate-180 transition-transform inline-block">▼</span>
                 </summary>
-                <div className="px-5 pb-5 space-y-4 border-t border-gray-800">
+                <div className="px-5 pb-5 space-y-4 border-t border-gray-200">
                   <p className="text-xs text-gray-600 pt-4">Cole aqui qualquer texto que contenha telefones — CSV, lista do WhatsApp, texto copiado de sites. O sistema extrai os números automaticamente.</p>
                   <textarea value={captureText} onChange={e => { setCaptureText(e.target.value); setParsedPhones([]) }}
                     rows={6} placeholder={`(15) 3522-1234\n(15) 99988-7766\nMercado Central: (15) 3523-9999\n15 99777-8888`}
@@ -2504,7 +2502,7 @@ export default function MasterPainel() {
                   <p className="text-xs text-gray-600 text-center">Anti-ban: delay 45-90s entre envios • max 20/dia • 6 versões diferentes da mensagem • só horário comercial</p>
                 </div>
               ) : (
-                <div className="bg-gray-900 rounded-2xl border border-orange-500/30 p-5 space-y-3">
+                <div className="bg-white rounded-2xl border border-orange-500/30 p-5 space-y-3">
                   {/* Header */}
                   <div className="flex items-center justify-between">
                     <div>
@@ -2545,7 +2543,7 @@ export default function MasterPainel() {
 
                   {/* Log completo de envios */}
                   {sendLog.length > 0 && (
-                    <div className="bg-gray-950 rounded-xl border border-gray-800 max-h-48 overflow-y-auto">
+                    <div className="bg-gray-50 rounded-xl border border-gray-200 max-h-48 overflow-y-auto">
                       <div className="p-3 space-y-1.5">
                         {[...sendLog].reverse().map((l, i) => (
                           <div key={i} className={`flex items-center gap-2 text-xs ${l.success ? 'text-green-400' : 'text-red-400'}`}>
@@ -2566,8 +2564,8 @@ export default function MasterPainel() {
 
               {/* Histórico de campanhas */}
               {!sendProgress && campaigns.length > 0 && (
-                <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                     <p className="text-xs font-black text-gray-400 uppercase tracking-wider">📊 Histórico de campanhas</p>
                     <button onClick={loadCampaigns} className="text-xs text-gray-600 hover:text-gray-400">
                       <RefreshCw className="w-3 h-3"/>
@@ -2604,16 +2602,16 @@ export default function MasterPainel() {
               {queueLoading ? (
                 <div className="text-center py-10 text-gray-600"><Loader2 className="w-6 h-6 mx-auto animate-spin mb-2" /><p className="text-sm">Carregando fila...</p></div>
               ) : queue.length === 0 ? (
-                <div className="text-center py-16 text-gray-600 bg-gray-900 rounded-2xl border border-gray-800">
+                <div className="text-center py-16 text-gray-600 bg-white rounded-2xl border border-gray-200">
                   <Send className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p className="font-semibold">Fila vazia</p>
                   <p className="text-sm mt-1">Vai em <button onClick={() => setProspInnerTab('capture')} className="text-orange-400 hover:underline">Capturar Contatos</button> e adiciona os primeiros</p>
                 </div>
               ) : (
-                <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
                   <div className="overflow-x-auto max-h-96 overflow-y-auto">
                     <table className="w-full text-sm">
-                      <thead className="sticky top-0 bg-gray-900 border-b border-gray-800">
+                      <thead className="sticky top-0 bg-white border-b border-gray-200">
                         <tr>
                           <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider">Telefone</th>
                           <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider hidden sm:table-cell">Nome</th>
@@ -2683,7 +2681,7 @@ export default function MasterPainel() {
               {leadsLoading ? (
                 <div className="text-center py-16 text-gray-600"><Loader2 className="w-6 h-6 mx-auto animate-spin mb-2"/><p className="text-sm">Carregando leads...</p></div>
               ) : prospLeads.length === 0 ? (
-                <div className="text-center py-16 text-gray-600 bg-gray-900 rounded-2xl border border-gray-800">
+                <div className="text-center py-16 text-gray-600 bg-white rounded-2xl border border-gray-200">
                   <Users className="w-10 h-10 mx-auto mb-3 opacity-30"/>
                   <p className="font-semibold">Nenhum lead ainda</p>
                   <p className="text-sm mt-1 text-gray-700">Quando um mercado responder à Zara, aparece aqui automaticamente</p>
@@ -2717,7 +2715,7 @@ export default function MasterPainel() {
                           if (!stagLeads.length) return null
                           return (
                             <div key={s.id} className={`rounded-2xl border overflow-hidden ${s.bg}`}>
-                              <div className="px-4 py-2.5 flex items-center gap-2 border-b border-gray-800/40">
+                              <div className="px-4 py-2.5 flex items-center gap-2 border-b border-gray-200/40">
                                 <span className={`w-2 h-2 rounded-full ${s.dot}`}/>
                                 <span className={`text-xs font-black uppercase tracking-wider ${s.color}`}>{s.label}</span>
                                 <span className={`text-xs font-bold ml-auto ${s.color}`}>{stagLeads.length}</span>
@@ -2748,10 +2746,10 @@ export default function MasterPainel() {
                 </div>
               ) : (
                 /* ── LIST VIEW ── */
-                <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
                   <div className="overflow-x-auto max-h-[560px] overflow-y-auto">
                     <table className="w-full text-sm">
-                      <thead className="sticky top-0 bg-gray-900 border-b border-gray-800">
+                      <thead className="sticky top-0 bg-white border-b border-gray-200">
                         <tr>
                           <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider">Nome / Mercado</th>
                           <th className="text-left px-4 py-3 text-gray-500 font-semibold text-xs uppercase tracking-wider hidden sm:table-cell">Cidade</th>
