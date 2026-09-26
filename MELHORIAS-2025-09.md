@@ -1,5 +1,18 @@
 # 🚀 Melhorias ZatendeStok - Setembro 2025
 
+## 📋 ÍNDICE
+
+1. [Mobile Analytics - Cameras (25/09)](#mobile-analytics)
+2. [Correção de Endereço - Corta Preços (25/09)](#correção-endereço)
+3. [🔒 SECURITY - Isolamento de Conversas (25/09)](#security-conversas)
+4. [💬 Sistema de Conversas WhatsApp (25/09)](#sistema-conversas)
+5. [🎨 Redesign MasterPainel Light Theme (25/09)](#redesign-master)
+6. [✅ Verificação Final de Segurança (25/09)](#verificacao-final)
+
+---
+
+<a name="mobile-analytics"></a>
+
 ## 📱 Mobile Analytics - Cameras (2025-09-25)
 
 ### **Problema Identificado:**
