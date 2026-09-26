@@ -1,4 +1,4 @@
-# ZatendeStok — AGENTS.md (v13.0 — 2026-09-23)
+# ZatendeStok — AGENTS.md (v14.0 — 2026-09-25)
 
 ## Projeto
 
@@ -435,6 +435,62 @@ curl https://ws-relay-production-42a7.up.railway.app/health
 - wa-bot.js linha 947: fallback preço → "Rua Capão Bonito 20, Itapeva-SP"
 - AGENTS.md: pixCity BOITUVA → ITAPEVA (Rua Capão Bonito 20)
 - PENDENTE: atualizar pixCity no painel /configuracoes (manual pelo admin)
+
+## HISTÓRICO DE CONVERSAS WHATSAPP — 2025-09-25 💬
+### Implementação completa com isolamento por cliente
+- **Nova página:** /conversas (clientes) — histórico isolado por storeId
+- **Persistência:** chat_history:{storeId}:{phone} no blob wa-leads
+- **API:** wa-chat-history.js com dupla autenticação (storeId+token OU master_key)
+- **Backend:** wa-bot.js salva automaticamente todas as mensagens (fire-and-forget)
+- **Isolamento:** CADA cliente vê APENAS suas próprias conversas (SECURITY CRITICAL)
+- **Admin:** MasterPainel (master_key) vê TODAS as conversas de TODOS os clientes
+- **Migração:** migrate-chat-history.js para criar histórico de leads antigos
+- **UI:** Grid 2 cols (lista clientes | chat), busca, auto-refresh 30s, balões tipo WhatsApp
+
+### Estrutura de dados:
+```
+Blob: wa-leads
+Keys: chat_history:{storeId}:{phone}
+Exemplos:
+  - chat_history:cortaprecos_1789770018182:5515999999999
+  - chat_history:outromercado_123:5515988888888
+  - chat_history:zara:5515977777777 (leads ZatendeStok)
+```
+
+### Fluxo de salvamento (wa-bot.js):
+1. Cliente manda mensagem → webhook Evolution API
+2. wa-bot processa e responde
+3. pushHistory(senderNum, role, content, instanceName)
+4. saveChatHistory(storeId, phone, role, content)
+5. Salva no blob: chat_history:{storeId}:{phone}
+6. Mantém últimas 200 mensagens por cliente
+
+### Fluxo de visualização (clientes):
+1. Login → getMktStoreId() + getMktStoreToken()
+2. Acessa /conversas
+3. GET /api/wa-chat-history?storeId=X&token=Y
+4. API valida token
+5. Filtra: chat_history:{storeId}:*
+6. Retorna APENAS conversas deste cliente
+
+### Fluxo de visualização (admin - MasterPainel):
+1. Login → master_key
+2. Aba "Conversas Globais" (EM DESENVOLVIMENTO)
+3. GET /api/wa-chat-history?mk=MASTER_KEY
+4. Retorna TODAS as conversas de TODOS os clientes
+5. Com métricas e filtros por cliente
+
+## MASTER PAINEL REDESIGN — 2025-09-25 🎨
+### Light Theme Profissional (SaaS-style)
+- **Antes:** Dark theme (bg-gray-950/900) — cara de "IA genérica"
+- **Depois:** Light theme (bg-gray-50/white) — visual profissional tipo Stripe/Notion
+- **Cores:** gray-50 (fundo), white (cards), gray-200 (borders), gray-900 (text)
+- **Sidebar:** 260px, bg-white, shadow-sm, gradientes orange nos tabs ativos
+- **StatCards:** bg-white, border-gray-200, shadow-sm hover:shadow-md
+- **Botões:** Active com gradiente orange-50→orange-100, hover bg-gray-100
+- **Badge:** PAINEL MASTER com gradiente orange-500→orange-600
+- **Contraste:** WCAG AAA (alta legibilidade)
+- **Nova aba:** "Conversas Globais 💬" (preparação para métricas por cliente)
 
 ## DASHBOARD — src/pages/Dashboard.jsx (delivery widget 2025-09)
 - deliveryStats: fetched via useEffect → GET /api/delivery?storeId + processado no cliente
