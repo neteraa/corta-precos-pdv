@@ -789,6 +789,13 @@ export default async (req, context) => {
 
   // Instância que recebeu a mensagem — multi-tenant: cada loja usa a própria
   const instanceName = payload?.instance || process.env.EVOLUTION_INSTANCE
+  
+  // DEBUG: Log completo do webhook para investigar
+  console.log('━━━ WEBHOOK RECEBIDO ━━━')
+  console.log('payload.instance:', payload?.instance)
+  console.log('instanceName (final):', instanceName)
+  console.log('storeId mapeado:', getStoreIdFromInstance(instanceName))
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━')
 
   const data = payload?.data
 

@@ -35,15 +35,26 @@ export default function Conversas() {
       const storeId = getMktStoreId()
       const token = getMktStoreToken()
       
+      console.log('━━━ CONVERSAS DEBUG ━━━')
+      console.log('storeId:', storeId)
+      console.log('token:', token ? '✓ presente' : '✗ ausente')
+      console.log('━━━━━━━━━━━━━━━━━━━━━━')
+      
       if (!storeId || !token) {
         setClients([])
         return
       }
       
-      const res = await fetch(`/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}`)
+      const url = `/api/wa-chat-history?storeId=${encodeURIComponent(storeId)}&token=${encodeURIComponent(token)}`
+      console.log('Buscando:', url)
+      
+      const res = await fetch(url)
       const data = await res.json()
+      console.log('Resposta API:', data)
+      
       if (data.ok) {
         setClients(data.clients || [])
+        console.log('Clientes encontrados:', data.clients?.length || 0)
       }
     } catch (e) {
       console.error('loadClients:', e)
