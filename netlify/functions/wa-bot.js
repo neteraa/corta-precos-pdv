@@ -576,7 +576,7 @@ class OpenAIQuotaError extends Error {}
  * Chama LLM: usa Groq (gratuito, meta-llama/llama-4-scout-17b-16e-instruct) se GROQ_API_KEY estiver setada,
  * caso contrário usa OpenAI gpt-4o-mini como fallback.
  */
-async function askLLM(userMessage, senderNum, systemMsg) {
+async function askLLM(userMessage, senderNum, systemMsg, instanceName = 'default') {
   const groqKey = process.env.GROQ_API_KEY
   const oaiKey  = process.env.OPENAI_API_KEY
   const useGroq  = !!groqKey
@@ -589,7 +589,8 @@ async function askLLM(userMessage, senderNum, systemMsg) {
 
   if (!key) throw new OpenAIQuotaError('sem_credito')
 
-  const history = getHistory(senderNum)
+  // CRÍTICO: Busca histórico isolado por instanceName!
+  const history = getHistory(senderNum, instanceName)
   const ac = new AbortController()
   setTimeout(() => ac.abort(), 10000)
 
@@ -635,7 +636,8 @@ function parseLeadTag(rawReply) {
 
 // Memória de conversa por contato — mantém contexto entre mensagens
 // (dura enquanto a instância da função estiver quente — ~minutos/horas)
-const conversations  = new Map()   // senderNum → [{role, content}, ...]
+// CRÍTICO: Chave = instanceName:senderNum (ISOLA cada bot completamente!)
+const conversations  = new Map()   // "instanceName:senderNum" → [{role, content}, ...]
 const MAX_HISTORY    = 12          // 12 msgs — garante endereço + itens + total no contexto delivery
 
 // ─── Rate limiting por número ─────────────────────────────────────────────────
@@ -657,13 +659,16 @@ function checkRateLimit(senderNum) {
   return true
 }
 
-function getHistory(senderNum) {
-  if (!conversations.has(senderNum)) conversations.set(senderNum, [])
-  return conversations.get(senderNum)
+function getHistory(senderNum, instanceName = 'default') {
+  // CRÍTICO: Chave única por bot! instanceName:senderNum
+  const key = `${instanceName}:${senderNum}`
+  if (!conversations.has(key)) conversations.set(key, [])
+  return conversations.get(key)
 }
 
 function pushHistory(senderNum, role, content, instanceName = null) {
-  const hist = getHistory(senderNum)
+  // CRÍTICO: Usa instanceName na chave pra isolar bots!
+  const hist = getHistory(senderNum, instanceName || 'default')
   hist.push({ role, content })
   // Mantém só as últimas MAX_HISTORY mensagens pra não explodir o contexto
   if (hist.length > MAX_HISTORY) hist.splice(0, hist.length - MAX_HISTORY)
@@ -713,7 +718,7 @@ function parsePendingTag(rawReply) {
  * Usa dados da <zs_pending> tag (LLM) ou extração por regex como fallback.
  * Sobrevive a cold starts da função.
  */
-async function maybeStorePendingOrder(botReply, senderNum, senderName, pendingFromTag) {
+async function maybeStorePendingOrder(botReply, senderNum, senderName, pendingFromTag, instanceName = 'default') {
   // Preferir dados da tag <zs_pending> (LLM já extraiu address, items, total corretos)
   let pending = null
   if (pendingFromTag?.total && pendingFromTag.total > 7) {
@@ -732,7 +737,7 @@ async function maybeStorePendingOrder(botReply, senderNum, senderName, pendingFr
     if (totalMatch) {
       const total = parseFloat(totalMatch[1].replace(/\./g, '').replace(',', '.'))
       if (!isNaN(total) && total > 7) {
-        const hist     = getHistory(senderNum)
+        const hist     = getHistory(senderNum, instanceName)
         const addrMsg  = [...hist].reverse().find(m => m.role === 'user' && m.content.length > 5 && !/^\[/.test(m.content))
         const itemsMsg = [...hist].find(m => m.role === 'user' && /\dx\s|\d+\s*(kg|l\b|un|pack)|coca|arroz|feij|frango|biscoito/i.test(m.content))
         pending = {
@@ -983,7 +988,7 @@ export default async (req, context) => {
       // Imagem sem legenda: só vira "[comprovante enviado]" se o bot tinha acabado de pedir
       let finalText = text
       if (text === '[imagem enviada]') {
-        const hist = getHistory(senderNum)
+        const hist = getHistory(senderNum, instanceName)
         const lastBot = [...hist].reverse().find(m => m.role === 'assistant')
         const botPediuComprovante = lastBot?.content &&
           (lastBot.content.includes('comprovante') ||
@@ -1003,7 +1008,7 @@ export default async (req, context) => {
       }
 
       pushHistory(senderNum, 'user', finalText, instanceName)
-      rawReply = await askLLM(finalText, senderNum, systemMsg)
+      rawReply = await askLLM(finalText, senderNum, systemMsg, instanceName)
       if (!rawReply) return new Response('OK', { status: 200 })
 
       // Extrai tags internas — <zs_pending> (passo 4) e <zs_delivery> (passo 5)
@@ -1030,7 +1035,7 @@ export default async (req, context) => {
       }
 
       // Se bot enviou msg de pagamento PIX (passo 4), persiste draft no blob com dados da <zs_pending> tag
-      context.waitUntil(maybeStorePendingOrder(cpReply, senderNum, senderName, pendingData))
+      context.waitUntil(maybeStorePendingOrder(cpReply, senderNum, senderName, pendingData, instanceName))
 
       pushHistory(senderNum, 'assistant', cpReply, instanceName)
       context.waitUntil(sendReply(senderNum, cpReply, instanceName))
@@ -1072,7 +1077,7 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
 
       systemMsg = SYSTEM_PROMPT + profileCtx
       pushHistory(senderNum, 'user', text, instanceName)
-      rawReply = await askLLM(text, senderNum, systemMsg)
+      rawReply = await askLLM(text, senderNum, systemMsg, instanceName)
       if (!rawReply) return new Response('OK', { status: 200 })
 
       const { clean: reply, lead: extracted } = parseLeadTag(rawReply)
@@ -1099,7 +1104,7 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
       }
 
       pushHistory(senderNum, 'user', text, instanceName)
-      rawReply = await askLLM(text, senderNum, systemMsg)
+      rawReply = await askLLM(text, senderNum, systemMsg, instanceName)
       if (!rawReply) return new Response('OK', { status: 200 })
 
       // Bot do mercado não usa <zs_lead> — resposta direta
