@@ -147,18 +147,6 @@ function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList, promos) {
   // Busca promoção ativa do produto
   const activePromo = findPromo(p, promos)
   const promoText = activePromo ? formatPromoText(activePromo) : (p.promo || null)
-  
-  // Debug
-  if (p.name && p.name.toLowerCase().includes('atlanta')) {
-    console.log('🏷️ Atlanta - Debug:', {
-      produto: p.name,
-      sku: p.sku,
-      promoGroup: p.promoGroup,
-      promosCount: promos?.length,
-      activePromo,
-      promoText
-    })
-  }
 
   // FIX 1: strip accents — jsPDF built-in helvetica is ASCII-only
   const name = pdfSafe(p.name || '')
@@ -288,18 +276,6 @@ function LabelPreview({ p, tmplId, sizeId, storeName, tmplList, promos }) {
   // Busca promoção ativa
   const activePromo = findPromo(p, promos)
   const promoText = activePromo ? formatPromoText(activePromo) : (p.promo || null)
-  
-  // Debug
-  if (p.name && p.name.toLowerCase().includes('atlanta')) {
-    console.log('👁️ Atlanta Preview - Debug:', {
-      produto: p.name,
-      sku: p.sku,
-      promoGroup: p.promoGroup,
-      promosCount: promos?.length,
-      activePromo,
-      promoText
-    })
-  }
 
   // Scale to fit ~220px wide, keep aspect ratio
   const PREVIEW_W = 220
@@ -604,9 +580,57 @@ export default function Etiquetas() {
         </div>
       </div>
 
+      {/* ── Promoções (ATALHO RÁPIDO) ── */}
+      {promos.filter(p => p.active).length > 0 && (
+        <div className="card p-4 space-y-3 bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-200">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">⚡</span>
+            <label className="font-black text-orange-800 text-sm">ATALHO RÁPIDO: Adicionar Promoção Inteira</label>
+          </div>
+          <p className="text-xs text-orange-600">Clique numa promoção pra adicionar TODOS os produtos de uma vez!</p>
+          
+          <div className="space-y-2">
+            {promos.filter(p => p.active).map(promo => {
+              // Conta quantos produtos tem nessa promoção
+              const promoProducts = products.filter(prod => {
+                if (prod.promoGroup && promo.groupName === prod.promoGroup) return true
+                if (prod.sku && Array.isArray(promo.skus) && promo.skus.includes(prod.sku)) return true
+                return false
+              })
+              
+              const promoLabel = formatPromoText(promo) || promo.label || 'Promoção'
+              
+              return (
+                <button
+                  key={promo.id}
+                  onClick={() => {
+                    promoProducts.forEach(p => addToBasket(p))
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-orange-50 border-2 border-orange-200 hover:border-orange-400 rounded-xl transition-all text-left group"
+                >
+                  <div className="flex-1">
+                    <div className="text-sm font-black text-orange-800">{promoLabel}</div>
+                    {promo.groupName && (
+                      <div className="text-xs text-gray-500 mt-0.5">Grupo: {promo.groupName}</div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="text-xs font-bold text-orange-600">{promoProducts.length} produtos</div>
+                      <div className="text-[10px] text-gray-400">clique pra adicionar</div>
+                    </div>
+                    <Plus className="w-5 h-5 text-orange-500 group-hover:scale-110 transition-transform" />
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── Search ── */}
       <div className="card p-4 space-y-3">
-        <label className="font-bold text-gray-800 text-sm block">Adicionar produto</label>
+        <label className="font-bold text-gray-800 text-sm block">Ou adicionar produto individual</label>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input value={query} onChange={e => setQuery(e.target.value)}
