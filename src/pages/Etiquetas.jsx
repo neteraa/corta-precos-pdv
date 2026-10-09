@@ -199,16 +199,37 @@ function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList, promos) {
     doc.text(nameLines, x + PAD, nameY, { lineHeightFactor: 1.35 })
   }
 
-  // ── promo pill
+  // ── promo (DESTAQUE GIGANTE EM A4!)
   if (promoText && h >= 45) {
     const promoSafe = pdfSafe(String(promoText || ''))
     if (promoSafe && promoSafe.trim()) {
-      const pillY = y + h * 0.63
-      doc.setFillColor(sr, sg, sb)
-      doc.roundedRect(x + PAD, pillY - 2.5, w - PAD * 2, 5, 1, 1, 'F')
-      doc.setFontSize(fpt(h, 0.08))
-      doc.setTextColor(str, stg, stb)
-      doc.text(promoSafe, x + w / 2, pillY + 0.8, { align: 'center' })
+      // A4 (h >= 200) = GIGANTE! Pequenas (h < 200) = pill normal
+      if (h >= 200) {
+        // A4: PROMOÇÃO GIGANTE COM FUNDO
+        const promoH = h * 0.22  // 22% da altura
+        const promoY = y + h * 0.38  // posição central
+        
+        // Fundo da promoção (retângulo grande)
+        doc.setFillColor(sr, sg, sb)
+        doc.roundedRect(x + PAD * 2, promoY, w - PAD * 4, promoH, 3, 3, 'F')
+        
+        // Texto GIGANTE
+        doc.setFontSize(fpt(h, 0.12))  // 3x maior!
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(str, stg, stb)
+        doc.text(promoSafe, x + w / 2, promoY + promoH / 2 + (fpt(h, 0.12) / 2.8346) * 0.35, { 
+          align: 'center',
+          maxWidth: w - PAD * 6
+        })
+      } else {
+        // Etiquetas pequenas: pill normal
+        const pillY = y + h * 0.63
+        doc.setFillColor(sr, sg, sb)
+        doc.roundedRect(x + PAD, pillY - 2.5, w - PAD * 2, 5, 1, 1, 'F')
+        doc.setFontSize(fpt(h, 0.08))
+        doc.setTextColor(str, stg, stb)
+        doc.text(promoSafe, x + w / 2, pillY + 0.8, { align: 'center' })
+      }
     }
   }
 
@@ -331,24 +352,56 @@ function LabelPreview({ p, tmplId, sizeId, storeName, tmplList, promos }) {
           {(p.name || '').toUpperCase()}
         </div>
 
-        {/* Promo pill */}
+        {/* Promo (GIGANTE EM A4!) */}
         {promoText && sz.h >= 45 && (
-          <div style={{
-            background: t.strip,
-            color: t.stripTxt,
-            fontSize: Math.max(6, H * 0.075),
-            fontWeight: 700,
-            padding: '1px 6px',
-            borderRadius: 3,
-            textAlign: 'center',
-            alignSelf: 'flex-start',
-            maxWidth: '100%',
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-            textOverflow: 'ellipsis',
-          }}>
-            {promoText.toUpperCase()}
-          </div>
+          sz.h >= 200 ? (
+            // A4: Promoção GIGANTE COM EXPLOSÃO
+            <div style={{
+              background: `linear-gradient(135deg, ${t.strip} 0%, ${t.strip}dd 100%)`,
+              color: t.stripTxt,
+              fontSize: Math.max(14, H * 0.13),
+              fontWeight: 900,
+              padding: `${H * 0.09}px ${W * 0.05}px`,
+              borderRadius: 12,
+              textAlign: 'center',
+              width: '92%',
+              alignSelf: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: 1.15,
+              wordBreak: 'break-word',
+              hyphens: 'auto',
+              boxShadow: `0 4px 12px rgba(0,0,0,0.15), inset 0 -2px 4px rgba(0,0,0,0.1)`,
+              border: `3px solid ${t.stripTxt}33`,
+              letterSpacing: '0.02em',
+              textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+              position: 'relative',
+              overflow: 'visible',
+            }}>
+              <span style={{ position: 'relative', zIndex: 1 }}>
+                {promoText.toUpperCase()}
+              </span>
+            </div>
+          ) : (
+            // Pequenas: pill normal
+            <div style={{
+              background: t.strip,
+              color: t.stripTxt,
+              fontSize: Math.max(6, H * 0.075),
+              fontWeight: 700,
+              padding: '1px 6px',
+              borderRadius: 3,
+              textAlign: 'center',
+              alignSelf: 'flex-start',
+              maxWidth: '100%',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+            }}>
+              {promoText.toUpperCase()}
+            </div>
+          )
         )}
 
         {/* Price row */}
