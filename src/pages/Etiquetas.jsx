@@ -60,21 +60,11 @@ const splitPrice = (price) => {
 const findPromo = (product, promos) => {
   if (!product || !promos || !Array.isArray(promos)) return null
   
-  // Procura por grupo
+  // Procura por grupo (campo correto: promo.group, não groupName!)
   if (product.promoGroup) {
     const p = promos.find(promo => 
       promo && promo.active && 
-      promo.groupName === product.promoGroup
-    )
-    if (p) return p
-  }
-  
-  // Procura por SKU
-  if (product.sku) {
-    const p = promos.find(promo => 
-      promo && promo.active && 
-      Array.isArray(promo.skus) && 
-      promo.skus.includes(product.sku)
+      promo.group === product.promoGroup
     )
     if (p) return p
   }
@@ -87,25 +77,25 @@ const formatPromoText = (promo) => {
   if (!promo || typeof promo !== 'object') return null
   
   try {
-    if (promo.type === 'mix') {
-      // "2 por R$10" ou "Leve 3 Pague 2"
-      if (promo.mixPayUnits && promo.mixPayUnits < promo.mixUnits) {
-        return `LEVE ${promo.mixUnits} PAGUE ${promo.mixPayUnits}`
-      }
-      if (promo.mixPrice && promo.mixUnits) {
-        return `${promo.mixUnits} POR R$ ${Number(promo.mixPrice).toFixed(2).replace('.', ',')}`
-      }
+    // ESTRUTURA REAL: type='combo'|'percent'|'fixed', qty, totalPrice, discountPct, discountAmt
+    
+    if (promo.type === 'combo' && promo.qty && promo.totalPrice) {
+      // "4 POR R$ 10,00"
+      return `${promo.qty} POR R$ ${Number(promo.totalPrice).toFixed(2).replace('.', ',')}`
     }
     
-    if (promo.type === 'percent' && promo.percent) {
-      return `${promo.percent}% OFF`
+    if (promo.type === 'percent' && promo.discountPct) {
+      // "20% OFF"
+      return `${promo.discountPct}% OFF`
     }
     
-    if (promo.type === 'fixed' && promo.discount) {
-      return `R$ ${Number(promo.discount).toFixed(2).replace('.', ',')} OFF`
+    if (promo.type === 'fixed' && promo.discountAmt) {
+      // "R$ 5,00 OFF"
+      return `R$ ${Number(promo.discountAmt).toFixed(2).replace('.', ',')} OFF`
     }
     
-    return promo.label || null
+    // Fallback: nome da promoção
+    return promo.name || null
   } catch (err) {
     console.error('Erro ao formatar promoção:', err)
     return null
@@ -591,14 +581,12 @@ export default function Etiquetas() {
           
           <div className="space-y-2">
             {promos.filter(p => p.active).map(promo => {
-              // Conta quantos produtos tem nessa promoção
-              const promoProducts = products.filter(prod => {
-                if (prod.promoGroup && promo.groupName === prod.promoGroup) return true
-                if (prod.sku && Array.isArray(promo.skus) && promo.skus.includes(prod.sku)) return true
-                return false
-              })
+              // Conta quantos produtos tem nessa promoção (CAMPO CORRETO: promo.group!)
+              const promoProducts = products.filter(prod => 
+                prod.promoGroup && promo.group && prod.promoGroup === promo.group
+              )
               
-              const promoLabel = formatPromoText(promo) || promo.label || 'Promoção'
+              const promoLabel = formatPromoText(promo) || promo.name || 'Promoção'
               
               return (
                 <button
@@ -610,9 +598,7 @@ export default function Etiquetas() {
                 >
                   <div className="flex-1">
                     <div className="text-sm font-black text-orange-800">{promoLabel}</div>
-                    {promo.groupName && (
-                      <div className="text-xs text-gray-500 mt-0.5">Grupo: {promo.groupName}</div>
-                    )}
+                    <div className="text-xs text-gray-500 mt-0.5">{promo.name}</div>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right">
