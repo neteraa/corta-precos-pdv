@@ -1,0 +1,181 @@
+Assunto: ZatendeStok v3.0 - Novas Funcionalidades Disponíveis
+
+Prezado(a) Cliente,
+
+É com satisfação que informamos a disponibilização da versão 3.0 do ZatendeStok, que inclui duas importantes funcionalidades desenvolvidas para atender suas necessidades operacionais e de conformidade fiscal.
+
+═══════════════════════════════════════════════════════════════════
+
+📊 SISTEMA FISCAL NACIONAL
+
+Implementamos o módulo de cálculo e exibição de impostos, garantindo conformidade com a Lei 12.741/2012 (Lei da Transparência Fiscal).
+
+CARACTERÍSTICAS:
+• Cálculo automático de ICMS, PIS e COFINS por venda
+• Cobertura nacional: configurável para todos os 27 estados brasileiros
+• Suporte a três regimes tributários: Simples Nacional, Lucro Presumido e Lucro Real
+• Exibição automática dos valores de impostos na nota impressa do consumidor
+• Configuração intuitiva através de interface visual
+
+COMO ATIVAR:
+1. Acesse: Menu → Configurações → Configurações Fiscais
+2. Ative a opção "Mostrar Impostos na Nota"
+3. Selecione seu regime tributário
+4. Selecione seu estado (UF)
+5. Salve as configurações
+
+INVESTIMENTO: Sem custo adicional (incluído no sistema)
+
+RECOMENDAÇÃO: Consulte seu contador antes de ativar para confirmar o regime tributário e alíquotas aplicáveis ao seu estabelecimento.
+
+═══════════════════════════════════════════════════════════════════
+
+🧾 EMISSÃO DE NOTA FISCAL ELETRÔNICA (NF-e/NFC-e)
+
+Desenvolvemos integração completa para emissão oficial de Nota Fiscal de Consumidor Eletrônica (NFC-e), permitindo que seu estabelecimento emita notas fiscais diretamente do sistema de vendas.
+
+CARACTERÍSTICAS:
+• Emissão oficial via SEFAZ através da plataforma Focus NFe (parceiro homologado)
+• XML assinado digitalmente com certificado A1
+• DANFE (Documento Auxiliar) gerado automaticamente em PDF
+• Chave de acesso válida e rastreável
+• Consulta de status em tempo real
+• Registro histórico de todas as notas emitidas
+• Ambientes separados: Homologação (testes) e Produção (oficial)
+• Possibilidade de cancelamento de notas em até 24 horas
+
+COMO FUNCIONA:
+1. Configuração inicial (realizada uma única vez)
+2. Durante o atendimento, realize a venda normalmente
+3. Após finalizar, clique no botão "Emitir NF-e"
+4. O sistema transmite automaticamente para SEFAZ
+5. Autorização ocorre em 3 a 10 segundos
+6. Cliente recebe nota fiscal oficial
+
+REQUISITOS TÉCNICOS:
+• Conta ativa na plataforma Focus NFe
+• Certificado digital A1 válido
+• Conexão com internet
+
+INVESTIMENTO ADICIONAL:
+• Plataforma Focus NFe: a partir de R$ 49,00/mês (inclui 50 notas)
+• Certificado Digital A1: R$ 150,00 a R$ 250,00 (renovação anual)
+• Período de teste: Focus NFe oferece 10 notas gratuitas para avaliação
+
+CONFIGURAÇÃO:
+1. Crie conta em: https://focusnfe.com.br
+2. Configure seu certificado A1 no painel Focus NFe
+3. Obtenha o token de integração
+4. No ZatendeStok: Menu → Configurações → Emissão de NF-e
+5. Ative a função e preencha os dados da empresa
+6. Teste em ambiente de Homologação
+7. Após validação, altere para ambiente de Produção
+
+IMPORTANTE: Recomendamos sempre testar em ambiente de Homologação antes de utilizar o ambiente de Produção.
+
+═══════════════════════════════════════════════════════════════════
+
+✅ GARANTIAS E COMPATIBILIDADE
+
+• O sistema anterior continua funcionando normalmente
+• Todas as funcionalidades existentes foram preservadas
+• As novas funcionalidades são OPCIONAIS
+• Vendas podem continuar sem emissão de NF-e
+• Nenhuma interrupção nas operações atuais
+• Sistema completamente testado antes da disponibilização
+
+═══════════════════════════════════════════════════════════════════
+
+📚 DOCUMENTAÇÃO TÉCNICA
+
+Disponibilizamos documentação completa para auxiliar na configuração:
+
+• FISCAL.md - Guia completo do sistema fiscal
+• NFE.md - Manual de emissão de NF-e passo a passo
+• RELEASE_NOTES_v3.0.md - Notas de versão detalhadas
+
+Todos os documentos estão disponíveis no repositório do sistema.
+
+═══════════════════════════════════════════════════════════════════
+
+🎯 BENEFÍCIOS PRÁTICOS
+
+ANTES DA ATUALIZAÇÃO:
+• Cliente solicita nota fiscal → Impossibilidade de emissão
+• Transparência de impostos → Processo manual
+• Conformidade fiscal → Limitada
+
+APÓS A ATUALIZAÇÃO:
+• Cliente solicita nota fiscal → Emissão automática e oficial
+• Transparência de impostos → Totalmente automatizada
+• Conformidade fiscal → 100% em conformidade com legislação vigente
+
+═══════════════════════════════════════════════════════════════════
+
+💼 ANÁLISE DE INVESTIMENTO
+
+Para estabelecimentos com faturamento mensal de R$ 1.000.000,00:
+• Custo mensal estimado: R$ 199,00 (plano Focus NFe recomendado)
+• Representatividade: 0,02% do faturamento mensal
+• Benefício: Conformidade legal total e profissionalização
+
+═══════════════════════════════════════════════════════════════════
+
+📞 SUPORTE E ASSISTÊNCIA
+
+Nossa equipe está à disposição para auxiliar na configuração e esclarecimento de dúvidas:
+
+SUPORTE TÉCNICO ZATENDESTOK:
+• E-mail: suporte@zatendestok.com.br
+• WhatsApp: (15) 99660-4075
+• Horário: Segunda a Sexta, 8h às 18h | Sábado, 8h às 12h
+
+ORIENTAÇÕES FISCAIS:
+• Recomendamos consultar seu contador para definições tributárias
+
+SUPORTE FOCUS NFE:
+• E-mail: suporte@focusnfe.com.br
+• Documentação: https://focusnfe.com.br/doc/
+
+═══════════════════════════════════════════════════════════════════
+
+🚀 PRÓXIMOS PASSOS RECOMENDADOS
+
+1. SISTEMA FISCAL (IMEDIATO):
+   ✓ Consulte seu contador para confirmar regime tributário
+   ✓ Acesse as Configurações Fiscais no sistema
+   ✓ Ative a funcionalidade
+   ✓ Realize uma venda de teste
+
+2. EMISSÃO DE NF-e (PLANEJAMENTO):
+   ✓ Avalie necessidade com seu contador
+   ✓ Se aplicável, crie conta na Focus NFe (teste gratuito)
+   ✓ Adquira certificado digital A1
+   ✓ Agende conosco para configuração assistida
+   ✓ Realize testes em ambiente de Homologação
+   ✓ Após validação, inicie operação em Produção
+
+═══════════════════════════════════════════════════════════════════
+
+INFORMAÇÕES TÉCNICAS DA VERSÃO:
+• Versão: 3.0.0
+• Data de disponibilização: 26 de setembro de 2024
+• Status: Produção
+• Ambiente: https://zatendestock.netlify.app
+
+═══════════════════════════════════════════════════════════════════
+
+Reforçamos nosso compromisso com a evolução contínua do sistema, sempre buscando agregar valor ao seu negócio e garantir conformidade com a legislação vigente.
+
+Permanecemos à disposição para quaisquer esclarecimentos adicionais.
+
+Atenciosamente,
+
+Equipe ZatendeStok
+Sistema Profissional de Gestão para Mercados
+
+--
+ZatendeStok
+E-mail: suporte@zatendestok.com.br
+WhatsApp: (15) 99660-4075
+Web: https://zatendestock.netlify.app

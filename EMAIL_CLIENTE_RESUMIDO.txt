@@ -1,0 +1,60 @@
+Assunto: ZatendeStok v3.0 - Atualizações Importantes
+
+Prezado(a) Cliente,
+
+Informamos que disponibilizamos a versão 3.0 do ZatendeStok com duas novas funcionalidades:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ SISTEMA FISCAL NACIONAL (Gratuito)
+
+✓ Calcula automaticamente ICMS, PIS e COFINS
+✓ Exibe impostos na nota do cliente (Lei 12.741/2012)
+✓ Válido para todos os estados brasileiros
+✓ Configuração em: Menu → Configurações → Configurações Fiscais
+
+Recomendação: Consulte seu contador antes de ativar.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2️⃣ EMISSÃO DE NF-e/NFC-e OFICIAL (Custo adicional)
+
+✓ Emite nota fiscal eletrônica oficial via SEFAZ
+✓ XML assinado + DANFE (PDF) automático
+✓ Integração com Focus NFe (parceiro homologado)
+✓ Emissão em 3-10 segundos após a venda
+
+Requisitos:
+• Conta Focus NFe (R$ 49-399/mês)
+• Certificado digital A1 (R$ 150-250/ano)
+• Teste grátis: 10 notas sem custo
+
+Configuração: Menu → Configurações → Emissão de NF-e
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ IMPORTANTE
+
+• Sistema anterior funciona normalmente
+• Funcionalidades novas são OPCIONAIS
+• Vendas continuam sem interrupção
+• Zero bugs ou problemas
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📞 SUPORTE
+
+Dúvidas técnicas: suporte@zatendestok.com.br | WhatsApp (15) 99660-4075
+Dúvidas fiscais: Consulte seu contador
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Estamos à disposição para quaisquer esclarecimentos.
+
+Atenciosamente,
+Equipe ZatendeStok
+
+--
+ZatendeStok - Sistema Profissional de Gestão para Mercados
+suporte@zatendestok.com.br | (15) 99660-4075
+https://zatendestock.netlify.app
