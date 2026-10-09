@@ -58,46 +58,58 @@ const splitPrice = (price) => {
 
 /* ── Encontra promoção ativa de um produto ─────────────── */
 const findPromo = (product, promos) => {
-  if (!product || !promos) return null
+  if (!product || !promos || !Array.isArray(promos)) return null
   
   // Procura por grupo
   if (product.promoGroup) {
     const p = promos.find(promo => 
-      promo.active && 
+      promo && promo.active && 
       promo.groupName === product.promoGroup
     )
     if (p) return p
   }
   
   // Procura por SKU
-  const p = promos.find(promo => 
-    promo.active && 
-    promo.skus?.includes(product.sku)
-  )
-  return p || null
+  if (product.sku) {
+    const p = promos.find(promo => 
+      promo && promo.active && 
+      Array.isArray(promo.skus) && 
+      promo.skus.includes(product.sku)
+    )
+    if (p) return p
+  }
+  
+  return null
 }
 
 /* ── Formata texto da promoção pra etiqueta ───────────── */
 const formatPromoText = (promo) => {
-  if (!promo) return null
+  if (!promo || typeof promo !== 'object') return null
   
-  if (promo.type === 'mix') {
-    // "2 por R$10" ou "Leve 3 Pague 2"
-    if (promo.mixPayUnits && promo.mixPayUnits < promo.mixUnits) {
-      return `LEVE ${promo.mixUnits} PAGUE ${promo.mixPayUnits}`
+  try {
+    if (promo.type === 'mix') {
+      // "2 por R$10" ou "Leve 3 Pague 2"
+      if (promo.mixPayUnits && promo.mixPayUnits < promo.mixUnits) {
+        return `LEVE ${promo.mixUnits} PAGUE ${promo.mixPayUnits}`
+      }
+      if (promo.mixPrice && promo.mixUnits) {
+        return `${promo.mixUnits} POR R$ ${Number(promo.mixPrice).toFixed(2).replace('.', ',')}`
+      }
     }
-    return `${promo.mixUnits} POR R$ ${promo.mixPrice.toFixed(2).replace('.', ',')}`
+    
+    if (promo.type === 'percent' && promo.percent) {
+      return `${promo.percent}% OFF`
+    }
+    
+    if (promo.type === 'fixed' && promo.discount) {
+      return `R$ ${Number(promo.discount).toFixed(2).replace('.', ',')} OFF`
+    }
+    
+    return promo.label || null
+  } catch (err) {
+    console.error('Erro ao formatar promoção:', err)
+    return null
   }
-  
-  if (promo.type === 'percent') {
-    return `${promo.percent}% OFF`
-  }
-  
-  if (promo.type === 'fixed') {
-    return `R$ ${promo.discount.toFixed(2).replace('.', ',')} OFF`
-  }
-  
-  return promo.label || 'PROMOÇÃO'
 }
 
 /* ── font size: mm height → pt ──────────────────────────── */
@@ -122,16 +134,34 @@ const hex2rgb = hex => [
    setFontSize() always takes pt regardless of unit
 ══════════════════════════════════════════════════════════ */
 function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList, promos) {
+  // Validações básicas
+  if (!doc || !p || typeof w !== 'number' || typeof h !== 'number') {
+    console.error('pdfLabel: argumentos inválidos', { doc: !!doc, p: !!p, w, h })
+    return
+  }
+  
   const t = (tmplList || TMPL).find(t => t.id === tmplId) || (tmplList || TMPL)[0]
-  const STORE = storeName || 'MEU MERCADO'
+  const STORE = String(storeName || 'MEU MERCADO')
   const { int, dec } = splitPrice(p.price)
   
   // Busca promoção ativa do produto
   const activePromo = findPromo(p, promos)
   const promoText = activePromo ? formatPromoText(activePromo) : (p.promo || null)
+  
+  // Debug
+  if (p.name && p.name.toLowerCase().includes('atlanta')) {
+    console.log('🏷️ Atlanta - Debug:', {
+      produto: p.name,
+      sku: p.sku,
+      promoGroup: p.promoGroup,
+      promosCount: promos?.length,
+      activePromo,
+      promoText
+    })
+  }
 
   // FIX 1: strip accents — jsPDF built-in helvetica is ASCII-only
-  const name = pdfSafe(p.name)
+  const name = pdfSafe(p.name || '')
 
   const hs = h * 0.27  // header strip height
 
@@ -158,9 +188,12 @@ function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList, promos) {
   // FIX 2: draw only ONE text in strip — oferta shows "* SUPER OFERTA *" instead of store name
   doc.setFont('helvetica', 'bold')
   const stripLabel = tmplId === 'oferta' ? '* SUPER OFERTA *' : pdfSafe(STORE)
-  doc.setFontSize(fpt(h, tmplId === 'oferta' ? 0.10 : 0.115))
+  const stripFs = fpt(h, tmplId === 'oferta' ? 0.10 : 0.115)
+  doc.setFontSize(stripFs)
   doc.setTextColor(str, stg, stb)
-  doc.text(stripLabel, x + w / 2, y + hs * 0.73, { align: 'center' })
+  if (stripLabel && stripLabel.trim()) {
+    doc.text(stripLabel, x + w / 2, y + hs * 0.73, { align: 'center' })
+  }
 
   // FIX 3: auto-shrink font until name fits in nameLinesMax lines
   const maxNameW    = w - PAD * 2
@@ -170,31 +203,35 @@ function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList, promos) {
   doc.setFont('helvetica', 'bold')
   for (let i = 0; i < 8; i++) {
     doc.setFontSize(nameFs)
-    if (doc.splitTextToSize(name, maxNameW).length <= nameLinesMax || nameFs <= 4.5) break
+    if (!name || doc.splitTextToSize(name, maxNameW).length <= nameLinesMax || nameFs <= 4.5) break
     nameFs = Math.max(4.5, nameFs * 0.82)
   }
-  const nameLines = doc.splitTextToSize(name, maxNameW).slice(0, nameLinesMax)
+  const nameLines = name ? doc.splitTextToSize(name, maxNameW).slice(0, nameLinesMax) : []
 
   // FIX 4: compute nameY so text never overlaps price block
-  const lineHmm  = (nameFs / 2.8346) * 1.35          // line height in mm
-  const nameBlockH = nameLines.length * lineHmm
-  const nameAreaTop = y + hs + 1.2
-  const priceBlockTop = y + h * (h <= 25 ? 0.54 : 0.60)  // price block starts here
-  const nameCenter = nameAreaTop + (priceBlockTop - nameAreaTop - nameBlockH) / 2
-  const nameY = Math.max(nameAreaTop + lineHmm * 0.82, nameCenter + lineHmm * 0.82)
+  if (nameLines.length > 0) {
+    const lineHmm  = (nameFs / 2.8346) * 1.35          // line height in mm
+    const nameBlockH = nameLines.length * lineHmm
+    const nameAreaTop = y + hs + 1.2
+    const priceBlockTop = y + h * (h <= 25 ? 0.54 : 0.60)  // price block starts here
+    const nameCenter = nameAreaTop + (priceBlockTop - nameAreaTop - nameBlockH) / 2
+    const nameY = Math.max(nameAreaTop + lineHmm * 0.82, nameCenter + lineHmm * 0.82)
 
-  doc.setTextColor(nr, ng, nb)
-  doc.text(nameLines, x + PAD, nameY, { lineHeightFactor: 1.35 })
+    doc.setTextColor(nr, ng, nb)
+    doc.text(nameLines, x + PAD, nameY, { lineHeightFactor: 1.35 })
+  }
 
   // ── promo pill
   if (promoText && h >= 45) {
-    const promoSafe = pdfSafe(promoText)
-    const pillY = y + h * 0.63
-    doc.setFillColor(sr, sg, sb)
-    doc.roundedRect(x + PAD, pillY - 2.5, w - PAD * 2, 5, 1, 1, 'F')
-    doc.setFontSize(fpt(h, 0.08))
-    doc.setTextColor(str, stg, stb)
-    doc.text(promoSafe, x + w / 2, pillY + 0.8, { align: 'center' })
+    const promoSafe = pdfSafe(String(promoText || ''))
+    if (promoSafe && promoSafe.trim()) {
+      const pillY = y + h * 0.63
+      doc.setFillColor(sr, sg, sb)
+      doc.roundedRect(x + PAD, pillY - 2.5, w - PAD * 2, 5, 1, 1, 'F')
+      doc.setFontSize(fpt(h, 0.08))
+      doc.setTextColor(str, stg, stb)
+      doc.text(promoSafe, x + w / 2, pillY + 0.8, { align: 'center' })
+    }
   }
 
   // ── price layout: R$ [INT] ,DEC
@@ -205,17 +242,21 @@ function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList, promos) {
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(pr, pg, pb)
 
+  // Garante que int e dec são strings válidas
+  const intStr = String(int || '0')
+  const decStr = String(dec || ',00')
+
   doc.setFontSize(smFs)
   const rsW = doc.getTextWidth('R$') + 0.8
   doc.text('R$', x + PAD, priceBaseline - (bigFs / 2.8346) * 0.22)
 
   doc.setFontSize(bigFs)
   const intX = x + PAD + rsW
-  doc.text(int, intX, priceBaseline)
-  const intW = doc.getTextWidth(int)
+  doc.text(intStr, intX, priceBaseline)
+  const intW = doc.getTextWidth(intStr)
 
   doc.setFontSize(smFs)
-  doc.text(dec, intX + intW + 0.5, priceBaseline - (bigFs / 2.8346) * 0.22)
+  doc.text(decStr, intX + intW + 0.5, priceBaseline - (bigFs / 2.8346) * 0.22)
 
   // ── unit (KG / LT etc.)
   const unit = (p.unit || '').toUpperCase()
@@ -227,9 +268,12 @@ function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList, promos) {
 
   // ── barcode / SKU footer
   if (h >= 35 && (p.sku || p.barcode)) {
-    doc.setFontSize(fpt(h, 0.075))
-    doc.setTextColor(150, 150, 150)
-    doc.text(p.barcode || p.sku, x + w - PAD, y + h - 1.2, { align: 'right' })
+    const footer = String(p.barcode || p.sku || '')
+    if (footer.trim()) {
+      doc.setFontSize(fpt(h, 0.075))
+      doc.setTextColor(150, 150, 150)
+      doc.text(footer, x + w - PAD, y + h - 1.2, { align: 'right' })
+    }
   }
 }
 
@@ -244,6 +288,18 @@ function LabelPreview({ p, tmplId, sizeId, storeName, tmplList, promos }) {
   // Busca promoção ativa
   const activePromo = findPromo(p, promos)
   const promoText = activePromo ? formatPromoText(activePromo) : (p.promo || null)
+  
+  // Debug
+  if (p.name && p.name.toLowerCase().includes('atlanta')) {
+    console.log('👁️ Atlanta Preview - Debug:', {
+      produto: p.name,
+      sku: p.sku,
+      promoGroup: p.promoGroup,
+      promosCount: promos?.length,
+      activePromo,
+      promoText
+    })
+  }
 
   // Scale to fit ~220px wide, keep aspect ratio
   const PREVIEW_W = 220
