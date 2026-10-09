@@ -54,6 +54,15 @@
 - ✅ **Ambientes** homologação e produção
 - ✅ **Cancelamento** em até 24h
 
+### 🏷️ Etiquetas de Preço Inteligentes (NOVO! 🎨)
+- ✅ **Promoções automáticas** nas etiquetas
+- ✅ **Impressão A4** (vertical e horizontal)
+- ✅ **4 templates** profissionais (Mercado, Gôndola, Oferta, Clean)
+- ✅ **6 tamanhos** (40×20mm até A4)
+- ✅ **Mostra promoções** cadastradas ("2 por R$10", "Leve 3 Pague 2")
+- ✅ **PDF profissional** pronto pra impressão
+- ✅ **Preview em tempo real**
+
 ### 🤖 Bot WhatsApp com IA
 - ✅ Atendimento automático humanizado
 - ✅ Catálogo de produtos via WhatsApp
@@ -194,6 +203,7 @@ NETLIFY_AUTH_TOKEN=nfp_...
 - [README.md](./README.md) - Documentação geral (este arquivo)
 - [FISCAL.md](./FISCAL.md) - Sistema fiscal (impostos na nota)
 - [NFE.md](./NFE.md) - Emissão de NF-e/NFC-e oficial
+- [ETIQUETAS_MELHORIAS.md](./ETIQUETAS_MELHORIAS.md) - Etiquetas com promoções + A4
 - [GITHUB_PUSH.md](./GITHUB_PUSH.md) - Instruções de push
 - [DEPLOY_SUMMARY.md](./DEPLOY_SUMMARY.md) - Resumo do deploy
 
@@ -262,6 +272,16 @@ Desenvolvido com ❤️ por **ZatendeStok**
 ---
 
 ## 🔄 Changelog
+
+### v3.1.0 - Etiquetas Inteligentes com Promoções (2024-09-26)
+- ✅ **PROMOÇÕES AUTOMÁTICAS NAS ETIQUETAS!**
+- ✅ Mostra promoções cadastradas ("2 por R$10", "Leve 3 Pague 2", "20% OFF")
+- ✅ Impressão A4 vertical e horizontal
+- ✅ 6 tamanhos disponíveis (40×20mm até A4)
+- ✅ 4 templates profissionais
+- ✅ Preview em tempo real
+- ✅ Multi-tenant verificado e isolado
+- ✅ Zero impacto em etiquetas antigas
 
 ### v3.0.0 - Emissão Oficial de NF-e (2024-09-26)
 - ✅ **EMISSÃO DE NF-e/NFC-e OFICIAL!**
