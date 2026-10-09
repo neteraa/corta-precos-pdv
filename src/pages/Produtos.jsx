@@ -6,7 +6,7 @@ import { parseGdoorCsv, parseGenericCsv, downloadCsvTemplate } from '../utils/im
 import { compressImage, savePhoto as dbSavePhoto } from '../utils/photoDb.js'
 import { autoFetchPhotos, fetchProductPhoto, searchProductPhotos, urlToDataUrl } from '../utils/openFoodFacts.js'
 
-const EMPTY = { sku: '', name: '', category: '', cost: '', price: '', stock: '', unit: 'UN', minStock: '', expiryDate: '', priceAtacado: '', qtdAtacado: '' }
+const EMPTY = { sku: '', name: '', category: '', cost: '', price: '', stock: '', unit: 'UN', minStock: '', expiryDate: '', lote: '', priceAtacado: '', qtdAtacado: '' }
 const UNITS = ['UN', 'KG', 'G', 'LT', 'ML', 'CX', 'PC', 'DZ', 'MT']
 
 /* ── Stock badge ─────────────────────────────────────────── */
@@ -63,7 +63,7 @@ function ProductCard({ p, photo, onEdit, onDelete }) {
 
 /* ── Main component ──────────────────────────────────────── */
 export default function Produtos() {
-  const { products, upsertProduct, deleteProduct, importProducts, photos, saveProductPhoto } = useStore()
+  const { products, upsertProduct, deleteProduct, importProducts, photos, saveProductPhoto, addLot } = useStore()
 
   const [query,     setQuery]     = useState('')
   const [editing,   setEditing]   = useState(null)
@@ -185,20 +185,54 @@ export default function Produtos() {
     e.preventDefault()
     const fd  = new FormData(e.target)
     const id  = editing.id || `p${Date.now()}`
-    upsertProduct({
+    const loteNum = fd.get('lote')?.trim() || ''
+    const stock = Number(fd.get('stock'))
+    const expiryDate = fd.get('expiryDate') || null
+    const cost = Number(fd.get('cost'))
+
+    // Dados base do produto (SEM estoque ainda, será adicionado via lote)
+    const productData = {
       id,
       sku:        skuInput,
       name:       fd.get('name'),
       category:   fd.get('category'),
       unit:       fd.get('unit'),
-      cost:         Number(fd.get('cost')),
+      cost,
       price:        Number(fd.get('price')),
-      stock:        Number(fd.get('stock')),
+      stock:        editing.id ? editing.stock : 0, // Mantém estoque atual se for edição
       minStock:     fd.get('minStock')   ? Number(fd.get('minStock'))   : 0,
-      expiryDate:   fd.get('expiryDate') || null,
+      expiryDate,
       priceAtacado: fd.get('priceAtacado') ? Number(fd.get('priceAtacado')) : 0,
       qtdAtacado:   fd.get('qtdAtacado')   ? Number(fd.get('qtdAtacado'))   : 0,
-    })
+      // Dados fiscais (OPCIONAIS - só salva se preenchido)
+      ncm:              fd.get('ncm')?.trim() || null,
+      cfop:             fd.get('cfop')?.trim() || null,
+      origem:           fd.get('origem') || null,
+      cst:              fd.get('cst')?.trim() || null,
+      icms_aliquota:    fd.get('icms_aliquota') ? Number(fd.get('icms_aliquota')) : null,
+      pis_aliquota:     fd.get('pis_aliquota')  ? Number(fd.get('pis_aliquota'))  : null,
+      cofins_aliquota:  fd.get('cofins_aliquota') ? Number(fd.get('cofins_aliquota')) : null,
+    }
+
+    // ✅ SISTEMA DE LOTES (FIFO)
+    // Se informar lote + validade + estoque > 0 → usa controle de lotes
+    if (loteNum && expiryDate && stock > 0) {
+      // Modo edição: mantém estoque atual, adiciona novo lote
+      if (editing.id) {
+        upsertProduct({ ...productData, stock: editing.stock || 0 })
+        addLot(id, { qty: stock, expiryDate, cost })
+      } 
+      // Modo criação: cria produto + primeiro lote
+      else {
+        upsertProduct({ ...productData, stock: 0 })
+        addLot(id, { qty: stock, expiryDate, cost })
+      }
+    } 
+    // ❌ SEM LOTE: modo simples (atualiza estoque direto)
+    else {
+      upsertProduct({ ...productData, stock })
+    }
+
     if (photoData)    await saveProductPhoto(id, photoData)
     else if (photoRemoved && editing.id) await saveProductPhoto(editing.id, null)
     setEditing(null)
@@ -633,9 +667,52 @@ export default function Produtos() {
                     <input name="minStock" type="number" min="0" defaultValue={editing.minStock || ''} placeholder="Ex: 10" className="input" />
                   </div>
                   <div>
-                    <label className="label">Validade</label>
-                    <input name="expiryDate" type="date" defaultValue={editing.expiryDate || ''} className="input" />
+                    <label className="label">Unidade</label>
+                    <select name="unit" defaultValue={editing.unit || 'UN'} className="input">
+                      {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
                   </div>
+                </div>
+
+                {/* 📦 LOTE E VALIDADE */}
+                <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 space-y-2">
+                  <p className="text-xs font-bold text-purple-700 flex items-center gap-1.5">
+                    📦 Controle de Lote (FIFO)
+                    <span className="text-[10px] font-normal text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">Opcional</span>
+                  </p>
+                  
+                  {/* Lotes existentes */}
+                  {editing.id && editing.lots && editing.lots.length > 0 && (
+                    <div className="bg-purple-100 border border-purple-300 rounded-lg p-2 space-y-1">
+                      <p className="text-[10px] font-bold text-purple-700 mb-1">📋 Lotes em estoque:</p>
+                      {editing.lots.map((lot, idx) => (
+                        <div key={lot.id || idx} className="flex items-center justify-between text-[10px] bg-white rounded px-2 py-1">
+                          <span className="font-mono text-purple-800">
+                            {lot.expiryDate ? new Date(lot.expiryDate).toLocaleDateString('pt-BR') : 'Sem validade'}
+                          </span>
+                          <span className="font-bold text-purple-600">{lot.qty} un</span>
+                        </div>
+                      ))}
+                      <p className="text-[9px] text-purple-600 mt-1">
+                        💡 Os lotes acima já estão no estoque. Ao preencher os campos abaixo, você <strong>adiciona um NOVO lote</strong>.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="label">Data de Validade</label>
+                      <input name="expiryDate" type="date" defaultValue="" className="input" />
+                    </div>
+                    <div>
+                      <label className="label">Número do Lote</label>
+                      <input name="lote" type="text" defaultValue="" placeholder="Ex: L2024-001" className="input" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-purple-600 leading-snug">
+                    💡 Ao cadastrar com lote, o sistema usa <strong>FIFO</strong> (First In, First Out): produtos com validade mais próxima saem primeiro do estoque automaticamente.
+                    {editing.id && ' Deixe os campos vazios se não quiser adicionar novo lote.'}
+                  </p>
                 </div>
 
                 {/* Preço atacado */}
@@ -655,6 +732,91 @@ export default function Produtos() {
                   </div>
                   <p className="text-[10px] text-blue-600">Quando o cliente levar ≥ qtd mín., o preço atacado é aplicado automaticamente no PDV.</p>
                 </div>
+
+                {/* 📊 DADOS FISCAIS (OPCIONAL) */}
+                <details className="rounded-xl border border-green-200 bg-green-50">
+                  <summary className="p-3 cursor-pointer hover:bg-green-100 transition-colors rounded-xl">
+                    <span className="text-xs font-bold text-green-700 flex items-center gap-1.5">
+                      📊 Dados Fiscais (Opcional)
+                      <span className="text-[10px] font-normal text-green-600 bg-green-100 px-1.5 py-0.5 rounded">Para NF-e</span>
+                    </span>
+                  </summary>
+                  <div className="p-3 pt-0 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="label text-xs">NCM</label>
+                        <input name="ncm" type="text" maxLength="8" 
+                          defaultValue={editing.ncm || ''} 
+                          placeholder="Ex: 19053100" 
+                          className="input text-sm" />
+                        <p className="text-[10px] text-green-600 mt-0.5">Nomenclatura Comum do Mercosul</p>
+                      </div>
+                      <div>
+                        <label className="label text-xs">CFOP Venda</label>
+                        <input name="cfop" type="text" maxLength="4" 
+                          defaultValue={editing.cfop || ''} 
+                          placeholder="Ex: 5102" 
+                          className="input text-sm" />
+                        <p className="text-[10px] text-green-600 mt-0.5">Código Fiscal de Operações</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="label text-xs">Origem</label>
+                        <select name="origem" defaultValue={editing.origem ?? '0'} className="input text-sm">
+                          <option value="0">0 - Nacional</option>
+                          <option value="1">1 - Estrangeira (importação direta)</option>
+                          <option value="2">2 - Estrangeira (mercado interno)</option>
+                          <option value="3">3 - Nacional c/ mais de 40% importado</option>
+                          <option value="4">4 - Nacional conf. processos</option>
+                          <option value="5">5 - Nacional c/ menos de 40% importado</option>
+                          <option value="6">6 - Estrangeira (importação direta) sem similar nacional</option>
+                          <option value="7">7 - Estrangeira (mercado interno) sem similar nacional</option>
+                          <option value="8">8 - Nacional (conteúdo importação sup. 70%)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="label text-xs">CST/CSOSN</label>
+                        <input name="cst" type="text" maxLength="3" 
+                          defaultValue={editing.cst || ''} 
+                          placeholder="Ex: 00 ou 102" 
+                          className="input text-sm" />
+                        <p className="text-[10px] text-green-600 mt-0.5">Código Situação Tributária</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="label text-xs">ICMS (%)</label>
+                        <input name="icms_aliquota" type="number" step="0.01" min="0" max="100"
+                          defaultValue={editing.icms_aliquota || ''} 
+                          placeholder="18.00" 
+                          className="input text-sm" />
+                      </div>
+                      <div>
+                        <label className="label text-xs">PIS (%)</label>
+                        <input name="pis_aliquota" type="number" step="0.01" min="0" max="100"
+                          defaultValue={editing.pis_aliquota || ''} 
+                          placeholder="0.65" 
+                          className="input text-sm" />
+                      </div>
+                      <div>
+                        <label className="label text-xs">COFINS (%)</label>
+                        <input name="cofins_aliquota" type="number" step="0.01" min="0" max="100"
+                          defaultValue={editing.cofins_aliquota || ''} 
+                          placeholder="3.00" 
+                          className="input text-sm" />
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-green-600 leading-snug">
+                      💡 <strong>Opcional:</strong> Deixe em branco se não emite NF-e. 
+                      Se preencher, os dados serão usados no cálculo de impostos e exportação fiscal.
+                      <strong> Consulte seu contador!</strong>
+                    </p>
+                  </div>
+                </details>
               </form>
             </div>
 

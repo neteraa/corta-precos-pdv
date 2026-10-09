@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { Database, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, Fingerprint, Copy, Check, Image, Palette, MessageCircle, Wifi, WifiOff, RefreshCw, LogOut, Bot, Clock, MapPin, CreditCard, Tag, Phone as PhoneIcon } from 'lucide-react'
+import { Database, Download, Upload, Info, Store, QrCode, Save, KeyRound, Eye, EyeOff, Users, Plus, Trash2, Fingerprint, Copy, Check, Image, Palette, MessageCircle, Wifi, WifiOff, RefreshCw, LogOut, Bot, Clock, MapPin, CreditCard, Tag, Phone as PhoneIcon, Calculator } from 'lucide-react'
 import { useStore } from '../store.jsx'
 import { parseGdoorCsv } from '../utils/importCsv.js'
 import { usePrinter, getNicheMeta } from '../hooks/usePrinter.js'
 import PixQR from '../components/PixQR.jsx'
+import ConfiguracaoFiscal from '../components/ConfiguracaoFiscal.jsx'
 import { getCredentials, saveCredentials, getConfiguredStoreId, saveStoreId, slugify } from '../utils/auth.js'
 import { getMktStoreToken, mktKey } from '../utils/tenantStorage.js'
 
@@ -936,6 +937,9 @@ export default function Configuracoes() {
           <Save className="w-4 h-4" /> {saved ? '✅ Salvo!' : 'Salvar dados'}
         </button>
       </Section>
+
+      {/* ── Configurações Fiscais ──────────────────────────────── */}
+      <ConfiguracaoFiscal />
 
       {/* ── Chave PIX ──────────────────────────────────────────── */}
       <Section icon={QrCode} title="PIX — QR Code Automático">

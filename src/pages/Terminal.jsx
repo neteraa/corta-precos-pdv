@@ -16,6 +16,7 @@ import { useBroadcastSend } from '../hooks/useBroadcast.js'
 import { useScanReceiver }  from '../hooks/useScanRelay.js'
 import PixQR from '../components/PixQR.jsx'
 import CameraScanner from '../components/CameraScanner.jsx'
+import { calcularImpostosVenda } from '../utils/fiscal.js'
 
 function calcPromoEngine(cart, products, promos) {
   const results = []
@@ -60,7 +61,7 @@ const PAY_ICON = { PIX: Smartphone, Débito: CreditCard, Crédito: CreditCard, D
 
 export default function Terminal() {
   const { products, registerSale, promos, sales, customers, addFiado, operators, syncNow,
-          cancelRequests, requestCancel, cancelSale } = useStore()
+          cancelRequests, requestCancel, cancelSale, fiscalConfig } = useStore()
   const todaySales = useMemo(() => {
     const today = new Date().toDateString()
     return sales.filter(s => new Date(s.date).toDateString() === today).length
@@ -330,12 +331,16 @@ export default function Terminal() {
         : payment === 'Crédito' && installments > 1 ? `Crédito ${installments}×` : payment
     }
 
+    // ── Cálculo de impostos (configurado em Configurações) ────
+    const impostos = calcularImpostosVenda(cart, products, fiscalConfig)
+
     const sale = {
       items: cart, subtotal, discount: discAmt, promoDiscount: totalPromoDiscount, total,
       payment: payLabel, troco: t,
       date: new Date().toISOString(), id: Date.now(),
       customerId: selectedCustomer?.id || null,
       operatorName: activeOperator?.name || '',
+      impostos,  // ← Adiciona info fiscal (só mostra se configurado!)
     }
     registerSale(sale)
     if (isFiado && selectedCustomer) {

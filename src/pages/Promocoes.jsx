@@ -144,6 +144,35 @@ export default function Promocoes() {
         </ol>
       </div>
 
+      {/* ⚠️ WARNING: Promoções sem produtos */}
+      {promoStats.some(r => r.active && r.productCount === 0) && (
+        <div className="bg-red-50 border-2 border-red-500 rounded-xl p-4 space-y-2 animate-pulse">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-white text-xl font-black">
+              ⚠️
+            </div>
+            <div className="flex-1">
+              <p className="font-black text-red-900 text-base">
+                ATENÇÃO: Promoções não vão aparecer no Terminal!
+              </p>
+              <p className="text-sm text-red-800 mt-1">
+                Você tem <strong>{promoStats.filter(r => r.active && r.productCount === 0).length} promoção(ões) ativa(s) sem produtos vinculados</strong>. 
+                O terminal só aplica desconto quando produtos têm o grupo configurado.
+              </p>
+              <div className="mt-3 bg-red-100 border border-red-300 rounded-lg p-3 text-xs text-red-900 space-y-1">
+                <p className="font-bold">✅ Como resolver:</p>
+                <ol className="list-decimal list-inside space-y-0.5 ml-2">
+                  <li>Encontre as promoções com "<span className="text-red-600 font-bold">⚠️ Nenhum produto atribuído</span>" abaixo</li>
+                  <li>Clique no botão "<strong>Ver produtos</strong>"</li>
+                  <li>Marque os produtos que participam da promoção</li>
+                  <li>Feche o painel — pronto! A promoção vai funcionar no terminal ✅</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* rules list */}
       {promoStats.length === 0 ? (
         <div className="card py-16 text-center text-gray-400 text-sm">
@@ -187,11 +216,15 @@ export default function Promocoes() {
                       <span className="font-semibold text-brand-600">{BRL.format(rule.totalPrice)}</span>
                     </span>
                     <span>Grupo: <code className="bg-gray-100 px-1 rounded text-gray-600">{rule.group}</code></span>
-                    <span className={`font-semibold ${rule.productCount === 0 ? 'text-red-500' : 'text-green-600'}`}>
-                      {rule.productCount === 0
-                        ? '⚠️ Nenhum produto atribuído'
-                        : `${rule.productCount} produto${rule.productCount !== 1 ? 's' : ''}`}
-                    </span>
+                    {rule.productCount === 0 ? (
+                      <span className="font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded border border-red-300 animate-pulse">
+                        ⚠️ Nenhum produto atribuído - CLIQUE EM "VER PRODUTOS"!
+                      </span>
+                    ) : (
+                      <span className="font-semibold text-green-600 bg-green-100 px-2 py-0.5 rounded">
+                        ✅ {rule.productCount} produto{rule.productCount !== 1 ? 's' : ''} vinculado{rule.productCount !== 1 ? 's' : ''}
+                      </span>
+                    )}
                     <span className="text-gray-400">
                       {(!rule.type || rule.type === 'combo') && <>Preço/un: <strong className="text-gray-600">{BRL.format((rule.totalPrice || 0) / rule.qty)}</strong></>}
                       {rule.type === 'percent' && <>Desconto: <strong className="text-purple-600">{rule.discountPct}%</strong></>}
@@ -295,14 +328,20 @@ export default function Promocoes() {
 
             <div className="space-y-3">
               <div>
-                <label className="label">Nome da promoção *</label>
+                <label className="label">
+                  Nome da promoção (DESCREVA O PRODUTO!) *
+                </label>
                 <input
                   autoFocus
                   value={editing.name}
                   onChange={e => handleNameChange(e.target.value)}
-                  placeholder="ex: 4 Danones por R$10"
+                  placeholder="ex: 4 Bono/Negresco 90g"
                   className="input"
                 />
+                <p className="text-xs text-red-600 font-bold mt-1 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
+                  ⚠️ ATENÇÃO: Escreva o NOME DO PRODUTO aqui! Não escreva apenas "4 unidades" ou "2 unidades"!<br/>
+                  Exemplo CERTO: "4 Coca-Cola 2L" | Exemplo ERRADO: "4 unidades"
+                </p>
               </div>
 
               <div>
@@ -413,10 +452,21 @@ export default function Promocoes() {
               )}
 
               {/* ── Produtos da promoção — busca inline ──────── */}
+              {editingSelected.size === 0 && (
+                <div className="bg-red-100 border-2 border-red-400 rounded-xl p-4 text-center animate-pulse">
+                  <div className="text-2xl mb-2">⚠️</div>
+                  <div className="font-black text-red-800 text-sm mb-1">PROMOÇÃO SEM PRODUTOS!</div>
+                  <div className="text-xs text-red-700">
+                    Selecione abaixo os produtos que participam desta promoção.<br/>
+                    <strong>Sem produtos vinculados, a promoção NÃO aparecerá no WhatsApp!</strong>
+                  </div>
+                </div>
+              )}
+              
               <div className="border border-gray-200 rounded-xl overflow-hidden">
                 <div className="flex items-center justify-between bg-gray-50 px-3 py-2 border-b border-gray-200">
                   <span className="text-xs font-black text-gray-700">
-                    🏷 Produtos da promoção
+                    🏷 Produtos da promoção {editingSelected.size === 0 && <span className="text-red-600">(OBRIGATÓRIO!)</span>}
                     {editingSelected.size > 0 && (
                       <span className="ml-2 bg-green-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
                         {editingSelected.size}
@@ -484,17 +534,32 @@ export default function Promocoes() {
                 </div>
               </div>
 
-              <label className="flex items-center gap-3 cursor-pointer">
-                <div
-                  onClick={() => setEditing(p => ({ ...p, active: !p.active }))}
-                  className={`w-10 h-6 rounded-full transition-colors ${editing.active ? 'bg-green-500' : 'bg-gray-300'}`}
-                >
-                  <div className={`w-4 h-4 bg-white rounded-full mt-1 transition-all shadow ${editing.active ? 'ml-5' : 'ml-1'}`} />
-                </div>
-                <span className="text-sm text-gray-700 font-semibold">
-                  {editing.active ? 'Promoção ativa' : 'Promoção inativa'}
-                </span>
-              </label>
+              <div className="border border-gray-200 rounded-xl p-4 bg-gray-50">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <div
+                    onClick={() => setEditing(p => ({ ...p, active: !p.active }))}
+                    className={`w-10 h-6 rounded-full transition-colors flex-shrink-0 mt-0.5 ${editing.active ? 'bg-green-500' : 'bg-gray-300'}`}
+                  >
+                    <div className={`w-4 h-4 bg-white rounded-full mt-1 transition-all shadow ${editing.active ? 'ml-5' : 'ml-1'}`} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm text-gray-900 font-bold mb-1">
+                      {editing.active ? '✅ Promoção ATIVA (aparece no WhatsApp)' : '⚪ Promoção INATIVA (não aparece no WhatsApp)'}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {editing.active && editingSelected.size === 0 && (
+                        <span className="text-red-600 font-bold">⚠️ ATENÇÃO: Você ativou a promoção mas não selecionou produtos! Ela NÃO vai aparecer no WhatsApp!</span>
+                      )}
+                      {editing.active && editingSelected.size > 0 && (
+                        <span className="text-green-700">Ótimo! Esta promoção aparecerá no bot do WhatsApp com {editingSelected.size} produto(s).</span>
+                      )}
+                      {!editing.active && (
+                        <span>Ative quando quiser que apareça no WhatsApp.</span>
+                      )}
+                    </div>
+                  </div>
+                </label>
+              </div>
             </div>
 
             <div className="flex gap-2 pt-1">

@@ -175,6 +175,34 @@ export function StoreProvider({ children }) {
     try { localStorage.setItem(mktKey('cp_expiry_days'), String(n)) } catch {}
   }, [])
 
+  // ── Configurações Fiscais (OPCIONAL) ───────────────────────────
+  const [fiscalConfig, setFiscalConfigState] = useState(() => {
+    try {
+      const saved = migrateAndGet('cp_fiscal_config', mktKey)
+      return saved ? JSON.parse(saved) : {
+        mostrar_impostos_nota: false,  // Desligado por padrão
+        regime: 'simples',              // simples, presumido, real
+        estado: 'SP',                   // UF da loja
+        icms_padrao: 18,
+        pis_padrao: 0.65,
+        cofins_padrao: 3.0,
+      }
+    } catch {
+      return {
+        mostrar_impostos_nota: false,
+        regime: 'simples',
+        estado: 'SP',
+        icms_padrao: 18,
+        pis_padrao: 0.65,
+        cofins_padrao: 3.0,
+      }
+    }
+  })
+  const setFiscalConfig = useCallback((config) => {
+    setFiscalConfigState(config)
+    try { localStorage.setItem(mktKey('cp_fiscal_config'), JSON.stringify(config)) } catch {}
+  }, [])
+
   // ── Pending-persists counter (per key) ──────────────────────────
   // Tracks in-flight POSTs so that applyServerData never overwrites
   // local state while a write is still in transit (Bug-2 fix).
@@ -693,6 +721,7 @@ export function StoreProvider({ children }) {
       resetAll, clearBusinessData,
       syncNow, lastSync, syncing,
       expiryAlertDays, setExpiryAlertDays,
+      fiscalConfig, setFiscalConfig,
       supplierOffers,
     }}>
       {children}

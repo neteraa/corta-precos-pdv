@@ -22,10 +22,9 @@ function leadsStore() {
   return getStore({ name: 'wa-leads', consistency: 'strong' })
 }
 
-// ─── Corta Preços: catálogo de produtos e promos (cache 20 min) ───────────────
-// CRÍTICO: StoreId SEM timestamp pra consistência com login!
-const CORTA_PRECOS_STORE_ID = 'cortaprecos'
-const catalogCache = { data: null, ts: 0 }
+// ─── Catálogo de produtos e promos (cache 1 min POR MERCADO) ──────────────────
+// Cache isolado por storeId — cada mercado tem seu próprio cache!
+const catalogCache = {} // { storeId: { data, ts } }
 
 // ─── Mapeamento Instance Name (Evolution API) → StoreId (Sistema) ─────────────
 // IMPORTANTE: instanceName vem do webhook Evolution API (payload.instance)
@@ -45,22 +44,60 @@ function getStoreIdFromInstance(instanceName) {
   return INSTANCE_TO_STOREID[instanceName] || instanceName
 }
 
-async function loadStoreCatalog() {
-  const TTL = 20 * 60 * 1000
-  if (catalogCache.data && (Date.now() - catalogCache.ts) < TTL) return catalogCache.data
+// Helper: Tenta buscar dado em múltiplas chaves possíveis (storeId + fallbacks)
+async function tryGetFromMultipleKeys(store, baseKey, storeId) {
+  const keysToTry = [`${storeId}:${baseKey}`]
+  
+  // Se storeId tem underscore (ex: cortaprecos_1789770018182), tenta SEM timestamp também
+  if (storeId.includes('_')) {
+    const baseStoreId = storeId.split('_')[0]  // cortaprecos_1789770018182 → cortaprecos
+    keysToTry.push(`${baseStoreId}:${baseKey}`)
+  }
+  
+  // Fallbacks globais
+  keysToTry.push(`default:${baseKey}`)  // Fallback: default
+  keysToTry.push(baseKey)               // Fallback: sem prefixo (legado)
+  
+  for (const key of keysToTry) {
+    const raw = await store.get(key, { type: 'text' }).catch(() => null)
+    if (raw) {
+      console.log(`[${baseKey}] ✅ Found at: ${key}`)
+      return raw
+    }
+  }
+  
+  console.log(`[${baseKey}] ❌ NOT FOUND for storeId: ${storeId}`)
+  return null
+}
+
+async function loadStoreCatalog(storeId = 'cortaprecos') {
+  const TTL = 1 * 60 * 1000  // 1 MINUTO
+  
+  // Cache isolado por storeId!
+  if (!catalogCache[storeId]) catalogCache[storeId] = { data: null, ts: 0 }
+  const cache = catalogCache[storeId]
+  
+  if (cache.data && (Date.now() - cache.ts) < TTL) {
+    console.log(`[loadStoreCatalog] Cache HIT para storeId: ${storeId}`)
+    return cache.data
+  }
+  
   try {
     const store = getStore({ name: 'corta-precos', consistency: 'eventual' })
-    const [prodRaw, promoRaw] = await Promise.all([
-      store.get(`${CORTA_PRECOS_STORE_ID}:cp_products`, { type: 'text' }).catch(() => null),
-      store.get(`${CORTA_PRECOS_STORE_ID}:cp_promos`,   { type: 'text' }).catch(() => null),
-    ])
+    
+    const prodRaw = await tryGetFromMultipleKeys(store, 'cp_products', storeId)
+    const promoRaw = await tryGetFromMultipleKeys(store, 'cp_promos', storeId)
+    
     const products = prodRaw  ? JSON.parse(prodRaw)  : []
     const promos   = promoRaw ? JSON.parse(promoRaw) : []
-    catalogCache.data = { products, promos }
-    catalogCache.ts   = Date.now()
-    return catalogCache.data
+    
+    cache.data = { products, promos }
+    cache.ts   = Date.now()
+    
+    console.log(`[loadStoreCatalog] Carregado pra storeId ${storeId}: ${products.length} produtos, ${promos.length} promoções`)
+    return cache.data
   } catch (e) {
-    console.error('loadStoreCatalog:', e.message)
+    console.error(`[loadStoreCatalog] Erro storeId ${storeId}:`, e.message)
     return { products: [], promos: [] }
   }
 }
@@ -84,21 +121,33 @@ function buildCatalogText(products, promos) {
   // Lista só os nomes das categorias (para o bot sugerir)
   const categoryList = Object.keys(byCategory).map(cat => `📦 ${cat}`).join('\n')
 
+  // PROMOÇÕES: Usa o NOME CADASTRADO da promoção com QUANTIDADE!
   const promoLines = promos
     .filter(pr => pr.active)
-    .map(pr => `• ${pr.name}`)
+    .filter(pr => {
+      // Só mostra se tiver produtos vinculados
+      const linked = products.filter(p => p.promoGroup === pr.group && p.price > 0)
+      return linked.length > 0
+    })
+    .map(pr => {
+      const price = pr.totalPrice?.toFixed(2).replace('.', ',') || '0,00'
+      const qty = pr.qty || 2
+      const name = pr.name || 'unidades'
+      // Mostra: quantidade + nome + preço
+      return `🔥 ${qty} ${name}: R$${price}`
+    })
 
   return {
     catalogText: lines.join('\n') || 'Catálogo sendo atualizado.',
-    categoryList,  // NOVO: lista de categorias
+    categoryList,
     promoText: promoLines.join('\n') || 'Nenhuma promoção ativa no momento.',
   }
 }
 
-async function saveDeliveryOrder(order) {
+async function saveDeliveryOrder(order, storeId = 'cortaprecos') {
   try {
     const store = getStore({ name: 'corta-precos', consistency: 'strong' })
-    const key   = `${CORTA_PRECOS_STORE_ID}:cp_deliveries`
+    const key   = `${storeId}:cp_deliveries`
     const raw   = await store.get(key, { type: 'text' }).catch(() => null)
     const orders = raw ? JSON.parse(raw) : []
     
@@ -167,9 +216,32 @@ CATÁLOGO COMPLETO (use SOMENTE quando cliente pedir categoria específica):
 ${catalogText}
 
 ━━━━━━━━━━━━━━━━━━━━━━
-🔥 PROMOÇÕES DE HOJE
+🔥 PROMOÇÕES ATIVAS AGORA
 ━━━━━━━━━━━━━━━━━━━━━━
 ${promoText}
+
+💡 REGRAS SOBRE PROMOÇÕES:
+• Quando perguntarem sobre promoções → COPIE E COLE a lista completa acima (não resuma, não altere)
+• NUNCA invente promoções! Use SOMENTE as listadas acima
+• Se perguntarem sobre produto específico (ex: "danone tá na promoção?") → verifique na lista acima
+• Se o produto NÃO estiver na lista → responda "Não temos promoção de [produto] agora, mas temos ótimos preços!"
+• SEMPRE sugira delivery após falar de promoções: "Quer aproveitar? Me passa seu endereço! 🛵"
+• Se não tiver NENHUMA promoção ativa → "No momento não temos promoções, mas nossos preços são sempre os melhores!"
+
+🧮 CÁLCULO DE PROMOÇÕES (CRÍTICO!):
+Quando cliente pedir quantidade de produto que TÁ em promoção:
+
+EXEMPLO 1: Promoção "2 Dondon Garrafão: R$17"
+• Cliente pede 4 unidades → 4 ÷ 2 = 2 promoções × R$17 = R$34 ✅
+• Cliente pede 6 unidades → 6 ÷ 2 = 3 promoções × R$17 = R$51 ✅
+• Cliente pede 1 unidade → 1 ÷ 2 = 0,5 não dá, mínimo 2 unidades ❌
+
+EXEMPLO 2: Promoção "5 Wafer Danny: R$9,99"
+• Cliente pede 10 unidades → 10 ÷ 5 = 2 promoções × R$9,99 = R$19,98 ✅
+• Cliente pede 3 unidades → 3 ÷ 5 = 0,6 não dá, mínimo 5 unidades ❌
+
+FÓRMULA: (quantidade pedida) ÷ (qtd da promoção) × (preço da promoção) = TOTAL
+NUNCA multiplique direto! SEMPRE divida primeiro pela quantidade da promoção!
 
 ━━━━━━━━━━━━━━━━━━━━━━
 🛵 ENTREGA EM CASA
@@ -180,9 +252,15 @@ CHAVE PIX DELIVERY: CNPJ 60.662.362/0001-70 — Corta Preços
 
 FLUXO DE ENTREGA (siga SEMPRE nessa ordem exata):
 1. Cliente quer entrega → pergunta o endereço completo (rua, número, bairro)
-2. Confirma os produtos que ele quer e lista com preços
-3. Calcula: total dos produtos + R$7 entrega = TOTAL FINAL
-4. Manda exatamente esta mensagem de pagamento (substitua os valores):
+2. Cliente informa os produtos que quer
+3. IMPORTANTE: Liste o pedido e CONFIRME antes de fechar:
+   "Deixa eu confirmar seu pedido:
+   • 4 Dondon Garrafão (2 promoções): R$34,00
+   • Total: R$41,00 (R$34 + R$7 entrega)
+   
+   Tá certo? Se sim, te mando o PIX!"
+   
+4. SÓ APÓS CONFIRMAÇÃO do cliente ("sim", "ok", "tá certo"), manda a mensagem de pagamento:
    "✅ Pedido confirmado! Total: R$XX,XX (produtos + R$7 entrega)\n💳 Pague via PIX:\nCNPJ: 60.662.362/0001-70\nFavorecido: Corta Preços\nApós pagar, me manda o comprovante aqui 📸"
    E INCLUA (antes da mensagem ao cliente) a tag interna de rascunho:
    <zs_pending>{"address":"ENDEREÇO","items":"PRODUTOS COM QTD","total":VALOR_FLOAT_APENAS_PRODUTOS_SEM_ENTREGA}</zs_pending>
@@ -206,20 +284,37 @@ REGRAS DO COMPROVANTE:
 ━━━━━━━━━━━━━━━━━━━━━━
 🧠 COMO SE COMPORTAR
 ━━━━━━━━━━━━━━━━━━━━━━
-• Linguagem natural e informal — "oi!", "claro!", "perfeito!", "pode deixar!"
-• Respostas CURTAS — WhatsApp não é e-mail. Máximo 3-4 linhas
-• Emojis naturais (1-2 por mensagem)
-• Quando perguntar preço: responde direto com o valor
-• Quando perguntar promoção: informa com entusiasmo!
-• Se produto não existir no catálogo: "Esse não temos, mas temos [sugestão]"
-• Para entrega: segue o fluxo acima sem pular etapas
+• Linguagem SUPER natural e informal — "opa!", "beleza!", "show!", "bora!", "pode deixar!"
+• Varie as saudações: às vezes "E aí!", às vezes "Opa!", "Oi!", "Beleza?" etc
+• Respostas CURTAS — WhatsApp não é e-mail. Máximo 3-4 linhas (NUNCA textão!)
+• Emojis naturais (1-2 por mensagem, sem exagero)
+• Use gírias brasileiras: "tá", "pra", "né", "vamo", "bora"
+• SEJA PROATIVO: sempre sugira produtos relacionados quando fizer sentido
+• Quando perguntar preço: responde direto E sugere outros da mesma categoria
+• Quando perguntar promoção: informa com ENTUSIASMO e já oferece delivery!
+• Se produto não existir: "Esse não temos, mas olha só [2-3 sugestões similares]"
+• Para entrega: segue o fluxo acima SEM PULAR ETAPAS (especialmente confirmação!)
+• NUNCA seja repetitivo: varie as respostas, não fale sempre igual!
+• Se cliente perguntar algo que você não sabe: "Deixa eu verificar isso pra você! Um momento 😊" (não invente!)
+• CONFIRME valores antes de finalizar pedido — evita erro e reclamação!
+• Use quebras de linha pra deixar mensagem mais legível (não manda bloco único de texto)
+
+━━━━━━━━━━━━━━━━━━━━━━
+💬 DICAS EXTRAS
+━━━━━━━━━━━━━━━━━━━━━━
+• Se cliente disser só "2" ou "3" sem contexto → pergunte: "2 de qual produto?"
+• Se cliente pedir produto sem especificar sabor/tamanho e tiver variações → pergunte qual
+• Quando listar produtos, use bullet points (•) pra ficar mais legível
+• Se pedido tá ficando grande (3+ itens), resuma no final: "Então são: X, Y e Z. Tá certo?"
+• Cliente perguntou preço mas não quer comprar? Não insista! Apenas responda educadamente
 
 ━━━━━━━━━━━━━━━━━━━━━━
 🚫 NUNCA DIZER
 ━━━━━━━━━━━━━━━━━━━━━━
 • Custo, margem, fornecedores
 • Dados financeiros internos ou de gestão
-• Que você é uma IA ou robô — você é a Zara, atendente da loja`
+• Que você é uma IA ou robô — você é a Zara, atendente da loja
+• "Desculpe, não posso" — seja positivo! Ofereça alternativa`
 }
 
 /** Extrai <zs_delivery>{...}</zs_delivery> da resposta */
@@ -594,7 +689,7 @@ async function askLLM(userMessage, senderNum, systemMsg, instanceName = 'default
   // CRÍTICO: Busca histórico isolado por instanceName!
   const history = getHistory(senderNum, instanceName)
   const ac = new AbortController()
-  setTimeout(() => ac.abort(), 10000)
+  setTimeout(() => ac.abort(), 20000)  // 20s timeout (antes: 10s)
 
   const res = await fetch(endpoint, {
     method:  'POST',
@@ -602,7 +697,7 @@ async function askLLM(userMessage, senderNum, systemMsg, instanceName = 'default
     signal:  ac.signal,
     body:    JSON.stringify({
       model,
-      max_tokens:  180,
+      max_tokens:  300,  // Aumentado de 180 pra 300 (pedidos podem ser longos)
       temperature: 0.45,
       messages: [
         { role: 'system', content: systemMsg },
@@ -801,39 +896,155 @@ function findProduct(query, products) {
   return hit || null
 }
 
-function quickReply(text, senderName, promoText, products) {
+async function quickReply(text, senderName, promoText, products, storeId = 'cortaprecos') {
   const t   = normStr(text)
   const nom = senderName ? `, ${senderName.split(' ')[0]}` : ''
 
-  // Saudação pura
+  // Saudação pura - VARIAÇÕES NATURAIS
   if (/^(oi+|ola+|hello|hi+|e[- ]?ai+|ei+|hey|bom dia|boa tarde|boa noite|tudo bem|tudo bom|oi tudo|ola tudo|boas|salve)[\s!.,?]*$/.test(t)) {
-    return `Oi${nom}! 👋 Bem-vindo ao Corta Preços!\n\n🛒 Preços · 🔥 Promoções · 🛵 Delivery\n\nMe fala o que você precisa! 😊`
+    const saudacoes = [
+      `E aí${nom}! 😊 Bem-vindo ao Corta Preços!\n\n🔥 Promoções · 🛒 Produtos · 🛵 Entrega\n\nQue que você tá precisando?`,
+      `Opa${nom}! 👋 Chegou no Corta Preços!\n\nTemos várias promoções hoje! 🔥\n\nMe fala o que você precisa!`,
+      `Oi${nom}! 😊 Tudo certo?\n\n🛒 Preços · 🔥 Ofertas · 🛵 Delivery\n\nComo posso te ajudar?`,
+      `E aí${nom}! Beleza? 🤙\n\n🔥 Temos várias ofertas hoje!\n\nQue que você quer?`,
+      `Opa${nom}! 😊 Bem-vindo!\n\nTá precisando de alguma coisa? Produtos, promoções, entrega... é só falar! 🛒`
+    ]
+    return saudacoes[Math.floor(Math.random() * saudacoes.length)]
   }
 
-  // Promoções / ofertas
-  if (/^(promocoes?|ofertas?|promocao|o que.*promo|qual.*promo|tem.*promo|promo.*hoje|descontos?|novidade)[\s!?]*$/.test(t)) {
-    const p = promoText || 'Nenhuma promoção ativa agora.'
-    return `🔥 Promoções de hoje${nom}:\n${p}\n\nQuer fazer um pedido? 🛒`
+  // Promoção de produto específico: "tem promoção de danone?", "cerveja tá na promoção?"
+  const promoProductRx = /(promo|oferta|desconto).*(de|do|da|em)\s+([a-záàâãéêíóôõúç\s]+)|([a-záàâãéêíóôõúç\s]+).*(promo|oferta|desconto)/i
+  const promoProductMatch = t.match(promoProductRx)
+  if (promoProductMatch && t.length < 100) {
+    // Extrai nome do produto
+    const productQuery = (promoProductMatch[3] || promoProductMatch[1] || '').trim().replace(/[?!.]+$/, '')
+    
+    if (productQuery.length > 2) {
+      // Busca produto no catálogo
+      const foundProduct = findProduct(productQuery, products)
+      
+      if (foundProduct && foundProduct.promoGroup) {
+        // Produto existe e tem promoGroup! Busca a promoção
+        const lines = promoText.split('\n')
+        const promoLine = lines.find(line => 
+          normStr(line).includes(normStr(foundProduct.name)) ||
+          normStr(line).includes(normStr(productQuery))
+        )
+        
+        if (promoLine) {
+          const respostas = [
+            `Tem sim${nom}! 🔥\n\n${promoLine}\n\n🛵 Bora aproveitar? Me passa seu endereço!`,
+            `Opa${nom}! Tá em promoção sim!\n\n${promoLine}\n\n😊 Quer pedir?`,
+            `Sim${nom}! Olha só:\n\n${promoLine}\n\nShow né? 🔥 Quer aproveitar?`
+          ]
+          return respostas[Math.floor(Math.random() * respostas.length)]
+        }
+      } else if (foundProduct) {
+        // Produto existe mas NÃO tá em promoção
+        const preco = `R$${Number(foundProduct.price).toFixed(2).replace('.', ',')}`
+        const respostas = [
+          `Esse não tá em promoção agora${nom}, mas o preço é ${preco} 😊\n\nQuer ver o que tá em oferta? 🔥`,
+          `${foundProduct.name} não tá na promoção${nom}, mas custa ${preco}!\n\nTenho outras ofertas! Quer ver? 🔥`,
+          `Não tem promoção desse agora${nom}, mas tá ${preco}!\n\nQuer que eu te mostre as promoções? 🔥`
+        ]
+        return respostas[Math.floor(Math.random() * respostas.length)]
+      }
+    }
+  }
+  
+  // Promoções / ofertas - Mostra TOP 10 ativas COM PRODUTOS!
+  if (/promo|oferta|desconto|barato|novidade|queima|liquida/i.test(t) && t.length < 80) {
+    const store = getStore({ name: 'corta-precos', consistency: 'strong' })
+    
+    const promoRaw = await tryGetFromMultipleKeys(store, 'cp_promos', storeId)
+    const prodRaw = await tryGetFromMultipleKeys(store, 'cp_products', storeId)
+    
+    const allPromos = promoRaw ? JSON.parse(promoRaw) : []
+    const allProducts = prodRaw ? JSON.parse(prodRaw) : []
+    
+    // FILTRO: Só promoções ativas QUE TÊM produtos vinculados!
+    const activePromos = allPromos
+      .filter(pr => pr.active)
+      .filter(pr => {
+        const linked = allProducts.filter(p => p.promoGroup === pr.group && p.price > 0)
+        return linked.length > 0 // SÓ se tiver produtos!
+      })
+      .slice(0, 10)
+    
+    if (activePromos.length > 0) {
+      const lines = activePromos
+        .map(pr => {
+          const price = pr.totalPrice?.toFixed(2).replace('.', ',') || '0,00'
+          
+          // MOSTRA: quantidade + nome + preço
+          const qty = pr.qty || 2
+          const name = pr.name || 'unidades'
+          
+          return `🔥 ${qty} ${name}: R$${price}`
+        })
+        .join('\n')
+      
+      const intros = [
+        `Opa${nom}! Olha só as ofertas de hoje! 🔥`,
+        `E aí${nom}! Temos várias promoções rolando! 🔥`,
+        `Oi${nom}! Chegou na hora certa! Olha as ofertas! 🔥`,
+        `Show${nom}! Tá cheio de promoção hoje! 🔥`
+      ]
+      const outros = [
+        `\n\n🛵 Quer aproveitar? Me passa seu endereço!`,
+        `\n\nShow né? 🛵 Delivery só R$7! Me fala seu endereço!`,
+        `\n\n😊 Bora aproveitar? Entrega R$7 só!`,
+        `\n\n🔥 Delivery R$7! Quer pedir? Me manda seu endereço!`
+      ]
+      return intros[Math.floor(Math.random() * intros.length)] + `\n\n${lines}` + outros[Math.floor(Math.random() * outros.length)]
+    } else {
+      const respostas = [
+        `Opa${nom}! No momento não temos promoções, mas nossos preços são sempre os melhores! 😊\n\nQuer ver nossos produtos?`,
+        `Oi${nom}! Agora não temos ofertas rolando, mas temos preços ótimos! 😊\n\nTá precisando de alguma coisa?`,
+        `E aí${nom}! Sem promoções no momento, mas nossos preços são show! 💪\n\nQue que você precisa?`
+      ]
+      return respostas[Math.floor(Math.random() * respostas.length)]
+    }
   }
 
   // Horário
   if (/horario|que hora|abre|fecha|funcionamento|ta aberto|esta aberto|ficam aberto/.test(t) && t.length < 55) {
-    return `⏰ Horário Corta Preços${nom}:\n• Segunda a Sábado: 9h às 19h\n• Domingo: 9h às 13h\n\nTe espero aqui! 😊`
+    const respostas = [
+      `⏰ A gente funciona assim${nom}:\n• Seg a Sáb: 9h às 19h\n• Domingo: 9h às 13h\n\nBora fazer um pedido? 😊`,
+      `⏰ Horário${nom}:\n• Segunda a Sábado: 9h às 19h\n• Domingo: 9h às 13h\n\nTá precisando de alguma coisa? 🛒`,
+      `⏰ Abrimos${nom}:\nSeg-Sáb: 9h às 19h 🕘\nDomingo: 9h às 13h\n\nVem aqui ou pede delivery! 🛵`
+    ]
+    return respostas[Math.floor(Math.random() * respostas.length)]
   }
 
   // Pagamento / PIX
   if (/pagamento|aceita|pix|cartao|dinheiro|forma de pag|como pago|como pagar/.test(t) && t.length < 65) {
-    return `💳 Pagamentos${nom}:\nPIX ✅ | Dinheiro ✅ | Débito ✅ | Crédito ✅\n\nDelivery: somente PIX (CNPJ 60.662.362/0001-70) 🛵`
+    const respostas = [
+      `💳 Aceitamos tudo${nom}!\nPIX ✅ | Dinheiro ✅ | Débito ✅ | Crédito ✅\n\n🛵 Delivery: só PIX (CNPJ 60.662.362/0001-70)`,
+      `💳 Pode pagar do jeito que quiser${nom}:\nPIX, Dinheiro, Débito, Crédito - tá tudo ok! ✅\n\nDelivery aceita só PIX! 🛵`,
+      `💳 Pagamento${nom}?\nVale tudo: PIX, dinheiro, cartão! ✅\n\nPra delivery só PIX (CNPJ 60.662.362/0001-70) 🛵`
+    ]
+    return respostas[Math.floor(Math.random() * respostas.length)]
   }
 
   // Endereço / localização
   if (/endereco|localizacao|onde fica|onde voces ficam|como chegar|maps|googl/.test(t) && t.length < 60) {
-    return `📍 Corta Preços${nom}:\nRua Capão Bonito, 20 - Itapeva-SP\nWhatsApp: (15) 9979-6930\n\nQuer fazer um pedido por entrega? 🛵`
+    const respostas = [
+      `📍 A gente fica aqui${nom}:\nRua Capão Bonito, 20 - Itapeva-SP\n\n🛵 Ou prefere delivery? Me passa seu endereço!`,
+      `📍 Estamos na Rua Capão Bonito, 20${nom}!\nItapeva-SP · (15) 9979-6930\n\nQuer pedir entrega? 🛵`,
+      `📍 Corta Preços${nom}:\nRua Capão Bonito, 20 - Itapeva-SP\n\nVem aqui ou faz pedido! 🛵`
+    ]
+    return respostas[Math.floor(Math.random() * respostas.length)]
   }
 
   // Taxa de entrega
   if (/taxa|frete|entrega.*custa|custa.*entrega|quanto.*entrega|entrega.*quanto|delivery.*taxa/.test(t) && t.length < 60) {
-    return `🛵 Taxa de entrega${nom}: R$7,00 fixo!\nPagamento somente PIX.\n\nMe passa seu endereço pra começar o pedido 😊`
+    const respostas = [
+      `🛵 Entrega${nom}: R$7 fixo pra qualquer lugar!\nPagamento: só PIX\n\nBora? Me passa seu endereço! 😊`,
+      `🛵 Taxa de entrega${nom}: R$7,00!\nPaga por PIX na hora.\n\nQue que você quer pedir?`,
+      `🛵 Delivery${nom}: R$7 só!\nPIX pra gente: CNPJ 60.662.362/0001-70\n\nMe fala seu endereço! 😊`
+    ]
+    return respostas[Math.floor(Math.random() * respostas.length)]
   }
 
   // Busca de preço: "preço do arroz", "quanto custa leite", "tem feijão?", "valor da carne"
@@ -844,7 +1055,30 @@ function quickReply(text, senderName, promoText, products) {
     const found = findProduct(query, products)
     if (found) {
       const preco = `R$${Number(found.price).toFixed(2).replace('.', ',')}`
-      return `🏷️ ${found.name}: ${preco}${nom}\n\nQuer pedir? Me passa seu endereço! 🛵`
+      
+      // PROATIVIDADE: Sugerir produtos relacionados!
+      const category = found.category
+      const related = products
+        .filter(p => p.category === category && p.id !== found.id && p.price > 0)
+        .slice(0, 2)
+      
+      const respostas = [
+        `🏷️ ${found.name}: ${preco}${nom}\n\nBora pedir? Me manda seu endereço! 🛵`,
+        `${preco} o ${found.name}${nom}! 😊\n\nQuer? É só me passar seu endereço! 🛵`,
+        `Temos sim${nom}! ${found.name}: ${preco}\n\n🛵 Quer delivery?`
+      ]
+      
+      let resp = respostas[Math.floor(Math.random() * respostas.length)]
+      
+      // Adiciona sugestão de relacionados
+      if (related.length > 0) {
+        const sugestoes = related.map(p => 
+          `${p.name}: R$${Number(p.price).toFixed(2).replace('.', ',')}`
+        ).join('\n')
+        resp += `\n\n💡 Também temos:\n${sugestoes}`
+      }
+      
+      return resp
     }
     // Produto não encontrado no catálogo → deixa o LLM responder
     return null
@@ -858,7 +1092,30 @@ function quickReply(text, senderName, promoText, products) {
     const found = findProduct(query, products)
     if (found) {
       const preco = `R$${Number(found.price).toFixed(2).replace('.', ',')}`
-      return `Sim${nom}! Temos ${found.name} por ${preco} 🛒\nQuer pedir?`
+      
+      // Produtos relacionados
+      const related = products
+        .filter(p => p.category === found.category && p.id !== found.id && p.price > 0)
+        .slice(0, 2)
+      
+      const respostas = [
+        `Temos sim${nom}! 😊\n${found.name}: ${preco}\n\nQuer pedir?`,
+        `Opa${nom}! Temos!\n🏷️ ${found.name}: ${preco}\n\nBora?`,
+        `Tem sim${nom}! ${preco} 😊\n\n🛵 Quer delivery?`,
+        `Sim${nom}! ${found.name} - ${preco}\n\nVamo pedir? 🛵`
+      ]
+      
+      let resp = respostas[Math.floor(Math.random() * respostas.length)]
+      
+      // Sugestão proativa
+      if (related.length > 0) {
+        const sugestoes = related.map(p => 
+          `${p.name}: R$${Number(p.price).toFixed(2).replace('.', ',')}`
+        ).join('\n')
+        resp += `\n\n💡 Também temos:\n${sugestoes}`
+      }
+      
+      return resp
     }
     return null  // deixa LLM sugerir alternativa
   }
@@ -936,9 +1193,8 @@ export default async (req, context) => {
   console.log(`wa-bot [${instanceName}]: msg de ${senderNum} (${senderName}): ${text.slice(0, 80)}`)
 
   // ── Instâncias: Corta Preços store bot vs Zara sales bot ─────────────────
-  // CRÍTICO: Separação correta entre mercado (Corta Preços) e vendas (Zara)
   const CORTA_PRECOS_INSTANCES = ['cortaprecos', 'cortaprecos_1789770018182']
-  const ZARA_INSTANCES = ['zara', 'zatendeapi', 'zatendestok']  // VENDAS do sistema
+  const ZARA_INSTANCES = ['zara', 'zatendeapi', 'zatendestok']
   
   const isCortaPrecos = CORTA_PRECOS_INSTANCES.includes(instanceName?.toLowerCase())
                      || String(instanceName || '').toLowerCase().startsWith('cortaprecos_')
@@ -970,9 +1226,36 @@ export default async (req, context) => {
         }
       }
       
-      const { products, promos } = await loadStoreCatalog()
+      // MULTI-TENANT: Extrai storeId do instanceName
+      const storeId = getStoreIdFromInstance(instanceName)
+      
+      const { products, promos } = await loadStoreCatalog(storeId)
       const { catalogText, categoryList, promoText } = buildCatalogText(products, promos)
       systemMsg = buildCortaPrecosPrompt(catalogText, categoryList, promoText)
+
+      // 🔥 DETECÇÃO DE PRODUTO EM PROMOÇÃO: sugere automaticamente!
+      // Se cliente pedir produto que TÁ em promoção → bot oferece a promoção
+      const activePromos = promos.filter(pr => pr.active)
+      for (const promo of activePromos) {
+        const promoProducts = products.filter(p => p.promoGroup === promo.group && p.price > 0)
+        for (const product of promoProducts) {
+          const normProduct = normStr(product.name)
+          const normMsg = normStr(text)
+          // Se cliente mencionou o produto
+          if (normMsg.includes(normProduct) || normMsg.includes(normProduct.split(' ')[0])) {
+            // Monta a linha da promoção
+            const promoLine = promoText.split('\n').find(line => 
+              normStr(line).includes(normProduct)
+            )
+            if (promoLine) {
+              systemMsg += `\n\n🔥 ATENÇÃO! Cliente mencionou "${product.name}" que está em PROMOÇÃO!\n`
+              systemMsg += `Promoção ativa: ${promoLine}\n`
+              systemMsg += `IMPORTANTE: OFEREÇA esta promoção com entusiasmo! Ex: "Opa! Temos promoção: ${promoLine}. Quer aproveitar? 🔥"\n`
+              break // só sugere UMA promoção por vez
+            }
+          }
+        }
+      }
 
       // Personalização baseada no perfil do cliente
       if (senderName) {
@@ -1001,12 +1284,12 @@ export default async (req, context) => {
       }
 
       // Fast-path: responde saudações/promoções/horário/preços sem chamar LLM
-      const quick = quickReply(finalText, senderName, promoText, products)
+      const quick = await quickReply(finalText, senderName, promoText, products, storeId)
       if (quick) {
         pushHistory(senderNum, 'user', finalText, instanceName)
         pushHistory(senderNum, 'assistant', quick, instanceName)
         context.waitUntil(sendReply(senderNum, quick, instanceName))
-        console.log(`wa-bot [CortaPrecos]: fast-path para ${senderNum}: ${quick.slice(0, 60)}`)
+        console.log(`wa-bot [${storeId}]: fast-path para ${senderNum}: ${quick.slice(0, 60)}`)
         return new Response('OK', { status: 200 })
       }
 
@@ -1020,8 +1303,8 @@ export default async (req, context) => {
 
       let tagSaved = false
       if (delivery && delivery.address) {
-        context.waitUntil(saveDeliveryOrder({ ...delivery, waName: senderName || delivery.name || senderNum }))
-        console.log(`wa-bot [CortaPrecos]: delivery via tag para ${senderNum}:`, JSON.stringify(delivery))
+        context.waitUntil(saveDeliveryOrder({ ...delivery, waName: senderName || delivery.name || senderNum }, storeId))
+        console.log(`wa-bot [${storeId}]: delivery via tag para ${senderNum}:`, JSON.stringify(delivery))
         tagSaved = true
         // Limpa draft do blob — tag já salvou
         const bs = getStore({ name: 'corta-precos', consistency: 'strong' })
@@ -1032,8 +1315,8 @@ export default async (req, context) => {
       if (!tagSaved && finalText === '[comprovante enviado]') {
         const pending = await popPendingOrder(senderNum)
         if (pending) {
-          context.waitUntil(saveDeliveryOrder({ ...pending, waName: senderName }))
-          console.log(`wa-bot [CortaPrecos]: delivery via fallback blob para ${senderNum}:`, JSON.stringify(pending))
+          context.waitUntil(saveDeliveryOrder({ ...pending, waName: senderName }, storeId))
+          console.log(`wa-bot [${storeId}]: delivery via fallback blob para ${senderNum}:`, JSON.stringify(pending))
         }
       }
 
@@ -1122,7 +1405,7 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
       console.error('wa-bot: OpenAI sem crédito — enviando fallback')
       let fallback
       if (isCortaPrecos) {
-        // Fallback inteligente por palavras-chave quando OpenAI está sem crédito
+        // Fallback inteligente por palavras-chave quando LLM falha
         const t = text.toLowerCase()
         if (/promo|desconto|oferta|promoção/.test(t)) {
           fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 🔥 Passando pelas promoções agora temos os combos especiais!\nLiga pra gente no (15) 9979-6930 e a gente te conta tudo 😊`
@@ -1132,8 +1415,11 @@ Se tiver algum problema/dúvida: resolva com simpatia e, se necessário, diga qu
           fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 😊 Para consultar preços liga no (15) 9979-6930 ou passa aqui na loja — Corta Preços, Rua Capão Bonito 20, Itapeva-SP!`
         } else if (/hora|horário|abre|fecha|funcionamento/.test(t)) {
           fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! ⏰ Nosso horário:\n• Segunda a Sábado: 9h às 19h\n• Domingo: 9h às 13h\n\nTe espero aqui! 😊`
+        } else if (/quero|quer|pedir|comprar|levar|vou|preciso|eu queria/i.test(t)) {
+          // Cliente quer fazer pedido mas LLM falhou
+          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 😊\n\nPra agilizar seu pedido, liga direto: (15) 9979-6930 📱\n\nOu manda aqui: endereço completo + lista de produtos!\n\n🛵 Delivery R$7 (PIX: 60.662.362/0001-70)`
         } else {
-          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 👋 Tô com uma instabilidade técnica agora, mas já resolvo.\nPode ligar direto: (15) 9979-6930 📱 Estamos aqui!`
+          fallback = `Oi${senderName ? ', ' + senderName.split(' ')[0] : ''}! 😊\n\nMe manda sua pergunta de novo? Tive um problema aqui.\n\nOu liga: (15) 9979-6930 📱`
         }
       } else if (isZara) {
         fallback = `Oi${senderName ? ', ' + senderName : ''}! 👋 Tô aqui sim — só tive um probleminha técnico agora.\nVou chamar o Pedro pra te atender direitinho. Já te retorno! 😊`

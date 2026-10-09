@@ -118,6 +118,35 @@ export function buildReceipt(sale, settings = {}) {
   push(row('Pagamento', norm(sale.payment || '')))
   push(divider())
 
+  // ── Impostos (OPCIONAL - só se configurado!) ───────────────
+  if (sale.impostos && sale.impostos.mostrar) {
+    const imp = sale.impostos
+    push(CMD.BOLD_ON)
+    
+    if (imp.aproximado) {
+      // Simples Nacional - mostra valor aproximado
+      push(line(''))
+      push(line('TRIBUTOS APROXIMADOS:'))
+      push(row('Trib. aprox.', BRL(imp.total)))
+      push(CMD.BOLD_OFF)
+      push(line('Conforme Lei 12.741/2012'))
+      push(line('(Simples Nacional)'))
+    } else {
+      // Lucro Presumido/Real - mostra detalhado
+      push(line(''))
+      push(line('TRIBUTOS:'))
+      push(CMD.BOLD_OFF)
+      if (imp.icms > 0) push(row('ICMS', BRL(imp.icms)))
+      if (imp.pis > 0) push(row('PIS', BRL(imp.pis)))
+      if (imp.cofins > 0) push(row('COFINS', BRL(imp.cofins)))
+      push(CMD.BOLD_ON)
+      push(row('Total tributos', BRL(imp.total)))
+      push(CMD.BOLD_OFF)
+    }
+    
+    push(divider())
+  }
+
   // ── Footer ─────────────────────────────────────────────────
   push(CMD.ALIGN_CENTER)
   push(line('Obrigado pela preferencia!'))
