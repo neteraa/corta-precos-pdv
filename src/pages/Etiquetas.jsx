@@ -175,8 +175,8 @@ function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList, promos) {
 
   // FIX 3: auto-shrink font until name fits in nameLinesMax lines
   const maxNameW    = w - PAD * 2
-  const nameLinesMax = h <= 25 ? 1 : 2
-  let   nameFs      = fpt(h, h <= 25 ? 0.150 : 0.122)
+  const nameLinesMax = h <= 25 ? 1 : (h >= 200 ? 3 : 2)  // A4 permite 3 linhas
+  let   nameFs      = fpt(h, h <= 25 ? 0.150 : (h >= 200 ? 0.10 : 0.122))  // A4 fonte maior
 
   doc.setFont('helvetica', 'bold')
   for (let i = 0; i < 8; i++) {
@@ -190,7 +190,7 @@ function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList, promos) {
   if (nameLines.length > 0) {
     const lineHmm  = (nameFs / 2.8346) * 1.35          // line height in mm
     const nameBlockH = nameLines.length * lineHmm
-    const nameAreaTop = y + hs + 1.2
+    const nameAreaTop = y + hs + (h >= 200 ? 8 : 1.2)  // A4 mais espaço
     const priceBlockTop = y + h * (h <= 25 ? 0.54 : 0.60)  // price block starts here
     const nameCenter = nameAreaTop + (priceBlockTop - nameAreaTop - nameBlockH) / 2
     const nameY = Math.max(nameAreaTop + lineHmm * 0.82, nameCenter + lineHmm * 0.82)
@@ -205,22 +205,32 @@ function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList, promos) {
     if (promoSafe && promoSafe.trim()) {
       // A4 (h >= 200) = GIGANTE! Pequenas (h < 200) = pill normal
       if (h >= 200) {
-        // A4: PROMOÇÃO GIGANTE COM FUNDO
-        const promoH = h * 0.22  // 22% da altura
-        const promoY = y + h * 0.38  // posição central
+        // A4: PROMOÇÃO GIGANTE COM PREÇO UNITÁRIO
+        const promoH = h * 0.24  // altura da caixa
+        const promoY = y + h * 0.48  // mais pra baixo (depois do nome)
         
         // Fundo da promoção (retângulo grande)
         doc.setFillColor(sr, sg, sb)
         doc.roundedRect(x + PAD * 2, promoY, w - PAD * 4, promoH, 3, 3, 'F')
         
-        // Texto GIGANTE
-        doc.setFontSize(fpt(h, 0.12))  // 3x maior!
+        // Texto da promoção (grande)
+        doc.setFontSize(fpt(h, 0.11))
         doc.setFont('helvetica', 'bold')
         doc.setTextColor(str, stg, stb)
-        doc.text(promoSafe, x + w / 2, promoY + promoH / 2 + (fpt(h, 0.12) / 2.8346) * 0.35, { 
+        doc.text(promoSafe, x + w / 2, promoY + promoH * 0.35, { 
           align: 'center',
           maxWidth: w - PAD * 6
         })
+        
+        // Calcula e mostra preço unitário da promoção
+        const promo = activePromo
+        if (promo && promo.type === 'combo' && promo.qty > 0 && promo.totalPrice > 0) {
+          const unitPrice = promo.totalPrice / promo.qty
+          const unitText = `(R$ ${unitPrice.toFixed(2).replace('.', ',')} cada)`
+          doc.setFontSize(fpt(h, 0.055))
+          doc.setFont('helvetica', 'normal')
+          doc.text(unitText, x + w / 2, promoY + promoH * 0.70, { align: 'center' })
+        }
       } else {
         // Etiquetas pequenas: pill normal
         const pillY = y + h * 0.63
@@ -234,20 +244,28 @@ function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList, promos) {
   }
 
   // ── price layout: R$ [INT] ,DEC
-  const bigFs = fpt(h, 0.38)
-  const smFs  = fpt(h, 0.145)
+  const bigFs = fpt(h, h >= 200 && promoText ? 0.18 : 0.38)  // menor se A4 com promo
+  const smFs  = fpt(h, h >= 200 && promoText ? 0.08 : 0.145)
   const priceBaseline = y + h - h * 0.09
 
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('helvetica', h >= 200 && promoText ? 'normal' : 'bold')
   doc.setTextColor(pr, pg, pb)
 
   // Garante que int e dec são strings válidas
   const intStr = String(int || '0')
   const decStr = String(dec || ',00')
 
+  // A4 com promoção: mostra "De:" antes
+  if (h >= 200 && promoText) {
+    doc.setFontSize(smFs)
+    doc.setFont('helvetica', 'normal')
+    doc.text('De:', x + PAD, priceBaseline - (bigFs / 2.8346) * 0.22)
+    doc.setFont('helvetica', 'bold')
+  }
+
   doc.setFontSize(smFs)
-  const rsW = doc.getTextWidth('R$') + 0.8
-  doc.text('R$', x + PAD, priceBaseline - (bigFs / 2.8346) * 0.22)
+  const rsW = doc.getTextWidth(h >= 200 && promoText ? 'De: R$' : 'R$') + 0.8
+  doc.text('R$', x + PAD + (h >= 200 && promoText ? doc.getTextWidth('De: ') : 0), priceBaseline - (bigFs / 2.8346) * 0.22)
 
   doc.setFontSize(bigFs)
   const intX = x + PAD + rsW
@@ -342,12 +360,15 @@ function LabelPreview({ p, tmplId, sizeId, storeName, tmplList, promos }) {
         {/* Product name */}
         <div style={{
           fontWeight: 800,
-          fontSize: nameFs,
+          fontSize: sz.h >= 200 ? Math.max(10, H * 0.10) : nameFs,
           color: t.nameTxt,
-          lineHeight: 1.2,
+          lineHeight: 1.25,
           overflow: 'hidden',
-          maxHeight: '40%',
+          maxHeight: sz.h >= 200 ? '30%' : '40%',
           wordBreak: 'break-word',
+          display: '-webkit-box',
+          WebkitLineClamp: sz.h >= 200 ? 3 : 2,
+          WebkitBoxOrient: 'vertical',
         }}>
           {(p.name || '').toUpperCase()}
         </div>
@@ -355,11 +376,11 @@ function LabelPreview({ p, tmplId, sizeId, storeName, tmplList, promos }) {
         {/* Promo (GIGANTE EM A4!) */}
         {promoText && sz.h >= 45 && (
           sz.h >= 200 ? (
-            // A4: Promoção GIGANTE COM EXPLOSÃO
+            // A4: Promoção GIGANTE + Preço unitário
             <div style={{
               background: `linear-gradient(135deg, ${t.strip} 0%, ${t.strip}dd 100%)`,
               color: t.stripTxt,
-              fontSize: Math.max(14, H * 0.13),
+              fontSize: Math.max(12, H * 0.11),
               fontWeight: 900,
               padding: `${H * 0.09}px ${W * 0.05}px`,
               borderRadius: 12,
@@ -367,8 +388,10 @@ function LabelPreview({ p, tmplId, sizeId, storeName, tmplList, promos }) {
               width: '92%',
               alignSelf: 'center',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
+              gap: `${H * 0.015}px`,
               lineHeight: 1.15,
               wordBreak: 'break-word',
               hyphens: 'auto',
@@ -376,12 +399,26 @@ function LabelPreview({ p, tmplId, sizeId, storeName, tmplList, promos }) {
               border: `3px solid ${t.stripTxt}33`,
               letterSpacing: '0.02em',
               textShadow: '0 1px 2px rgba(0,0,0,0.2)',
-              position: 'relative',
-              overflow: 'visible',
             }}>
-              <span style={{ position: 'relative', zIndex: 1 }}>
+              <span style={{ fontSize: Math.max(12, H * 0.11) }}>
                 {promoText.toUpperCase()}
               </span>
+              {(() => {
+                const promo = activePromo
+                if (promo && promo.type === 'combo' && promo.qty > 0 && promo.totalPrice > 0) {
+                  const unitPrice = promo.totalPrice / promo.qty
+                  return (
+                    <span style={{ 
+                      fontSize: Math.max(7, H * 0.055),
+                      fontWeight: 400,
+                      opacity: 0.95
+                    }}>
+                      (R$ {unitPrice.toFixed(2).replace('.', ',')} cada)
+                    </span>
+                  )
+                }
+                return null
+              })()}
             </div>
           ) : (
             // Pequenas: pill normal
@@ -406,9 +443,36 @@ function LabelPreview({ p, tmplId, sizeId, storeName, tmplList, promos }) {
 
         {/* Price row */}
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1 }}>
-          <span style={{ fontSize: smPriceFs, fontWeight: 900, color: t.priceTxt, lineHeight: 1, marginBottom: smPriceFs * 0.22 }}>R$</span>
-          <span style={{ fontSize: priceFs, fontWeight: 900, color: t.priceTxt, lineHeight: 1 }}>{int}</span>
-          <span style={{ fontSize: smPriceFs, fontWeight: 900, color: t.priceTxt, lineHeight: 1, marginBottom: smPriceFs * 0.22 }}>{dec}</span>
+          {sz.h >= 200 && promoText && (
+            <span style={{ 
+              fontSize: Math.max(6, H * 0.08), 
+              fontWeight: 400, 
+              color: t.priceTxt, 
+              lineHeight: 1, 
+              marginBottom: (sz.h >= 200 && promoText ? Math.max(6, H * 0.18) : priceFs) / 3.7778 * 0.22,
+              marginRight: 2
+            }}>De:</span>
+          )}
+          <span style={{ 
+            fontSize: sz.h >= 200 && promoText ? Math.max(6, H * 0.08) : smPriceFs, 
+            fontWeight: sz.h >= 200 && promoText ? 700 : 900, 
+            color: t.priceTxt, 
+            lineHeight: 1, 
+            marginBottom: (sz.h >= 200 && promoText ? Math.max(6, H * 0.18) : smPriceFs) * 0.22 
+          }}>R$</span>
+          <span style={{ 
+            fontSize: sz.h >= 200 && promoText ? Math.max(6, H * 0.18) : priceFs, 
+            fontWeight: sz.h >= 200 && promoText ? 700 : 900, 
+            color: t.priceTxt, 
+            lineHeight: 1 
+          }}>{int}</span>
+          <span style={{ 
+            fontSize: sz.h >= 200 && promoText ? Math.max(6, H * 0.08) : smPriceFs, 
+            fontWeight: sz.h >= 200 && promoText ? 700 : 900, 
+            color: t.priceTxt, 
+            lineHeight: 1, 
+            marginBottom: (sz.h >= 200 && promoText ? Math.max(6, H * 0.18) : smPriceFs) * 0.22 
+          }}>{dec}</span>
           {!['UN', 'UND', ''].includes(unit) && (
             <span style={{ fontSize: Math.max(6, H * 0.09), color: t.nameTxt, opacity: 0.7, marginLeft: 2, marginBottom: 2 }}>/{unit}</span>
           )}
