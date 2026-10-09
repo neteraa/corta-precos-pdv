@@ -572,44 +572,51 @@ export default function Etiquetas() {
 
       {/* ── Promoções (ATALHO RÁPIDO) ── */}
       {promos.filter(p => p.active).length > 0 && (
-        <div className="card p-4 space-y-3 bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-200">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">⚡</span>
-            <label className="font-black text-orange-800 text-sm">ATALHO RÁPIDO: Adicionar Promoção Inteira</label>
-          </div>
-          <p className="text-xs text-orange-600">Clique numa promoção pra adicionar TODOS os produtos de uma vez!</p>
+        <div className="card p-4 space-y-3">
+          <label className="label flex items-center gap-2">
+            <span className="text-orange-500">⚡</span>
+            Adicionar promoção completa
+          </label>
+          <p className="text-xs text-gray-500 -mt-2">Escolha uma promoção pra adicionar todos os produtos de uma vez</p>
           
-          <div className="space-y-2">
-            {promos.filter(p => p.active).map(promo => {
-              // Conta quantos produtos tem nessa promoção (CAMPO CORRETO: promo.group!)
-              const promoProducts = products.filter(prod => 
-                prod.promoGroup && promo.group && prod.promoGroup === promo.group
-              )
-              
-              const promoLabel = formatPromoText(promo) || promo.name || 'Promoção'
-              
-              return (
-                <button
-                  key={promo.id}
-                  onClick={() => {
-                    promoProducts.forEach(p => addToBasket(p))
-                  }}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-orange-50 border-2 border-orange-200 hover:border-orange-400 rounded-xl transition-all text-left group"
-                >
-                  <div className="flex-1">
-                    <div className="text-sm font-black text-orange-800">{promoLabel}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{promo.name}</div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <div className="text-xs font-bold text-orange-600">{promoProducts.length} produtos</div>
-                      <div className="text-[10px] text-gray-400">clique pra adicionar</div>
-                    </div>
-                    <Plus className="w-5 h-5 text-orange-500 group-hover:scale-110 transition-transform" />
-                  </div>
-                </button>
-              )
-            })}
+          <div className="flex gap-2">
+            <select 
+              className="input flex-1"
+              value=""
+              onChange={(e) => {
+                if (!e.target.value) return
+                const promo = promos.find(p => p.id === e.target.value)
+                if (!promo) return
+                const promoProducts = products.filter(prod => 
+                  prod.promoGroup && promo.group && prod.promoGroup === promo.group
+                )
+                promoProducts.forEach(p => addToBasket(p))
+                e.target.value = '' // reset
+              }}
+            >
+              <option value="">Selecione uma promoção...</option>
+              {promos.filter(p => p.active).map(promo => {
+                const promoProducts = products.filter(prod => 
+                  prod.promoGroup && promo.group && prod.promoGroup === promo.group
+                )
+                
+                let label = formatPromoText(promo) || promo.name
+                
+                // Adiciona preço unitário se for combo
+                if (promo.type === 'combo' && promo.qty > 0 && promo.totalPrice > 0) {
+                  const unitPrice = promo.totalPrice / promo.qty
+                  label += ` (R$ ${unitPrice.toFixed(2).replace('.', ',')} cada)`
+                }
+                
+                label += ` • ${promoProducts.length} produtos`
+                
+                return (
+                  <option key={promo.id} value={promo.id}>
+                    {label}
+                  </option>
+                )
+              })}
+            </select>
           </div>
         </div>
       )}
