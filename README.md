@@ -35,13 +35,24 @@
 - ✅ Grupos de produtos
 - ✅ Sugestão automática no PDV
 
-### 📊 Sistema Fiscal (NOVO! 🎉)
+### 📊 Sistema Fiscal Completo (NOVO! 🎉)
 - ✅ **Configuração visual** (27 estados do Brasil)
 - ✅ **3 regimes tributários** (Simples Nacional, Lucro Presumido, Lucro Real)
 - ✅ **Campos fiscais por produto** (NCM, CFOP, CST, alíquotas)
 - ✅ **Cálculo automático** de impostos (ICMS, PIS, COFINS)
 - ✅ **Impressão na nota** (conforme Lei 12.741/2012)
 - ✅ **Multi-tenant** (isolado por loja)
+
+### 🧾 Emissão de NF-e/NFC-e (NOVO! 🔥)
+- ✅ **Emissão oficial** via Focus NFe + SEFAZ
+- ✅ **NFC-e** (Nota Fiscal Consumidor Eletrônica)
+- ✅ **XML assinado** digitalmente com certificado A1
+- ✅ **DANFE** (PDF) automático
+- ✅ **Chave de acesso** válida
+- ✅ **Consulta de status** em tempo real
+- ✅ **Histórico** de notas emitidas
+- ✅ **Ambientes** homologação e produção
+- ✅ **Cancelamento** em até 24h
 
 ### 🤖 Bot WhatsApp com IA
 - ✅ Atendimento automático humanizado
@@ -180,8 +191,11 @@ NETLIFY_AUTH_TOKEN=nfp_...
 
 ## 📖 Documentação
 
-- [FISCAL.md](./FISCAL.md) - Sistema fiscal completo
+- [README.md](./README.md) - Documentação geral (este arquivo)
+- [FISCAL.md](./FISCAL.md) - Sistema fiscal (impostos na nota)
+- [NFE.md](./NFE.md) - Emissão de NF-e/NFC-e oficial
 - [GITHUB_PUSH.md](./GITHUB_PUSH.md) - Instruções de push
+- [DEPLOY_SUMMARY.md](./DEPLOY_SUMMARY.md) - Resumo do deploy
 
 ---
 
@@ -248,6 +262,18 @@ Desenvolvido com ❤️ por **ZatendeStok**
 ---
 
 ## 🔄 Changelog
+
+### v3.0.0 - Emissão Oficial de NF-e (2024-09-26)
+- ✅ **EMISSÃO DE NF-e/NFC-e OFICIAL!**
+- ✅ Integração com Focus NFe + SEFAZ
+- ✅ XML assinado digitalmente
+- ✅ DANFE (PDF) automático
+- ✅ Configuração completa (CNPJ, IE, endereço)
+- ✅ Botão no Terminal pra emitir nota
+- ✅ Validação automática de dados
+- ✅ Consulta de status em tempo real
+- ✅ Histórico de notas emitidas
+- ✅ Ambientes homologação + produção
 
 ### v2.0.0 - Sistema Fiscal Empresarial (2024-09-26)
 - ✅ Sistema fiscal nacional completo

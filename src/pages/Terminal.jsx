@@ -17,6 +17,7 @@ import { useScanReceiver }  from '../hooks/useScanRelay.js'
 import PixQR from '../components/PixQR.jsx'
 import CameraScanner from '../components/CameraScanner.jsx'
 import { calcularImpostosVenda } from '../utils/fiscal.js'
+import { montarNFCe, emitirNFCe, consultarNFCe, validarConfigNFe } from '../utils/nfe.js'
 
 function calcPromoEngine(cart, products, promos) {
   const results = []
@@ -61,7 +62,7 @@ const PAY_ICON = { PIX: Smartphone, Débito: CreditCard, Crédito: CreditCard, D
 
 export default function Terminal() {
   const { products, registerSale, promos, sales, customers, addFiado, operators, syncNow,
-          cancelRequests, requestCancel, cancelSale, fiscalConfig } = useStore()
+          cancelRequests, requestCancel, cancelSale, fiscalConfig, nfeConfig, registrarNota } = useStore()
   const todaySales = useMemo(() => {
     const today = new Date().toDateString()
     return sales.filter(s => new Date(s.date).toDateString() === today).length
@@ -93,6 +94,11 @@ export default function Terminal() {
   const [received,   setReceived]   = useState('')
   const [showCamera, setShowCamera] = useState(false)
   const inputRef = useRef(null)
+
+  // ── NF-e emission ────────────────────────────────────────────
+  const [emitindoNFe, setEmitindoNFe] = useState(false)
+  const [nfeErro, setNfeErro] = useState(null)
+  const [nfeStatus, setNfeStatus] = useState(null)
 
   // ── Split payment ────────────────────────────────────────────
   const [splitMode, setSplitMode] = useState(false)
@@ -353,6 +359,68 @@ export default function Terminal() {
     if (!isFiado) setSelectedCustomerId(null)
     broadcast({ type: 'cart', cart: [], promoResults: [], subtotal: 0, total: 0 })
     printer.printReceipt(sale)
+  }
+
+  // ── Emissão de NF-e ──────────────────────────────────────────────
+  const emitirNota = async (venda) => {
+    // Valida configuração
+    const validacao = validarConfigNFe(nfeConfig)
+    if (!validacao.valido) {
+      setNfeErro(`Configuração incompleta: ${validacao.erros.join(', ')}`)
+      return
+    }
+
+    setEmitindoNFe(true)
+    setNfeErro(null)
+    setNfeStatus('Montando nota...')
+
+    try {
+      // Monta objeto NFC-e
+      setNfeStatus('Enviando para SEFAZ...')
+      const nfce = montarNFCe(venda, products, nfeConfig)
+      
+      // Emite via API Focus NFe
+      const resultado = await emitirNFCe(
+        nfce,
+        nfeConfig.token_nfe,
+        nfeConfig.ambiente === 'homologacao'
+      )
+
+      // Aguarda processamento
+      setNfeStatus('Aguardando autorização...')
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      
+      // Consulta status
+      const status = await consultarNFCe(
+        resultado.referencia,
+        nfeConfig.token_nfe,
+        nfeConfig.ambiente === 'homologacao'
+      )
+
+      // Salva no histórico
+      const nota = {
+        id: resultado.referencia,
+        vendaId: venda.id,
+        numero: status.numero,
+        chave: status.chave_nfe,
+        status: status.status,
+        data: new Date().toISOString(),
+        valor: venda.total,
+        ambiente: nfeConfig.ambiente,
+      }
+      registrarNota(nota)
+
+      setNfeStatus('✅ Nota autorizada!')
+      setEmitindoNFe(false)
+      
+      // Limpa após 3s
+      setTimeout(() => setNfeStatus(null), 3000)
+      
+    } catch (error) {
+      console.error('Erro ao emitir NF-e:', error)
+      setNfeErro(error.message || 'Erro ao emitir nota fiscal')
+      setEmitindoNFe(false)
+    }
   }
 
   // ── Número deste terminal (único por aba/janela via sessionStorage) ──
@@ -951,10 +1019,52 @@ export default function Terminal() {
             ) : (
               <div style={{ color: txt2, fontSize: 10, marginBottom: 14 }}>Acima de <strong style={{ color: acc }}>R$100</strong> ganha Cupom Premiado 🎟️</div>
             )}
-            <button onClick={() => { setLastSale(null); setPendingCancelId(null); setTimeout(() => inputRef.current?.focus(), 50) }}
+            <button onClick={() => { setLastSale(null); setPendingCancelId(null); setNfeErro(null); setNfeStatus(null); setTimeout(() => inputRef.current?.focus(), 50) }}
               style={{ width: '100%', padding: '13px', borderRadius: 9, background: acc, border: 'none', color: '#000', fontWeight: 900, fontSize: 15, cursor: 'pointer', letterSpacing: 1, marginBottom: 8 }}>
               PRÓXIMO CLIENTE →
             </button>
+
+            {/* ── Emitir NF-e (se habilitado) ── */}
+            {nfeConfig.habilitado && validarConfigNFe(nfeConfig).valido && !nfeStatus && (
+              <button
+                onClick={() => emitirNota(lastSale)}
+                disabled={emitindoNFe}
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  borderRadius: 8, 
+                  background: emitindoNFe ? bg3 : '#16a34a', 
+                  border: 'none', 
+                  color: emitindoNFe ? txt2 : '#fff', 
+                  fontSize: 12, 
+                  fontWeight: 700, 
+                  cursor: emitindoNFe ? 'wait' : 'pointer', 
+                  letterSpacing: 0.5,
+                  marginBottom: 8,
+                  opacity: emitindoNFe ? 0.6 : 1
+                }}>
+                {emitindoNFe ? '⏳ Emitindo...' : '📄 Emitir NF-e'}
+              </button>
+            )}
+
+            {/* Status da emissão */}
+            {nfeStatus && (
+              <div style={{ padding: '8px 12px', borderRadius: 8, background: '#16a34a18', border: '1px solid #16a34a', marginBottom: 8 }}>
+                <div style={{ fontSize: 11, color: '#4ade80', fontWeight: 700 }}>{nfeStatus}</div>
+              </div>
+            )}
+
+            {/* Erro na emissão */}
+            {nfeErro && (
+              <div style={{ padding: '8px 12px', borderRadius: 8, background: '#dc262618', border: '1px solid #dc2626', marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }}>❌ {nfeErro}</div>
+                <button 
+                  onClick={() => setNfeErro(null)}
+                  style={{ marginTop: 4, fontSize: 9, color: txt2, background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                  Fechar
+                </button>
+              </div>
+            )}
 
             {/* ── Cancel request ── */}
             {!pendingCancelId ? (

@@ -203,6 +203,64 @@ export function StoreProvider({ children }) {
     try { localStorage.setItem(mktKey('cp_fiscal_config'), JSON.stringify(config)) } catch {}
   }, [])
 
+  // ── Configurações NF-e (OPCIONAL - para emissão de nota fiscal eletrônica) ───
+  const [nfeConfig, setNfeConfigState] = useState(() => {
+    try {
+      const saved = migrateAndGet('cp_nfe_config', mktKey)
+      return saved ? JSON.parse(saved) : {
+        habilitado: false,           // Liga/desliga emissão de NF-e
+        token_nfe: '',                // Token da API Focus NFe
+        ambiente: 'homologacao',      // homologacao ou producao
+        cnpj: '',
+        razao_social: '',
+        nome_fantasia: '',
+        ie: '',                       // Inscrição Estadual
+        regime: 'simples',            // simples, presumido, real
+        logradouro: '',
+        numero: '',
+        complemento: '',
+        bairro: '',
+        municipio: '',
+        uf: 'SP',
+        cep: '',
+        telefone: '',
+        email: '',
+        mensagem_nota: 'Obrigado pela preferencia!',
+      }
+    } catch {
+      return {
+        habilitado: false,
+        token_nfe: '',
+        ambiente: 'homologacao',
+        cnpj: '', razao_social: '', nome_fantasia: '', ie: '', regime: 'simples',
+        logradouro: '', numero: '', complemento: '', bairro: '', municipio: '',
+        uf: 'SP', cep: '', telefone: '', email: '',
+        mensagem_nota: 'Obrigado pela preferencia!',
+      }
+    }
+  })
+  const setNfeConfig = useCallback((config) => {
+    setNfeConfigState(config)
+    try { localStorage.setItem(mktKey('cp_nfe_config'), JSON.stringify(config)) } catch {}
+  }, [])
+
+  // ── Histórico de NF-e emitidas ──────────────────────────────────────
+  const [notasFiscais, setNotasFiscaisState] = useState(() => {
+    try {
+      const saved = migrateAndGet('cp_notas_fiscais', mktKey)
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+  const registrarNota = useCallback((nota) => {
+    setNotasFiscaisState(prev => {
+      const next = [nota, ...prev]
+      try { localStorage.setItem(mktKey('cp_notas_fiscais'), JSON.stringify(next)) } catch {}
+      return next
+    })
+  }, [])
+
   // ── Pending-persists counter (per key) ──────────────────────────
   // Tracks in-flight POSTs so that applyServerData never overwrites
   // local state while a write is still in transit (Bug-2 fix).
@@ -722,6 +780,8 @@ export function StoreProvider({ children }) {
       syncNow, lastSync, syncing,
       expiryAlertDays, setExpiryAlertDays,
       fiscalConfig, setFiscalConfig,
+      nfeConfig, setNfeConfig,
+      notasFiscais, registrarNota,
       supplierOffers,
     }}>
       {children}

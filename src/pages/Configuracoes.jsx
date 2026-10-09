@@ -5,6 +5,7 @@ import { parseGdoorCsv } from '../utils/importCsv.js'
 import { usePrinter, getNicheMeta } from '../hooks/usePrinter.js'
 import PixQR from '../components/PixQR.jsx'
 import ConfiguracaoFiscal from '../components/ConfiguracaoFiscal.jsx'
+import ConfiguracaoNFe from '../components/ConfiguracaoNFe.jsx'
 import { getCredentials, saveCredentials, getConfiguredStoreId, saveStoreId, slugify } from '../utils/auth.js'
 import { getMktStoreToken, mktKey } from '../utils/tenantStorage.js'
 
@@ -940,6 +941,9 @@ export default function Configuracoes() {
 
       {/* ── Configurações Fiscais ──────────────────────────────── */}
       <ConfiguracaoFiscal />
+
+      {/* ── Emissão de NF-e ────────────────────────────────────── */}
+      <ConfiguracaoNFe />
 
       {/* ── Chave PIX ──────────────────────────────────────────── */}
       <Section icon={QrCode} title="PIX — QR Code Automático">
