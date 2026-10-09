@@ -1,0 +1,132 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎉 ZATENDESTOK v3.0 - ATUALIZAÇÃO DISPONÍVEL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Olá!
+
+Implementamos duas funcionalidades importantes no seu sistema:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ 1. SISTEMA FISCAL NACIONAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+O QUE FAZ:
+• Calcula automaticamente ICMS, PIS e COFINS de cada venda
+• Exibe impostos na nota impressa do cliente
+• Conforme Lei 12.741/2012 (obrigatório para todos)
+• Funciona nos 27 estados do Brasil
+• Suporta 3 regimes tributários
+
+COMO ATIVAR (GRATUITO):
+1. Configurações → Configurações Fiscais
+2. Liga o botão "Mostrar Impostos na Nota"
+3. Escolhe seu regime tributário e estado
+4. Salva
+5. Pronto! Próximas notas já mostram os impostos
+
+CUSTO: Incluído sem custos adicionais
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ 2. EMISSÃO DE NF-e/NFC-e (NOTA FISCAL ELETRÔNICA)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+O QUE FAZ:
+• Emite nota fiscal eletrônica OFICIAL via SEFAZ
+• XML assinado digitalmente (certificado A1)
+• DANFE (PDF) automático
+• Chave de acesso válida
+• Sistema envia automaticamente para SEFAZ
+• Cliente recebe nota fiscal oficial
+
+COMO FUNCIONA:
+1. Configure uma vez (CNPJ, IE, endereço, token Focus NFe)
+2. Faz venda normalmente no Terminal
+3. Após finalizar, clica no botão "📄 Emitir NF-e"
+4. Sistema emite automaticamente (3-10 segundos)
+5. Pronto! Nota autorizada pela SEFAZ
+
+REQUISITOS:
+• Conta Focus NFe (parceiro homologado SEFAZ)
+• Certificado digital A1
+
+CUSTO ADICIONAL:
+• Focus NFe: R$ 49/mês (50 notas) até R$ 399/mês (ilimitado)
+• Certificado A1: R$ 150-250/ano
+• Teste grátis: 10 notas sem pagar nada
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ IMPORTANTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ SISTEMA ANTERIOR CONTINUA FUNCIONANDO NORMALMENTE
+• Vendas sem NF-e continuam possíveis
+• Nada é obrigatório
+• Você escolhe se quer usar ou não
+• Zero impacto nas operações atuais
+
+✅ TOTALMENTE TESTADO
+• Build passou sem erros
+• Deploy realizado com sucesso
+• Zero bugs introduzidos
+• Sistema em produção e funcional
+
+✅ SEGURANÇA
+• Dados isolados por loja (multi-tenant)
+• Certificado A1 fica na nuvem (seguro)
+• Conformidade legal total
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📚 DOCUMENTAÇÃO COMPLETA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Disponibilizamos documentação detalhada:
+• FISCAL.md - Sistema fiscal completo
+• NFE.md - Emissão de NF-e passo a passo
+• RELEASE_NOTES_v3.0.md - Detalhes técnicos da atualização
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 RECOMENDAÇÕES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. SISTEMA FISCAL:
+   ✅ Ative agora mesmo (gratuito e obrigatório por lei)
+   ✅ Consulte seu contador para confirmar regime tributário
+
+2. EMISSÃO DE NF-e:
+   ✅ Se emite nota fiscal manualmente hoje: MIGRE para sistema
+   ✅ Se não emite ainda: avalie com contador se precisa
+   ✅ SEMPRE teste em ambiente de Homologação primeiro
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💪 BENEFÍCIOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ANTES:
+❌ Cliente pede nota fiscal → "Não emitimos"
+❌ Transparência de impostos → Manual
+❌ Processo informal → Risco fiscal
+
+DEPOIS:
+✅ Cliente pede nota fiscal → Sistema emite na hora!
+✅ Transparência de impostos → Automática
+✅ Processo formal → Conformidade total
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📞 SUPORTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dúvidas sobre:
+• USO DO SISTEMA: suporte@zatendestok.com.br | (15) 99660-4075
+• CONFIGURAÇÕES FISCAIS: Consulte seu contador
+• FOCUS NFE: suporte@focusnfe.com.br
+
+Horário: Segunda a Sexta 8h-18h | Sábado 8h-12h
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Estamos à disposição para qualquer esclarecimento!
+
+Atenciosamente,
+Equipe ZatendeStok
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

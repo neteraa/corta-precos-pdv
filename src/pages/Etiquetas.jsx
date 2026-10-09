@@ -9,6 +9,8 @@ const SIZES = [
   { id: '60x40',  label: '60 × 40 mm',           w: 60,  h: 40 },
   { id: '80x50',  label: '80 × 50 mm',           w: 80,  h: 50 },
   { id: '100x60', label: '100 × 60 mm (gôndola)', w: 100, h: 60 },
+  { id: 'a4v',    label: 'A4 Vertical (210 × 297 mm)',   w: 210, h: 297 },
+  { id: 'a4h',    label: 'A4 Horizontal (297 × 210 mm)', w: 297, h: 210 },
 ]
 
 /* ── Templates ──────────────────────────────────────────── */
@@ -54,6 +56,50 @@ const splitPrice = (price) => {
   return { int: a, dec: ',' + b }
 }
 
+/* ── Encontra promoção ativa de um produto ─────────────── */
+const findPromo = (product, promos) => {
+  if (!product || !promos) return null
+  
+  // Procura por grupo
+  if (product.promoGroup) {
+    const p = promos.find(promo => 
+      promo.active && 
+      promo.groupName === product.promoGroup
+    )
+    if (p) return p
+  }
+  
+  // Procura por SKU
+  const p = promos.find(promo => 
+    promo.active && 
+    promo.skus?.includes(product.sku)
+  )
+  return p || null
+}
+
+/* ── Formata texto da promoção pra etiqueta ───────────── */
+const formatPromoText = (promo) => {
+  if (!promo) return null
+  
+  if (promo.type === 'mix') {
+    // "2 por R$10" ou "Leve 3 Pague 2"
+    if (promo.mixPayUnits && promo.mixPayUnits < promo.mixUnits) {
+      return `LEVE ${promo.mixUnits} PAGUE ${promo.mixPayUnits}`
+    }
+    return `${promo.mixUnits} POR R$ ${promo.mixPrice.toFixed(2).replace('.', ',')}`
+  }
+  
+  if (promo.type === 'percent') {
+    return `${promo.percent}% OFF`
+  }
+  
+  if (promo.type === 'fixed') {
+    return `R$ ${promo.discount.toFixed(2).replace('.', ',')} OFF`
+  }
+  
+  return promo.label || 'PROMOÇÃO'
+}
+
 /* ── font size: mm height → pt ──────────────────────────── */
 const fpt = (hMm, pct) => Math.max(4.5, hMm * 2.8346 * pct)
 
@@ -75,10 +121,14 @@ const hex2rgb = hex => [
    PDF DRAWING — all coords in mm (jsPDF unit:'mm')
    setFontSize() always takes pt regardless of unit
 ══════════════════════════════════════════════════════════ */
-function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList) {
+function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList, promos) {
   const t = (tmplList || TMPL).find(t => t.id === tmplId) || (tmplList || TMPL)[0]
   const STORE = storeName || 'MEU MERCADO'
   const { int, dec } = splitPrice(p.price)
+  
+  // Busca promoção ativa do produto
+  const activePromo = findPromo(p, promos)
+  const promoText = activePromo ? formatPromoText(activePromo) : (p.promo || null)
 
   // FIX 1: strip accents — jsPDF built-in helvetica is ASCII-only
   const name = pdfSafe(p.name)
@@ -137,14 +187,14 @@ function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList) {
   doc.text(nameLines, x + PAD, nameY, { lineHeightFactor: 1.35 })
 
   // ── promo pill
-  if (p.promo && h >= 45) {
-    const promoText = pdfSafe(p.promo)
+  if (promoText && h >= 45) {
+    const promoSafe = pdfSafe(promoText)
     const pillY = y + h * 0.63
     doc.setFillColor(sr, sg, sb)
     doc.roundedRect(x + PAD, pillY - 2.5, w - PAD * 2, 5, 1, 1, 'F')
     doc.setFontSize(fpt(h, 0.08))
     doc.setTextColor(str, stg, stb)
-    doc.text(promoText, x + w / 2, pillY + 0.8, { align: 'center' })
+    doc.text(promoSafe, x + w / 2, pillY + 0.8, { align: 'center' })
   }
 
   // ── price layout: R$ [INT] ,DEC
@@ -186,10 +236,14 @@ function pdfLabel(doc, p, x, y, w, h, tmplId, storeName, tmplList) {
 /* ══════════════════════════════════════════════════════════
    BROWSER LIVE PREVIEW — CSS mirror of the PDF template
 ══════════════════════════════════════════════════════════ */
-function LabelPreview({ p, tmplId, sizeId, storeName, tmplList }) {
+function LabelPreview({ p, tmplId, sizeId, storeName, tmplList, promos }) {
   const sz = SIZES.find(s => s.id === sizeId) || SIZES[0]
   const t  = (tmplList || TMPL).find(t => t.id === tmplId) || (tmplList || TMPL)[0]
   const STORE = storeName || 'MEU MERCADO'
+
+  // Busca promoção ativa
+  const activePromo = findPromo(p, promos)
+  const promoText = activePromo ? formatPromoText(activePromo) : (p.promo || null)
 
   // Scale to fit ~220px wide, keep aspect ratio
   const PREVIEW_W = 220
@@ -256,7 +310,7 @@ function LabelPreview({ p, tmplId, sizeId, storeName, tmplList }) {
         </div>
 
         {/* Promo pill */}
-        {p.promo && sz.h >= 45 && (
+        {promoText && sz.h >= 45 && (
           <div style={{
             background: t.strip,
             color: t.stripTxt,
@@ -271,7 +325,7 @@ function LabelPreview({ p, tmplId, sizeId, storeName, tmplList }) {
             whiteSpace: 'nowrap',
             textOverflow: 'ellipsis',
           }}>
-            {p.promo.toUpperCase()}
+            {promoText.toUpperCase()}
           </div>
         )}
 
@@ -344,7 +398,7 @@ function TmplChip({ t, selected, onClick, storeName, themeColor }) {
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
 export default function Etiquetas() {
-  const { products } = useStore()
+  const { products, promos } = useStore()
   const { settings } = usePrinter()
   const storeName  = settings.storeName  || 'MEU MERCADO'
   const themeColor = settings.themeColor || '#f97316'
@@ -427,9 +481,9 @@ export default function Etiquetas() {
         if (y + hMm > pageH - mY) {
           doc.addPage()
           col = 0; row = 0
-          pdfLabel(doc, p, mX, mY, wMm, hMm, tmplId, storeName, tmplList)
+          pdfLabel(doc, p, mX, mY, wMm, hMm, tmplId, storeName, tmplList, promos)
         } else {
-          pdfLabel(doc, p, x, y, wMm, hMm, tmplId, storeName, tmplList)
+          pdfLabel(doc, p, x, y, wMm, hMm, tmplId, storeName, tmplList, promos)
         }
 
         col++
@@ -588,7 +642,7 @@ export default function Etiquetas() {
                 {basket.flatMap(({ product: p, copies }) =>
                   Array.from({ length: Math.min(copies, 3) }, (_, i) => (
                     <LabelPreview key={`${p.id}-${i}`} p={p} tmplId={tmplId} sizeId={sizeId}
-                      storeName={storeName} tmplList={tmplList} />
+                      storeName={storeName} tmplList={tmplList} promos={promos} />
                   ))
                 )}
                 {totalLabels > basket.length * 3 && (
